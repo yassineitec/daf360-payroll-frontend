@@ -1,0 +1,9 @@
+<daf-side-nav
+  [items]="navItems()"
+  [config]="sideNavConfig"
+  [activeRoute]="activeRoute()"
+  (itemClick)="onNavClick($event)" />
+
+<main class="shell-content">
+  <router-outlet />
+</main>

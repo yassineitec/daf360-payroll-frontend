@@ -1,0 +1,103 @@
+<div class="page-header">
+  <h1 class="page-title">Simulation cohorte</h1>
+  <p class="page-subtitle">Simulez un groupe d'employés et obtenez le budget total</p>
+</div>
+
+<div class="cohort-layout">
+  <section class="card" [formGroup]="form">
+    <h2 class="card-title">Paramètres de la cohorte</h2>
+
+    <div class="field-row">
+      <div class="field-group">
+        <label class="field-label">Pays</label>
+        <app-pays-select formControlName="paysId"></app-pays-select>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Exercice fiscal</label>
+        <input type="number" class="field-input" formControlName="fiscalYear" />
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Nom de la cohorte (optionnel)</label>
+      <input type="text" class="field-input" formControlName="cohortName" placeholder="Ex : Budget Q1 2025 TN" />
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Employés (une ligne par employé : net,typeContrat)</label>
+      <textarea class="field-textarea" formControlName="csvText" rows="8"
+                placeholder="2500,CDI&#10;1800,CDD&#10;1200,STAGE"></textarea>
+      <span class="field-hint">Format : net_souhaité,type_contrat — ex : 2500,CDI</span>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-primary" (click)="submit()" [disabled]="form.invalid || loading()">
+        @if (loading()) { Simulation en cours… } @else { Lancer la simulation }
+      </button>
+    </div>
+
+    @if (error()) {
+      <div class="alert alert-error">{{ error() }}</div>
+    }
+  </section>
+
+  @if (results().length) {
+    <section class="card">
+      <h2 class="card-title">Résultats — {{ results().length }} employés</h2>
+
+      <div class="summary-row">
+        <div class="summary-item">
+          <span class="summary-label">Coût chargé total</span>
+          <span class="summary-value">{{ totalLoadedCost | number:'1.0-0' }}
+            @if (results()[0]?.localCurrency) {
+              <span class="devise">{{ results()[0].localCurrency }}</span>
+            }
+          </span>
+        </div>
+        @if (totalLoadedCostEur !== null) {
+          <div class="summary-item">
+            <span class="summary-label">Total EUR</span>
+            <span class="summary-value">{{ totalLoadedCostEur | number:'1.0-0' }} <span class="devise">EUR</span></span>
+          </div>
+        }
+        @if (totalLoadedCostUsd !== null) {
+          <div class="summary-item">
+            <span class="summary-label">Total USD</span>
+            <span class="summary-value">{{ totalLoadedCostUsd | number:'1.0-0' }} <span class="devise">USD</span></span>
+          </div>
+        }
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Net saisi</th>
+              <th>Brut</th>
+              <th>Coût chargé</th>
+              <th>EUR</th>
+              <th>USD</th>
+              <th>IRPP</th>
+              <th>Convergence</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of results(); track r.id; let i = $index) {
+              <tr [class.row-warn]="!r.convergenceOk">
+                <td>{{ i + 1 }}</td>
+                <td>{{ r.inputNet | number:'1.0-0' }}</td>
+                <td>{{ r.gross | number:'1.0-0' }}</td>
+                <td>{{ r.loadedCost | number:'1.0-0' }}</td>
+                <td>{{ r.loadedCostEur != null ? (r.loadedCostEur | number:'1.0-0') : '—' }}</td>
+                <td>{{ r.loadedCostUsd != null ? (r.loadedCostUsd | number:'1.0-0') : '—' }}</td>
+                <td>{{ r.irppAmount | number:'1.0-0' }}</td>
+                <td>{{ r.convergenceOk ? '✓' : '⚠️ ' + r.iterationsUsed + ' iter.' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+</div>

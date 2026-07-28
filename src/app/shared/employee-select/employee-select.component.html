@@ -1,0 +1,47 @@
+<div class="esc" [class.esc--open]="open()" [class.esc--selected]="selected() !== null">
+  <div class="esc__control">
+    <input
+      class="esc__input"
+      type="text"
+      autocomplete="off"
+      spellcheck="false"
+      [value]="displayText()"
+      [placeholder]="selected() ? '' : 'Rechercher un employé…'"
+      [disabled]="isDisabled()"
+      (focus)="onFocus()"
+      (input)="onInput($event)"
+      (blur)="onBlur()"
+    />
+    @if (selected() && !isDisabled()) {
+      <button class="esc__clear" type="button" tabindex="-1" (mousedown)="clear($event)">✕</button>
+    }
+    @if (loading()) {
+      <span class="esc__spinner" aria-hidden="true"></span>
+    } @else {
+      <span class="esc__caret" aria-hidden="true">▾</span>
+    }
+  </div>
+
+  @if (open()) {
+    <div class="esc__dropdown" role="listbox">
+      @if (loading()) {
+        <div class="esc__empty">Chargement…</div>
+      } @else if (employees().length === 0) {
+        <div class="esc__empty">Aucun employé trouvé</div>
+      }
+      @for (e of employees(); track e.userId) {
+        <div
+          class="esc__option"
+          [class.esc__option--active]="e.userId === selected()?.userId"
+          role="option"
+          (mousedown)="pick(e)"
+        >
+          <span class="esc__option-name">{{ e.fullName }}</span>
+          @if (e.employeeId) {
+            <span class="esc__option-badge">{{ e.employeeId }}</span>
+          }
+        </div>
+      }
+    </div>
+  }
+</div>

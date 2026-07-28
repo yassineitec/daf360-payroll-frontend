@@ -1,0 +1,105 @@
+<div class="page-header">
+  <h1 class="page-title">Administration Paie</h1>
+  <p class="page-subtitle">Création d'un nouveau jeu de paramètres (workflow 4-eyes)</p>
+</div>
+
+<div class="admin-layout">
+  <section class="card" [formGroup]="form">
+    <h2 class="card-title">Nouveau jeu de paramètres</h2>
+
+    <div class="field-row">
+      <div class="field-group">
+        <label class="field-label">Pays</label>
+        <app-pays-select formControlName="paysId"></app-pays-select>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Exercice fiscal</label>
+        <input type="number" class="field-input" formControlName="fiscalYear" />
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field-group">
+        <label class="field-label">Tolérance convergence</label>
+        <input type="number" step="0.001" class="field-input" formControlName="convergenceTolerance" />
+      </div>
+      <div class="field-group">
+        <label class="field-label">Max itérations</label>
+        <input type="number" class="field-input" formControlName="maxConvergenceIterations" />
+      </div>
+      <div class="field-group">
+        <label class="field-label">Seuil calibration (%)</label>
+        <input type="number" step="0.1" class="field-input" formControlName="calibrationThresholdPct" />
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Barème IRPP (JSON)</label>
+      <textarea class="field-textarea" formControlName="irppBrackets" rows="6"
+        placeholder='[{"lower":0,"upper":5000,"rate":0.00},{"lower":5000,"upper":20000,"rate":0.26}]'></textarea>
+      <span class="field-hint">Format : tableau de tranches &#123;"lower", "upper"|null, "rate"&#125;</span>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Motif de modification</label>
+      <input type="text" class="field-input" formControlName="changeRationale"
+             placeholder="Ex : Révision barème IRPP loi finances 2025" />
+    </div>
+
+    <!-- Charges sociales -->
+    <div class="charges-section">
+      <div class="charges-header">
+        <span class="charges-title">Charges sociales ({{ rates.length }})</span>
+        <button type="button" class="btn-sm btn-sm--add" (click)="addRate()">+ Ajouter</button>
+      </div>
+
+      @if (rates.length === 0) {
+        <div class="charges-empty">Aucune charge ajoutée. Cliquez sur « Ajouter » pour en créer.</div>
+      } @else {
+        <div class="rates-wrap">
+          <div class="rates-head">
+            <span>Type</span><span>Code</span><span>Libellé</span>
+            <span>Sal. %</span><span>Pat. %</span><span>Base</span>
+            <span>Plafond</span><span></span>
+          </div>
+          <ng-container formArrayName="socialChargeRates">
+            @for (ctrl of rates.controls; track $index; let i = $index) {
+              <div class="rates-row" [formGroupName]="i">
+                <select class="ri" formControlName="contractType">
+                  @for (ct of contractTypes; track ct) {
+                    <option [value]="ct">{{ ct }}</option>
+                  }
+                </select>
+                <input class="ri" formControlName="chargeCode" placeholder="CNSS" />
+                <input class="ri" formControlName="chargeLabel" placeholder="Caisse nationale..." />
+                <input class="ri" type="number" step="0.0001" formControlName="employeeRate" placeholder="0.0918" />
+                <input class="ri" type="number" step="0.0001" formControlName="employerRate" placeholder="0.1657" />
+                <select class="ri" formControlName="baseCalculation">
+                  @for (opt of baseCalcOptions; track opt.value) {
+                    <option [value]="opt.value">{{ opt.label }}</option>
+                  }
+                </select>
+                <input class="ri" type="number" formControlName="capAmount" placeholder="—" />
+                <button type="button" class="btn-remove" title="Supprimer" (click)="removeRate(i)">✕</button>
+              </div>
+            }
+          </ng-container>
+        </div>
+      }
+    </div>
+
+    <div class="info-box">
+      <strong>Workflow :</strong> DRAFT → Soumettre → PENDING_FINANCE →
+      Approbation RH + Finance (simultanée) → ACTIVE (ancien ACTIVE archivé automatiquement)
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-primary" (click)="submit()" [disabled]="form.invalid || loading()">
+        @if (loading()) { Création… } @else { Créer le jeu de paramètres (DRAFT) }
+      </button>
+    </div>
+
+    @if (error()) { <div class="alert alert-error">{{ error() }}</div> }
+    @if (success()) { <div class="alert alert-success">{{ success() }}</div> }
+  </section>
+</div>

@@ -1,0 +1,260 @@
+<div class="page-header">
+  <h1 class="page-title">Paramètres de paie</h1>
+  <p class="page-subtitle">Gestion des barèmes IRPP, charges sociales et rubriques de paie</p>
+</div>
+
+<div class="ps-layout">
+  <section class="card" [formGroup]="filterForm">
+    <div class="filter-row">
+      <div class="field-group">
+        <label class="field-label">Pays</label>
+        <app-pays-select formControlName="paysId"></app-pays-select>
+      </div>
+      <button class="btn btn-primary" (click)="load()" [disabled]="filterForm.invalid || loading()">
+        Charger
+      </button>
+    </div>
+    @if (error()) { <div class="alert alert-error">{{ error() }}</div> }
+  </section>
+
+  @if (paramSets().length) {
+    <section class="card">
+      <h2 class="card-title">Jeux de paramètres ({{ paramSets().length }})</h2>
+      <div class="ps-list">
+        @for (ps of paramSets(); track ps.id) {
+          <div class="ps-item" [class.ps-item--selected]="selected()?.id === ps.id" (click)="select(ps)">
+            <div class="ps-item-header">
+              <span class="ps-item-label">v{{ ps.version }} — {{ ps.fiscalYear }}</span>
+              <span [class]="statusClass(ps)">{{ statusLabel(ps) }}</span>
+            </div>
+            <div class="ps-item-meta">
+              Tolérance convergence : {{ ps.convergenceTolerance }} · Seuil calibration : {{ ps.calibrationThresholdPct }}%
+            </div>
+            <div class="ps-item-actions" (click)="$event.stopPropagation()">
+              @if (ps.status === 'DRAFT') {
+                <button class="btn-sm btn-sm--primary" (click)="submit(ps.id)">Soumettre</button>
+              }
+              @if (ps.status === 'PENDING_FINANCE' && !ps.approvedByHr) {
+                <button class="btn-sm btn-sm--secondary" (click)="approveHr(ps.id)">Approuver — Directeur Pays</button>
+              }
+              @if (ps.status === 'PENDING_FINANCE' && !ps.approvedByFinance) {
+                <button class="btn-sm btn-sm--secondary" (click)="approveFinance(ps.id)">Approuver — DAF</button>
+              }
+            </div>
+          </div>
+
+          @if (selected()?.id === ps.id) {
+            <div class="ps-detail" (click)="$event.stopPropagation()">
+
+              <!-- ── Charges sociales ─────────────────────────────────────── -->
+              <div class="detail-section-header">
+                <h3>Charges sociales ({{ ps.socialChargeRates.length }})</h3>
+                <button class="btn-sm btn-sm--secondary" type="button" (click)="openChargesEditor(ps)">
+                  @if (editingChargesId() === ps.id) { Annuler } @else { Modifier }
+                </button>
+              </div>
+
+              @if (editingChargesId() !== ps.id) {
+                @if (ps.socialChargeRates.length) {
+                  <div class="table-wrap">
+                    <table class="data-table">
+                      <thead><tr><th>Type</th><th>Code</th><th>Libellé</th><th>Sal. %</th><th>Pat. %</th><th>Base</th></tr></thead>
+                      <tbody>
+                        @for (r of ps.socialChargeRates; track r.chargeCode) {
+                          <tr>
+                            <td>{{ r.contractType }}</td>
+                            <td>{{ r.chargeCode }}</td>
+                            <td>{{ r.chargeLabel }}</td>
+                            <td>{{ (r.employeeRate * 100) | number:'1.2-2' }}%</td>
+                            <td>{{ (r.employerRate * 100) | number:'1.2-2' }}%</td>
+                            <td>{{ r.baseCalculation }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                } @else {
+                  <p class="detail-empty">Aucune charge configurée — cliquez sur « Modifier » pour en ajouter.</p>
+                }
+              }
+
+              @if (editingChargesId() === ps.id) {
+                <div class="charges-editor" [formGroup]="chargesForm">
+                  <div class="editor-toolbar">
+                    <button type="button" class="btn-sm btn-sm--secondary" (click)="addEditRate()">+ Ajouter une ligne</button>
+                    <button type="button" class="btn-sm btn-sm--primary" (click)="saveCharges(ps.id)" [disabled]="savingCharges()">
+                      @if (savingCharges()) { Enregistrement… } @else { Enregistrer }
+                    </button>
+                  </div>
+                  @if (editRates.length === 0) {
+                    <p class="detail-empty">Aucune charge — cliquez sur « Ajouter une ligne ».</p>
+                  } @else {
+                    <div class="rates-wrap">
+                      <div class="rates-head">
+                        <span>Type</span><span>Code</span><span>Libellé</span>
+                        <span>Sal. %</span><span>Pat. %</span><span>Base</span>
+                        <span>Plafond</span><span></span>
+                      </div>
+                      <ng-container formArrayName="rates">
+                        @for (ctrl of editRates.controls; track $index; let i = $index) {
+                          <div class="rates-row" [formGroupName]="i">
+                            <select class="ri" formControlName="contractType">
+                              @for (ct of contractTypes; track ct) { <option [value]="ct">{{ ct }}</option> }
+                            </select>
+                            <input class="ri" formControlName="chargeCode" placeholder="CNSS" />
+                            <input class="ri" formControlName="chargeLabel" placeholder="Caisse nationale..." />
+                            <input class="ri" type="number" step="0.0001" formControlName="employeeRate" />
+                            <input class="ri" type="number" step="0.0001" formControlName="employerRate" />
+                            <select class="ri" formControlName="baseCalculation">
+                              @for (opt of baseCalcOptions; track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }
+                            </select>
+                            <input class="ri" type="number" formControlName="capAmount" placeholder="—" />
+                            <button type="button" class="btn-remove" title="Supprimer" (click)="removeEditRate(i)">✕</button>
+                          </div>
+                        }
+                      </ng-container>
+                    </div>
+                  }
+                </div>
+              }
+
+              <!-- ── Avantages en nature (legacy) ────────────────────────── -->
+              @if (ps.benefits.length) {
+                <div class="detail-section-header" style="margin-top:20px">
+                  <h3>Avantages en nature ({{ ps.benefits.length }})</h3>
+                </div>
+                <div class="table-wrap">
+                  <table class="data-table">
+                    <thead><tr><th>Code</th><th>Libellé</th><th>Valeur/mois</th><th>Imposable</th></tr></thead>
+                    <tbody>
+                      @for (b of ps.benefits; track b.benefitCode) {
+                        <tr>
+                          <td>{{ b.benefitCode }}</td>
+                          <td>{{ b.benefitLabelFr }}</td>
+                          <td>{{ b.monthlyValue | number:'1.0-0' }}</td>
+                          <td>{{ b.isTaxable ? 'Oui' : 'Non' }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+
+              <!-- ── Rubriques de paie ────────────────────────────────────── -->
+              <div class="detail-section-header" style="margin-top:20px">
+                <h3>Rubriques de paie ({{ ps.rubriques.length }})</h3>
+                <button class="btn-sm btn-sm--secondary" type="button" (click)="openRubriquesEditor(ps)">
+                  @if (editingRubriquesId() === ps.id) { Annuler } @else { Modifier }
+                </button>
+              </div>
+
+              <!-- Read-only rubriques view -->
+              @if (editingRubriquesId() !== ps.id) {
+                @if (ps.rubriques.length) {
+                  <div class="table-wrap">
+                    <table class="data-table">
+                      <thead>
+                        <tr>
+                          <th>Code</th>
+                          <th>Libellé</th>
+                          <th>Nature</th>
+                          <th>Mode calcul</th>
+                          <th>Valeur / Taux</th>
+                          <th>Direction</th>
+                          <th>IRPP</th>
+                          <th>Charges</th>
+                          <th>Contrats</th>
+                          <th>Actif</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (r of ps.rubriques; track r.code) {
+                          <tr [class.row-inactive]="!r.isActive">
+                            <td><code class="code-pill">{{ r.code }}</code></td>
+                            <td>{{ r.labelFr }}</td>
+                            <td><span [class]="natureClass(r.nature)">{{ r.nature }}</span></td>
+                            <td>{{ formatCalcMode(r.calcMode) }}</td>
+                            <td class="num">{{ rubriqueValue(r) }}</td>
+                            <td><span [class]="directionClass(r.direction)">{{ r.direction }}</span></td>
+                            <td class="center">{{ r.isSubjectToIrpp ? '✓' : '—' }}</td>
+                            <td class="center">{{ r.isSubjectToSocialCharges ? '✓' : '—' }}</td>
+                            <td>{{ r.contractTypes || 'Tous' }}</td>
+                            <td class="center">{{ r.isActive ? '✓' : '—' }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                } @else {
+                  <p class="detail-empty">Aucune rubrique configurée — cliquez sur « Modifier » pour en ajouter.</p>
+                }
+              }
+
+              <!-- Rubriques inline editor -->
+              @if (editingRubriquesId() === ps.id) {
+                <div class="rubriques-editor" [formGroup]="rubriquesForm">
+                  <div class="editor-toolbar">
+                    <button type="button" class="btn-sm btn-sm--secondary" (click)="addEditRubrique()">+ Ajouter une rubrique</button>
+                    <button type="button" class="btn-sm btn-sm--primary" (click)="saveRubriques(ps.id)" [disabled]="savingRubriques()">
+                      @if (savingRubriques()) { Enregistrement… } @else { Enregistrer }
+                    </button>
+                  </div>
+
+                  @if (editRubriques.length === 0) {
+                    <p class="detail-empty">Aucune rubrique — cliquez sur « Ajouter une rubrique ».</p>
+                  } @else {
+                    <div class="rubriques-wrap">
+                      <div class="rubrique-head">
+                        <span>Code</span>
+                        <span>Libellé FR</span>
+                        <span>Nature</span>
+                        <span>Mode</span>
+                        <span>Montant</span>
+                        <span>Taux (déc.)</span>
+                        <span>Direction</span>
+                        <span title="Soumis à l'IRPP">IRPP</span>
+                        <span title="Soumis aux charges sociales">CS</span>
+                        <span title="Laisser vide = tous les types">Contrats</span>
+                        <span>Actif</span>
+                        <span></span>
+                      </div>
+                      <ng-container formArrayName="items">
+                        @for (ctrl of editRubriques.controls; track $index; let i = $index) {
+                          <div class="rubrique-row" [formGroupName]="i">
+                            <input class="ri" formControlName="code" placeholder="TICKETS_RESTO" style="text-transform:uppercase" />
+                            <input class="ri" formControlName="labelFr" placeholder="Tickets restaurant Pluxee" />
+                            <select class="ri" formControlName="nature">
+                              @for (n of rubriqueNatures; track n) { <option [value]="n">{{ n }}</option> }
+                            </select>
+                            <select class="ri" formControlName="calcMode">
+                              @for (m of rubriqueCalcModes; track m.value) { <option [value]="m.value">{{ m.label }}</option> }
+                            </select>
+                            <input class="ri" type="number" step="0.01" formControlName="amount" placeholder="—" />
+                            <input class="ri" type="number" step="0.0001" formControlName="rate" placeholder="0.0500" />
+                            <select class="ri" formControlName="direction">
+                              <option value="CREDIT">CREDIT</option>
+                              <option value="DEBIT">DEBIT</option>
+                            </select>
+                            <div class="ri-check"><input type="checkbox" formControlName="isSubjectToIrpp" /></div>
+                            <div class="ri-check"><input type="checkbox" formControlName="isSubjectToSocialCharges" /></div>
+                            <input class="ri" formControlName="contractTypes" placeholder="CDI,CDD" />
+                            <div class="ri-check"><input type="checkbox" formControlName="isActive" /></div>
+                            <button type="button" class="btn-remove" title="Supprimer" (click)="removeEditRubrique(i)">✕</button>
+                          </div>
+                        }
+                      </ng-container>
+                    </div>
+                    <p class="editor-hint">
+                      Taux : valeur décimale (ex. 0.05 = 5%). Montant : en devise locale. Contrats vide = applicable à tous les types.
+                    </p>
+                  }
+                </div>
+              }
+
+            </div>
+          }
+        }
+      </div>
+    </section>
+  }
+</div>

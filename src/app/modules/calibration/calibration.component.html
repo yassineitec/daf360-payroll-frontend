@@ -1,0 +1,88 @@
+<div class="page-header">
+  <h1 class="page-title">Calibration mensuelle</h1>
+  <p class="page-subtitle">Comparaison prévu / réel et déclenchement de la mise à jour des paramètres</p>
+</div>
+
+<div class="cal-layout">
+  <!-- Open cycle form -->
+  <section class="card" [formGroup]="openForm">
+    <h2 class="card-title">Ouvrir un cycle</h2>
+    <div class="field-row">
+      <div class="field-group">
+        <label class="field-label">Pays</label>
+        <app-pays-select formControlName="paysId"></app-pays-select>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Période (AAAA-MM)</label>
+        <input type="text" class="field-input" formControlName="period" placeholder="2025-01" />
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" (click)="openCycle()" [disabled]="openForm.invalid || loading()">
+        Ouvrir le cycle
+      </button>
+      <button class="btn btn-ghost" type="button" (click)="loadCycles()">
+        Charger les cycles
+      </button>
+    </div>
+    @if (error()) { <div class="alert alert-error">{{ error() }}</div> }
+  </section>
+
+  <!-- Upload actuals -->
+  <section class="card">
+    <h2 class="card-title">Importer les réalisés partenaire (CSV)</h2>
+    <div class="field-group">
+      <label class="field-label">ID du cycle</label>
+      <input type="number" class="field-input"
+             [value]="uploadCycleId() ?? ''"
+             (input)="uploadCycleId.set(+($any($event.target).value))"
+             placeholder="ID cycle" />
+    </div>
+    <div class="field-group">
+      <label class="field-label">Fichier CSV</label>
+      <input type="file" accept=".csv" class="field-input" (change)="onFileChange($event)" />
+      <span class="field-hint">Format : profileUserId,actualLoadedCost,contractType</span>
+    </div>
+    <button class="btn btn-primary" (click)="uploadActuals()"
+            [disabled]="!uploadCycleId() || !uploadFile() || loading()">
+      Importer
+    </button>
+  </section>
+
+  <!-- Cycles list -->
+  @if (cycles().length) {
+    <section class="card">
+      <h2 class="card-title">Cycles ({{ cycles().length }})</h2>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Période</th>
+              <th>Statut</th>
+              <th>Prévu</th>
+              <th>Réel</th>
+              <th>Écart %</th>
+              <th>Effectif</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of cycles(); track c.id) {
+              <tr>
+                <td>{{ c.id }}</td>
+                <td>{{ c.period }}</td>
+                <td><span [class]="statusClass(c.status)">{{ c.status }}</span></td>
+                <td>{{ c.predictedTotalLoadedCost != null ? (c.predictedTotalLoadedCost | number:'1.0-0') : '—' }}</td>
+                <td>{{ c.actualTotalLoadedCost != null ? (c.actualTotalLoadedCost | number:'1.0-0') : '—' }}</td>
+                <td [class.text-warn]="(c.variancePct ?? 0) > 1">
+                  {{ c.variancePct != null ? (c.variancePct | number:'1.2-2') + '%' : '—' }}
+                </td>
+                <td>{{ c.headcount ?? '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+</div>

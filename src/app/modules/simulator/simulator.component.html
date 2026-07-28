@@ -1,0 +1,135 @@
+<div class="page-header">
+  <h1 class="page-title">Simulateur de paie individuel</h1>
+  <p class="page-subtitle">Calcul net → brut → coût chargé via convergence Newton-Raphson</p>
+</div>
+
+<div class="sim-layout">
+  <!-- Input form -->
+  <section class="sim-card" [formGroup]="form">
+    <h2 class="card-title">Paramètres d'entrée</h2>
+
+    <div class="field-group">
+      <label class="field-label">Pays</label>
+      <app-pays-select formControlName="paysId"></app-pays-select>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="inputNet">Net souhaité (devise locale)</label>
+      <input id="inputNet" type="number" class="field-input"
+             formControlName="inputNet"
+             placeholder="Ex : 2500" step="100" />
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="contractType">Type de contrat</label>
+      <select id="contractType" class="field-input" formControlName="contractType">
+        @for (ct of contractTypes; track ct) {
+          <option [value]="ct">{{ ct }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-primary" (click)="submit()" [disabled]="form.invalid || loading()">
+        @if (loading()) { Calcul en cours… } @else { Simuler }
+      </button>
+      <button class="btn btn-ghost" (click)="reset()" type="button">Réinitialiser</button>
+    </div>
+
+    @if (error()) {
+      <div class="alert alert-error">{{ error() }}</div>
+    }
+  </section>
+
+  <!-- Result -->
+  @if (result(); as r) {
+    <section class="sim-card sim-result">
+      <h2 class="card-title">
+        Résultat
+        @if (r.localCurrency) {
+          <span class="currency-badge">{{ r.localCurrency }}</span>
+        }
+      </h2>
+
+      @if (convergenceWarning()) {
+        <div class="alert alert-warning">
+          ⚠️ La convergence n'a pas abouti après {{ r.iterationsUsed }} itérations —
+          le résultat est une estimation.
+        </div>
+      }
+
+      <div class="strata-grid">
+        <div class="stratum stratum--net">
+          <span class="stratum-label">Net en main</span>
+          <span class="stratum-value">{{ r.inputNet | number:'1.2-2' }}
+            @if (r.localCurrency) { <span class="stratum-devise">{{ r.localCurrency }}</span> }
+          </span>
+        </div>
+        <div class="stratum stratum--taxable">
+          <span class="stratum-label">Base imposable</span>
+          <span class="stratum-value">{{ r.taxableBase | number:'1.2-2' }}
+            @if (r.localCurrency) { <span class="stratum-devise">{{ r.localCurrency }}</span> }
+          </span>
+        </div>
+        <div class="stratum stratum--gross">
+          <span class="stratum-label">Salaire brut</span>
+          <span class="stratum-value">{{ r.gross | number:'1.2-2' }}
+            @if (r.localCurrency) { <span class="stratum-devise">{{ r.localCurrency }}</span> }
+          </span>
+        </div>
+        <div class="stratum stratum--cost">
+          <span class="stratum-label">Coût chargé</span>
+          <span class="stratum-value">{{ r.loadedCost | number:'1.2-2' }}
+            @if (r.localCurrency) { <span class="stratum-devise">{{ r.localCurrency }}</span> }
+          </span>
+        </div>
+        @if (r.loadedCostEur != null) {
+          <div class="stratum stratum--fx">
+            <span class="stratum-label">Coût chargé</span>
+            <span class="stratum-value">{{ r.loadedCostEur | number:'1.2-2' }}
+              <span class="stratum-devise">EUR</span>
+            </span>
+          </div>
+        }
+        @if (r.loadedCostUsd != null) {
+          <div class="stratum stratum--fx">
+            <span class="stratum-label">Coût chargé</span>
+            <span class="stratum-value">{{ r.loadedCostUsd | number:'1.2-2' }}
+              <span class="stratum-devise">USD</span>
+            </span>
+          </div>
+        }
+      </div>
+
+      <div class="detail-grid">
+        <div class="detail-row">
+          <span>IRPP</span>
+          <span>{{ r.irppAmount | number:'1.2-2' }} {{ r.localCurrency ?? '' }}</span>
+        </div>
+        <div class="detail-row">
+          <span>Charges salariales</span>
+          <span>{{ r.employeeCharges | number:'1.2-2' }} {{ r.localCurrency ?? '' }}</span>
+        </div>
+        <div class="detail-row">
+          <span>Charges patronales</span>
+          <span>{{ r.employerCharges | number:'1.2-2' }} {{ r.localCurrency ?? '' }}</span>
+        </div>
+        @if (r.fxRateEur != null) {
+          <div class="detail-row detail-row--fx">
+            <span>Taux EUR</span>
+            <span>1 {{ r.localCurrency }} = {{ r.fxRateEur | number:'1.3-4' }} EUR</span>
+          </div>
+        }
+        @if (r.fxRateUsd != null) {
+          <div class="detail-row detail-row--fx">
+            <span>Taux USD</span>
+            <span>1 {{ r.localCurrency }} = {{ r.fxRateUsd | number:'1.3-4' }} USD</span>
+          </div>
+        }
+        <div class="detail-row">
+          <span>Itérations convergence</span><span>{{ r.iterationsUsed }}</span>
+        </div>
+      </div>
+    </section>
+  }
+</div>

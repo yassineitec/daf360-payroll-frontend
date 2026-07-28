@@ -1,0 +1,39 @@
+<div class="psc" [class.psc--open]="open()" [class.psc--selected]="selected() !== null">
+  <div class="psc__control">
+    <input
+      class="psc__input"
+      type="text"
+      autocomplete="off"
+      spellcheck="false"
+      [value]="displayText()"
+      [placeholder]="selected() ? '' : 'Rechercher un pays…'"
+      [disabled]="isDisabled()"
+      (focus)="onFocus()"
+      (input)="onInput($event)"
+      (blur)="onBlur()"
+    />
+    @if (selected() && !isDisabled()) {
+      <button class="psc__clear" type="button" tabindex="-1" (mousedown)="clear($event)">✕</button>
+    }
+    <span class="psc__caret" aria-hidden="true">▾</span>
+  </div>
+
+  @if (open()) {
+    <div class="psc__dropdown" role="listbox">
+      @if (filtered().length === 0) {
+        <div class="psc__empty">Aucun pays trouvé</div>
+      }
+      @for (p of filtered(); track p.id) {
+        <div
+          class="psc__option"
+          [class.psc__option--active]="p.id === selected()?.id"
+          role="option"
+          (mousedown)="pick(p)"
+        >
+          <span class="psc__option-label">{{ p.frenchLabel }}</span>
+          <span class="psc__option-iso">{{ p.isoCode }}</span>
+        </div>
+      }
+    </div>
+  }
+</div>

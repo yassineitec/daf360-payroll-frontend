@@ -1,0 +1,19 @@
+:host {
+  --shell-header-h:  64px;
+  --shell-sidebar-w: 256px;
+  display: block;
+}
+
+.shell-content {
+  margin-left: var(--shell-sidebar-w);
+  height:      calc(100vh - var(--shell-header-h));
+  overflow-y:  auto;
+  overflow-x:  hidden;
+  padding:     2rem;
+  background:  var(--color-background);
+  box-sizing:  border-box;
+
+  @media (max-width: 1024px) { padding: 1.5rem; }
+  @media (max-width: 768px)  { margin-left: 0; padding: 0.5rem 0.5rem 0.5rem 3.25rem; }
+  @media (max-width: 480px)  { padding: 0.5rem 0.375rem 0.5rem 3.25rem; }
+}
