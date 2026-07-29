@@ -1,8 +1,12 @@
 FROM node:22-slim AS builder
 WORKDIR /app
-COPY package.json ./
+# package-lock.json MUST be copied and `npm ci` used (not `npm install`): the
+# caret ranges on @angular/* would otherwise resolve to whatever patch is newest
+# at build time. A remote built on a different Angular patch than the shell loads
+# a SECOND copy of @angular/core at runtime → NG0203 on every navigation.
+COPY package*.json ./
 COPY .npmrc ./
-RUN npm install --legacy-peer-deps
+RUN npm ci --legacy-peer-deps
 COPY . .
 RUN npm run build -- --configuration development
 
