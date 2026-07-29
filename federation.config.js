@@ -9,7 +9,7 @@ module.exports = withNativeFederation({
   shared: {
     ...shareAll({
       singleton: true,
-      strictVersion: true,
+      strictVersion: false,
       requiredVersion: 'auto',
     }),
     '@angular/core': {
@@ -45,7 +45,7 @@ module.exports = withNativeFederation({
     '@khalilrebhiitec/daf360': {
       singleton: true,
       strictVersion: false,
-      requiredVersion: '^3.4.0',
+      requiredVersion: '^4.7.0',
     },
     '@ngrx/store': {
       singleton: true,
