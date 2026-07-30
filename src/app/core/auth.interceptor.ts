@@ -17,6 +17,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   const isPortalCall  = req.url.startsWith(environment.portalUrl);
   const isPayrollApi  = req.url.startsWith(environment.payrollApiUrl);
+  const isHrApi       = req.url.startsWith(environment.hrApiUrl);
 
   if (isPortalCall) {
     return next(req.clone({ withCredentials: true })).pipe(
@@ -27,7 +28,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     );
   }
 
-  if (isPayrollApi) {
+  if (isPayrollApi || isHrApi) {
     return next(withToken(req, store.user()?.rhToken)).pipe(
       catchError(err => {
         if (err.status !== 401) return throwError(() => err);
