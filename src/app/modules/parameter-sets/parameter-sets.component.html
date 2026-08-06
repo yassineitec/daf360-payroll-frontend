@@ -172,7 +172,7 @@
                           <tr [class.row-inactive]="!r.isActive">
                             <td><code class="code-pill">{{ r.code }}</code></td>
                             <td>{{ r.labelFr }}</td>
-                            <td><span [class]="natureClass(r.nature)">{{ r.nature }}</span></td>
+                            <td><span [class]="natureClass(r.nature)">{{ natureLabel(r.nature) }}</span></td>
                             <td>{{ formatCalcMode(r.calcMode) }}</td>
                             <td class="num">{{ rubriqueValue(r) }}</td>
                             <td><span [class]="directionClass(r.direction)">{{ r.direction }}</span></td>
@@ -190,63 +190,196 @@
                 }
               }
 
-              <!-- Rubriques inline editor -->
+              <!-- Rubriques guided card editor -->
               @if (editingRubriquesId() === ps.id) {
                 <div class="rubriques-editor" [formGroup]="rubriquesForm">
                   <div class="editor-toolbar">
                     <button type="button" class="btn-sm btn-sm--secondary" (click)="addEditRubrique()">+ Ajouter une rubrique</button>
                     <button type="button" class="btn-sm btn-sm--primary" (click)="saveRubriques(ps.id)" [disabled]="savingRubriques()">
-                      @if (savingRubriques()) { Enregistrement… } @else { Enregistrer }
+                      @if (savingRubriques()) { Enregistrement… } @else { Enregistrer tout }
                     </button>
                   </div>
 
                   @if (editRubriques.length === 0) {
                     <p class="detail-empty">Aucune rubrique — cliquez sur « Ajouter une rubrique ».</p>
                   } @else {
-                    <div class="rubriques-wrap">
-                      <div class="rubrique-head">
-                        <span>Code</span>
-                        <span>Libellé FR</span>
-                        <span>Nature</span>
-                        <span>Mode</span>
-                        <span>Montant</span>
-                        <span>Taux (déc.)</span>
-                        <span>Direction</span>
-                        <span title="Soumis à l'IRPP">IRPP</span>
-                        <span title="Soumis aux charges sociales">CS</span>
-                        <span title="Laisser vide = tous les types">Contrats</span>
-                        <span>Actif</span>
-                        <span></span>
-                      </div>
-                      <ng-container formArrayName="items">
-                        @for (ctrl of editRubriques.controls; track $index; let i = $index) {
-                          <div class="rubrique-row" [formGroupName]="i">
-                            <input class="ri" formControlName="code" placeholder="TICKETS_RESTO" style="text-transform:uppercase" />
-                            <input class="ri" formControlName="labelFr" placeholder="Tickets restaurant Pluxee" />
-                            <select class="ri" formControlName="nature">
-                              @for (n of rubriqueNatures; track n) { <option [value]="n">{{ n }}</option> }
-                            </select>
-                            <select class="ri" formControlName="calcMode">
-                              @for (m of rubriqueCalcModes; track m.value) { <option [value]="m.value">{{ m.label }}</option> }
-                            </select>
-                            <input class="ri" type="number" step="0.01" formControlName="amount" placeholder="—" />
-                            <input class="ri" type="number" step="0.0001" formControlName="rate" placeholder="0.0500" />
-                            <select class="ri" formControlName="direction">
-                              <option value="CREDIT">CREDIT</option>
-                              <option value="DEBIT">DEBIT</option>
-                            </select>
-                            <div class="ri-check"><input type="checkbox" formControlName="isSubjectToIrpp" /></div>
-                            <div class="ri-check"><input type="checkbox" formControlName="isSubjectToSocialCharges" /></div>
-                            <input class="ri" formControlName="contractTypes" placeholder="CDI,CDD" />
-                            <div class="ri-check"><input type="checkbox" formControlName="isActive" /></div>
-                            <button type="button" class="btn-remove" title="Supprimer" (click)="removeEditRubrique(i)">✕</button>
-                          </div>
-                        }
-                      </ng-container>
+                    <div class="preview-control">
+                      <span class="field-label">Salaire brut de test :</span>
+                      <input type="number" class="ri preview-gross-input"
+                             [value]="testGross()"
+                             (input)="testGross.set(+$any($event.target).value || 3000)"
+                             min="1" step="100" />
+                      <span class="preview-gross-unit">TND / mois</span>
                     </div>
-                    <p class="editor-hint">
-                      Taux : valeur décimale (ex. 0.05 = 5%). Montant : en devise locale. Contrats vide = applicable à tous les types.
-                    </p>
+
+                    <ng-container formArrayName="items">
+                      @for (ctrl of editRubriques.controls; track $index; let i = $index) {
+                        <div class="rubrique-card" [class.rubrique-card--expanded]="isRubriqueExpanded(i)" [formGroupName]="i">
+
+                          <div class="rubrique-card-header" (click)="toggleRubriqueCard(i)">
+                            <div class="rch-left">
+                              <span class="rch-arrow">{{ isRubriqueExpanded(i) ? '▼' : '▶' }}</span>
+                              <code class="code-pill">{{ editRubriqueGroup(i).get('code')!.value || '…' }}</code>
+                              <span class="rch-label">{{ editRubriqueGroup(i).get('labelFr')!.value || 'Nouvelle rubrique' }}</span>
+                              <span [class]="natureClass(editRubriqueGroup(i).get('nature')!.value)">
+                                {{ natureLabel(editRubriqueGroup(i).get('nature')!.value) }}
+                              </span>
+                              <span class="rch-mode">{{ calcModeLabel(editRubriqueGroup(i).get('calcMode')!.value) }}</span>
+                            </div>
+                            <div class="rch-right">
+                              <span class="rch-value">{{ previewAmount(i) }} TND</span>
+                              <button type="button" class="btn-remove" title="Supprimer cette rubrique"
+                                      (click)="$event.stopPropagation(); removeEditRubrique(i)">✕</button>
+                            </div>
+                          </div>
+
+                          @if (isRubriqueExpanded(i)) {
+                            <div class="rubrique-card-body">
+
+                              <div class="rg-section">
+                                <h4 class="rg-section-title">Identification</h4>
+                                <div class="rg-row">
+                                  <div class="rg-field rg-field--sm">
+                                    <label class="field-label">Code interne *</label>
+                                    <input class="field-input" formControlName="code"
+                                           placeholder="CNSS_SAL" style="text-transform:uppercase" />
+                                  </div>
+                                  <div class="rg-field rg-field--lg">
+                                    <label class="field-label">Libellé (français) *</label>
+                                    <input class="field-input" formControlName="labelFr"
+                                           placeholder="ex : Cotisation CNSS salariale" />
+                                  </div>
+                                  <div class="rg-field rg-field--lg">
+                                    <label class="field-label">Libellé (anglais)</label>
+                                    <input class="field-input" formControlName="labelEn"
+                                           placeholder="ex : CNSS employee contribution" />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div class="rg-section">
+                                <h4 class="rg-section-title">Nature de la rubrique</h4>
+                                <div class="rg-radio-group">
+                                  @for (opt of natureOptions; track opt.value) {
+                                    <label class="rg-radio-card"
+                                           [class.rg-radio-card--selected]="editRubriqueGroup(i).get('nature')!.value === opt.value">
+                                      <input type="radio" formControlName="nature" [value]="opt.value" />
+                                      <span class="rg-radio-title">{{ opt.label }}</span>
+                                      <span class="rg-radio-desc">{{ opt.description }}</span>
+                                    </label>
+                                  }
+                                </div>
+                              </div>
+
+                              <div class="rg-section">
+                                <h4 class="rg-section-title">Comment est-elle calculée ?</h4>
+                                <div class="rg-radio-group">
+                                  @for (opt of calcModeOptions; track opt.value) {
+                                    <label class="rg-radio-card"
+                                           [class.rg-radio-card--selected]="editRubriqueGroup(i).get('calcMode')!.value === opt.value">
+                                      <input type="radio" formControlName="calcMode" [value]="opt.value" />
+                                      <span class="rg-radio-title">{{ opt.label }}</span>
+                                      <span class="rg-radio-desc">{{ opt.description }}</span>
+                                    </label>
+                                  }
+                                </div>
+
+                                @if (editRubriqueGroup(i).get('calcMode')!.value === 'FIXE_MENSUEL' ||
+                                     editRubriqueGroup(i).get('calcMode')!.value === 'FIXE_JOURNALIER') {
+                                  <div class="rg-row rg-row--mt">
+                                    <div class="rg-field rg-field--md">
+                                      <label class="field-label">
+                                        Montant ({{ editRubriqueGroup(i).get('calcMode')!.value === 'FIXE_JOURNALIER' ? 'par jour' : 'par mois' }})
+                                      </label>
+                                      <input class="field-input" type="number" step="0.01" formControlName="amount" placeholder="0.00" />
+                                    </div>
+                                  </div>
+                                }
+
+                                @if (editRubriqueGroup(i).get('calcMode')!.value === 'POURCENTAGE_BRUT' ||
+                                     editRubriqueGroup(i).get('calcMode')!.value === 'POURCENTAGE_CHARGES' ||
+                                     editRubriqueGroup(i).get('calcMode')!.value === 'POURCENTAGE_PLAFONNE') {
+                                  <div class="rg-row rg-row--mt">
+                                    <div class="rg-field rg-field--sm">
+                                      <label class="field-label">Taux (%)</label>
+                                      <input class="field-input" type="number" step="0.01"
+                                             formControlName="ratePercent" placeholder="9.18" />
+                                    </div>
+                                    @if (editRubriqueGroup(i).get('calcMode')!.value === 'POURCENTAGE_PLAFONNE') {
+                                      <div class="rg-field rg-field--md">
+                                        <label class="field-label">Plafond mensuel</label>
+                                        <input class="field-input" type="number" step="0.01"
+                                               formControlName="capAmount" placeholder="3 500.00" />
+                                      </div>
+                                    }
+                                  </div>
+                                }
+                              </div>
+
+                              <div class="rg-section">
+                                <h4 class="rg-section-title">Fiscalité &amp; charges sociales</h4>
+                                <div class="rg-checkbox-group">
+                                  <label class="rg-checkbox-item">
+                                    <input type="checkbox" formControlName="isSubjectToIrpp" />
+                                    <span>
+                                      <strong>Soumis à l'IRPP</strong>
+                                      <small>Cette rubrique est intégrée dans le calcul de l'impôt sur le revenu</small>
+                                    </span>
+                                  </label>
+                                  <label class="rg-checkbox-item">
+                                    <input type="checkbox" formControlName="isSubjectToSocialCharges" />
+                                    <span>
+                                      <strong>Élargit l'assiette des charges sociales</strong>
+                                      <small>Cette rubrique s'ajoute à la base de calcul des cotisations sociales</small>
+                                    </span>
+                                  </label>
+                                </div>
+                              </div>
+
+                              <div class="rg-section">
+                                <h4 class="rg-section-title">Types de contrat applicables</h4>
+                                <div class="rg-checkbox-group">
+                                  <label class="rg-checkbox-item">
+                                    <input type="checkbox" formControlName="ctAll" />
+                                    <span>
+                                      <strong>Tous les types de contrat</strong>
+                                      <small>CDI, CDD, Stage, CIVP — aucune restriction</small>
+                                    </span>
+                                  </label>
+                                  @if (!editRubriqueGroup(i).get('ctAll')!.value) {
+                                    <div class="rg-contract-types">
+                                      <label class="rg-tag-check"><input type="checkbox" formControlName="ctCDI" /> CDI</label>
+                                      <label class="rg-tag-check"><input type="checkbox" formControlName="ctCDD" /> CDD</label>
+                                      <label class="rg-tag-check"><input type="checkbox" formControlName="ctSTAGE" /> Stage</label>
+                                      <label class="rg-tag-check"><input type="checkbox" formControlName="ctCIVP" /> CIVP</label>
+                                    </div>
+                                  }
+                                </div>
+                              </div>
+
+                              <div class="rg-section">
+                                <h4 class="rg-section-title">Statut</h4>
+                                <label class="rg-checkbox-item">
+                                  <input type="checkbox" formControlName="isActive" />
+                                  <span>
+                                    <strong>Rubrique active</strong>
+                                    <small>Décocher pour désactiver sans supprimer</small>
+                                  </span>
+                                </label>
+                              </div>
+
+                              <div class="rg-preview-section">
+                                <span class="rg-preview-label">
+                                  Aperçu — pour un salaire brut de {{ testGross().toLocaleString('fr-FR') }} TND
+                                </span>
+                                <span class="rg-preview-amount">{{ previewAmount(i) }} TND</span>
+                              </div>
+
+                            </div>
+                          }
+                        </div>
+                      }
+                    </ng-container>
                   }
                 </div>
               }
