@@ -147,6 +147,8 @@ export class ParameterSetsComponent {
     this.closeChargesEditor();
     while (this.editRubriques.length) this.editRubriques.removeAt(0);
     (ps.rubriques ?? []).forEach(r => this.editRubriques.push(this.makeRubriqueGroup(r)));
+    // Auto-expand the first card so the form is immediately visible.
+    this.expandedRubriques.set(new Set([0]));
     this.editingRubriquesId.set(ps.id);
   }
 
