@@ -77,7 +77,13 @@ export class ParameterSetsComponent {
     this.loading.set(true);
     this.error.set(null);
     this.api.listParameterSets(paysId).subscribe({
-      next: ps => { this.paramSets.set(ps); this.loading.set(false); },
+      next: ps => {
+        this.paramSets.set(ps);
+        this.loading.set(false);
+        // Auto-select the first (usually only) parameter set so the detail
+        // panel — including Rubriques — is visible without an extra click.
+        if (ps.length > 0 && !this.selected()) this.selected.set(ps[0]);
+      },
       error: err => { this.error.set(err?.error?.message ?? 'Erreur'); this.loading.set(false); },
     });
   }

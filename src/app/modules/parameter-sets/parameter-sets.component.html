@@ -24,6 +24,7 @@
         @for (ps of paramSets(); track ps.id) {
           <div class="ps-item" [class.ps-item--selected]="selected()?.id === ps.id" (click)="select(ps)">
             <div class="ps-item-header">
+              <span class="ps-item-expand-icon">{{ selected()?.id === ps.id ? '▼' : '▶' }}</span>
               <span class="ps-item-label">v{{ ps.version }} — {{ ps.fiscalYear }}</span>
               <span [class]="statusClass(ps)">{{ statusLabel(ps) }}</span>
             </div>
