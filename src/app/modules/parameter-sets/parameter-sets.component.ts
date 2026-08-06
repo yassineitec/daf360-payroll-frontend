@@ -187,7 +187,15 @@ export class ParameterSetsComponent {
     this.expandedRubriques.set(s);
   }
 
-  removeEditRubrique(i: number): void { this.editRubriques.removeAt(i); }
+  removeEditRubrique(i: number): void {
+    this.editRubriques.removeAt(i);
+    const updated = new Set<number>();
+    this.expandedRubriques().forEach(idx => {
+      if (idx < i) updated.add(idx);
+      else if (idx > i) updated.add(idx - 1);
+    });
+    this.expandedRubriques.set(updated);
+  }
 
   saveRubriques(psId: number): void {
     this.savingRubriques.set(true);
