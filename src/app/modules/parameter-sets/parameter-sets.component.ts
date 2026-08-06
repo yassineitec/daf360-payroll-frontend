@@ -6,6 +6,7 @@ import {
   ParameterSetDto,
   SocialChargeRateDto,
   SavePayrollRubriqueRequest,
+  PayrollRubriqueDto,
 } from '../../core/payroll-api.service';
 import { PaysSelectComponent } from '../../shared/pays-select/pays-select.component';
 
@@ -44,13 +45,22 @@ export class ParameterSetsComponent {
   // ── Rubriques de paie editor ──────────────────────────────────────────────
   readonly editingRubriquesId = signal<number | null>(null);
   readonly savingRubriques    = signal(false);
+  readonly expandedRubriques  = signal<Set<number>>(new Set());
+  readonly testGross          = signal<number>(3000);
 
-  readonly rubriqueNatures   = ['AVANTAGE', 'INDEMNITE', 'PRIME', 'RETENUE'];
-  readonly rubriqueCalcModes = [
-    { value: 'FIXE_MENSUEL',        label: 'Fixe mensuel' },
-    { value: 'FIXE_JOURNALIER',     label: 'Fixe/jour' },
-    { value: 'POURCENTAGE_BRUT',    label: '% Brut' },
-    { value: 'POURCENTAGE_CHARGES', label: '% Charges' },
+  readonly natureOptions = [
+    { value: 'AVANTAGE',  label: 'Avantage en nature', description: 'Élément de rémunération non monétaire ajouté au brut' },
+    { value: 'INDEMNITE', label: 'Indemnité',           description: 'Compensation pour frais ou contraintes professionnelles' },
+    { value: 'PRIME',     label: 'Prime',               description: 'Complément de salaire lié à la performance ou au poste' },
+    { value: 'RETENUE',   label: 'Retenue',             description: 'Prélèvement déduit du salaire brut' },
+  ];
+
+  readonly calcModeOptions = [
+    { value: 'FIXE_MENSUEL',         label: 'Montant fixe mensuel',        description: 'Un montant défini, versé chaque mois' },
+    { value: 'FIXE_JOURNALIER',      label: 'Montant par jour travaillé',  description: 'Montant × nombre de jours effectivement travaillés' },
+    { value: 'POURCENTAGE_BRUT',     label: 'Pourcentage du salaire brut', description: 'Taux × salaire brut total' },
+    { value: 'POURCENTAGE_CHARGES',  label: 'Pourcentage des charges',     description: 'Taux × base de calcul des charges sociales' },
+    { value: 'POURCENTAGE_PLAFONNE', label: 'Pourcentage plafonné',        description: 'Taux × min(salaire brut, plafond mensuel)' },
   ];
 
   readonly rubriquesForm = this.fb.group({ items: this.fb.array([]) });
@@ -136,47 +146,45 @@ export class ParameterSetsComponent {
     if (this.editingRubriquesId() === ps.id) { this.closeRubriquesEditor(); return; }
     this.closeChargesEditor();
     while (this.editRubriques.length) this.editRubriques.removeAt(0);
-    (ps.rubriques ?? []).forEach(r => this.editRubriques.push(this.fb.group({
-      code:                     [r.code,     Validators.required],
-      labelFr:                  [r.labelFr,  Validators.required],
-      labelEn:                  [r.labelEn ?? ''],
-      nature:                   [r.nature    ?? 'AVANTAGE'],
-      calcMode:                 [r.calcMode  ?? 'FIXE_MENSUEL'],
-      amount:                   [r.amount    ?? null],
-      rate:                     [r.rate      ?? null],
-      employerSharePct:         [r.employerSharePct ?? 0],
-      employeeSharePct:         [r.employeeSharePct ?? 0],
-      isSubjectToSocialCharges: [r.isSubjectToSocialCharges ?? false],
-      isSubjectToIrpp:          [r.isSubjectToIrpp ?? true],
-      direction:                [r.direction ?? 'CREDIT'],
-      contractTypes:            [r.contractTypes ?? ''],
-      isActive:                 [r.isActive  ?? true],
-    })));
+    (ps.rubriques ?? []).forEach(r => this.editRubriques.push(this.makeRubriqueGroup(r)));
     this.editingRubriquesId.set(ps.id);
+  }
+
+  private makeRubriqueGroup(r: Partial<PayrollRubriqueDto>): FormGroup {
+    return this.fb.group({
+      code:                     [r.code     ?? '',           Validators.required],
+      labelFr:                  [r.labelFr  ?? '',           Validators.required],
+      labelEn:                  [r.labelEn  ?? ''],
+      nature:                   [r.nature   ?? 'AVANTAGE'],
+      calcMode:                 [r.calcMode ?? 'FIXE_MENSUEL'],
+      amount:                   [r.amount   ?? null],
+      ratePercent:              [r.rate != null ? +(r.rate * 100).toFixed(4) : null],
+      capAmount:                [r.capAmount ?? null],
+      employerSharePct:         [r.employerSharePct  ?? 0],
+      employeeSharePct:         [r.employeeSharePct  ?? 0],
+      isSubjectToSocialCharges: [r.isSubjectToSocialCharges ?? false],
+      isSubjectToIrpp:          [r.isSubjectToIrpp   ?? true],
+      ctAll:                    [!r.contractTypes],
+      ctCDI:                    [r.contractTypes?.includes('CDI')   ?? false],
+      ctCDD:                    [r.contractTypes?.includes('CDD')   ?? false],
+      ctSTAGE:                  [r.contractTypes?.includes('STAGE') ?? false],
+      ctCIVP:                   [r.contractTypes?.includes('CIVP')  ?? false],
+      isActive:                 [r.isActive  ?? true],
+    });
   }
 
   private closeRubriquesEditor(): void {
     this.editingRubriquesId.set(null);
+    this.expandedRubriques.set(new Set());
     while (this.editRubriques.length) this.editRubriques.removeAt(0);
   }
 
   addEditRubrique(): void {
-    this.editRubriques.push(this.fb.group({
-      code:                     ['', Validators.required],
-      labelFr:                  ['', Validators.required],
-      labelEn:                  [''],
-      nature:                   ['AVANTAGE'],
-      calcMode:                 ['FIXE_MENSUEL'],
-      amount:                   [null],
-      rate:                     [null],
-      employerSharePct:         [0],
-      employeeSharePct:         [0],
-      isSubjectToSocialCharges: [false],
-      isSubjectToIrpp:          [true],
-      direction:                ['CREDIT'],
-      contractTypes:            [''],
-      isActive:                 [true],
-    }));
+    this.editRubriques.push(this.makeRubriqueGroup({}));
+    const newIndex = this.editRubriques.length - 1;
+    const s = new Set(this.expandedRubriques());
+    s.add(newIndex);
+    this.expandedRubriques.set(s);
   }
 
   removeEditRubrique(i: number): void { this.editRubriques.removeAt(i); }
@@ -191,13 +199,17 @@ export class ParameterSetsComponent {
       nature:                   r.nature,
       calcMode:                 r.calcMode,
       amount:                   r.amount,
-      rate:                     r.rate,
-      employerSharePct:         r.employerSharePct,
-      employeeSharePct:         r.employeeSharePct,
+      rate:                     r.ratePercent != null ? r.ratePercent / 100 : null,
+      capAmount:                r.capAmount,
+      employerSharePct:         r.employerSharePct ?? 0,
+      employeeSharePct:         r.employeeSharePct ?? 0,
       isSubjectToSocialCharges: r.isSubjectToSocialCharges,
       isSubjectToIrpp:          r.isSubjectToIrpp,
-      direction:                r.direction,
-      contractTypes:            r.contractTypes?.trim() || null,
+      direction:                r.nature === 'RETENUE' ? 'DEBIT' : 'CREDIT',
+      contractTypes:            r.ctAll ? null :
+        (['CDI', 'CDD', 'STAGE', 'CIVP'] as const)
+          .filter((t: string) => r['ct' + t] === true)
+          .join(',') || null,
       isActive:                 r.isActive,
     }));
     this.api.updateRubriques(psId, payload).subscribe({
@@ -276,18 +288,65 @@ export class ParameterSetsComponent {
 
   formatCalcMode(calcMode: string): string {
     switch (calcMode) {
-      case 'FIXE_MENSUEL':        return 'Fixe mensuel';
-      case 'FIXE_JOURNALIER':     return 'Fixe/jour';
-      case 'POURCENTAGE_BRUT':    return '% Brut';
-      case 'POURCENTAGE_CHARGES': return '% Charges';
-      default:                    return calcMode;
+      case 'FIXE_MENSUEL':         return 'Fixe mensuel';
+      case 'FIXE_JOURNALIER':      return 'Fixe/jour';
+      case 'POURCENTAGE_BRUT':     return '% Brut';
+      case 'POURCENTAGE_CHARGES':  return '% Charges';
+      case 'POURCENTAGE_PLAFONNE': return '% Plafonné';
+      default:                     return calcMode;
     }
   }
 
-  rubriqueValue(r: { calcMode: string; amount: number | null; rate: number | null }, devise: string = ''): string {
+  rubriqueValue(r: { calcMode: string; amount: number | null; rate: number | null; capAmount?: number | null }, devise: string = ''): string {
     if (r.calcMode === 'FIXE_MENSUEL' || r.calcMode === 'FIXE_JOURNALIER') {
       return r.amount != null ? `${r.amount.toLocaleString('fr-FR')}${r.calcMode === 'FIXE_JOURNALIER' ? '/j' : ''}` : '—';
     }
-    return r.rate != null ? `${(r.rate * 100).toFixed(2)} %` : '—';
+    if (r.rate != null) {
+      const pct = `${(r.rate * 100).toFixed(2)} %`;
+      return (r.calcMode === 'POURCENTAGE_PLAFONNE' && r.capAmount != null)
+        ? `${pct} (plaf. ${r.capAmount.toLocaleString('fr-FR')})`
+        : pct;
+    }
+    return '—';
+  }
+
+  toggleRubriqueCard(i: number): void {
+    const s = new Set(this.expandedRubriques());
+    if (s.has(i)) { s.delete(i); } else { s.add(i); }
+    this.expandedRubriques.set(s);
+  }
+
+  isRubriqueExpanded(i: number): boolean {
+    return this.expandedRubriques().has(i);
+  }
+
+  natureLabel(value: string): string {
+    return this.natureOptions.find(o => o.value === value)?.label ?? value;
+  }
+
+  calcModeLabel(value: string): string {
+    return this.calcModeOptions.find(o => o.value === value)?.label ?? value;
+  }
+
+  previewAmount(i: number): string {
+    const g = this.editRubriqueGroup(i).getRawValue();
+    const gross = this.testGross();
+    let amount = 0;
+    switch (g['calcMode']) {
+      case 'FIXE_MENSUEL':
+      case 'FIXE_JOURNALIER':
+        amount = g['amount'] ?? 0;
+        break;
+      case 'POURCENTAGE_BRUT':
+      case 'POURCENTAGE_CHARGES':
+        amount = gross * (g['ratePercent'] ?? 0) / 100;
+        break;
+      case 'POURCENTAGE_PLAFONNE': {
+        const cap: number = g['capAmount'] ?? gross;
+        amount = Math.min(gross, cap) * (g['ratePercent'] ?? 0) / 100;
+        break;
+      }
+    }
+    return amount.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 }
