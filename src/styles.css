@@ -5,14 +5,38 @@
 @source './app';
 @source '../node_modules/@khalilrebhiitec/daf360/fesm2022/khalilrebhiitec-daf360.mjs';
 
+/* Colour names the LIB doesn't declare must be registered here, in @theme — not in
+   :root below. Tailwind v4 generates `bg-x`/`text-x`/`border-x` only for colours in
+   the theme namespace; a :root declaration merely sets the value of an already-
+   registered token. The lib ships --color-error-container / --color-on-error-container
+   but NO --color-error, so `bg-error` / `text-error` declared in :root resolved to
+   nothing and rendered uncoloured. */
+@theme {
+  --color-error: var(--color-danger);
+}
+
+/* ⚠️ The three brand overrides below are duplicated VERBATIM in daf360-shell,
+   daf360-rh-frontend and daf360-facturation-frontend. Every remote's styles.css is
+   loaded into the shell's single document, so the last :root to load wins — if the
+   four blocks disagree, the whole app's text/background colour changes depending on
+   which remote you happened to navigate through. Change one, change all four. */
 :root {
   --font-sans:                       'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Finance component SCSS hardcodes #0b1c30 as its text colour and #f8f9fb as its
+     page background; point the lib tokens at both so `text-on-surface` /
+     `bg-background` match (lib defaults: #191c1e / #f2f4f6). */
+  --color-on-surface:                #0b1c30;
+  --color-background:                #f8f9fb;
+  /* Lib bug: --color-teal-light (#1C4E5C) is actually DARKER than
+     --color-teal (#2D5D6E), so daf-button's variant="teal" hover state
+     (hover:bg-teal-light) barely changes anything visible instead of
+     lightening. Point it at the bright teal accent. */
+  --color-teal-light:                #00c1ad;
   --color-text:                      var(--color-on-surface);
   --color-text-muted:                var(--color-on-surface-variant);
   --color-border:                    var(--color-outline-variant);
   --color-bg:                        var(--color-background);
   --color-bg-secondary:              var(--color-surface-container-low);
-  --color-error:                     var(--color-danger);
   --color-primary-hover:             var(--color-primary);
   --color-primary-dark:              var(--color-primary);
   --color-primary-light:             var(--color-teal-light);
