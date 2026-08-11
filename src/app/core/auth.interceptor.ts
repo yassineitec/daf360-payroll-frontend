@@ -1,43 +1,59 @@
 import { HttpInterceptorFn, HttpRequest } from '@angular/common/http';
-import { inject } from '@angular/core';
-import { catchError, throwError, from, switchMap, EMPTY } from 'rxjs';
+import { inject, Injector } from '@angular/core';
+import { Store } from '@ngrx/store';
+import { selectCurrentUser } from '@khalilrebhiitec/daf360';
+import { catchError, throwError, from, switchMap, EMPTY, take } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { UserStore } from './user.store';
 import { AuthService } from './auth.service';
 
-function withToken(req: HttpRequest<unknown>, token: string | null | undefined): HttpRequest<unknown> {
+function withToken(
+  req: HttpRequest<unknown>,
+  token: string | null | undefined,
+): HttpRequest<unknown> {
   return token
     ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` }, withCredentials: true })
     : req.clone({ withCredentials: true });
 }
 
-export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  const store = inject(UserStore);
-  const auth  = inject(AuthService);
+/** Read the current user's rhToken synchronously from the NgRx store. */
+function getRhToken(store: Store): string | null | undefined {
+  let token: string | null | undefined;
+  store.select(selectCurrentUser).pipe(take(1)).subscribe(u => { token = u?.rhToken; });
+  return token;
+}
 
-  const isPortalCall  = req.url.startsWith(environment.portalUrl);
-  const isPayrollApi  = req.url.startsWith(environment.payrollApiUrl);
-  const isHrApi       = req.url.startsWith(environment.hrApiUrl);
+export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  // Use Store directly — avoids UserStore → HttpClient → interceptor → UserStore cycle.
+  const store    = inject(Store);
+  // Use Injector for lazy AuthService access — AuthService injects UserStore,
+  // so we must NOT inject it eagerly here (same cycle risk).
+  const injector = inject(Injector);
+  const getAuth  = () => injector.get(AuthService);
+
+  const isPortalCall = req.url.startsWith(environment.portalUrl);
+  const isPayrollApi = req.url.startsWith(environment.payrollApiUrl);
+  const isHrApi      = req.url.startsWith(environment.hrApiUrl);
 
   if (isPortalCall) {
     return next(req.clone({ withCredentials: true })).pipe(
       catchError(err => {
-        if (err.status === 401) auth.login();
+        if (err.status === 401) getAuth().login();
         return throwError(() => err);
       }),
     );
   }
 
   if (isPayrollApi || isHrApi) {
-    return next(withToken(req, store.user()?.rhToken)).pipe(
+    return next(withToken(req, getRhToken(store))).pipe(
       catchError(err => {
         if (err.status !== 401) return throwError(() => err);
-        return from(auth.refreshToken()).pipe(
+        return from(getAuth().refreshToken()).pipe(
           switchMap(isAuthenticated => {
-            if (!isAuthenticated) { auth.login(); return EMPTY; }
-            return next(withToken(req, store.user()?.rhToken));
+            if (!isAuthenticated) { getAuth().login(); return EMPTY; }
+            // Re-read token from store after successful refresh
+            return next(withToken(req, getRhToken(store)));
           }),
-          catchError(() => { auth.login(); return EMPTY; }),
+          catchError(() => { getAuth().login(); return EMPTY; }),
         );
       }),
     );

@@ -35,6 +35,68 @@
 .ri { height: 30px; padding: 0 7px; border: 1px solid var(--color-outline-variant); border-radius: var(--radius-md); background: var(--color-surface-container-low); color: var(--color-on-surface); font-size: 0.8125rem; width: 100%; box-sizing: border-box; &:focus { outline: none; border-color: var(--color-primary); } }
 .btn-remove { height: 26px; width: 26px; border: none; border-radius: var(--radius-md); background: none; cursor: pointer; color: var(--color-on-surface-variant); font-size: 0.875rem; display: flex; align-items: center; justify-content: center; padding: 0; &:hover { background: color-mix(in srgb, var(--color-error) 12%, transparent); color: var(--color-error); } }
 
+/* ── Charge formula expansion ────────────────────────────────────────────── */
+
+// rates-row modifier: round bottom corners only when NOT followed by a formula block
+.rates-row--formula {
+  border-radius: 0 !important;
+}
+
+// Placeholder cells when rates are replaced by formula hint arrows
+.ri--hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  color: var(--color-primary);
+  opacity: 0.7;
+  font-style: italic;
+}
+
+// Expansion block that appears directly below a FORMULE-mode rates-row
+.rate-formula-block {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 14px 14px;
+  background: color-mix(in srgb, var(--color-primary) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 20%, transparent);
+  border-top: none;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  min-width: 680px;
+}
+
+.rate-formula-field {
+  flex: 1 1 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rate-formula-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-on-surface-variant);
+}
+
+// Inline code in read-only charge table showing the formula string
+.formula-preview {
+  font-family: 'Cascadia Code', 'Consolas', 'Fira Code', monospace;
+  font-size: 0.72rem;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  vertical-align: middle;
+}
+
 /* ── Rubriques de paie ─────────────────────────────────────────────────── */
 .rubriques-editor { margin-top: 10px; }
 .rubriques-wrap { overflow-x: auto; }
@@ -249,6 +311,66 @@
     border-color: var(--color-primary);
     background: color-mix(in srgb, var(--color-primary) 10%, transparent);
     color: var(--color-primary);
+  }
+}
+
+/* ── Formula expression input ────────────────────────────────────────────── */
+.rg-field--full {
+  flex: 1 1 100%;
+  min-width: 280px;
+}
+
+.formula-input {
+  font-family: 'Cascadia Code', 'Consolas', 'Fira Code', monospace;
+  font-size: 0.875rem;
+  letter-spacing: 0.01em;
+  &::placeholder { color: var(--color-on-surface-variant); opacity: 0.6; font-style: italic; }
+}
+
+.formula-hint { margin-bottom: 8px !important; }
+
+.formula-vars {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.formula-vars-divider {
+  font-size: 0.75rem;
+  color: var(--color-on-surface-variant);
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+.formula-var-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border: 1px solid var(--color-outline-variant);
+  border-radius: 999px;
+  background: var(--color-surface-container);
+  color: var(--color-on-surface);
+  font-family: monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+  &:hover {
+    border-color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+    color: var(--color-primary);
+  }
+  &--rubrique {
+    border-color: color-mix(in srgb, #8b5cf6 35%, transparent);
+    color: #7c3aed;
+    background: color-mix(in srgb, #8b5cf6 8%, transparent);
+    &:hover {
+      border-color: #8b5cf6;
+      background: color-mix(in srgb, #8b5cf6 18%, transparent);
+      color: #5b21b6;
+    }
   }
 }
 

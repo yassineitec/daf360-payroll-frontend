@@ -29,6 +29,11 @@ export const routes: Routes = [
           import('./modules/parameter-sets/parameter-sets.routes').then(m => m.PARAMETER_SETS_ROUTES),
       },
       {
+        path: 'budget',
+        loadChildren: () =>
+          import('./modules/budget/budget.routes').then(m => m.BUDGET_ROUTES),
+      },
+      {
         path: 'admin',
         loadChildren: () =>
           import('./modules/admin/admin.routes').then(m => m.ADMIN_ROUTES),

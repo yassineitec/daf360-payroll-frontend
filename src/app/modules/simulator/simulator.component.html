@@ -1,135 +1,495 @@
-<div class="page-header">
-  <h1 class="page-title">Simulateur de paie individuel</h1>
-  <p class="page-subtitle">Calcul net → brut → coût chargé via convergence Newton-Raphson</p>
-</div>
+<daf-page [loading]="loading()">
+  <daf-page-header
+    title="Simulateur de paie individuel"
+    subtitle="Net cible → 5 strates → coût chargé · multi-devises · convergence Newton-Raphson">
+  </daf-page-header>
 
-<div class="sim-layout">
-  <!-- Input form -->
-  <section class="sim-card" [formGroup]="form">
-    <h2 class="card-title">Paramètres d'entrée</h2>
+  <div class="px-6 pb-8">
+    <div class="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6" [formGroup]="form">
 
-    <div class="field-group">
-      <label class="field-label">Pays</label>
-      <app-pays-select formControlName="paysId"></app-pays-select>
-    </div>
+      <!-- ─── Form card ─────────────────────────────────────────────────────── -->
+      <daf-card [options]="{ variant: 'outlined', padding: 'none', radius: 'xl' }">
 
-    <div class="field-group">
-      <label class="field-label" for="inputNet">Net souhaité (devise locale)</label>
-      <input id="inputNet" type="number" class="field-input"
-             formControlName="inputNet"
-             placeholder="Ex : 2500" step="100" />
-    </div>
-
-    <div class="field-group">
-      <label class="field-label" for="contractType">Type de contrat</label>
-      <select id="contractType" class="field-input" formControlName="contractType">
-        @for (ct of contractTypes; track ct) {
-          <option [value]="ct">{{ ct }}</option>
-        }
-      </select>
-    </div>
-
-    <div class="form-actions">
-      <button class="btn btn-primary" (click)="submit()" [disabled]="form.invalid || loading()">
-        @if (loading()) { Calcul en cours… } @else { Simuler }
-      </button>
-      <button class="btn btn-ghost" (click)="reset()" type="button">Réinitialiser</button>
-    </div>
-
-    @if (error()) {
-      <div class="alert alert-error">{{ error() }}</div>
-    }
-  </section>
-
-  <!-- Result -->
-  @if (result(); as r) {
-    <section class="sim-card sim-result">
-      <h2 class="card-title">
-        Résultat
-        @if (r.localCurrency) {
-          <span class="currency-badge">{{ r.localCurrency }}</span>
-        }
-      </h2>
-
-      @if (convergenceWarning()) {
-        <div class="alert alert-warning">
-          ⚠️ La convergence n'a pas abouti après {{ r.iterationsUsed }} itérations —
-          le résultat est une estimation.
+        <!-- Section: Profil candidat -->
+        <div class="px-5 py-4 border-b border-outline-variant flex items-center gap-3">
+          <span class="material-symbols-outlined text-xl text-primary" style="font-variation-settings:'FILL' 1">person</span>
+          <h2 class="text-base font-semibold text-on-surface">Profil candidat</h2>
         </div>
+
+        <div class="p-5 flex flex-col gap-4">
+
+          <!-- Pays -->
+          <div>
+            <label class="block text-[13px] font-medium text-on-surface-variant mb-1.5">
+              Pays / Référentiel fiscal <span class="text-danger">*</span>
+            </label>
+            <app-pays-select formControlName="paysId"></app-pays-select>
+          </div>
+
+          <!-- Nom / Poste -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="candidateLabel" class="block text-[13px] font-medium text-on-surface-variant mb-1.5">Nom / Label</label>
+              <input id="candidateLabel" type="text" formControlName="candidateLabel"
+                     placeholder="ex : Candidat A"
+                     class="h-9 w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+            </div>
+            <div>
+              <label for="poste" class="block text-[13px] font-medium text-on-surface-variant mb-1.5">Poste</label>
+              <input id="poste" type="text" formControlName="poste"
+                     placeholder="ex : Ingénieur logiciel"
+                     class="h-9 w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+            </div>
+          </div>
+
+          <!-- Grade / Discipline -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="grade" class="block text-[13px] font-medium text-on-surface-variant mb-1.5">Grade</label>
+              <select id="grade" formControlName="grade"
+                      class="h-9 w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                <option value="">— Sélectionner —</option>
+                @for (g of grades(); track g.id) {
+                  <option [value]="g.labelFr">{{ g.labelFr }}</option>
+                }
+              </select>
+            </div>
+            <div>
+              <label for="discipline" class="block text-[13px] font-medium text-on-surface-variant mb-1.5">Discipline</label>
+              <select id="discipline" formControlName="discipline"
+                      class="h-9 w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                <option value="">— Sélectionner —</option>
+                @for (d of disciplines(); track d.id) {
+                  <option [value]="d.labelFr">{{ d.labelFr }}</option>
+                }
+              </select>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Section: Paramètres de calcul -->
+        <div class="px-5 py-4 border-t border-b border-outline-variant flex items-center gap-3">
+          <span class="material-symbols-outlined text-xl text-secondary" style="font-variation-settings:'FILL' 1">calculate</span>
+          <h2 class="text-base font-semibold text-on-surface">Paramètres de calcul</h2>
+        </div>
+
+        <div class="p-5 flex flex-col gap-4">
+
+          <!-- Mode toggle -->
+          <div>
+            <p class="text-[13px] font-medium text-on-surface-variant mb-1.5">Mode de simulation</p>
+            <div class="flex rounded-xl border border-outline-variant overflow-hidden text-[13px] font-medium">
+              <button type="button"
+                      class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 transition-colors"
+                      [class.bg-primary]="mode() === 'NET_TO_BRUT'"
+                      [class.text-on-primary]="mode() === 'NET_TO_BRUT'"
+                      [class.text-on-surface-variant]="mode() !== 'NET_TO_BRUT'"
+                      (click)="setMode('NET_TO_BRUT')">
+                <span class="material-symbols-outlined text-[16px]">arrow_upward</span>
+                Net → Brut
+              </button>
+              <button type="button"
+                      class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border-l border-outline-variant transition-colors"
+                      [class.bg-primary]="mode() === 'BRUT_TO_NET'"
+                      [class.text-on-primary]="mode() === 'BRUT_TO_NET'"
+                      [class.text-on-surface-variant]="mode() !== 'BRUT_TO_NET'"
+                      (click)="setMode('BRUT_TO_NET')">
+                <span class="material-symbols-outlined text-[16px]">arrow_downward</span>
+                Brut → Net
+              </button>
+            </div>
+            <p class="mt-1 text-[11px] text-on-surface-variant">
+              @if (mode() === 'NET_TO_BRUT') { Saisissez le net souhaité — le brut et le coût chargé sont calculés. }
+              @else { Saisissez le brut — le net et le coût chargé sont calculés en un seul passage. }
+            </p>
+          </div>
+
+          <!-- Period toggle -->
+          <div>
+            <p class="text-[13px] font-medium text-on-surface-variant mb-1.5">Période de saisie</p>
+            <div class="flex rounded-xl border border-outline-variant overflow-hidden text-[13px] font-medium">
+              <button type="button"
+                      class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 transition-colors"
+                      [class.bg-secondary]="period() === 'MONTHLY'"
+                      [class.text-on-secondary]="period() === 'MONTHLY'"
+                      [class.text-on-surface-variant]="period() !== 'MONTHLY'"
+                      (click)="setPeriod('MONTHLY')">
+                <span class="material-symbols-outlined text-[16px]">calendar_view_month</span>
+                Mensuel
+              </button>
+              <button type="button"
+                      class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border-l border-outline-variant transition-colors"
+                      [class.bg-secondary]="period() === 'YEARLY'"
+                      [class.text-on-secondary]="period() === 'YEARLY'"
+                      [class.text-on-surface-variant]="period() !== 'YEARLY'"
+                      (click)="setPeriod('YEARLY')">
+                <span class="material-symbols-outlined text-[16px]">calendar_month</span>
+                Annuel
+              </button>
+            </div>
+            <p class="mt-1 text-[11px] text-on-surface-variant">
+              @if (period() === 'MONTHLY') { Saisie mensuelle — les résultats affichent le mensuel et l'annuel (× 12). }
+              @else { Saisie annuelle — la valeur est divisée par 12 avant calcul. Les résultats s'affichent en mensuel et annuel. }
+            </p>
+          </div>
+
+          <!-- Net cible (NET_TO_BRUT only) -->
+          @if (mode() === 'NET_TO_BRUT') {
+            <div>
+              <label for="inputNet" class="block text-[13px] font-medium text-on-surface-variant mb-1.5">
+                Net souhaité {{ period() === 'MONTHLY' ? 'mensuel' : 'annuel' }} (devise locale) <span class="text-danger">*</span>
+              </label>
+              <input id="inputNet" type="number" formControlName="inputNet"
+                     placeholder="ex : 2 500" step="100" min="1"
+                     class="h-9 w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+            </div>
+          }
+
+          <!-- Salaire brut (BRUT_TO_NET only) -->
+          @if (mode() === 'BRUT_TO_NET') {
+            <div>
+              <label for="inputGross" class="block text-[13px] font-medium text-on-surface-variant mb-1.5">
+                Salaire brut {{ period() === 'MONTHLY' ? 'mensuel' : 'annuel' }} (devise locale) <span class="text-danger">*</span>
+              </label>
+              <input id="inputGross" type="number" formControlName="inputGross"
+                     placeholder="ex : 3 800" step="100" min="1"
+                     class="h-9 w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+            </div>
+          }
+
+          <!-- Contrat / Jours -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="contractType" class="block text-[13px] font-medium text-on-surface-variant mb-1.5">Type de contrat</label>
+              <select id="contractType" formControlName="contractType"
+                      class="h-9 w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
+                @for (ct of availableContractTypes(); track ct) {
+                  <option [value]="ct">{{ ct }}</option>
+                }
+              </select>
+            </div>
+            <div>
+              <label for="joursTravailes" class="block text-[13px] font-medium text-on-surface-variant mb-1.5">Jours ouvrés / mois</label>
+              <input id="joursTravailes" type="number" formControlName="joursTravailes"
+                     min="1" max="31" step="1"
+                     class="h-9 w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Benefits -->
+        @if (loadingRefs()) {
+          <div class="px-5 pb-4 text-[13px] text-on-surface-variant flex items-center gap-2">
+            <span class="material-symbols-outlined text-base animate-spin">progress_activity</span>
+            Chargement des avantages…
+          </div>
+        }
+
+        @if (availableBenefits().length > 0) {
+          <div class="px-5 py-4 border-t border-outline-variant flex items-center gap-3">
+            <span class="material-symbols-outlined text-xl text-tertiary" style="font-variation-settings:'FILL' 1">redeem</span>
+            <h2 class="text-base font-semibold text-on-surface">Avantages à inclure</h2>
+          </div>
+          <div class="benefits-grid px-5 pb-5">
+            @for (benefit of availableBenefits(); track benefit.benefitCode) {
+              <label class="benefit-chip" [class.benefit-chip--active]="isBenefitSelected(benefit.benefitCode)">
+                <input type="checkbox"
+                       [checked]="isBenefitSelected(benefit.benefitCode)"
+                       (change)="toggleBenefit(benefit.benefitCode)" />
+                <span class="benefit-name">{{ benefit.benefitLabelFr }}</span>
+                <span class="benefit-amount">{{ benefit.monthlyValue | number:'1.0-0' }}
+                  <span class="benefit-type" [class.benefit-type--taxable]="benefit.isTaxable">
+                    {{ benefit.isTaxable ? 'imposable' : 'exonéré' }}
+                  </span>
+                </span>
+              </label>
+            }
+          </div>
+        }
+
+        <!-- Actions -->
+        <div class="px-5 pb-5 flex items-center gap-3 flex-wrap border-t border-outline-variant pt-5">
+          <daf-button
+            label="Simuler"
+            variant="primary"
+            [options]="{ loading: loading(), disabled: form.invalid || loading(), iconStart: 'calculate' }"
+            (onClick)="submit()">
+          </daf-button>
+          <daf-button
+            label="Réinitialiser"
+            variant="ghost"
+            [options]="{ iconStart: 'refresh' }"
+            (onClick)="reset()">
+          </daf-button>
+        </div>
+
+        @if (error()) {
+          <div class="mx-5 mb-5 flex items-center gap-2 rounded-xl border border-danger/30 bg-danger/5 px-4 py-2.5 text-sm text-danger">
+            <span class="material-symbols-outlined text-base">error</span>
+            {{ error() }}
+          </div>
+        }
+
+      </daf-card>
+
+      <!-- ─── Result card ────────────────────────────────────────────────────── -->
+      @if (result(); as r) {
+        <daf-card [options]="{ variant: 'outlined', padding: 'none', radius: 'xl' }">
+
+          <!-- Header -->
+          <div class="px-5 py-4 border-b border-outline-variant flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 flex-wrap">
+              <span class="material-symbols-outlined text-xl text-primary" style="font-variation-settings:'FILL' 1">bar_chart</span>
+              <h2 class="text-base font-semibold text-on-surface">
+                Résultat
+                @if (r.localCurrency) {
+                  <span class="ml-2 inline-flex items-center rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-bold text-on-primary">{{ r.localCurrency }}</span>
+                }
+              </h2>
+              @if (r.mode === 'BRUT_TO_NET') {
+                <span class="inline-flex items-center gap-1 rounded-full bg-secondary/10 px-2.5 py-0.5 text-[11px] font-semibold text-secondary">
+                  <span class="material-symbols-outlined text-[13px]">arrow_downward</span>Brut → Net
+                </span>
+              }
+            </div>
+            <daf-button
+              label="Exporter PDF"
+              variant="ghost"
+              [options]="{ loading: pdfGenerating(), iconStart: 'picture_as_pdf' }"
+              (onClick)="exportPdf()">
+            </daf-button>
+          </div>
+
+          <div class="p-5 sm:p-8 flex flex-col gap-5" id="sim-result-printable">
+
+            <!-- Candidate metadata -->
+            @if (r.candidateLabel || r.poste) {
+              <div class="candidate-meta">
+                @if (r.candidateLabel) { <span class="meta-item meta-label">{{ r.candidateLabel }}</span> }
+                @if (r.poste) { <span class="meta-item">{{ r.poste }}</span> }
+                @if (r.grade) { <span class="meta-item meta-badge">{{ r.grade }}</span> }
+                @if (r.discipline) { <span class="meta-item meta-badge">{{ r.discipline }}</span> }
+              </div>
+            }
+
+            @if (convergenceWarning()) {
+              <div class="flex items-center gap-2 rounded-xl border border-warning/40 bg-warning/8 px-4 py-2.5 text-sm text-warning-dark">
+                <span class="material-symbols-outlined text-base">warning</span>
+                Convergence non atteinte après {{ r.iterationsUsed }} itérations — résultat estimé.
+              </div>
+            }
+
+            <!-- 5-strata waterfall -->
+            <div class="strata-waterfall">
+              <div class="stratum stratum--s1">
+                <div class="stratum-badge">S1</div>
+                <div class="stratum-body">
+                  <span class="stratum-label">Net versé</span>
+                  <span class="stratum-value">{{ r.inputNet | number:'1.2-2' }}
+                    @if (r.localCurrency) { <em>{{ r.localCurrency }}</em> }
+                  </span>
+                </div>
+              </div>
+
+              <div class="stratum-arrow">+ cotisations salariales ({{ (r.netTaxable - r.inputNet) | number:'1.2-2' }})</div>
+
+              <div class="stratum stratum--s2">
+                <div class="stratum-badge">S2</div>
+                <div class="stratum-body">
+                  <span class="stratum-label">Net imposable</span>
+                  <span class="stratum-value">{{ r.netTaxable | number:'1.2-2' }}
+                    @if (r.localCurrency) { <em>{{ r.localCurrency }}</em> }
+                  </span>
+                </div>
+              </div>
+
+              <div class="stratum-arrow">+ IRPP ({{ r.irppAmount | number:'1.2-2' }})</div>
+
+              <div class="stratum stratum--s3">
+                <div class="stratum-badge">S3</div>
+                <div class="stratum-body">
+                  <span class="stratum-label">Brut base taxable</span>
+                  <span class="stratum-value">{{ r.gross | number:'1.2-2' }}
+                    @if (r.localCurrency) { <em>{{ r.localCurrency }}</em> }
+                  </span>
+                </div>
+              </div>
+
+              @if (r.grossWithBenefits != null && r.grossWithBenefits !== r.gross) {
+                <div class="stratum-arrow">+ avantages exonérés ({{ (r.grossWithBenefits - r.gross) | number:'1.2-2' }})</div>
+                <div class="stratum stratum--s4">
+                  <div class="stratum-badge">S4</div>
+                  <div class="stratum-body">
+                    <span class="stratum-label">Brut total</span>
+                    <span class="stratum-value">{{ r.grossWithBenefits | number:'1.2-2' }}
+                      @if (r.localCurrency) { <em>{{ r.localCurrency }}</em> }
+                    </span>
+                  </div>
+                </div>
+              } @else {
+                <div class="stratum stratum--s4 stratum--empty">
+                  <div class="stratum-badge">S4</div>
+                  <div class="stratum-body">
+                    <span class="stratum-label">Brut total</span>
+                    <span class="stratum-value stratum-value--equal">= S3 (pas d'avantages exonérés)</span>
+                  </div>
+                </div>
+              }
+
+              <div class="stratum-arrow">+ charges patronales ({{ r.employerCharges | number:'1.2-2' }})</div>
+
+              <div class="stratum stratum--s5">
+                <div class="stratum-badge">S5</div>
+                <div class="stratum-body">
+                  <span class="stratum-label">Coût chargé total</span>
+                  <span class="stratum-value stratum-value--highlight">{{ r.loadedCost | number:'1.2-2' }}
+                    @if (r.localCurrency) { <em>{{ r.localCurrency }}</em> }
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Annual summary (always shown) -->
+            <div class="rounded-xl border border-outline-variant/50 overflow-hidden">
+              <div class="px-4 py-2 bg-surface-container-low border-b border-outline-variant/40 flex items-center gap-2">
+                <span class="material-symbols-outlined text-[14px] text-outline" style="font-variation-settings:'FILL' 1">event_repeat</span>
+                <p class="text-[10px] font-bold uppercase tracking-widest text-outline">Récapitulatif annuel (× 12)</p>
+              </div>
+              <div class="grid grid-cols-3 divide-x divide-outline-variant/30 text-center">
+                <div class="px-3 py-3">
+                  <p class="text-[10px] text-on-surface-variant uppercase tracking-wide mb-1">Net / an</p>
+                  <p class="text-[13px] font-semibold tabular-nums">{{ (r.gross - r.employeeCharges - r.irppAmount) * 12 | number:'1.0-0' }}</p>
+                  <p class="text-[10px] text-on-surface-variant">{{ r.localCurrency }}</p>
+                </div>
+                <div class="px-3 py-3">
+                  <p class="text-[10px] text-on-surface-variant uppercase tracking-wide mb-1">Brut / an</p>
+                  <p class="text-[13px] font-semibold tabular-nums">{{ r.gross * 12 | number:'1.0-0' }}</p>
+                  <p class="text-[10px] text-on-surface-variant">{{ r.localCurrency }}</p>
+                </div>
+                <div class="px-3 py-3">
+                  <p class="text-[10px] text-on-surface-variant uppercase tracking-wide mb-1">Coût chargé / an</p>
+                  <p class="text-[14px] font-bold text-primary tabular-nums">{{ r.loadedCost * 12 | number:'1.0-0' }}</p>
+                  <p class="text-[10px] text-on-surface-variant">{{ r.localCurrency }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Multi-currency -->
+            @if (r.loadedCostEur != null || r.loadedCostChf != null) {
+              <div class="fx-row">
+                <span class="fx-label">Coût chargé en :</span>
+                @if (r.loadedCostEur != null) {
+                  <span class="fx-chip">
+                    <strong>{{ r.loadedCostEur | number:'1.2-2' }}</strong> EUR
+                    <em>(1 {{ r.localCurrency }} = {{ r.fxRateEur | number:'1.4-4' }} EUR)</em>
+                  </span>
+                }
+                @if (r.loadedCostChf != null) {
+                  <span class="fx-chip">
+                    <strong>{{ r.loadedCostChf | number:'1.2-2' }}</strong> CHF
+                    <em>(1 {{ r.localCurrency }} = {{ r.fxRateChf | number:'1.4-4' }} CHF)</em>
+                  </span>
+                }
+                @if (r.loadedCostUsd != null) {
+                  <span class="fx-chip">
+                    <strong>{{ r.loadedCostUsd | number:'1.2-2' }}</strong> USD
+                    <em>(1 {{ r.localCurrency }} = {{ r.fxRateUsd | number:'1.4-4' }} USD)</em>
+                  </span>
+                }
+              </div>
+            }
+
+            <!-- Cost / net ratio -->
+            @if (r.costNetRatio != null) {
+              <div class="ratio-row">
+                <span class="ratio-label">Ratio coût / net</span>
+                <span class="ratio-value">× {{ r.costNetRatio | number:'1.2-2' }}</span>
+                <span class="ratio-desc">— pour 1 {{ r.localCurrency }} net, l'employeur paie {{ r.costNetRatio | number:'1.2-2' }} {{ r.localCurrency }}</span>
+              </div>
+            }
+
+            <!-- Detail breakdown -->
+            <details class="detail-block">
+              <summary class="detail-summary">Détail du calcul</summary>
+              <div class="detail-grid">
+                <div class="detail-row">
+                  <span>Charges salariales</span>
+                  <span class="text-right">
+                    {{ r.employeeCharges | number:'1.2-2' }} {{ r.localCurrency ?? '' }}
+                    <span class="block text-[10px] text-on-surface-variant tabular-nums">{{ r.employeeCharges * 12 | number:'1.0-0' }} / an</span>
+                  </span>
+                </div>
+                <div class="detail-row">
+                  <span>IRPP</span>
+                  <span class="text-right">
+                    {{ r.irppAmount | number:'1.2-2' }} {{ r.localCurrency ?? '' }}
+                    <span class="block text-[10px] text-on-surface-variant tabular-nums">{{ r.irppAmount * 12 | number:'1.0-0' }} / an</span>
+                  </span>
+                </div>
+                <div class="detail-row">
+                  <span>Charges patronales</span>
+                  <span class="text-right">
+                    {{ r.employerCharges | number:'1.2-2' }} {{ r.localCurrency ?? '' }}
+                    <span class="block text-[10px] text-on-surface-variant tabular-nums">{{ r.employerCharges * 12 | number:'1.0-0' }} / an</span>
+                  </span>
+                </div>
+                <div class="detail-row detail-row--meta">
+                  <span>Contrat</span>
+                  <span>{{ r.contractType }}</span>
+                </div>
+                <div class="detail-row detail-row--meta">
+                  <span>Paramètre set</span>
+                  <span>#{{ r.parameterSetId }}</span>
+                </div>
+                <div class="detail-row detail-row--meta">
+                  <span>Itérations convergence</span>
+                  <span>{{ r.iterationsUsed }}</span>
+                </div>
+              </div>
+            </details>
+
+            <!-- Rubrique breakdown -->
+            @if (parsedRubriques().length > 0) {
+              <details class="detail-block">
+                <summary class="detail-summary">
+                  Rubriques de paie
+                  <span class="detail-summary-count">{{ parsedRubriques().length }}</span>
+                </summary>
+                <div class="rubrique-table">
+                  <div class="rubrique-table-head">
+                    <span>Code</span>
+                    <span>Nature</span>
+                    <span>Mode</span>
+                    <span class="text-right">Montant</span>
+                  </div>
+                  @for (rb of parsedRubriques(); track rb.code) {
+                    <div class="rubrique-row" [class.rubrique-row--debit]="rb.direction === 'DEBIT'">
+                      <span class="rubrique-code">{{ rb.code }}</span>
+                      <span class="rubrique-nature">{{ rb.nature ?? '—' }}</span>
+                      <span class="rubrique-mode">
+                        @if (rb.calcMode === 'FORMULE') {
+                          <span class="mode-badge mode-badge--formula">ƒ(x)</span>
+                        } @else {
+                          {{ rb.calcMode }}
+                        }
+                      </span>
+                      <span class="rubrique-amount" [class.rubrique-amount--credit]="rb.direction === 'CREDIT'"
+                                                    [class.rubrique-amount--debit]="rb.direction === 'DEBIT'">
+                        {{ rb.direction === 'CREDIT' ? '+' : '−' }}{{ rb.amount | number:'1.2-2' }}
+                        <em>{{ r.localCurrency }}</em>
+                      </span>
+                    </div>
+                  }
+                </div>
+              </details>
+            }
+
+          </div>
+        </daf-card>
       }
 
-      <div class="strata-grid">
-        <div class="stratum stratum--net">
-          <span class="stratum-label">Net en main</span>
-          <span class="stratum-value">{{ r.inputNet | number:'1.2-2' }}
-            @if (r.localCurrency) { <span class="stratum-devise">{{ r.localCurrency }}</span> }
-          </span>
-        </div>
-        <div class="stratum stratum--taxable">
-          <span class="stratum-label">Base imposable</span>
-          <span class="stratum-value">{{ r.taxableBase | number:'1.2-2' }}
-            @if (r.localCurrency) { <span class="stratum-devise">{{ r.localCurrency }}</span> }
-          </span>
-        </div>
-        <div class="stratum stratum--gross">
-          <span class="stratum-label">Salaire brut</span>
-          <span class="stratum-value">{{ r.gross | number:'1.2-2' }}
-            @if (r.localCurrency) { <span class="stratum-devise">{{ r.localCurrency }}</span> }
-          </span>
-        </div>
-        <div class="stratum stratum--cost">
-          <span class="stratum-label">Coût chargé</span>
-          <span class="stratum-value">{{ r.loadedCost | number:'1.2-2' }}
-            @if (r.localCurrency) { <span class="stratum-devise">{{ r.localCurrency }}</span> }
-          </span>
-        </div>
-        @if (r.loadedCostEur != null) {
-          <div class="stratum stratum--fx">
-            <span class="stratum-label">Coût chargé</span>
-            <span class="stratum-value">{{ r.loadedCostEur | number:'1.2-2' }}
-              <span class="stratum-devise">EUR</span>
-            </span>
-          </div>
-        }
-        @if (r.loadedCostUsd != null) {
-          <div class="stratum stratum--fx">
-            <span class="stratum-label">Coût chargé</span>
-            <span class="stratum-value">{{ r.loadedCostUsd | number:'1.2-2' }}
-              <span class="stratum-devise">USD</span>
-            </span>
-          </div>
-        }
-      </div>
-
-      <div class="detail-grid">
-        <div class="detail-row">
-          <span>IRPP</span>
-          <span>{{ r.irppAmount | number:'1.2-2' }} {{ r.localCurrency ?? '' }}</span>
-        </div>
-        <div class="detail-row">
-          <span>Charges salariales</span>
-          <span>{{ r.employeeCharges | number:'1.2-2' }} {{ r.localCurrency ?? '' }}</span>
-        </div>
-        <div class="detail-row">
-          <span>Charges patronales</span>
-          <span>{{ r.employerCharges | number:'1.2-2' }} {{ r.localCurrency ?? '' }}</span>
-        </div>
-        @if (r.fxRateEur != null) {
-          <div class="detail-row detail-row--fx">
-            <span>Taux EUR</span>
-            <span>1 {{ r.localCurrency }} = {{ r.fxRateEur | number:'1.3-4' }} EUR</span>
-          </div>
-        }
-        @if (r.fxRateUsd != null) {
-          <div class="detail-row detail-row--fx">
-            <span>Taux USD</span>
-            <span>1 {{ r.localCurrency }} = {{ r.fxRateUsd | number:'1.3-4' }} USD</span>
-          </div>
-        }
-        <div class="detail-row">
-          <span>Itérations convergence</span><span>{{ r.iterationsUsed }}</span>
-        </div>
-      </div>
-    </section>
-  }
-</div>
+    </div>
+  </div>
+</daf-page>

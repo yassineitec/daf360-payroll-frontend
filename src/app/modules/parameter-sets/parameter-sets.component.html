@@ -59,15 +59,27 @@
                 @if (ps.socialChargeRates.length) {
                   <div class="table-wrap">
                     <table class="data-table">
-                      <thead><tr><th>Type</th><th>Code</th><th>Libellé</th><th>Sal. %</th><th>Pat. %</th><th>Base</th></tr></thead>
+                      <thead><tr><th>Type</th><th>Code</th><th>Libellé</th><th>Part sal.</th><th>Part pat.</th><th>Base</th></tr></thead>
                       <tbody>
                         @for (r of ps.socialChargeRates; track r.chargeCode) {
                           <tr>
                             <td>{{ r.contractType }}</td>
-                            <td>{{ r.chargeCode }}</td>
+                            <td><code class="code-pill">{{ r.chargeCode }}</code></td>
                             <td>{{ r.chargeLabel }}</td>
-                            <td>{{ (r.employeeRate * 100) | number:'1.2-2' }}%</td>
-                            <td>{{ (r.employerRate * 100) | number:'1.2-2' }}%</td>
+                            <td class="num">
+                              @if (r.baseCalculation === 'FORMULE') {
+                                <code class="formula-preview">{{ r.formulaEe || '—' }}</code>
+                              } @else {
+                                {{ (r.employeeRate * 100) | number:'1.2-2' }}%
+                              }
+                            </td>
+                            <td class="num">
+                              @if (r.baseCalculation === 'FORMULE') {
+                                <code class="formula-preview">{{ r.formulaEr || '—' }}</code>
+                              } @else {
+                                {{ (r.employerRate * 100) | number:'1.2-2' }}%
+                              }
+                            </td>
                             <td>{{ r.baseCalculation }}</td>
                           </tr>
                         }
@@ -93,25 +105,71 @@
                     <div class="rates-wrap">
                       <div class="rates-head">
                         <span>Type</span><span>Code</span><span>Libellé</span>
-                        <span>Sal. %</span><span>Pat. %</span><span>Base</span>
-                        <span>Plafond</span><span></span>
+                        <span>Part sal.</span><span>Part pat.</span><span>Base</span>
+                        <span>Plaf. / Ordre</span><span></span>
                       </div>
                       <ng-container formArrayName="rates">
                         @for (ctrl of editRates.controls; track $index; let i = $index) {
-                          <div class="rates-row" [formGroupName]="i">
-                            <select class="ri" formControlName="contractType">
-                              @for (ct of contractTypes; track ct) { <option [value]="ct">{{ ct }}</option> }
-                            </select>
-                            <input class="ri" formControlName="chargeCode" placeholder="CNSS" />
-                            <input class="ri" formControlName="chargeLabel" placeholder="Caisse nationale..." />
-                            <input class="ri" type="number" step="0.0001" formControlName="employeeRate" />
-                            <input class="ri" type="number" step="0.0001" formControlName="employerRate" />
-                            <select class="ri" formControlName="baseCalculation">
-                              @for (opt of baseCalcOptions; track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }
-                            </select>
-                            <input class="ri" type="number" formControlName="capAmount" placeholder="—" />
-                            <button type="button" class="btn-remove" title="Supprimer" (click)="removeEditRate(i)">✕</button>
-                          </div>
+                          <!-- Wrap row + formula expansion in one ng-container so both share formGroupName -->
+                          <ng-container [formGroupName]="i">
+                            <div class="rates-row" [class.rates-row--formula]="editRateGroup(i).get('baseCalculation')!.value === 'FORMULE'">
+                              <select class="ri" formControlName="contractType">
+                                @for (ct of contractTypes; track ct) { <option [value]="ct">{{ ct }}</option> }
+                              </select>
+                              <input class="ri" formControlName="chargeCode" placeholder="CNSS" style="text-transform:uppercase" />
+                              <input class="ri" formControlName="chargeLabel" placeholder="Caisse nationale..." />
+                              @if (editRateGroup(i).get('baseCalculation')!.value !== 'FORMULE') {
+                                <input class="ri" type="number" step="0.0001" formControlName="employeeRate" placeholder="0.0918" />
+                                <input class="ri" type="number" step="0.0001" formControlName="employerRate" placeholder="0.1657" />
+                              } @else {
+                                <span class="ri ri--hint">↓ EE</span>
+                                <span class="ri ri--hint">↓ ER</span>
+                              }
+                              <select class="ri" formControlName="baseCalculation">
+                                @for (opt of baseCalcOptions; track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }
+                              </select>
+                              @if (editRateGroup(i).get('baseCalculation')!.value !== 'FORMULE') {
+                                <input class="ri" type="number" formControlName="capAmount" placeholder="—" />
+                              } @else {
+                                <input class="ri" type="number" formControlName="evalOrder" placeholder="0" title="Ordre d'évaluation (0 = premier)" />
+                              }
+                              <button type="button" class="btn-remove" title="Supprimer" (click)="removeEditRate(i)">✕</button>
+                            </div>
+
+                            <!-- Formula expansion — shown only when baseCalculation = FORMULE -->
+                            @if (editRateGroup(i).get('baseCalculation')!.value === 'FORMULE') {
+                              <div class="rate-formula-block">
+                                <div class="rate-formula-field">
+                                  <label class="rate-formula-label">Formule part salariale (EE) *</label>
+                                  <input class="field-input formula-input" formControlName="formulaEe"
+                                         placeholder="ex : BRUT * 0.0918"
+                                         autocomplete="off" spellcheck="false" />
+                                  <div class="formula-vars">
+                                    @for (v of chargeVariableHints(i); track v.name) {
+                                      <button type="button" class="formula-var-chip" [title]="v.desc"
+                                              (click)="insertChargeFormulaVar(i, 'formulaEe', v.name)">{{ v.name }}</button>
+                                    }
+                                  </div>
+                                </div>
+                                <div class="rate-formula-field">
+                                  <label class="rate-formula-label">Formule part patronale (ER) *</label>
+                                  <input class="field-input formula-input" formControlName="formulaEr"
+                                         placeholder="ex : BRUT * 0.1657"
+                                         autocomplete="off" spellcheck="false" />
+                                  <div class="formula-vars">
+                                    @for (v of chargeVariableHints(i); track v.name) {
+                                      <button type="button" class="formula-var-chip" [title]="v.desc"
+                                              (click)="insertChargeFormulaVar(i, 'formulaEr', v.name)">{{ v.name }}</button>
+                                    }
+                                  </div>
+                                </div>
+                                <p class="editor-hint" style="flex:1 1 100%;margin-top:6px">
+                                  ℹ️ Les charges avec un ordre inférieur sont calculées en premier et leurs résultats (ex : <code>CNSS_EE</code>) sont disponibles dans la formule.
+                                  Un cycle de dépendances est détecté automatiquement à la simulation.
+                                </p>
+                              </div>
+                            }
+                          </ng-container>
                         }
                       </ng-container>
                     </div>
@@ -314,6 +372,40 @@
                                                formControlName="capAmount" placeholder="3 500.00" />
                                       </div>
                                     }
+                                  </div>
+                                }
+
+                                @if (editRubriqueGroup(i).get('calcMode')!.value === 'FORMULE') {
+                                  <div class="rg-row rg-row--mt">
+                                    <div class="rg-field rg-field--full">
+                                      <label class="field-label">Expression de calcul *</label>
+                                      <input class="field-input formula-input"
+                                             formControlName="formulaExpression"
+                                             placeholder="ex : BRUT * 0.02 + CNSS_EE * 0.50"
+                                             autocomplete="off" spellcheck="false" />
+                                      <p class="editor-hint formula-hint">
+                                        Opérateurs : <code>+</code> <code>-</code> <code>*</code> <code>/</code> <code>( )</code>
+                                        — Cliquez sur une variable pour l'insérer dans la formule :
+                                      </p>
+                                      <div class="formula-vars">
+                                        @for (v of formulaVariableHints(); track v.name) {
+                                          <button type="button" class="formula-var-chip"
+                                                  [title]="v.desc"
+                                                  (click)="insertFormulaVar(i, v.name)">{{ v.name }}</button>
+                                        }
+                                        @if (priorRubriqueVars(i).length > 0) {
+                                          <span class="formula-vars-divider">Rubriques précédentes :</span>
+                                          @for (v of priorRubriqueVars(i); track v.name) {
+                                            <button type="button" class="formula-var-chip formula-var-chip--rubrique"
+                                                    [title]="v.desc"
+                                                    (click)="insertFormulaVar(i, v.name)">{{ v.name }}</button>
+                                          }
+                                        }
+                                      </div>
+                                      <p class="editor-hint" style="margin-top:6px">
+                                        ℹ️ L'aperçu en temps réel n'est pas disponible en mode formule — lancez une simulation pour voir le résultat exact.
+                                      </p>
+                                    </div>
                                   </div>
                                 }
                               </div>

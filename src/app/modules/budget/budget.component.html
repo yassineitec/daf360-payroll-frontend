@@ -1,0 +1,189 @@
+<daf-page [loading]="loading()">
+  <daf-page-header
+    title="Budget prévisionnel"
+    subtitle="Vue agrégée des coûts salariaux et projections budgétaires. Données générées automatiquement à chaque activation de barème.">
+  </daf-page-header>
+
+  <div class="px-6 pb-8 flex flex-col gap-6">
+
+    <!-- ── Country selector ────────────────────────────────────────────────── -->
+    <daf-card [options]="{ variant: 'outlined', padding: 'none', radius: 'xl' }">
+      <div class="px-5 py-4 border-b border-outline-variant flex items-center gap-3">
+        <span class="material-symbols-outlined text-xl text-primary" style="font-variation-settings:'FILL' 1">
+          public
+        </span>
+        <h2 class="text-base font-semibold text-on-surface">Sélection du pays</h2>
+      </div>
+      <div class="p-5 sm:p-8 flex items-end gap-4 flex-wrap">
+        <div class="flex-1 min-w-[200px]">
+          <p class="text-[13px] font-medium text-on-surface-variant mb-1.5">Pays <span class="text-danger">*</span></p>
+          <app-pays-select [formControl]="$any(paysIdCtrl)" />
+        </div>
+        <daf-button
+          label="Charger les données"
+          variant="primary"
+          [options]="{ loading: loading(), disabled: !paysIdCtrl.value || loading(), iconStart: 'download' }"
+          (onClick)="load()">
+        </daf-button>
+      </div>
+
+      @if (error()) {
+        <div class="mx-5 mb-5 flex items-center gap-2 rounded-xl border border-danger/30 bg-danger/5 px-4 py-2.5 text-sm text-danger">
+          <span class="material-symbols-outlined text-base">error</span>
+          {{ error() }}
+        </div>
+      }
+    </daf-card>
+
+    <!-- ── Results ─────────────────────────────────────────────────────────── -->
+    @if (latestPeriod()) {
+
+      <!-- Period header badge -->
+      <div class="flex items-center gap-3">
+        <span class="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-bold text-primary">
+          <span class="material-symbols-outlined text-base" style="font-variation-settings:'FILL' 1">calendar_month</span>
+          Période : {{ latestPeriod() }}
+        </span>
+        @if (headcount()) {
+          <span class="inline-flex items-center gap-1 rounded-full border border-outline-variant px-3 py-1 text-xs text-on-surface-variant">
+            <span class="material-symbols-outlined text-sm">group</span>
+            {{ headcount() }} employés
+          </span>
+        }
+      </div>
+
+      <!-- ── F.04 — Cost lines ─────────────────────────────────────────────── -->
+      <daf-card [options]="{ variant: 'outlined', padding: 'none', radius: 'xl' }">
+        <div class="px-5 py-4 border-b border-outline-variant flex items-center gap-3">
+          <span class="material-symbols-outlined text-xl text-secondary" style="font-variation-settings:'FILL' 1">
+            payments
+          </span>
+          <h2 class="text-base font-semibold text-on-surface">Lignes de coût mensuel — F.04</h2>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 p-5 sm:p-8">
+
+          <!-- EMPLOYER_LOADED -->
+          @if (employerLine(); as el) {
+            <daf-metric-card
+              label="Coût chargé employeur"
+              [value]="fmt(el.monthlyAmount) + ' ' + currency()"
+              [options]="{ icon: 'account_balance_wallet', iconColor: 'text-primary', iconBg: 'bg-primary/10' }">
+            </daf-metric-card>
+          }
+
+          <!-- EMPLOYEE_NET -->
+          @if (employeeLine(); as enl) {
+            <daf-metric-card
+              label="Masse salariale nette"
+              [value]="fmt(enl.monthlyAmount) + ' ' + currency()"
+              [options]="{ icon: 'person', iconColor: 'text-secondary', iconBg: 'bg-secondary/10' }">
+            </daf-metric-card>
+          }
+
+        </div>
+
+        <!-- FX conversions row -->
+        @if (employerLine()?.monthlyEur != null || employerLine()?.monthlyChf != null) {
+          <div class="mx-5 sm:mx-8 mb-5 sm:mb-8 rounded-xl border border-outline-variant overflow-hidden">
+            <div class="flex items-center gap-2 px-4 py-3 bg-surface-container-low border-b border-outline-variant">
+              <span class="material-symbols-outlined text-base text-on-surface-variant">currency_exchange</span>
+              <span class="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+                Coût chargé mensuel en devises
+              </span>
+            </div>
+            <div class="divide-y divide-outline-variant">
+              @if (employerLine()?.monthlyEur != null) {
+                <div class="flex items-center gap-4 px-4 py-3 text-sm tabular-nums">
+                  <span class="w-10 font-bold text-on-surface-variant">EUR</span>
+                  <span class="font-semibold text-primary">{{ fmt(employerLine()!.monthlyEur, 2) }} EUR</span>
+                </div>
+              }
+              @if (employerLine()?.monthlyChf != null) {
+                <div class="flex items-center gap-4 px-4 py-3 text-sm tabular-nums">
+                  <span class="w-10 font-bold text-on-surface-variant">CHF</span>
+                  <span class="font-semibold text-primary">{{ fmt(employerLine()!.monthlyChf, 2) }} CHF</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </daf-card>
+
+      <!-- ── F.07 — Forecast outputs ──────────────────────────────────────── -->
+      <daf-card [options]="{ variant: 'outlined', padding: 'none', radius: 'xl' }">
+        <div class="px-5 py-4 border-b border-outline-variant flex items-center gap-3">
+          <span class="material-symbols-outlined text-xl text-tertiary" style="font-variation-settings:'FILL' 1">
+            trending_up
+          </span>
+          <h2 class="text-base font-semibold text-on-surface">Projections budgétaires — F.07</h2>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 p-5 sm:p-8">
+
+          @if (monthlyForecast(); as mf) {
+            <daf-metric-card
+              label="Prévision mensuelle"
+              [value]="fmt(mf.forecastAmount) + ' ' + currency()"
+              [options]="{ icon: 'calendar_view_month', iconColor: 'text-on-surface-variant', iconBg: 'bg-surface-container' }">
+            </daf-metric-card>
+          }
+
+          @if (quarterlyForecast(); as qf) {
+            <daf-metric-card
+              label="Prévision trimestrielle"
+              [value]="fmt(qf.forecastAmount) + ' ' + currency()"
+              [options]="{ icon: 'calendar_view_week', iconColor: 'text-secondary', iconBg: 'bg-secondary/10' }">
+            </daf-metric-card>
+          }
+
+          @if (annualForecast(); as af) {
+            <daf-metric-card
+              label="Prévision annuelle"
+              [value]="fmt(af.forecastAmount) + ' ' + currency()"
+              [options]="{ icon: 'calendar_today', iconColor: 'text-primary', iconBg: 'bg-primary/10' }">
+            </daf-metric-card>
+          }
+
+        </div>
+      </daf-card>
+
+      <!-- ── History ──────────────────────────────────────────────────────── -->
+      @if (historyPeriods().length > 0) {
+        <daf-card [options]="{ variant: 'outlined', padding: 'none', radius: 'xl' }">
+          <div class="px-5 py-4 border-b border-outline-variant flex items-center gap-3">
+            <span class="material-symbols-outlined text-xl text-on-surface-variant" style="font-variation-settings:'FILL' 1">
+              history
+            </span>
+            <h2 class="text-base font-semibold text-on-surface">Historique des périodes</h2>
+          </div>
+
+          <div class="divide-y divide-outline-variant">
+            @for (period of historyPeriods(); track period) {
+              <div class="px-5 py-4">
+                <p class="text-[13px] font-semibold text-on-surface-variant mb-3">{{ period }}</p>
+                <div class="flex flex-wrap gap-4">
+                  @for (line of linesForPeriod(period); track line.id) {
+                    <div class="flex items-center gap-2 rounded-xl border border-outline-variant px-4 py-2.5 text-sm">
+                      <span class="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
+                        {{ line.lineType === 'EMPLOYER_LOADED' ? 'Coût chargé' : 'Net salarial' }}
+                      </span>
+                      <span class="font-semibold tabular-nums text-on-surface">
+                        {{ fmt(line.monthlyAmount) }} {{ line.localCurrency }}
+                      </span>
+                      @if (line.headcount) {
+                        <span class="text-[11px] text-on-surface-variant">· {{ line.headcount }} emp.</span>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        </daf-card>
+      }
+
+    }
+
+  </div>
+</daf-page>

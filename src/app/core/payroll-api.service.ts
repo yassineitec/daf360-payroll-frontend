@@ -30,7 +30,7 @@ export interface PayrollRubriqueDto {
   labelFr: string;
   labelEn: string | null;
   nature: string;            // AVANTAGE | INDEMNITE | PRIME | RETENUE
-  calcMode: string;          // FIXE_MENSUEL | FIXE_JOURNALIER | POURCENTAGE_BRUT | POURCENTAGE_CHARGES | POURCENTAGE_PLAFONNE
+  calcMode: string;          // FIXE_MENSUEL | FIXE_JOURNALIER | POURCENTAGE_BRUT | POURCENTAGE_CHARGES | POURCENTAGE_PLAFONNE | FORMULE
   amount: number | null;
   rate: number | null;       // decimal, e.g. 0.05 = 5%
   capAmount: number | null;  // used by POURCENTAGE_PLAFONNE: min(gross, capAmount) × rate
@@ -41,6 +41,8 @@ export interface PayrollRubriqueDto {
   direction: string;         // CREDIT | DEBIT
   contractTypes: string | null;  // null = all; "CDI,CDD" = specific
   isActive: boolean;
+  formulaExpression?: string | null;  // arithmetic expression for FORMULE mode, e.g. "BRUT * 0.02 + CNSS_EE * 0.5"
+  displayOrder?: number;              // evaluation order; lower = computed first
   createdAt?: string;
 }
 
@@ -60,6 +62,8 @@ export interface SavePayrollRubriqueRequest {
   direction?: string;
   contractTypes?: string | null;
   isActive?: boolean;
+  formulaExpression?: string | null;
+  displayOrder?: number;
 }
 
 export interface SocialChargeRateDto {
@@ -69,8 +73,15 @@ export interface SocialChargeRateDto {
   chargeLabel: string;
   employeeRate: number;
   employerRate: number;
+  /** GROSS | CAPPED_GROSS | FIXED | FORMULE */
   baseCalculation: string;
   capAmount: number | null;
+  /** Formula override for the employee-side amount; null = use employeeRate × base. */
+  formulaEe?: string | null;
+  /** Formula override for the employer-side amount; null = use employerRate × base. */
+  formulaEr?: string | null;
+  /** Evaluation order within the parameter set; lower = evaluated first. */
+  evalOrder?: number;
 }
 
 export interface BenefitCatalogueDto {
@@ -85,9 +96,16 @@ export interface BenefitCatalogueDto {
   isTaxable: boolean;
 }
 
+export type SimulationMode = 'NET_TO_BRUT' | 'BRUT_TO_NET';
+
 export interface SimulationRequest {
   paysId: number;
-  inputNet: number;
+  /** NET_TO_BRUT: required. BRUT_TO_NET: ignored. */
+  inputNet?: number;
+  /** BRUT_TO_NET: required. NET_TO_BRUT: ignored. */
+  inputGross?: number;
+  /** Defaults to NET_TO_BRUT when omitted (backward-compatible). */
+  mode?: SimulationMode;
   profileUserId?: number | null;
   contractType?: string;
   joursTravailes?: number;            // working days for FIXE_JOURNALIER rubriques (default 22)
@@ -96,6 +114,21 @@ export interface SimulationRequest {
   poste?: string;
   grade?: string;
   discipline?: string;
+}
+
+/** One evaluated rubrique line returned inside {@link SimulationResultDto.rubriquesApplied}. */
+export interface RubriqueAppliedItem {
+  code:      string;
+  nature:    string | null;
+  calcMode:  string;
+  direction: 'CREDIT' | 'DEBIT';
+  amount:    number;
+}
+
+/** Parse the JSON blob stored in {@link SimulationResultDto.rubriquesApplied}. */
+export function parseRubriquesApplied(json: string | null | undefined): RubriqueAppliedItem[] {
+  if (!json) return [];
+  try { return JSON.parse(json) as RubriqueAppliedItem[]; } catch { return []; }
 }
 
 /**
@@ -143,6 +176,8 @@ export interface SimulationResultDto {
   poste: string | null;
   grade: string | null;
   discipline: string | null;
+  /** NET_TO_BRUT | BRUT_TO_NET — null for legacy rows without a mode column. */
+  mode: SimulationMode | null;
   simulatedAt: string;
 }
 
@@ -150,10 +185,15 @@ export interface CohortSimulationRequest {
   paysId: number;
   fiscalYear: number;
   cohortName?: string;
+  /** Global direction toggle — all entries use the same mode. Defaults to NET_TO_BRUT. */
+  mode?: SimulationMode;
   employees: Array<{
     profileUserId?: number;
-    inputNet: number;
+    /** NET_TO_BRUT: required. */
+    inputNet?: number;
     contractType?: string;
+    /** BRUT_TO_NET: required. */
+    inputGross?: number;
   }>;
 }
 

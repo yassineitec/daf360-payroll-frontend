@@ -36,6 +36,7 @@ export class ParameterSetsComponent {
     { value: 'GROSS',        label: 'Brut' },
     { value: 'CAPPED_GROSS', label: 'Brut plafonné' },
     { value: 'FIXED',        label: 'Fixe' },
+    { value: 'FORMULE',      label: 'Formule personnalisée' },
   ];
 
   readonly chargesForm = this.fb.group({ rates: this.fb.array([]) });
@@ -61,6 +62,7 @@ export class ParameterSetsComponent {
     { value: 'POURCENTAGE_BRUT',     label: 'Pourcentage du salaire brut', description: 'Taux × salaire brut total' },
     { value: 'POURCENTAGE_CHARGES',  label: 'Pourcentage des charges',     description: 'Taux × base de calcul des charges sociales' },
     { value: 'POURCENTAGE_PLAFONNE', label: 'Pourcentage plafonné',        description: 'Taux × min(salaire brut, plafond mensuel)' },
+    { value: 'FORMULE',              label: 'Expression personnalisée',    description: 'Formule libre : BRUT, CNSS_EE, CHARGES_ER, ou résultat d\'une autre rubrique' },
   ];
 
   readonly rubriquesForm = this.fb.group({ items: this.fb.array([]) });
@@ -107,6 +109,9 @@ export class ParameterSetsComponent {
       employerRate:    [r.employerRate],
       baseCalculation: [r.baseCalculation ?? 'GROSS'],
       capAmount:       [r.capAmount],
+      formulaEe:       [r.formulaEe ?? ''],
+      formulaEr:       [r.formulaEr ?? ''],
+      evalOrder:       [r.evalOrder ?? 0],
     })));
     this.editingChargesId.set(ps.id);
   }
@@ -125,6 +130,9 @@ export class ParameterSetsComponent {
       employerRate:    [0],
       baseCalculation: ['GROSS'],
       capAmount:       [null],
+      formulaEe:       [''],
+      formulaEr:       [''],
+      evalOrder:       [0],
     }));
   }
 
@@ -168,6 +176,7 @@ export class ParameterSetsComponent {
       amount:                   [r.amount   ?? null],
       ratePercent:              [r.rate != null ? +(r.rate * 100).toFixed(4) : null],
       capAmount:                [r.capAmount ?? null],
+      formulaExpression:        [r.formulaExpression ?? ''],
       employerSharePct:         [r.employerSharePct  ?? 0],
       employeeSharePct:         [r.employeeSharePct  ?? 0],
       isSubjectToSocialCharges: [r.isSubjectToSocialCharges ?? false],
@@ -208,7 +217,7 @@ export class ParameterSetsComponent {
   saveRubriques(psId: number): void {
     this.savingRubriques.set(true);
     const raw = this.rubriquesForm.getRawValue().items as any[];
-    const payload: SavePayrollRubriqueRequest[] = raw.map(r => ({
+    const payload: SavePayrollRubriqueRequest[] = raw.map((r, idx) => ({
       code:                     r.code,
       labelFr:                  r.labelFr,
       labelEn:                  r.labelEn?.trim() || null,
@@ -217,6 +226,8 @@ export class ParameterSetsComponent {
       amount:                   r.amount,
       rate:                     r.ratePercent != null ? r.ratePercent / 100 : null,
       capAmount:                r.capAmount,
+      formulaExpression:        r.calcMode === 'FORMULE' ? (r.formulaExpression?.trim() || null) : null,
+      displayOrder:             idx,
       employerSharePct:         r.employerSharePct ?? 0,
       employeeSharePct:         r.employeeSharePct ?? 0,
       isSubjectToSocialCharges: r.isSubjectToSocialCharges,
@@ -309,11 +320,15 @@ export class ParameterSetsComponent {
       case 'POURCENTAGE_BRUT':     return '% Brut';
       case 'POURCENTAGE_CHARGES':  return '% Charges';
       case 'POURCENTAGE_PLAFONNE': return '% Plafonné';
+      case 'FORMULE':              return 'Formule';
       default:                     return calcMode;
     }
   }
 
-  rubriqueValue(r: { calcMode: string; amount: number | null; rate: number | null; capAmount?: number | null }, devise: string = ''): string {
+  rubriqueValue(r: { calcMode: string; amount: number | null; rate: number | null; capAmount?: number | null; formulaExpression?: string | null }, devise: string = ''): string {
+    if (r.calcMode === 'FORMULE') {
+      return r.formulaExpression ? `= ${r.formulaExpression}` : '— (formule vide)';
+    }
     if (r.calcMode === 'FIXE_MENSUEL' || r.calcMode === 'FIXE_JOURNALIER') {
       return r.amount != null ? `${r.amount.toLocaleString('fr-FR')}${r.calcMode === 'FIXE_JOURNALIER' ? '/j' : ''}` : '—';
     }
@@ -324,6 +339,86 @@ export class ParameterSetsComponent {
         : pct;
     }
     return '—';
+  }
+
+  // ── Formula mode helpers ───────────────────────────────────────────────────
+
+  /**
+   * Returns the set of formula variable chips for the selected parameter set:
+   * BRUT, CHARGES_EE/ER, and one _EE/_ER pair per distinct charge code.
+   */
+  formulaVariableHints(): { name: string; desc: string }[] {
+    const ps = this.selected();
+    const hints: { name: string; desc: string }[] = [
+      { name: 'BRUT',       desc: 'Salaire brut' },
+      { name: 'CHARGES_EE', desc: 'Total charges salariales' },
+      { name: 'CHARGES_ER', desc: 'Total charges patronales' },
+    ];
+    const seen = new Set<string>();
+    (ps?.socialChargeRates ?? []).forEach(r => {
+      const key = r.chargeCode.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+      if (!seen.has(key)) {
+        seen.add(key);
+        hints.push({ name: key + '_EE', desc: `Part salariale — ${r.chargeLabel}` });
+        hints.push({ name: key + '_ER', desc: `Part patronale — ${r.chargeLabel}` });
+      }
+    });
+    return hints;
+  }
+
+  /**
+   * Returns variable chips for rubriques that appear before position `currentIndex`
+   * in the list (lower display_order → referenceable by later FORMULE rubriques).
+   */
+  priorRubriqueVars(currentIndex: number): { name: string; desc: string }[] {
+    return this.editRubriques.controls
+      .slice(0, currentIndex)
+      .map((ctrl, i) => {
+        const g = ctrl as FormGroup;
+        const code  = (g.get('code')!.value as string  || '').toUpperCase().replace(/[^A-Z0-9]/g, '_');
+        const label =  g.get('labelFr')!.value as string || `Rubrique #${i + 1}`;
+        return code ? { name: code, desc: label } : null;
+      })
+      .filter((v): v is { name: string; desc: string } => v !== null);
+  }
+
+  /** Appends a variable name into the formulaExpression field of card i. */
+  insertFormulaVar(i: number, varName: string): void {
+    const ctrl = this.editRubriqueGroup(i).get('formulaExpression')!;
+    const current: string = ctrl.value ?? '';
+    ctrl.setValue(current ? `${current} + ${varName}` : varName);
+    ctrl.markAsDirty();
+  }
+
+  // ── Charge formula helpers ─────────────────────────────────────────────────
+
+  /**
+   * Returns variable chips available to the formula of charge at position `i`.
+   * A charge can reference BRUT and the results of charges that appear BEFORE it
+   * in the list (i.e. have a lower eval_order / earlier position).
+   */
+  chargeVariableHints(currentIndex: number): { name: string; desc: string }[] {
+    const hints: { name: string; desc: string }[] = [
+      { name: 'BRUT', desc: 'Salaire brut' },
+    ];
+    this.editRates.controls.slice(0, currentIndex).forEach(ctrl => {
+      const g = ctrl as FormGroup;
+      const code  = ((g.get('chargeCode')!.value as string) || '').toUpperCase().replace(/[^A-Z0-9]/g, '_');
+      const label =   g.get('chargeLabel')!.value as string || '';
+      if (code) {
+        hints.push({ name: code + '_EE', desc: `Part salariale — ${label}` });
+        hints.push({ name: code + '_ER', desc: `Part patronale — ${label}` });
+      }
+    });
+    return hints;
+  }
+
+  /** Appends a variable name into the formulaEe or formulaEr field of charge row i. */
+  insertChargeFormulaVar(i: number, side: 'formulaEe' | 'formulaEr', varName: string): void {
+    const ctrl = this.editRateGroup(i).get(side)!;
+    const current: string = ctrl.value ?? '';
+    ctrl.setValue(current ? `${current} + ${varName}` : varName);
+    ctrl.markAsDirty();
   }
 
   toggleRubriqueCard(i: number): void {
@@ -362,6 +457,9 @@ export class ParameterSetsComponent {
         amount = Math.min(gross, cap) * (g['ratePercent'] ?? 0) / 100;
         break;
       }
+      case 'FORMULE':
+        // Cannot evaluate formula without charge context — simulation shows the real value
+        return '—';
     }
     return amount.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }

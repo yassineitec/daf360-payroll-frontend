@@ -1,19 +1,24 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { catchError, of } from 'rxjs';
 import { PayrollEngineService, RunPayrollResponse } from '../../core/payroll-engine.service';
 import { CandidateSimulationService, CandidateSimulationSummaryDto, CandidateCostApprovalDto } from '../../core/candidate-simulation.service';
 import { EmployeeSelectComponent } from '../../shared/employee-select/employee-select.component';
+import { SelectComponent } from '@khalilrebhiitec/daf360';
+import { environment } from '../../../environments/environment';
 
 type Tab = 'employees' | 'candidates';
 const STATUS_LABEL: Record<string, string> = { PENDING: 'En attente', APPROVED: 'Approuvé', REJECTED: 'Refusé' };
 const STATUS_CLASS: Record<string, string> = { PENDING: 'badge--warn', APPROVED: 'badge--active', REJECTED: 'badge--error' };
+interface PaysItem { id: number; iso_code: string; french_label: string; }
 
 @Component({
   selector: 'app-engine-results',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, ReactiveFormsModule, EmployeeSelectComponent],
+  imports: [CommonModule, ReactiveFormsModule, EmployeeSelectComponent, SelectComponent],
   template: `
     <div class="page-header">
       <h1 class="page-title">Historique de paie & simulations</h1>
@@ -127,11 +132,13 @@ const STATUS_CLASS: Record<string, string> = { PENDING: 'badge--warn', APPROVED:
       <!-- pays filter -->
       <div class="card filter-row">
         <div class="form-field">
-          <label>Pays (ID)</label>
-          <input class="input" type="number" [value]="candidatePaysId()"
-                 (change)="candidatePaysId.set(+getVal($event))" placeholder="ex: 179" />
+          <daf-select
+            [options]="paysOptions()"
+            [selected]="candidatePaysId() ? ['' + candidatePaysId()] : []"
+            [config]="paysSelectConfig"
+            (selectedChange)="onPaysChange($event)" />
         </div>
-        <button class="btn btn--primary" [disabled]="candLoading()" (click)="loadCandidates()">
+        <button class="btn btn--primary" [disabled]="candLoading() || !candidatePaysId()" (click)="loadCandidates()">
           {{ candLoading() ? 'Chargement...' : 'Rechercher' }}
         </button>
         @if (selectedCandidate()) {
@@ -385,10 +392,11 @@ const STATUS_CLASS: Record<string, string> = { PENDING: 'badge--warn', APPROVED:
                        font-size: .875rem; }
   `],
 })
-export class EngineResultsComponent {
+export class EngineResultsComponent implements OnInit {
   private readonly engineApi  = inject(PayrollEngineService);
   private readonly candSvc    = inject(CandidateSimulationService);
   private readonly fb         = inject(FormBuilder);
+  private readonly http       = inject(HttpClient);
 
   // ── tab ───────────────────────────────────────────────────────────────
   readonly activeTab = signal<Tab>('employees');
@@ -419,7 +427,7 @@ export class EngineResultsComponent {
   }
 
   // ── candidates tab ─────────────────────────────────────────────────────
-  readonly candidatePaysId   = signal<number>(179);
+  readonly candidatePaysId   = signal<number | null>(null);
   readonly candLoading       = signal(false);
   readonly candError         = signal<string | null>(null);
   readonly candSearched      = signal(false);
@@ -427,13 +435,30 @@ export class EngineResultsComponent {
   readonly selectedCandidate = signal<CandidateSimulationSummaryDto | null>(null);
   readonly histLoading       = signal(false);
   readonly history           = signal<CandidateCostApprovalDto[]>([]);
+  private readonly paysList  = signal<PaysItem[]>([]);
+  readonly paysOptions = computed(() =>
+    this.paysList().map(p => ({ value: String(p.id), label: `${p.french_label} (${p.iso_code})` }))
+  );
+  readonly paysSelectConfig = { label: 'Pays', placeholder: 'Rechercher un pays...', searchable: true };
+
+  ngOnInit(): void {
+    this.http.get<PaysItem[]>(`${environment.hrApiUrl}/api/hr/config/hs/pays-list`)
+      .pipe(catchError(() => of([] as PaysItem[])))
+      .subscribe(list => this.paysList.set(list));
+  }
+
+  onPaysChange(selected: string[]): void {
+    this.candidatePaysId.set(selected[0] ? Number(selected[0]) : null);
+  }
 
   loadCandidates(): void {
+    const paysId = this.candidatePaysId();
+    if (!paysId) return;
     this.candLoading.set(true);
     this.candError.set(null);
     this.candSearched.set(false);
     this.selectedCandidate.set(null);
-    this.candSvc.getCandidatesWithHistory(this.candidatePaysId()).subscribe({
+    this.candSvc.getCandidatesWithHistory(paysId).subscribe({
       next: list => { this.candidateList.set(list); this.candLoading.set(false); this.candSearched.set(true); },
       error: e   => {
         this.candError.set(e?.error?.message ?? 'Impossible de charger les candidats.');
@@ -462,5 +487,4 @@ export class EngineResultsComponent {
     return ((c.firstName?.[0] ?? '') + (c.lastName?.[0] ?? '')).toUpperCase() || '?';
   }
 
-  getVal(e: Event): string { return (e.target as HTMLInputElement).value; }
 }

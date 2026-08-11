@@ -1,103 +1,217 @@
-<div class="page-header">
-  <h1 class="page-title">Simulation cohorte</h1>
-  <p class="page-subtitle">Simulez un groupe d'employés et obtenez le budget total</p>
-</div>
+<daf-page [loading]="loading()">
+  <daf-page-header
+    title="Simulation cohorte — Impact budgétaire"
+    subtitle="Simulez l'impact d'une révision salariale sur un périmètre d'employés actifs. Aucun salaire individuel n'est affiché.">
+  </daf-page-header>
 
-<div class="cohort-layout">
-  <section class="card" [formGroup]="form">
-    <h2 class="card-title">Paramètres de la cohorte</h2>
+  <div class="px-6 pb-8 flex flex-col gap-6">
 
-    <div class="field-row">
-      <div class="field-group">
-        <label class="field-label">Pays</label>
-        <app-pays-select formControlName="paysId"></app-pays-select>
+    <!-- ── Form card ──────────────────────────────────────────────────────── -->
+    <daf-card [options]="{ variant: 'outlined', padding: 'none', radius: 'xl' }">
+
+      <div class="px-5 py-4 border-b border-outline-variant flex items-center gap-3">
+        <span class="material-symbols-outlined text-xl text-primary" style="font-variation-settings:'FILL' 1">group_work</span>
+        <h2 class="text-base font-semibold text-on-surface">Périmètre &amp; modificateur</h2>
       </div>
-      <div class="field-group">
-        <label class="field-label">Exercice fiscal</label>
-        <input type="number" class="field-input" formControlName="fiscalYear" />
-      </div>
-    </div>
 
-    <div class="field-group">
-      <label class="field-label">Nom de la cohorte (optionnel)</label>
-      <input type="text" class="field-input" formControlName="cohortName" placeholder="Ex : Budget Q1 2025 TN" />
-    </div>
+      <div class="p-5 sm:p-8 flex flex-col gap-6">
 
-    <div class="field-group">
-      <label class="field-label">Employés (une ligne par employé : net,typeContrat)</label>
-      <textarea class="field-textarea" formControlName="csvText" rows="8"
-                placeholder="2500,CDI&#10;1800,CDD&#10;1200,STAGE"></textarea>
-      <span class="field-hint">Format : net_souhaité,type_contrat — ex : 2500,CDI</span>
-    </div>
-
-    <div class="form-actions">
-      <button class="btn btn-primary" (click)="submit()" [disabled]="form.invalid || loading()">
-        @if (loading()) { Simulation en cours… } @else { Lancer la simulation }
-      </button>
-    </div>
-
-    @if (error()) {
-      <div class="alert alert-error">{{ error() }}</div>
-    }
-  </section>
-
-  @if (results().length) {
-    <section class="card">
-      <h2 class="card-title">Résultats — {{ results().length }} employés</h2>
-
-      <div class="summary-row">
-        <div class="summary-item">
-          <span class="summary-label">Coût chargé total</span>
-          <span class="summary-value">{{ totalLoadedCost | number:'1.0-0' }}
-            @if (results()[0]?.localCurrency) {
-              <span class="devise">{{ results()[0].localCurrency }}</span>
-            }
-          </span>
+        <!-- Pays -->
+        <div>
+          <p class="text-[13px] font-medium text-on-surface-variant mb-1.5">
+            Pays <span class="text-danger">*</span>
+          </p>
+          <app-pays-select [formControl]="$any(paysIdCtrl)" />
         </div>
-        @if (totalLoadedCostEur !== null) {
-          <div class="summary-item">
-            <span class="summary-label">Total EUR</span>
-            <span class="summary-value">{{ totalLoadedCostEur | number:'1.0-0' }} <span class="devise">EUR</span></span>
+
+        <!-- Demographic filters -->
+        <div>
+          <div class="flex items-center gap-3 mb-4">
+            <span class="text-[11px] font-bold uppercase tracking-[0.07em] text-on-surface-variant whitespace-nowrap">
+              Filtres démographiques
+            </span>
+            <div class="flex-1 h-px bg-outline-variant"></div>
+            <span class="text-[11px] text-on-surface-variant italic whitespace-nowrap">vide = tous les actifs</span>
           </div>
-        }
-        @if (totalLoadedCostUsd !== null) {
-          <div class="summary-item">
-            <span class="summary-label">Total USD</span>
-            <span class="summary-value">{{ totalLoadedCostUsd | number:'1.0-0' }} <span class="devise">USD</span></span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <daf-form-field
+              [options]="{ label: 'Grade', type: 'text', placeholder: 'ex : Senior' }"
+              [value]="grade()"
+              (valueChange)="grade.set(($event ?? '') + '')">
+            </daf-form-field>
+            <daf-form-field
+              [options]="{ label: 'Discipline', type: 'text', placeholder: 'ex : Engineering' }"
+              [value]="discipline()"
+              (valueChange)="discipline.set(($event ?? '') + '')">
+            </daf-form-field>
+            <daf-select
+              [options]="contractTypeOptions"
+              [selected]="[contractType()]"
+              [config]="{ label: 'Type de contrat', fullWidth: true }"
+              (selectedChange)="contractType.set($event[0])">
+            </daf-select>
+            <daf-form-field
+              [options]="{ label: 'Entité', type: 'text', placeholder: 'ex : ITEC Tunisia' }"
+              [value]="entite()"
+              (valueChange)="entite.set(($event ?? '') + '')">
+            </daf-form-field>
+          </div>
+        </div>
+
+        <!-- Modifier -->
+        <div>
+          <div class="flex items-center gap-3 mb-4">
+            <span class="text-[11px] font-bold uppercase tracking-[0.07em] text-on-surface-variant whitespace-nowrap">
+              Modificateur salarial
+            </span>
+            <div class="flex-1 h-px bg-outline-variant"></div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <daf-select
+              [options]="modifierTypeOptions"
+              [selected]="[modifierType()]"
+              [config]="{ label: 'Type', fullWidth: true }"
+              (selectedChange)="modifierType.set($event[0])">
+            </daf-select>
+            <div class="flex flex-col gap-1">
+              <daf-form-field
+                [options]="{ label: modifierType() === 'PCT' ? 'Valeur (%)' : 'Montant (devise locale)', type: 'number', placeholder: 'ex : 5' }"
+                [value]="modifierValue().toString()"
+                (valueChange)="modifierValue.set(+($event ?? 0))">
+              </daf-form-field>
+              <p class="text-[11px] text-on-surface-variant">
+                @if (modifierType() === 'PCT') {
+                  5 = +5% · −3 = −3% du net versé
+                } @else {
+                  Montant à ajouter / soustraire au salaire net
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Actions -->
+      <div class="px-5 pb-5 sm:px-8 sm:pb-8 flex items-center gap-4 flex-wrap">
+        <daf-button
+          label="Simuler l'impact"
+          variant="primary"
+          [options]="{ loading: loading(), disabled: !paysIdCtrl.value || loading(), iconStart: 'calculate' }"
+          (onClick)="submit()">
+        </daf-button>
+
+        @if (error()) {
+          <div class="flex items-center gap-2 rounded-xl border border-danger/30 bg-danger/5 px-4 py-2.5 text-sm text-danger">
+            <span class="material-symbols-outlined text-base">error</span>
+            {{ error() }}
           </div>
         }
       </div>
 
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Net saisi</th>
-              <th>Brut</th>
-              <th>Coût chargé</th>
-              <th>EUR</th>
-              <th>USD</th>
-              <th>IRPP</th>
-              <th>Convergence</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (r of results(); track r.id; let i = $index) {
-              <tr [class.row-warn]="!r.convergenceOk">
-                <td>{{ i + 1 }}</td>
-                <td>{{ r.inputNet | number:'1.0-0' }}</td>
-                <td>{{ r.gross | number:'1.0-0' }}</td>
-                <td>{{ r.loadedCost | number:'1.0-0' }}</td>
-                <td>{{ r.loadedCostEur != null ? (r.loadedCostEur | number:'1.0-0') : '—' }}</td>
-                <td>{{ r.loadedCostUsd != null ? (r.loadedCostUsd | number:'1.0-0') : '—' }}</td>
-                <td>{{ r.irppAmount | number:'1.0-0' }}</td>
-                <td>{{ r.convergenceOk ? '✓' : '⚠️ ' + r.iterationsUsed + ' iter.' }}</td>
-              </tr>
+    </daf-card>
+
+    <!-- ── Results ──────────────────────────────────────────────────────────── -->
+    @if (result(); as r) {
+      <daf-card [options]="{ variant: 'outlined', padding: 'none', radius: 'xl' }">
+
+        <!-- Card header -->
+        <div class="px-5 py-4 border-b border-outline-variant flex items-center justify-between flex-wrap gap-3">
+          <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-xl text-tertiary" style="font-variation-settings:'FILL' 1">analytics</span>
+            <h2 class="text-base font-semibold text-on-surface">Résultats de simulation</h2>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+              <span class="material-symbols-outlined text-sm">group</span>
+              {{ r.headcount }} employés simulés
+            </span>
+            @if (r.appliedFilters.grade) {
+              <span class="rounded-full border border-outline-variant px-2.5 py-0.5 text-[11px] text-on-surface-variant">
+                Grade : {{ r.appliedFilters.grade }}
+              </span>
             }
-          </tbody>
-        </table>
-      </div>
-    </section>
-  }
-</div>
+            @if (r.appliedFilters.discipline) {
+              <span class="rounded-full border border-outline-variant px-2.5 py-0.5 text-[11px] text-on-surface-variant">
+                Discipline : {{ r.appliedFilters.discipline }}
+              </span>
+            }
+            @if (r.appliedFilters.contractType) {
+              <span class="rounded-full border border-outline-variant px-2.5 py-0.5 text-[11px] text-on-surface-variant">
+                {{ r.appliedFilters.contractType }}
+              </span>
+            }
+            <span class="rounded-full border border-primary/40 bg-primary/5 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
+              @if (r.modifierType === 'PCT') {
+                {{ r.modifierValue > 0 ? '+' : '' }}{{ r.modifierValue }}%
+              } @else {
+                {{ r.modifierValue > 0 ? '+' : '' }}{{ fmt(r.modifierValue) }} {{ r.localCurrency }}
+              }
+            </span>
+          </div>
+        </div>
+
+        <!-- KPI metric cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 p-5 sm:p-8">
+          <daf-metric-card
+            label="Coût mensuel actuel"
+            [value]="fmt(r.currentMonthlyCost) + ' ' + (r.localCurrency ?? '')"
+            [options]="{ icon: 'payments', iconColor: 'text-on-surface-variant', iconBg: 'bg-surface-container' }">
+          </daf-metric-card>
+
+          <daf-metric-card
+            label="Coût mensuel projeté"
+            [value]="fmt(r.projectedMonthlyCost) + ' ' + (r.localCurrency ?? '')"
+            [options]="{ icon: 'trending_up', iconColor: 'text-primary', iconBg: 'bg-primary/10' }">
+          </daf-metric-card>
+
+          <daf-metric-card
+            label="Δ mensuel"
+            [value]="(r.deltaMonthly > 0 ? '+' : '') + fmt(r.deltaMonthly) + ' ' + (r.localCurrency ?? '')"
+            [options]="{ icon: 'compare_arrows', iconColor: r.deltaMonthly >= 0 ? 'text-success' : 'text-danger', iconBg: r.deltaMonthly >= 0 ? 'bg-success/10' : 'bg-danger/10' }"
+            [delta]="deltaMetric(r, true)">
+          </daf-metric-card>
+
+          <daf-metric-card
+            label="Impact annuel"
+            [value]="(r.deltaAnnual > 0 ? '+' : '') + fmt(r.deltaAnnual) + ' ' + (r.localCurrency ?? '')"
+            [options]="{ icon: 'calendar_today', iconColor: r.deltaAnnual >= 0 ? 'text-success' : 'text-danger', iconBg: r.deltaAnnual >= 0 ? 'bg-success/10' : 'bg-danger/10' }"
+            [delta]="deltaMetric(r, false)">
+          </daf-metric-card>
+        </div>
+
+        <!-- FX conversions -->
+        @if (r.currentMonthlyCostEur != null || r.currentMonthlyCostChf != null) {
+          <div class="mx-5 sm:mx-8 mb-5 sm:mb-8 rounded-xl border border-outline-variant overflow-hidden">
+            <div class="flex items-center gap-2 px-4 py-3 bg-surface-container-low border-b border-outline-variant">
+              <span class="material-symbols-outlined text-base text-on-surface-variant">currency_exchange</span>
+              <span class="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+                Conversions devises — coût mensuel chargé
+              </span>
+            </div>
+            <div class="divide-y divide-outline-variant">
+              @if (r.currentMonthlyCostEur != null) {
+                <div class="flex items-center gap-4 px-4 py-3 text-sm">
+                  <span class="w-10 font-bold text-on-surface-variant">EUR</span>
+                  <span class="flex-1 tabular-nums">{{ fmt(r.currentMonthlyCostEur) }} EUR</span>
+                  <span class="material-symbols-outlined text-sm text-on-surface-variant">arrow_forward</span>
+                  <span class="flex-1 tabular-nums font-semibold text-primary">{{ fmt(r.projectedMonthlyCostEur) }} EUR</span>
+                </div>
+              }
+              @if (r.currentMonthlyCostChf != null) {
+                <div class="flex items-center gap-4 px-4 py-3 text-sm">
+                  <span class="w-10 font-bold text-on-surface-variant">CHF</span>
+                  <span class="flex-1 tabular-nums">{{ fmt(r.currentMonthlyCostChf) }} CHF</span>
+                  <span class="material-symbols-outlined text-sm text-on-surface-variant">arrow_forward</span>
+                  <span class="flex-1 tabular-nums font-semibold text-primary">{{ fmt(r.projectedMonthlyCostChf) }} CHF</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+      </daf-card>
+    }
+
+  </div>
+</daf-page>
