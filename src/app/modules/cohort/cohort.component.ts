@@ -1,78 +1,99 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { PayrollApiService, SimulationResultDto } from '../../core/payroll-api.service';
+import {
+  CohortAggregateResponse,
+  PayrollApiService,
+} from '../../core/payroll-api.service';
 import { PaysSelectComponent } from '../../shared/pays-select/pays-select.component';
+import {
+  ButtonComponent,
+  CardComponent,
+  MetricCardComponent,
+  PageComponent,
+  PageHeaderComponent,
+  FormFieldComponent,
+  SelectComponent,
+  type SelectOption,
+  type MetricDelta,
+} from '@khalilrebhiitec/daf360';
 
 @Component({
   selector: 'app-cohort',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, ReactiveFormsModule, PaysSelectComponent],
+  imports: [
+    CommonModule, ReactiveFormsModule, PaysSelectComponent,
+    ButtonComponent, CardComponent, MetricCardComponent,
+    PageComponent, PageHeaderComponent, FormFieldComponent, SelectComponent,
+  ],
   templateUrl: './cohort.component.html',
   styleUrl: './cohort.component.scss',
 })
 export class CohortComponent {
   private readonly api = inject(PayrollApiService);
-  private readonly fb  = inject(FormBuilder);
 
   readonly loading  = signal(false);
   readonly error    = signal<string | null>(null);
-  readonly results  = signal<SimulationResultDto[]>([]);
+  readonly result   = signal<CohortAggregateResponse | null>(null);
 
-  readonly form = this.fb.group({
-    paysId:     [null as number | null, Validators.required],
-    fiscalYear: [new Date().getFullYear(), Validators.required],
-    cohortName: [''],
-    csvText:    ['', Validators.required],
-  });
+  // Signal-based form state — cleaner with OnPush + daf360 components
+  readonly paysIdCtrl    = new FormControl<number | null>(null);
+  readonly grade         = signal('');
+  readonly discipline    = signal('');
+  readonly contractType  = signal('');
+  readonly entite        = signal('');
+  readonly modifierType  = signal('PCT');
+  readonly modifierValue = signal(0);
 
-  get totalLoadedCost(): number {
-    return this.results().reduce((s, r) => s + r.loadedCost, 0);
-  }
+  readonly contractTypeOptions: SelectOption[] = [
+    { value: '',    label: 'Tous' },
+    { value: 'CDI', label: 'CDI' },
+    { value: 'CDD', label: 'CDD' },
+  ];
 
-  get totalLoadedCostEur(): number | null {
-    const arr = this.results().filter(r => r.loadedCostEur != null);
-    return arr.length ? arr.reduce((s, r) => s + r.loadedCostEur!, 0) : null;
-  }
-
-  get totalLoadedCostUsd(): number | null {
-    const arr = this.results().filter(r => r.loadedCostUsd != null);
-    return arr.length ? arr.reduce((s, r) => s + r.loadedCostUsd!, 0) : null;
-  }
+  readonly modifierTypeOptions: SelectOption[] = [
+    { value: 'PCT',    label: 'Pourcentage (%)' },
+    { value: 'ABSOLU', label: 'Montant absolu (devise locale)' },
+  ];
 
   submit(): void {
-    if (this.form.invalid) return;
-    const { paysId, fiscalYear, cohortName, csvText } = this.form.getRawValue();
-
-    const employees = (csvText ?? '').split('\n')
-      .map(l => l.trim()).filter(Boolean)
-      .map(line => {
-        const [net, ct] = line.split(',').map(p => p.trim());
-        return { inputNet: parseFloat(net), contractType: ct || 'CDI' };
-      })
-      .filter(e => !isNaN(e.inputNet));
-
-    if (!employees.length) {
-      this.error.set('Aucun employé valide dans la liste');
-      return;
-    }
+    const paysId = this.paysIdCtrl.value;
+    if (!paysId) return;
 
     this.loading.set(true);
     this.error.set(null);
-    this.results.set([]);
+    this.result.set(null);
 
-    this.api.runCohortSimulation({
-      paysId: paysId!,
-      fiscalYear: fiscalYear!,
-      cohortName: cohortName || undefined,
-      employees,
+    this.api.runCohortAggregate({
+      paysId,
+      grade:        this.grade()        || null,
+      discipline:   this.discipline()   || null,
+      contractType: this.contractType() || null,
+      entite:       this.entite()       || null,
+      modifierType: this.modifierType(),
+      modifierValue:this.modifierValue(),
     }).subscribe({
-      next: res => { this.results.set(res); this.loading.set(false); },
+      next:  res => { this.result.set(res);  this.loading.set(false); },
       error: err => {
         this.error.set(err?.error?.message ?? 'Erreur lors de la simulation cohorte');
         this.loading.set(false);
       },
     });
+  }
+
+  fmt(v: number | null | undefined, dec = 2): string {
+    if (v == null) return '—';
+    return new Intl.NumberFormat('fr-FR', {
+      minimumFractionDigits: dec,
+      maximumFractionDigits: dec,
+    }).format(v);
+  }
+
+  deltaMetric(r: CohortAggregateResponse, monthly = true): MetricDelta {
+    const v = monthly ? r.deltaMonthly : r.deltaAnnual;
+    const prefix = v > 0 ? '+' : '';
+    const direction: 'up' | 'down' | 'neutral' = v > 0 ? 'up' : v < 0 ? 'down' : 'neutral';
+    return { value: `${prefix}${this.fmt(v)} ${r.localCurrency ?? ''}`, direction };
   }
 }

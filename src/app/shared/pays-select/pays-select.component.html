@@ -19,7 +19,10 @@
   </div>
 
   @if (open()) {
-    <div class="psc__dropdown" role="listbox">
+    <div class="psc__dropdown" role="listbox"
+         [style.top]="dropdownPos.top"
+         [style.left]="dropdownPos.left"
+         [style.width]="dropdownPos.width">
       @if (filtered().length === 0) {
         <div class="psc__empty">Aucun pays trouvé</div>
       }

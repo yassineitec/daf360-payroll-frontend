@@ -26,6 +26,7 @@ const APP_NAV_DEFS: AppNavDef[] = [
   { id: 'engine-results', label: 'Historique de paie',    icon: 'history',              route: 'engine-results', permission: 'PAYROLL_VIEW_RESULTS' },
   { id: 'calibration',    label: 'Calibration',           icon: 'tune',                 route: 'calibration',    permission: 'PAYROLL_RUN_CALIBRATION' },
   { id: 'parameter-sets', label: 'Paramètres',            icon: 'settings_applications', route: 'parameter-sets', permission: 'PAYROLL_VIEW_PARAMSET' },
+  { id: 'budget',         label: 'Budget prévisionnel',   icon: 'account_balance',      route: 'budget',         permission: 'PAYROLL_VIEW_BUDGET_AGGREGATE' },
   { id: 'admin',          label: 'Administration',        icon: 'admin_panel_settings', route: 'admin',          permission: 'PAYROLL_SUPER_ADMIN' },
 ];
 

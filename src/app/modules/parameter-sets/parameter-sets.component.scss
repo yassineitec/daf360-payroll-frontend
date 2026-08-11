@@ -12,8 +12,11 @@
 .alert { padding: 12px 16px; border-radius: var(--radius-md); font-size: 0.875rem; margin-top: 16px; &-error { background: color-mix(in srgb, var(--color-error) 12%, transparent); color: var(--color-error); } }
 .ps-list { display: flex; flex-direction: column; gap: 8px; }
 .ps-item { padding: 16px; border: 1px solid var(--color-outline-variant); border-radius: var(--radius-md); cursor: pointer; transition: background 0.15s; &:hover { background: var(--color-surface-container-low); } &--selected { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 5%, transparent); } }
-.ps-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-.ps-item-label { font-weight: 600; font-size: 0.9375rem; }
+.ps-item-header { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.ps-item-expand-icon { font-size: 0.65rem; color: var(--color-primary); flex-shrink: 0; transition: transform 0.15s; }
+.ps-item-label { font-weight: 600; font-size: 0.9375rem; flex: 1; }
+// push status badge to the right
+.ps-item-header > span:last-child { margin-left: auto; }
 .ps-item-meta { font-size: 0.8125rem; color: var(--color-on-surface-variant); margin-bottom: 12px; }
 .ps-item-actions { display: flex; gap: 8px; }
 .btn-sm { height: 32px; padding: 0 14px; border-radius: var(--radius-md); font-size: 0.8125rem; font-weight: 600; cursor: pointer; border: none; &--primary { background: var(--color-primary); color: var(--color-on-primary); } &--secondary { background: var(--color-secondary); color: var(--color-on-secondary); } }
@@ -31,6 +34,68 @@
 .rates-row { display: grid; grid-template-columns: 80px 80px 1fr 68px 68px 110px 76px 32px; gap: 5px; padding: 5px 10px; border: 1px solid var(--color-outline-variant); border-top: none; align-items: center; min-width: 680px; background: var(--color-surface); &:last-child { border-radius: 0 0 var(--radius-md) var(--radius-md); } }
 .ri { height: 30px; padding: 0 7px; border: 1px solid var(--color-outline-variant); border-radius: var(--radius-md); background: var(--color-surface-container-low); color: var(--color-on-surface); font-size: 0.8125rem; width: 100%; box-sizing: border-box; &:focus { outline: none; border-color: var(--color-primary); } }
 .btn-remove { height: 26px; width: 26px; border: none; border-radius: var(--radius-md); background: none; cursor: pointer; color: var(--color-on-surface-variant); font-size: 0.875rem; display: flex; align-items: center; justify-content: center; padding: 0; &:hover { background: color-mix(in srgb, var(--color-error) 12%, transparent); color: var(--color-error); } }
+
+/* ── Charge formula expansion ────────────────────────────────────────────── */
+
+// rates-row modifier: round bottom corners only when NOT followed by a formula block
+.rates-row--formula {
+  border-radius: 0 !important;
+}
+
+// Placeholder cells when rates are replaced by formula hint arrows
+.ri--hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  color: var(--color-primary);
+  opacity: 0.7;
+  font-style: italic;
+}
+
+// Expansion block that appears directly below a FORMULE-mode rates-row
+.rate-formula-block {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 14px 14px;
+  background: color-mix(in srgb, var(--color-primary) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 20%, transparent);
+  border-top: none;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  min-width: 680px;
+}
+
+.rate-formula-field {
+  flex: 1 1 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rate-formula-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-on-surface-variant);
+}
+
+// Inline code in read-only charge table showing the formula string
+.formula-preview {
+  font-family: 'Cascadia Code', 'Consolas', 'Fira Code', monospace;
+  font-size: 0.72rem;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  vertical-align: middle;
+}
 
 /* ── Rubriques de paie ─────────────────────────────────────────────────── */
 .rubriques-editor { margin-top: 10px; }
@@ -70,3 +135,267 @@
 /* Direction badges */
 .badge--credit { background: color-mix(in srgb, #22c55e 14%, transparent); color: #15803d; }
 .badge--debit  { background: color-mix(in srgb, #ef4444 14%, transparent); color: #b91c1c; }
+
+/* ── Test-gross preview control ─────────────────────────────────────────── */
+.preview-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  .preview-gross-input { width: 110px; height: 32px; }
+  .preview-gross-unit { font-size: 0.8125rem; color: var(--color-on-surface-variant); }
+}
+
+/* ── Guided rubrique card ────────────────────────────────────────────────── */
+.rubrique-card {
+  border: 1px solid var(--color-outline-variant);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+  background: var(--color-surface);
+  overflow: hidden;
+  transition: border-color 0.15s;
+  &--expanded { border-color: var(--color-primary); }
+}
+
+.rubrique-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  cursor: pointer;
+  gap: 12px;
+  user-select: none;
+  &:hover { background: var(--color-surface-container-low); }
+}
+
+.rch-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+.rch-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.rch-arrow { font-size: 0.6875rem; color: var(--color-on-surface-variant); width: 14px; }
+.rch-label {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280px;
+}
+.rch-mode { font-size: 0.75rem; color: var(--color-on-surface-variant); white-space: nowrap; }
+.rch-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+
+/* ── Card body ───────────────────────────────────────────────────────────── */
+.rubrique-card-body {
+  padding: 0 20px 20px;
+  border-top: 1px solid var(--color-outline-variant);
+}
+
+/* ── Form sections ───────────────────────────────────────────────────────── */
+.rg-section {
+  margin-top: 20px;
+  &-title {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-on-surface-variant);
+    margin: 0 0 12px;
+  }
+}
+
+.rg-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  &--mt { margin-top: 12px; }
+}
+
+.rg-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  &--sm  { flex: 0 0 140px; }
+  &--md  { flex: 0 0 200px; }
+  &--lg  { flex: 1 1 240px; min-width: 180px; max-width: 360px; }
+}
+
+/* ── Radio cards ─────────────────────────────────────────────────────────── */
+.rg-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.rg-radio-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  min-width: 160px;
+  flex: 1 1 160px;
+  max-width: 220px;
+  border: 1px solid var(--color-outline-variant);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  input[type="radio"] { display: none; }
+  &--selected {
+    border-color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 6%, transparent);
+  }
+  &:hover:not(.rg-radio-card--selected) {
+    background: var(--color-surface-container-low);
+  }
+}
+
+.rg-radio-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.rg-radio-desc {
+  font-size: 0.75rem;
+  color: var(--color-on-surface-variant);
+  line-height: 1.4;
+}
+
+/* ── Checkbox groups ─────────────────────────────────────────────────────── */
+.rg-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rg-checkbox-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  input[type="checkbox"] { margin-top: 3px; flex-shrink: 0; }
+  strong { display: block; font-size: 0.875rem; font-weight: 600; }
+  small { display: block; font-size: 0.75rem; color: var(--color-on-surface-variant); margin-top: 1px; }
+}
+
+.rg-contract-types {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-left: 24px;
+  margin-top: 8px;
+}
+
+.rg-tag-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 12px;
+  border: 1px solid var(--color-outline-variant);
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  input[type="checkbox"] { display: none; }
+  &:has(input:checked) {
+    border-color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+    color: var(--color-primary);
+  }
+}
+
+/* ── Formula expression input ────────────────────────────────────────────── */
+.rg-field--full {
+  flex: 1 1 100%;
+  min-width: 280px;
+}
+
+.formula-input {
+  font-family: 'Cascadia Code', 'Consolas', 'Fira Code', monospace;
+  font-size: 0.875rem;
+  letter-spacing: 0.01em;
+  &::placeholder { color: var(--color-on-surface-variant); opacity: 0.6; font-style: italic; }
+}
+
+.formula-hint { margin-bottom: 8px !important; }
+
+.formula-vars {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.formula-vars-divider {
+  font-size: 0.75rem;
+  color: var(--color-on-surface-variant);
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+.formula-var-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border: 1px solid var(--color-outline-variant);
+  border-radius: 999px;
+  background: var(--color-surface-container);
+  color: var(--color-on-surface);
+  font-family: monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+  &:hover {
+    border-color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+    color: var(--color-primary);
+  }
+  &--rubrique {
+    border-color: color-mix(in srgb, #8b5cf6 35%, transparent);
+    color: #7c3aed;
+    background: color-mix(in srgb, #8b5cf6 8%, transparent);
+    &:hover {
+      border-color: #8b5cf6;
+      background: color-mix(in srgb, #8b5cf6 18%, transparent);
+      color: #5b21b6;
+    }
+  }
+}
+
+/* ── Live preview ────────────────────────────────────────────────────────── */
+.rg-preview-section {
+  margin-top: 20px;
+  padding: 14px 16px;
+  background: color-mix(in srgb, var(--color-primary) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
+  border-radius: var(--radius-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.rg-preview-label {
+  font-size: 0.8125rem;
+  color: var(--color-on-surface-variant);
+}
+
+.rg-preview-amount {
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-primary);
+}

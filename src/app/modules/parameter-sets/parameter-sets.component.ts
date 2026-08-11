@@ -6,6 +6,7 @@ import {
   ParameterSetDto,
   SocialChargeRateDto,
   SavePayrollRubriqueRequest,
+  PayrollRubriqueDto,
 } from '../../core/payroll-api.service';
 import { PaysSelectComponent } from '../../shared/pays-select/pays-select.component';
 
@@ -35,6 +36,7 @@ export class ParameterSetsComponent {
     { value: 'GROSS',        label: 'Brut' },
     { value: 'CAPPED_GROSS', label: 'Brut plafonné' },
     { value: 'FIXED',        label: 'Fixe' },
+    { value: 'FORMULE',      label: 'Formule personnalisée' },
   ];
 
   readonly chargesForm = this.fb.group({ rates: this.fb.array([]) });
@@ -44,13 +46,23 @@ export class ParameterSetsComponent {
   // ── Rubriques de paie editor ──────────────────────────────────────────────
   readonly editingRubriquesId = signal<number | null>(null);
   readonly savingRubriques    = signal(false);
+  readonly expandedRubriques  = signal<Set<number>>(new Set());
+  readonly testGross          = signal<number>(3000);
 
-  readonly rubriqueNatures   = ['AVANTAGE', 'INDEMNITE', 'PRIME', 'RETENUE'];
-  readonly rubriqueCalcModes = [
-    { value: 'FIXE_MENSUEL',        label: 'Fixe mensuel' },
-    { value: 'FIXE_JOURNALIER',     label: 'Fixe/jour' },
-    { value: 'POURCENTAGE_BRUT',    label: '% Brut' },
-    { value: 'POURCENTAGE_CHARGES', label: '% Charges' },
+  readonly natureOptions = [
+    { value: 'AVANTAGE',  label: 'Avantage en nature', description: 'Élément de rémunération non monétaire ajouté au brut' },
+    { value: 'INDEMNITE', label: 'Indemnité',           description: 'Compensation pour frais ou contraintes professionnelles' },
+    { value: 'PRIME',     label: 'Prime',               description: 'Complément de salaire lié à la performance ou au poste' },
+    { value: 'RETENUE',   label: 'Retenue',             description: 'Prélèvement déduit du salaire brut' },
+  ];
+
+  readonly calcModeOptions = [
+    { value: 'FIXE_MENSUEL',         label: 'Montant fixe mensuel',        description: 'Un montant défini, versé chaque mois' },
+    { value: 'FIXE_JOURNALIER',      label: 'Montant par jour travaillé',  description: 'Montant × nombre de jours effectivement travaillés' },
+    { value: 'POURCENTAGE_BRUT',     label: 'Pourcentage du salaire brut', description: 'Taux × salaire brut total' },
+    { value: 'POURCENTAGE_CHARGES',  label: 'Pourcentage des charges',     description: 'Taux × base de calcul des charges sociales' },
+    { value: 'POURCENTAGE_PLAFONNE', label: 'Pourcentage plafonné',        description: 'Taux × min(salaire brut, plafond mensuel)' },
+    { value: 'FORMULE',              label: 'Expression personnalisée',    description: 'Formule libre : BRUT, CNSS_EE, CHARGES_ER, ou résultat d\'une autre rubrique' },
   ];
 
   readonly rubriquesForm = this.fb.group({ items: this.fb.array([]) });
@@ -67,7 +79,13 @@ export class ParameterSetsComponent {
     this.loading.set(true);
     this.error.set(null);
     this.api.listParameterSets(paysId).subscribe({
-      next: ps => { this.paramSets.set(ps); this.loading.set(false); },
+      next: ps => {
+        this.paramSets.set(ps);
+        this.loading.set(false);
+        // Auto-select the first (usually only) parameter set so the detail
+        // panel — including Rubriques — is visible without an extra click.
+        if (ps.length > 0 && !this.selected()) this.selected.set(ps[0]);
+      },
       error: err => { this.error.set(err?.error?.message ?? 'Erreur'); this.loading.set(false); },
     });
   }
@@ -91,6 +109,9 @@ export class ParameterSetsComponent {
       employerRate:    [r.employerRate],
       baseCalculation: [r.baseCalculation ?? 'GROSS'],
       capAmount:       [r.capAmount],
+      formulaEe:       [r.formulaEe ?? ''],
+      formulaEr:       [r.formulaEr ?? ''],
+      evalOrder:       [r.evalOrder ?? 0],
     })));
     this.editingChargesId.set(ps.id);
   }
@@ -109,6 +130,9 @@ export class ParameterSetsComponent {
       employerRate:    [0],
       baseCalculation: ['GROSS'],
       capAmount:       [null],
+      formulaEe:       [''],
+      formulaEr:       [''],
+      evalOrder:       [0],
     }));
   }
 
@@ -136,68 +160,83 @@ export class ParameterSetsComponent {
     if (this.editingRubriquesId() === ps.id) { this.closeRubriquesEditor(); return; }
     this.closeChargesEditor();
     while (this.editRubriques.length) this.editRubriques.removeAt(0);
-    (ps.rubriques ?? []).forEach(r => this.editRubriques.push(this.fb.group({
-      code:                     [r.code,     Validators.required],
-      labelFr:                  [r.labelFr,  Validators.required],
-      labelEn:                  [r.labelEn ?? ''],
-      nature:                   [r.nature    ?? 'AVANTAGE'],
-      calcMode:                 [r.calcMode  ?? 'FIXE_MENSUEL'],
-      amount:                   [r.amount    ?? null],
-      rate:                     [r.rate      ?? null],
-      employerSharePct:         [r.employerSharePct ?? 0],
-      employeeSharePct:         [r.employeeSharePct ?? 0],
-      isSubjectToSocialCharges: [r.isSubjectToSocialCharges ?? false],
-      isSubjectToIrpp:          [r.isSubjectToIrpp ?? true],
-      direction:                [r.direction ?? 'CREDIT'],
-      contractTypes:            [r.contractTypes ?? ''],
-      isActive:                 [r.isActive  ?? true],
-    })));
+    (ps.rubriques ?? []).forEach(r => this.editRubriques.push(this.makeRubriqueGroup(r)));
+    // Auto-expand the first card so the form is immediately visible.
+    this.expandedRubriques.set(new Set([0]));
     this.editingRubriquesId.set(ps.id);
+  }
+
+  private makeRubriqueGroup(r: Partial<PayrollRubriqueDto>): FormGroup {
+    return this.fb.group({
+      code:                     [r.code     ?? '',           Validators.required],
+      labelFr:                  [r.labelFr  ?? '',           Validators.required],
+      labelEn:                  [r.labelEn  ?? ''],
+      nature:                   [r.nature   ?? 'AVANTAGE'],
+      calcMode:                 [r.calcMode ?? 'FIXE_MENSUEL'],
+      amount:                   [r.amount   ?? null],
+      ratePercent:              [r.rate != null ? +(r.rate * 100).toFixed(4) : null],
+      capAmount:                [r.capAmount ?? null],
+      formulaExpression:        [r.formulaExpression ?? ''],
+      employerSharePct:         [r.employerSharePct  ?? 0],
+      employeeSharePct:         [r.employeeSharePct  ?? 0],
+      isSubjectToSocialCharges: [r.isSubjectToSocialCharges ?? false],
+      isSubjectToIrpp:          [r.isSubjectToIrpp   ?? true],
+      ctAll:                    [!r.contractTypes],
+      ctCDI:                    [r.contractTypes?.includes('CDI')   ?? false],
+      ctCDD:                    [r.contractTypes?.includes('CDD')   ?? false],
+      ctSTAGE:                  [r.contractTypes?.includes('STAGE') ?? false],
+      ctCIVP:                   [r.contractTypes?.includes('CIVP')  ?? false],
+      isActive:                 [r.isActive  ?? true],
+    });
   }
 
   private closeRubriquesEditor(): void {
     this.editingRubriquesId.set(null);
+    this.expandedRubriques.set(new Set());
     while (this.editRubriques.length) this.editRubriques.removeAt(0);
   }
 
   addEditRubrique(): void {
-    this.editRubriques.push(this.fb.group({
-      code:                     ['', Validators.required],
-      labelFr:                  ['', Validators.required],
-      labelEn:                  [''],
-      nature:                   ['AVANTAGE'],
-      calcMode:                 ['FIXE_MENSUEL'],
-      amount:                   [null],
-      rate:                     [null],
-      employerSharePct:         [0],
-      employeeSharePct:         [0],
-      isSubjectToSocialCharges: [false],
-      isSubjectToIrpp:          [true],
-      direction:                ['CREDIT'],
-      contractTypes:            [''],
-      isActive:                 [true],
-    }));
+    this.editRubriques.push(this.makeRubriqueGroup({}));
+    const newIndex = this.editRubriques.length - 1;
+    const s = new Set(this.expandedRubriques());
+    s.add(newIndex);
+    this.expandedRubriques.set(s);
   }
 
-  removeEditRubrique(i: number): void { this.editRubriques.removeAt(i); }
+  removeEditRubrique(i: number): void {
+    this.editRubriques.removeAt(i);
+    const updated = new Set<number>();
+    this.expandedRubriques().forEach(idx => {
+      if (idx < i) updated.add(idx);
+      else if (idx > i) updated.add(idx - 1);
+    });
+    this.expandedRubriques.set(updated);
+  }
 
   saveRubriques(psId: number): void {
     this.savingRubriques.set(true);
     const raw = this.rubriquesForm.getRawValue().items as any[];
-    const payload: SavePayrollRubriqueRequest[] = raw.map(r => ({
+    const payload: SavePayrollRubriqueRequest[] = raw.map((r, idx) => ({
       code:                     r.code,
       labelFr:                  r.labelFr,
       labelEn:                  r.labelEn?.trim() || null,
       nature:                   r.nature,
       calcMode:                 r.calcMode,
       amount:                   r.amount,
-      rate:                     r.rate,
-      employerSharePct:         r.employerSharePct,
-      employeeSharePct:         r.employeeSharePct,
+      rate:                     r.ratePercent != null ? r.ratePercent / 100 : null,
+      capAmount:                r.capAmount,
+      formulaExpression:        r.calcMode === 'FORMULE' ? (r.formulaExpression?.trim() || null) : null,
+      displayOrder:             idx,
+      employerSharePct:         r.employerSharePct ?? 0,
+      employeeSharePct:         r.employeeSharePct ?? 0,
       isSubjectToSocialCharges: r.isSubjectToSocialCharges,
       isSubjectToIrpp:          r.isSubjectToIrpp,
-      direction:                r.direction,
-      contractTypes:            r.contractTypes?.trim() || null,
+      direction:                r.nature === 'RETENUE' ? 'DEBIT' : 'CREDIT',
+      contractTypes:            r.ctAll ? null :
+        (['CDI', 'CDD', 'STAGE', 'CIVP'] as const)
+          .filter((t: string) => r['ct' + t] === true)
+          .join(',') || null,
       isActive:                 r.isActive,
     }));
     this.api.updateRubriques(psId, payload).subscribe({
@@ -276,18 +315,152 @@ export class ParameterSetsComponent {
 
   formatCalcMode(calcMode: string): string {
     switch (calcMode) {
-      case 'FIXE_MENSUEL':        return 'Fixe mensuel';
-      case 'FIXE_JOURNALIER':     return 'Fixe/jour';
-      case 'POURCENTAGE_BRUT':    return '% Brut';
-      case 'POURCENTAGE_CHARGES': return '% Charges';
-      default:                    return calcMode;
+      case 'FIXE_MENSUEL':         return 'Fixe mensuel';
+      case 'FIXE_JOURNALIER':      return 'Fixe/jour';
+      case 'POURCENTAGE_BRUT':     return '% Brut';
+      case 'POURCENTAGE_CHARGES':  return '% Charges';
+      case 'POURCENTAGE_PLAFONNE': return '% Plafonné';
+      case 'FORMULE':              return 'Formule';
+      default:                     return calcMode;
     }
   }
 
-  rubriqueValue(r: { calcMode: string; amount: number | null; rate: number | null }, devise: string = ''): string {
+  rubriqueValue(r: { calcMode: string; amount: number | null; rate: number | null; capAmount?: number | null; formulaExpression?: string | null }, devise: string = ''): string {
+    if (r.calcMode === 'FORMULE') {
+      return r.formulaExpression ? `= ${r.formulaExpression}` : '— (formule vide)';
+    }
     if (r.calcMode === 'FIXE_MENSUEL' || r.calcMode === 'FIXE_JOURNALIER') {
       return r.amount != null ? `${r.amount.toLocaleString('fr-FR')}${r.calcMode === 'FIXE_JOURNALIER' ? '/j' : ''}` : '—';
     }
-    return r.rate != null ? `${(r.rate * 100).toFixed(2)} %` : '—';
+    if (r.rate != null) {
+      const pct = `${(r.rate * 100).toFixed(2)} %`;
+      return (r.calcMode === 'POURCENTAGE_PLAFONNE' && r.capAmount != null)
+        ? `${pct} (plaf. ${r.capAmount.toLocaleString('fr-FR')})`
+        : pct;
+    }
+    return '—';
+  }
+
+  // ── Formula mode helpers ───────────────────────────────────────────────────
+
+  /**
+   * Returns the set of formula variable chips for the selected parameter set:
+   * BRUT, CHARGES_EE/ER, and one _EE/_ER pair per distinct charge code.
+   */
+  formulaVariableHints(): { name: string; desc: string }[] {
+    const ps = this.selected();
+    const hints: { name: string; desc: string }[] = [
+      { name: 'BRUT',       desc: 'Salaire brut' },
+      { name: 'CHARGES_EE', desc: 'Total charges salariales' },
+      { name: 'CHARGES_ER', desc: 'Total charges patronales' },
+    ];
+    const seen = new Set<string>();
+    (ps?.socialChargeRates ?? []).forEach(r => {
+      const key = r.chargeCode.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+      if (!seen.has(key)) {
+        seen.add(key);
+        hints.push({ name: key + '_EE', desc: `Part salariale — ${r.chargeLabel}` });
+        hints.push({ name: key + '_ER', desc: `Part patronale — ${r.chargeLabel}` });
+      }
+    });
+    return hints;
+  }
+
+  /**
+   * Returns variable chips for rubriques that appear before position `currentIndex`
+   * in the list (lower display_order → referenceable by later FORMULE rubriques).
+   */
+  priorRubriqueVars(currentIndex: number): { name: string; desc: string }[] {
+    return this.editRubriques.controls
+      .slice(0, currentIndex)
+      .map((ctrl, i) => {
+        const g = ctrl as FormGroup;
+        const code  = (g.get('code')!.value as string  || '').toUpperCase().replace(/[^A-Z0-9]/g, '_');
+        const label =  g.get('labelFr')!.value as string || `Rubrique #${i + 1}`;
+        return code ? { name: code, desc: label } : null;
+      })
+      .filter((v): v is { name: string; desc: string } => v !== null);
+  }
+
+  /** Appends a variable name into the formulaExpression field of card i. */
+  insertFormulaVar(i: number, varName: string): void {
+    const ctrl = this.editRubriqueGroup(i).get('formulaExpression')!;
+    const current: string = ctrl.value ?? '';
+    ctrl.setValue(current ? `${current} + ${varName}` : varName);
+    ctrl.markAsDirty();
+  }
+
+  // ── Charge formula helpers ─────────────────────────────────────────────────
+
+  /**
+   * Returns variable chips available to the formula of charge at position `i`.
+   * A charge can reference BRUT and the results of charges that appear BEFORE it
+   * in the list (i.e. have a lower eval_order / earlier position).
+   */
+  chargeVariableHints(currentIndex: number): { name: string; desc: string }[] {
+    const hints: { name: string; desc: string }[] = [
+      { name: 'BRUT', desc: 'Salaire brut' },
+    ];
+    this.editRates.controls.slice(0, currentIndex).forEach(ctrl => {
+      const g = ctrl as FormGroup;
+      const code  = ((g.get('chargeCode')!.value as string) || '').toUpperCase().replace(/[^A-Z0-9]/g, '_');
+      const label =   g.get('chargeLabel')!.value as string || '';
+      if (code) {
+        hints.push({ name: code + '_EE', desc: `Part salariale — ${label}` });
+        hints.push({ name: code + '_ER', desc: `Part patronale — ${label}` });
+      }
+    });
+    return hints;
+  }
+
+  /** Appends a variable name into the formulaEe or formulaEr field of charge row i. */
+  insertChargeFormulaVar(i: number, side: 'formulaEe' | 'formulaEr', varName: string): void {
+    const ctrl = this.editRateGroup(i).get(side)!;
+    const current: string = ctrl.value ?? '';
+    ctrl.setValue(current ? `${current} + ${varName}` : varName);
+    ctrl.markAsDirty();
+  }
+
+  toggleRubriqueCard(i: number): void {
+    const s = new Set(this.expandedRubriques());
+    if (s.has(i)) { s.delete(i); } else { s.add(i); }
+    this.expandedRubriques.set(s);
+  }
+
+  isRubriqueExpanded(i: number): boolean {
+    return this.expandedRubriques().has(i);
+  }
+
+  natureLabel(value: string): string {
+    return this.natureOptions.find(o => o.value === value)?.label ?? value;
+  }
+
+  calcModeLabel(value: string): string {
+    return this.calcModeOptions.find(o => o.value === value)?.label ?? value;
+  }
+
+  previewAmount(i: number): string {
+    const g = this.editRubriqueGroup(i).getRawValue();
+    const gross = this.testGross();
+    let amount = 0;
+    switch (g['calcMode']) {
+      case 'FIXE_MENSUEL':
+      case 'FIXE_JOURNALIER':
+        amount = g['amount'] ?? 0;
+        break;
+      case 'POURCENTAGE_BRUT':
+      case 'POURCENTAGE_CHARGES':
+        amount = gross * (g['ratePercent'] ?? 0) / 100;
+        break;
+      case 'POURCENTAGE_PLAFONNE': {
+        const cap: number = g['capAmount'] ?? gross;
+        amount = Math.min(gross, cap) * (g['ratePercent'] ?? 0) / 100;
+        break;
+      }
+      case 'FORMULE':
+        // Cannot evaluate formula without charge context — simulation shows the real value
+        return '—';
+    }
+    return amount.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 }

@@ -1,5 +1,5 @@
 import {
-  ChangeDetectionStrategy, Component, forwardRef, inject, OnInit,
+  ChangeDetectionStrategy, Component, ElementRef, forwardRef, inject, OnInit,
   signal, computed,
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
@@ -21,12 +21,16 @@ import { PayrollApiService, PaysDto } from '../../core/payroll-api.service';
 })
 export class PaysSelectComponent implements ControlValueAccessor, OnInit {
   private readonly api = inject(PayrollApiService);
+  private readonly el  = inject(ElementRef);
 
   readonly allPays    = signal<PaysDto[]>([]);
   readonly query      = signal('');
   readonly open       = signal(false);
   readonly isDisabled = signal(false);
   private readonly _id = signal<number | null>(null);
+
+  /** Fixed-position coords recomputed each time the dropdown opens. */
+  dropdownPos: { top: string; left: string; width: string } = { top: '0px', left: '0px', width: '0px' };
 
   private onChange: (v: number | null) => void = () => {};
   private onTouched: () => void = () => {};
@@ -59,8 +63,18 @@ export class PaysSelectComponent implements ControlValueAccessor, OnInit {
   registerOnTouched(fn: () => void): void { this.onTouched = fn; }
   setDisabledState(d: boolean): void { this.isDisabled.set(d); }
 
+  private updateDropdownPos(): void {
+    const rect = (this.el.nativeElement as HTMLElement).getBoundingClientRect();
+    this.dropdownPos = {
+      top:   `${rect.bottom + 4}px`,
+      left:  `${rect.left}px`,
+      width: `${rect.width}px`,
+    };
+  }
+
   onFocus(): void {
     this.query.set('');
+    this.updateDropdownPos();
     this.open.set(true);
   }
 
