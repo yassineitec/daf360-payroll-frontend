@@ -1,12 +1,29 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth.guard';
 import { PayrollShellComponent } from './layout/payroll-shell.component';
+import { provideState } from '@ngrx/store';
+import { provideEnvironmentInitializer } from '@angular/core';
+import { provideDafAccess } from '@khalilrebhiitec/daf360';
+import { environment } from '../environments/environment';
 
 export const routes: Routes = [
+  // Pas de redirection racine ici : la valeur par défaut est déclarée sur les enfants
+  // (`'' → simulator`, en fin de liste), comme dans facturation et log. Il y avait
+  // `{ path: '', redirectTo: '', pathMatch: 'full' }`, une route qui se redirigeait vers
+  // elle-même — supprimée parce qu'elle est fautive en soi, mais ce n'était PAS la cause du
+  // NG0203 : celui-ci persistait après. Voir `core/auth.guard.ts` pour la vraie raison.
   {
     path: '',
     component: PayrollShellComponent,
     canActivate: [authGuard],
+       providers: [
+          // Feeds the lib permission guard: unauthenticated → shell login; a permission
+          // denial → the shell's /forbidden page (federation shares one Router).
+          ...provideDafAccess({
+            loginRedirect: () => { window.location.href = environment.shellUrl || '/'; },
+            forbiddenRoute: '/forbidden',
+          }),
+        ],
     children: [
       {
         path: 'simulator',

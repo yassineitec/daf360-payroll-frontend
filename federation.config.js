@@ -50,12 +50,12 @@ module.exports = withNativeFederation({
     '@ngrx/store': {
       singleton: true,
       strictVersion: false,
-      requiredVersion: '^21.1.0',
+      requiredVersion: '21.1.0',
     },
     '@ngrx/effects': {
       singleton: true,
       strictVersion: false,
-      requiredVersion: '^21.1.0',
+      requiredVersion: '21.1.0',
     },
     '@ngx-translate/core': {
       singleton: true,
