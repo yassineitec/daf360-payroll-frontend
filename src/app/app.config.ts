@@ -13,6 +13,7 @@ import { provideTranslateHttpLoader } from "@ngx-translate/http-loader";
 import { routes } from "./app.routes";
 import { authInterceptor } from "./core/auth.interceptor";
 import { UserStore } from "./core/user.store";
+import { DEFAULT_LANG, resolveInitialLang } from "./core/language-preference";
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -26,7 +27,7 @@ export const appConfig: ApplicationConfig = {
       deps: [UserStore],
       multi: true,
     },
-    ...provideTranslateService({ fallbackLang: "fr", lang: "fr" }),
+    ...provideTranslateService({ fallbackLang: DEFAULT_LANG, lang: resolveInitialLang() }),
     ...provideTranslateHttpLoader({ prefix: "/assets/i18n/", suffix: ".json" }),
   ],
 };
