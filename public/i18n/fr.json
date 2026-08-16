@@ -1,0 +1,238 @@
+{
+  "PAYROLL": {
+    "COMMON": {
+      "LOADING": "Chargement…",
+      "CLOSE": "Fermer",
+      "CLEAR": "Effacer",
+      "BREADCRUMB_ROOT": "Paie"
+    },
+
+    "SIMULATOR": {
+      "TITLE": "Simulateur de paie",
+      "SUBTITLE": "Net cible, 5 strates, coût chargé — convergence Newton-Raphson.",
+      "BREADCRUMB": "Simulateur individuel",
+      "ACTIONS": {
+        "HISTORY": "Simulations récentes",
+        "RESET": "Réinitialiser"
+      },
+
+      "MODE": {
+        "NET_TO_BRUT": "Net → Brut",
+        "BRUT_TO_NET": "Brut → Net",
+        "NET_TO_BRUT_HINT": "Le net est la cible",
+        "BRUT_TO_NET_HINT": "Le brut est la cible"
+      },
+      "PERIOD": {
+        "MONTHLY": "Mensuel",
+        "YEARLY": "Annuel",
+        "YEARLY_HINT": "Divisé par 12 avant calcul",
+        "MONTHLY_ADJ": "mensuel",
+        "YEARLY_ADJ": "annuel"
+      },
+      "BADGE": {
+        "PARTIAL_CONVERGENCE": "Convergence partielle"
+      },
+
+      "STEPPER": {
+        "ARIA": "Étapes de la simulation",
+        "S1_TITLE": "Référentiel & sujet",
+        "S1_SUBTITLE_EMPTY": "Pays à choisir",
+        "S2_TITLE": "Rémunération",
+        "S3_TITLE": "Avantages",
+        "S3_SUBTITLE": "{{selected}} / {{total}} inclus",
+        "S3_SUBTITLE_EMPTY": "Aucun au référentiel",
+        "PREV": "Précédent",
+        "NEXT": "Suivant"
+      },
+
+      "STEP1": {
+        "TITLE": "01 · Référentiel & sujet",
+        "BADGE_READY": "Jeu v{{version}} · {{year}} · {{currency}}",
+        "BADGE_MISSING": "Aucun jeu actif",
+        "BADGE_IDLE": "Pays non choisi",
+        "PAYS_LABEL": "Pays",
+        "PAYS_PLACEHOLDER": "— Sélectionner un pays —",
+        "PAYS_PLACEHOLDER_EMPTY": "Aucun pays synchronisé",
+        "PAYS_HINT": "{{contracts}} contrat(s) · {{brackets}} tranche(s) IRPP · {{benefits}} avantage(s)",
+        "NO_PAYS": "Le référentiel pays est vide : la table pays_ref n'a pas encore été synchronisée depuis le service RH. Aucune simulation n'est possible tant qu'elle ne l'est pas.",
+        "NO_PARAMETER_SET": "Aucun jeu de paramètres ACTIF pour ce pays : le moteur n'a ni barème IRPP ni taux de charges. Créez-le puis activez-le dans Administration.",
+        "SUBJECT_LABEL": "Sujet de la simulation",
+        "SUBJECT_CANDIDATE": "Candidat",
+        "SUBJECT_CANDIDATE_HINT": "Identité saisie à la main",
+        "SUBJECT_EMPLOYEE": "Collaborateur",
+        "SUBJECT_EMPLOYEE_HINT": "Fiche RH existante",
+        "EMPLOYEE_LABEL": "Collaborateur",
+        "EMPLOYEE_HINT": "Contrat, grade et discipline sont repris de la fiche RH — inutile de les ressaisir.",
+        "CANDIDATE_LABEL": "Nom / label",
+        "CANDIDATE_LABEL_PLACEHOLDER": "ex : Candidat A",
+        "POSTE": "Poste",
+        "POSTE_PLACEHOLDER": "ex : Ingénieur logiciel",
+        "GRADE": "Grade",
+        "GRADE_PLACEHOLDER": "— Aucun —",
+        "DISCIPLINE": "Discipline",
+        "DISCIPLINE_PLACEHOLDER": "— Aucune —"
+      },
+
+      "STEP2": {
+        "TITLE": "02 · Rémunération",
+        "BADGE": "{{mode}} · {{period}}",
+        "DIRECTION_LABEL": "Sens du calcul",
+        "PERIOD_LABEL": "Période de saisie",
+        "NET_LABEL": "Net souhaité {{period}}",
+        "NET_PLACEHOLDER": "ex : 2 500",
+        "GROSS_LABEL": "Salaire brut {{period}}",
+        "GROSS_PLACEHOLDER": "ex : 3 800",
+        "AMOUNT_HINT_YEARLY": "Divisé par 12 avant calcul ; les résultats restent mensuels et annuels.",
+        "AMOUNT_HINT_MONTHLY": "Les résultats affichent le mensuel et l'annuel (× 12).",
+        "CONTRACT_LABEL": "Type de contrat",
+        "CONTRACT_PLACEHOLDER_NO_PAYS": "Choisir un pays",
+        "CONTRACT_PLACEHOLDER_EMPLOYEE": "— Repris de la fiche RH —",
+        "CONTRACT_PLACEHOLDER_CANDIDATE": "— Sélectionner —",
+        "CONTRACT_HINT_EMPLOYEE": "Renseignez-le pour forcer un autre contrat",
+        "WORKING_DAYS": "Jours ouvrés / mois",
+        "WORKING_DAYS_SUFFIX": "j"
+      },
+
+      "STEP3": {
+        "TITLE": "03 · Avantages du référentiel",
+        "CHECK_ALL": "Tout cocher",
+        "UNCHECK_ALL": "Tout décocher",
+        "BADGE_NONE": "Aucun",
+        "BADGE": "{{selected}} / {{total}} inclus",
+        "TAXABLE": "imposable",
+        "EXEMPT": "exonéré",
+        "EMPTY": "Les avantages proviennent du jeu de paramètres actif du pays. Sélectionnez un pays disposant d'un jeu actif pour les voir."
+      },
+
+      "RESULT": {
+        "TITLE": "Résultat",
+        "PENDING": "En attente",
+        "META": "{{contract}} · jeu #{{parameterSetId}} · {{date}}",
+        "LOADED_COST": "Coût chargé mensuel",
+        "PER_YEAR": "{{amount}} / an",
+        "COST_NET_RATIO": "· ratio coût / net × {{ratio}}",
+        "EMPTY_HINT": "Renseignez les 3 étapes puis lancez la simulation.",
+        "GROSS_MONTHLY": "Brut mensuel",
+        "NET_MONTHLY": "Net versé mensuel",
+        "BREAKDOWN_TITLE": "Décomposition du coût chargé",
+        "BREAKDOWN_ARIA": "Répartition du coût chargé",
+        "SEG_NET": "Net versé",
+        "SEG_EMPLOYEE_CHARGES": "Charges salariales",
+        "SEG_IRPP": "IRPP",
+        "SEG_EXEMPT_BENEFITS": "Avantages exonérés",
+        "SEG_EMPLOYER_CHARGES": "Charges patronales",
+        "CONVERGENCE_WARNING": "Convergence non atteinte après {{iterations}} itérations — résultat estimé.",
+        "SIMULATE": "Simuler",
+        "EXPORT_PDF": "Exporter PDF",
+        "PRINT": "Imprimer"
+      },
+
+      "BLOCKING": {
+        "NO_PAYS": "Choisissez d'abord un pays.",
+        "LOADING": "Chargement du référentiel…",
+        "NO_PARAMETER_SET": "Aucun jeu de paramètres ACTIF pour ce pays — la simulation est impossible tant qu'un jeu n'a pas été créé et activé dans Administration.",
+        "NO_EMPLOYEE": "Sélectionnez le collaborateur à simuler.",
+        "NO_CONTRACT": "Choisissez le type de contrat.",
+        "AMOUNT_REQUIRED": "Montant requis",
+        "AMOUNT_POSITIVE": "Le montant doit être positif"
+      },
+
+      "ERROR": {
+        "FORBIDDEN": "Vous n'avez pas la permission de lancer une simulation (PAYROLL_RUN_SIMULATION).",
+        "GENERIC": "Erreur lors de la simulation"
+      },
+
+      "CASCADE": {
+        "TITLE": "Cascade des 5 strates",
+        "SUBTITLE": "Du net versé au coût chargé",
+        "S1": "S1 · Net versé",
+        "S2": "S2 · Net imposable",
+        "S3": "S3 · Brut base taxable",
+        "S4": "S4 · Brut total",
+        "S5": "S5 · Coût chargé",
+        "ADD_EMPLOYEE_CHARGES": "+ cotisations salariales",
+        "ADD_IRPP": "+ IRPP",
+        "ADD_EXEMPT_BENEFITS": "+ avantages exonérés",
+        "ADD_EMPLOYER_CHARGES": "+ charges patronales",
+        "FX_TITLE": "Contre-valeurs",
+        "FX_RATE": "1 {{currency}} = {{rate}}"
+      },
+
+      "RUBRIQUES": {
+        "TITLE": "Rubriques de paie",
+        "SUBTITLE": "{{count}} ligne(s) évaluée(s)",
+        "COL_CODE": "Code",
+        "COL_NATURE": "Nature",
+        "COL_MODE": "Mode",
+        "COL_AMOUNT": "Montant"
+      },
+
+      "REFERENTIAL": {
+        "TITLE": "Référentiel appliqué",
+        "SUBTITLE": "Barème IRPP et charges sociales du jeu actif",
+        "IRPP_TITLE": "Barème IRPP",
+        "IRPP_EMPTY": "Barème non renseigné sur ce jeu.",
+        "CHARGES_TITLE": "Charges sociales",
+        "COL_CHARGE": "Charge",
+        "COL_EMPLOYEE": "Salarié",
+        "COL_EMPLOYER": "Employeur",
+        "CAP": "plafond {{amount}}",
+        "CHARGES_EMPTY": "Aucune charge pour ce type de contrat dans le jeu actif."
+      },
+
+      "HISTORY": {
+        "TITLE": "Simulations récentes",
+        "NO_PERMISSION": "L'historique demande la permission PAYROLL_VIEW_INDIVIDUAL ou PAYROLL_VIEW_AGGREGATE.",
+        "NO_PAYS": "Sélectionnez un pays pour voir ses dernières simulations.",
+        "EMPTY": "Aucune simulation enregistrée pour {{pays}}.",
+        "INTRO": "{{count}} dernière(s) simulation(s) — {{pays}}. Cliquez pour la réafficher dans le panneau de résultat.",
+        "EMPLOYEE_ENTRY": "Collaborateur #{{id}}",
+        "UNLABELLED": "Sans libellé"
+      }
+    },
+
+    "ADMIN": {
+      "TITLE": "Administration Paie",
+      "SUBTITLE": "Création d'un nouveau jeu de paramètres (workflow 4-eyes)",
+      "CARD_TITLE": "Nouveau jeu de paramètres",
+      "PAYS": "Pays",
+      "FISCAL_YEAR": "Exercice fiscal",
+      "TOLERANCE": "Tolérance convergence",
+      "MAX_ITERATIONS": "Max itérations",
+      "CALIBRATION_THRESHOLD": "Seuil calibration (%)",
+      "IRPP_BRACKETS": "Barème IRPP (JSON)",
+      "IRPP_HINT": "Format : tableau de tranches {\"lower\", \"upper\"|null, \"rate\"}",
+      "RATIONALE": "Motif de modification",
+      "RATIONALE_PLACEHOLDER": "Ex : Révision barème IRPP loi finances 2025",
+      "CHARGES_TITLE": "Charges sociales ({{count}})",
+      "ADD_CHARGE": "+ Ajouter",
+      "CHARGES_EMPTY": "Aucune charge ajoutée. Cliquez sur « Ajouter » pour en créer.",
+      "COL_TYPE": "Type",
+      "COL_CODE": "Code",
+      "COL_LABEL": "Libellé",
+      "COL_EMPLOYEE_RATE": "Sal. %",
+      "COL_EMPLOYER_RATE": "Pat. %",
+      "COL_BASE": "Base",
+      "COL_CAP": "Plafond",
+      "CHARGE_LABEL_PLACEHOLDER": "Caisse nationale...",
+      "REMOVE": "Supprimer",
+      "BASE_GROSS": "Brut",
+      "BASE_CAPPED_GROSS": "Brut plafonné",
+      "BASE_FIXED": "Fixe",
+      "WORKFLOW_LABEL": "Workflow :",
+      "WORKFLOW_TEXT": "DRAFT → Soumettre → PENDING_FINANCE → Approbation RH + Finance (simultanée) → ACTIVE (ancien ACTIVE archivé automatiquement)",
+      "SUBMITTING": "Création…",
+      "SUBMIT": "Créer le jeu de paramètres (DRAFT)",
+      "CREATED": "Jeu de paramètres v{{version}} créé (DRAFT). Soumettez-le pour le workflow d'approbation.",
+      "CREATED_WITH_CHARGES": "Jeu de paramètres v{{version}} créé (DRAFT) avec {{count}} charge(s) sociale(s). Soumettez-le pour le workflow d'approbation.",
+      "ERROR": "Erreur création"
+    },
+
+    "SELECT": {
+      "EMPLOYEE_PLACEHOLDER": "Rechercher un collaborateur…",
+      "EMPLOYEE_EMPTY": "Aucun collaborateur trouvé",
+      "PAYS_PLACEHOLDER": "Rechercher un pays…",
+      "PAYS_EMPTY": "Aucun pays trouvé"
+    }
+  }
+}

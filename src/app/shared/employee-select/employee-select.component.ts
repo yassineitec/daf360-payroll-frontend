@@ -16,8 +16,8 @@ import { HrProfileService, EmployeeListItem } from '../../core/hr-profile.servic
     useExisting: forwardRef(() => EmployeeSelectComponent),
     multi: true,
   }],
+  // No styleUrl: the chrome is now Tailwind utilities shared with `daf-select`.
   templateUrl: './employee-select.component.html',
-  styleUrl: './employee-select.component.scss',
 })
 export class EmployeeSelectComponent implements ControlValueAccessor, OnChanges, OnDestroy {
   @Input() paysId: number | null = null;

@@ -9,26 +9,8 @@ import { SideNavComponent } from '@khalilrebhiitec/daf360';
 import type { NavItem, SideNavConfig } from '@khalilrebhiitec/daf360';
 import { UserStore } from '../core/user.store';
 import { RemoteStylesService } from '../core/remote-styles.service';
+import { PAYROLL_NAV_DEFS, activeNavRoute } from '../core/payroll-nav';
 import { environment } from '../../environments/environment';
-
-interface AppNavDef {
-  id:         string;
-  label:      string;
-  icon:       string;
-  route:      string;
-  permission: string | null;
-}
-
-const APP_NAV_DEFS: AppNavDef[] = [
-  { id: 'simulator',      label: 'Simulateur individuel', icon: 'calculate',            route: 'simulator',      permission: 'PAYROLL_RUN_SIMULATION' },
-  { id: 'cohort',         label: 'Simulation cohorte',    icon: 'groups',               route: 'cohort',         permission: 'PAYROLL_RUN_SIMULATION' },
-  { id: 'engine-run',     label: 'Calcul de paie',        icon: 'payments',             route: 'engine-run',     permission: 'PAYROLL_RUN_ENGINE' },
-  { id: 'engine-results', label: 'Historique de paie',    icon: 'history',              route: 'engine-results', permission: 'PAYROLL_VIEW_RESULTS' },
-  { id: 'calibration',    label: 'Calibration',           icon: 'tune',                 route: 'calibration',    permission: 'PAYROLL_RUN_CALIBRATION' },
-  { id: 'parameter-sets', label: 'Paramètres',            icon: 'settings_applications', route: 'parameter-sets', permission: 'PAYROLL_VIEW_PARAMSET' },
-  { id: 'budget',         label: 'Budget prévisionnel',   icon: 'account_balance',      route: 'budget',         permission: 'PAYROLL_VIEW_BUDGET_AGGREGATE' },
-  { id: 'admin',          label: 'Administration',        icon: 'admin_panel_settings', route: 'admin',          permission: 'PAYROLL_SUPER_ADMIN' },
-];
 
 @Component({
   selector: 'app-payroll-shell',
@@ -51,7 +33,7 @@ export class PayrollShellComponent implements OnInit {
     this.cdr.detectChanges();
   }
 
-  readonly activeRoute = toSignal(
+  private readonly rawUrl = toSignal(
     this.router.events.pipe(
       filter(e => e instanceof NavigationEnd),
       map(() => this.router.url),
@@ -59,15 +41,27 @@ export class PayrollShellComponent implements OnInit {
     { initialValue: this.router.url, injector: this.injector },
   );
 
+  /**
+   * The URL reduced to a nav segment — `daf-side-nav` compares by strict equality, so
+   * handing it the absolute `/payroll/simulator` left every entry unlit. See
+   * `core/payroll-nav.ts`.
+   */
+  readonly activeRoute = computed(() => activeNavRoute(this.rawUrl() ?? ''));
+
   readonly sideNavConfig: SideNavConfig = {
     sectionLabel: 'PAIE',
     collapsible: true,
   };
 
+  /** Entries the user is allowed to see. Codes live in `core/payroll-nav.ts` and are the
+   *  same ones the route guards enforce, so the sidebar can't offer a page that bounces. */
   readonly navItems = computed<NavItem[]>(() =>
-    APP_NAV_DEFS.filter(
-      def => !def.permission || this.userStore.hasPermission(def.permission),
-    ).map(def => ({ id: def.id, label: def.label, icon: def.icon, route: def.route })),
+    PAYROLL_NAV_DEFS
+      .filter(def =>
+        !def.permissions.length ||
+        def.permissions.some(code => this.userStore.hasPermission(code)),
+      )
+      .map(def => ({ id: def.id, label: def.label, icon: def.icon, route: def.route })),
   );
 
   onNavClick(item: NavItem): void {

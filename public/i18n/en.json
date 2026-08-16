@@ -1,0 +1,238 @@
+{
+  "PAYROLL": {
+    "COMMON": {
+      "LOADING": "Loading…",
+      "CLOSE": "Close",
+      "CLEAR": "Clear",
+      "BREADCRUMB_ROOT": "Payroll"
+    },
+
+    "SIMULATOR": {
+      "TITLE": "Payroll simulator",
+      "SUBTITLE": "Target net, 5 layers, loaded cost — Newton-Raphson convergence.",
+      "BREADCRUMB": "Individual simulator",
+      "ACTIONS": {
+        "HISTORY": "Recent simulations",
+        "RESET": "Reset"
+      },
+
+      "MODE": {
+        "NET_TO_BRUT": "Net → Gross",
+        "BRUT_TO_NET": "Gross → Net",
+        "NET_TO_BRUT_HINT": "The net is the target",
+        "BRUT_TO_NET_HINT": "The gross is the target"
+      },
+      "PERIOD": {
+        "MONTHLY": "Monthly",
+        "YEARLY": "Yearly",
+        "YEARLY_HINT": "Divided by 12 before calculation",
+        "MONTHLY_ADJ": "monthly",
+        "YEARLY_ADJ": "yearly"
+      },
+      "BADGE": {
+        "PARTIAL_CONVERGENCE": "Partial convergence"
+      },
+
+      "STEPPER": {
+        "ARIA": "Simulation steps",
+        "S1_TITLE": "Reference data & subject",
+        "S1_SUBTITLE_EMPTY": "Country to pick",
+        "S2_TITLE": "Compensation",
+        "S3_TITLE": "Benefits",
+        "S3_SUBTITLE": "{{selected}} / {{total}} included",
+        "S3_SUBTITLE_EMPTY": "None in reference data",
+        "PREV": "Previous",
+        "NEXT": "Next"
+      },
+
+      "STEP1": {
+        "TITLE": "01 · Reference data & subject",
+        "BADGE_READY": "Set v{{version}} · {{year}} · {{currency}}",
+        "BADGE_MISSING": "No active set",
+        "BADGE_IDLE": "No country picked",
+        "PAYS_LABEL": "Country",
+        "PAYS_PLACEHOLDER": "— Select a country —",
+        "PAYS_PLACEHOLDER_EMPTY": "No country synced",
+        "PAYS_HINT": "{{contracts}} contract(s) · {{brackets}} IRPP bracket(s) · {{benefits}} benefit(s)",
+        "NO_PAYS": "The country reference is empty: the pays_ref table has not been synced from the HR service yet. No simulation is possible until it is.",
+        "NO_PARAMETER_SET": "No ACTIVE parameter set for this country: the engine has neither an IRPP scale nor charge rates. Create one, then activate it in Administration.",
+        "SUBJECT_LABEL": "Simulation subject",
+        "SUBJECT_CANDIDATE": "Candidate",
+        "SUBJECT_CANDIDATE_HINT": "Identity entered by hand",
+        "SUBJECT_EMPLOYEE": "Employee",
+        "SUBJECT_EMPLOYEE_HINT": "Existing HR record",
+        "EMPLOYEE_LABEL": "Employee",
+        "EMPLOYEE_HINT": "Contract, grade and discipline are taken from the HR record — no need to re-enter them.",
+        "CANDIDATE_LABEL": "Name / label",
+        "CANDIDATE_LABEL_PLACEHOLDER": "e.g. Candidate A",
+        "POSTE": "Position",
+        "POSTE_PLACEHOLDER": "e.g. Software engineer",
+        "GRADE": "Grade",
+        "GRADE_PLACEHOLDER": "— None —",
+        "DISCIPLINE": "Discipline",
+        "DISCIPLINE_PLACEHOLDER": "— None —"
+      },
+
+      "STEP2": {
+        "TITLE": "02 · Compensation",
+        "BADGE": "{{mode}} · {{period}}",
+        "DIRECTION_LABEL": "Calculation direction",
+        "PERIOD_LABEL": "Input period",
+        "NET_LABEL": "Target {{period}} net",
+        "NET_PLACEHOLDER": "e.g. 2,500",
+        "GROSS_LABEL": "{{period}} gross salary",
+        "GROSS_PLACEHOLDER": "e.g. 3,800",
+        "AMOUNT_HINT_YEARLY": "Divided by 12 before calculation; results stay monthly and yearly.",
+        "AMOUNT_HINT_MONTHLY": "Results show both the monthly and the yearly figure (× 12).",
+        "CONTRACT_LABEL": "Contract type",
+        "CONTRACT_PLACEHOLDER_NO_PAYS": "Pick a country",
+        "CONTRACT_PLACEHOLDER_EMPLOYEE": "— Taken from the HR record —",
+        "CONTRACT_PLACEHOLDER_CANDIDATE": "— Select —",
+        "CONTRACT_HINT_EMPLOYEE": "Fill it in to force another contract",
+        "WORKING_DAYS": "Working days / month",
+        "WORKING_DAYS_SUFFIX": "d"
+      },
+
+      "STEP3": {
+        "TITLE": "03 · Reference-data benefits",
+        "CHECK_ALL": "Check all",
+        "UNCHECK_ALL": "Uncheck all",
+        "BADGE_NONE": "None",
+        "BADGE": "{{selected}} / {{total}} included",
+        "TAXABLE": "taxable",
+        "EXEMPT": "exempt",
+        "EMPTY": "Benefits come from the country's active parameter set. Pick a country that has an active set to see them."
+      },
+
+      "RESULT": {
+        "TITLE": "Result",
+        "PENDING": "Pending",
+        "META": "{{contract}} · set #{{parameterSetId}} · {{date}}",
+        "LOADED_COST": "Monthly loaded cost",
+        "PER_YEAR": "{{amount}} / year",
+        "COST_NET_RATIO": "· cost / net ratio × {{ratio}}",
+        "EMPTY_HINT": "Fill in the 3 steps, then run the simulation.",
+        "GROSS_MONTHLY": "Monthly gross",
+        "NET_MONTHLY": "Monthly net paid",
+        "BREAKDOWN_TITLE": "Loaded-cost breakdown",
+        "BREAKDOWN_ARIA": "Loaded-cost distribution",
+        "SEG_NET": "Net paid",
+        "SEG_EMPLOYEE_CHARGES": "Employee charges",
+        "SEG_IRPP": "IRPP",
+        "SEG_EXEMPT_BENEFITS": "Exempt benefits",
+        "SEG_EMPLOYER_CHARGES": "Employer charges",
+        "CONVERGENCE_WARNING": "Convergence not reached after {{iterations}} iterations — estimated result.",
+        "SIMULATE": "Simulate",
+        "EXPORT_PDF": "Export PDF",
+        "PRINT": "Print"
+      },
+
+      "BLOCKING": {
+        "NO_PAYS": "Pick a country first.",
+        "LOADING": "Loading reference data…",
+        "NO_PARAMETER_SET": "No ACTIVE parameter set for this country — simulation is impossible until a set has been created and activated in Administration.",
+        "NO_EMPLOYEE": "Select the employee to simulate.",
+        "NO_CONTRACT": "Pick the contract type.",
+        "AMOUNT_REQUIRED": "Amount required",
+        "AMOUNT_POSITIVE": "The amount must be positive"
+      },
+
+      "ERROR": {
+        "FORBIDDEN": "You do not have permission to run a simulation (PAYROLL_RUN_SIMULATION).",
+        "GENERIC": "Simulation failed"
+      },
+
+      "CASCADE": {
+        "TITLE": "Cascade of the 5 layers",
+        "SUBTITLE": "From net paid to loaded cost",
+        "S1": "S1 · Net paid",
+        "S2": "S2 · Taxable net",
+        "S3": "S3 · Taxable gross base",
+        "S4": "S4 · Total gross",
+        "S5": "S5 · Loaded cost",
+        "ADD_EMPLOYEE_CHARGES": "+ employee contributions",
+        "ADD_IRPP": "+ IRPP",
+        "ADD_EXEMPT_BENEFITS": "+ exempt benefits",
+        "ADD_EMPLOYER_CHARGES": "+ employer charges",
+        "FX_TITLE": "Equivalents",
+        "FX_RATE": "1 {{currency}} = {{rate}}"
+      },
+
+      "RUBRIQUES": {
+        "TITLE": "Payroll items",
+        "SUBTITLE": "{{count}} line(s) evaluated",
+        "COL_CODE": "Code",
+        "COL_NATURE": "Nature",
+        "COL_MODE": "Mode",
+        "COL_AMOUNT": "Amount"
+      },
+
+      "REFERENTIAL": {
+        "TITLE": "Applied reference data",
+        "SUBTITLE": "IRPP scale and social charges of the active set",
+        "IRPP_TITLE": "IRPP scale",
+        "IRPP_EMPTY": "No scale set on this parameter set.",
+        "CHARGES_TITLE": "Social charges",
+        "COL_CHARGE": "Charge",
+        "COL_EMPLOYEE": "Employee",
+        "COL_EMPLOYER": "Employer",
+        "CAP": "cap {{amount}}",
+        "CHARGES_EMPTY": "No charge for this contract type in the active set."
+      },
+
+      "HISTORY": {
+        "TITLE": "Recent simulations",
+        "NO_PERMISSION": "History requires the PAYROLL_VIEW_INDIVIDUAL or PAYROLL_VIEW_AGGREGATE permission.",
+        "NO_PAYS": "Select a country to see its latest simulations.",
+        "EMPTY": "No simulation recorded for {{pays}}.",
+        "INTRO": "{{count}} latest simulation(s) — {{pays}}. Click one to show it again in the result panel.",
+        "EMPLOYEE_ENTRY": "Employee #{{id}}",
+        "UNLABELLED": "Unlabelled"
+      }
+    },
+
+    "ADMIN": {
+      "TITLE": "Payroll administration",
+      "SUBTITLE": "Creating a new parameter set (4-eyes workflow)",
+      "CARD_TITLE": "New parameter set",
+      "PAYS": "Country",
+      "FISCAL_YEAR": "Fiscal year",
+      "TOLERANCE": "Convergence tolerance",
+      "MAX_ITERATIONS": "Max iterations",
+      "CALIBRATION_THRESHOLD": "Calibration threshold (%)",
+      "IRPP_BRACKETS": "IRPP scale (JSON)",
+      "IRPP_HINT": "Format: array of brackets {\"lower\", \"upper\"|null, \"rate\"}",
+      "RATIONALE": "Change rationale",
+      "RATIONALE_PLACEHOLDER": "e.g. IRPP scale revision, 2025 finance act",
+      "CHARGES_TITLE": "Social charges ({{count}})",
+      "ADD_CHARGE": "+ Add",
+      "CHARGES_EMPTY": "No charge added. Click “Add” to create one.",
+      "COL_TYPE": "Type",
+      "COL_CODE": "Code",
+      "COL_LABEL": "Label",
+      "COL_EMPLOYEE_RATE": "Empl. %",
+      "COL_EMPLOYER_RATE": "Emplr. %",
+      "COL_BASE": "Base",
+      "COL_CAP": "Cap",
+      "CHARGE_LABEL_PLACEHOLDER": "National fund...",
+      "REMOVE": "Remove",
+      "BASE_GROSS": "Gross",
+      "BASE_CAPPED_GROSS": "Capped gross",
+      "BASE_FIXED": "Fixed",
+      "WORKFLOW_LABEL": "Workflow:",
+      "WORKFLOW_TEXT": "DRAFT → Submit → PENDING_FINANCE → HR + Finance approval (simultaneous) → ACTIVE (previous ACTIVE archived automatically)",
+      "SUBMITTING": "Creating…",
+      "SUBMIT": "Create the parameter set (DRAFT)",
+      "CREATED": "Parameter set v{{version}} created (DRAFT). Submit it for the approval workflow.",
+      "CREATED_WITH_CHARGES": "Parameter set v{{version}} created (DRAFT) with {{count}} social charge(s). Submit it for the approval workflow.",
+      "ERROR": "Creation failed"
+    },
+
+    "SELECT": {
+      "EMPLOYEE_PLACEHOLDER": "Search for an employee…",
+      "EMPLOYEE_EMPTY": "No employee found",
+      "PAYS_PLACEHOLDER": "Search for a country…",
+      "PAYS_EMPTY": "No country found"
+    }
+  }
+}

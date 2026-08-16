@@ -1,47 +1,77 @@
-<div class="esc" [class.esc--open]="open()" [class.esc--selected]="selected() !== null">
-  <div class="esc__control">
+<!--
+  Server-side searched employee picker. Styled to match `daf-select` exactly (same
+  trigger height/radius/border, same panel and rows) rather than carrying its own look:
+  the lib select can only filter options it already holds, and this list is paginated on
+  the HR service, so the component stays — only the chrome is shared.
+-->
+<div class="relative w-full">
+
+  <!-- `es-trigger` / `es-panel` are hooks, not styling: a consuming page that squares off
+       its inputs (the simulator) targets them through `::ng-deep`. Keep them. -->
+  <div class="es-trigger flex items-center gap-2 h-11 w-full px-3 rounded-md border transition-all duration-200"
+       [class]="open()
+         ? 'bg-surface border-tertiary ring-2 ring-tertiary/20 shadow-sm'
+         : 'bg-surface-container-low border-outline-variant hover:border-outline'">
+
+    <span class="material-symbols-outlined text-[18px] text-on-surface-variant shrink-0">badge</span>
+
     <input
-      class="esc__input"
+      class="flex-1 min-w-0 bg-transparent border-none outline-none text-body-md text-on-surface placeholder:text-on-surface-variant/50 disabled:opacity-50"
       type="text"
       autocomplete="off"
       spellcheck="false"
       [value]="displayText()"
-      [placeholder]="selected() ? '' : 'Rechercher un employé…'"
+      [placeholder]="selected() ? '' : 'Rechercher un collaborateur…'"
       [disabled]="isDisabled()"
       (focus)="onFocus()"
       (input)="onInput($event)"
-      (blur)="onBlur()"
-    />
+      (blur)="onBlur()" />
+
     @if (selected() && !isDisabled()) {
-      <button class="esc__clear" type="button" tabindex="-1" (mousedown)="clear($event)">✕</button>
+      <button type="button" tabindex="-1"
+              class="shrink-0 text-on-surface-variant hover:text-danger transition-colors"
+              title="Effacer"
+              (mousedown)="clear($event)">
+        <span class="material-symbols-outlined text-[18px]">close</span>
+      </button>
     }
-    @if (loading()) {
-      <span class="esc__spinner" aria-hidden="true"></span>
-    } @else {
-      <span class="esc__caret" aria-hidden="true">▾</span>
-    }
+
+    <span class="material-symbols-outlined text-[18px] text-on-surface-variant shrink-0 transition-transform duration-200"
+          [class.rotate-180]="open()"
+          [class.animate-spin]="loading()">
+      {{ loading() ? 'progress_activity' : 'expand_more' }}
+    </span>
   </div>
 
   @if (open()) {
-    <div class="esc__dropdown" role="listbox">
+    <div role="listbox"
+         class="es-panel absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-md border border-outline-variant bg-surface-container-lowest py-1 shadow-lg">
+
       @if (loading()) {
-        <div class="esc__empty">Chargement…</div>
-      } @else if (employees().length === 0) {
-        <div class="esc__empty">Aucun employé trouvé</div>
+        <p class="px-3 py-2 text-label-md text-on-surface-variant">Chargement…</p>
+      } @else if (!employees().length) {
+        <p class="px-3 py-2 text-label-md text-on-surface-variant">Aucun collaborateur trouvé</p>
       }
+
       @for (e of employees(); track e.userId) {
-        <div
-          class="esc__option"
-          [class.esc__option--active]="e.userId === selected()?.userId"
-          role="option"
-          (mousedown)="pick(e)"
-        >
-          <span class="esc__option-name">{{ e.fullName }}</span>
+        <div role="option"
+             class="flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors"
+             [class]="e.userId === selected()?.userId
+               ? 'bg-tertiary-container text-on-tertiary-container'
+               : 'text-on-surface hover:bg-surface-container'"
+             (mousedown)="pick(e)">
+          <span class="flex-1 min-w-0 truncate text-body-md">{{ e.fullName }}</span>
           @if (e.employeeId) {
-            <span class="esc__option-badge">{{ e.employeeId }}</span>
+            <span class="shrink-0 rounded-full bg-surface-container-highest px-2 py-0.5 text-[11px] font-semibold text-on-surface-variant">
+              {{ e.employeeId }}
+            </span>
+          }
+          @if (e.contractType) {
+            <span class="shrink-0 text-[11px] text-outline">{{ e.contractType }}</span>
           }
         </div>
       }
     </div>
   }
+
 </div>
