@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM node:22-slim AS builder
 WORKDIR /app
 # package-lock.json MUST be copied and `npm ci` used (not `npm install`): the
@@ -6,7 +7,32 @@ WORKDIR /app
 # a SECOND copy of @angular/core at runtime → NG0203 on every navigation.
 COPY package*.json ./
 COPY .npmrc ./
-RUN npm ci --legacy-peer-deps
+# Le même traitement que les services Maven (--mount=type=cache,target=/root/.m2) : le
+# cache npm survit d'un build à l'autre, donc une reconstruction résout depuis le disque
+# au lieu de re-télécharger ~1500 archives. Dix images qui se construisent en parallèle
+# contre un seul registre, c'est ce qui transformait UNE connexion coupée (ECONNRESET) en
+# build raté : sans cache et sans reprise, npm abandonnait tout ce qu'il avait déjà tiré.
+#
+#   · --mount=type=cache   /root/.npm persiste entre les builds (exige la ligne "syntax="
+#                          en tête de fichier). L'id est PARTAGÉ entre les fronts : ils ont
+#                          presque le même arbre Angular, autant ne le télécharger qu'une
+#                          fois pour tous. cacache est conçu pour les accès concurrents ;
+#                          en cas de contention, mettre un id par projet.
+#   · --prefer-offline     le cache d'abord, le réseau seulement pour ce qui manque.
+#   · fetch-retries 5      le défaut de npm est 2. Une coupure est maintenant reprise avec
+#                          un backoff au lieu de faire échouer l'étape.
+#   · fetch-timeout 10 min le défaut de 5 min est trop juste quand dix builds se partagent
+#                          le même lien montant.
+#   · --no-audit/--no-fund deux allers-retours réseau en moins, inutiles ici.
+#
+# "npm ci" reste "npm ci" : le lock fait toujours foi, donc la raison d'être de cette étape
+# (un seul patch @angular/* partagé par le shell et les remotes, sinon NG0203) est intacte.
+ENV NPM_CONFIG_FETCH_RETRIES=5 \
+    NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000 \
+    NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
+    NPM_CONFIG_FETCH_TIMEOUT=600000
+RUN --mount=type=cache,id=npm,target=/root/.npm \
+    npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
 COPY . .
 RUN npm run build -- --configuration development
 
