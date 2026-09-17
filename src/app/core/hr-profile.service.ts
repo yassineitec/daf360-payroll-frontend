@@ -7,7 +7,10 @@ export interface EmployeeListItem {
   userId: number;
   profileId: number | null;
   fullName: string;
-  employeeId: string | null;  // matricule e.g. "DUPPIE125"
+  /** Matricule paie — employee_profiles.payroll_matricule, e.g. "01", "206".
+   *  Le champ JSON garde le nom `employeeId` : seule sa source a changé côté rh-service
+   *  (il venait de Users.employee_id, NULL pour tous les profils en prod). */
+  employeeId: string | null;
   paysId: number | null;
   paysLabel: string | null;
   contractType: string | null;
