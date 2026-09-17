@@ -228,6 +228,51 @@
       "ERROR": "Erreur création"
     },
 
+    "PAYSLIPS": {
+      "TITLE": "Fiches de paie",
+      "SUBTITLE": "Importez le PDF mensuel de paie (une fiche par page) pour le répartir vers SharePoint",
+      "FORM": {
+        "TITLE": "Traiter un fichier de paie",
+        "PAYS": "Pays",
+        "YEAR": "Année",
+        "MONTH": "Mois",
+        "FILE_LABEL": "Fichier PDF",
+        "FILE_HINT": "PDF uniquement, 50 Mo max — une fiche de paie par page",
+        "SUBMIT": "Traiter le fichier",
+        "PROCESSING": "Traitement en cours…"
+      },
+      "MONTHS": {
+        "JANUARY": "Janvier", "FEBRUARY": "Février", "MARCH": "Mars", "APRIL": "Avril",
+        "MAY": "Mai", "JUNE": "Juin", "JULY": "Juillet", "AUGUST": "Août",
+        "SEPTEMBER": "Septembre", "OCTOBER": "Octobre", "NOVEMBER": "Novembre", "DECEMBER": "Décembre"
+      },
+      "SUMMARY": {
+        "TOTAL": "Pages",
+        "SUCCESS": "Traitées",
+        "ERROR": "Erreurs",
+        "UNIDENTIFIED": "Non identifiées"
+      },
+      "STATUS": {
+        "SUCCESS": "Succès",
+        "ERROR": "Erreur",
+        "UNIDENTIFIED": "Non identifié",
+        "DUPLICATE": "Doublon"
+      },
+      "TABLE": {
+        "PAGE": "Page",
+        "MATRICULE": "Matricule",
+        "EMPLOYEE": "Employé",
+        "STATUS": "Statut",
+        "SHAREPOINT_URL": "Lien SharePoint",
+        "ERROR_MESSAGE": "Message",
+        "EMPTY": "Aucun résultat à afficher"
+      },
+      "NOTIFY": {
+        "DONE": "Traitement terminé : {{success}} / {{total}} pages traitées avec succès",
+        "ERROR": "Impossible de traiter le fichier — vérifiez le format et réessayez"
+      }
+    },
+
     "SELECT": {
       "EMPLOYEE_PLACEHOLDER": "Rechercher un collaborateur…",
       "EMPLOYEE_EMPTY": "Aucun collaborateur trouvé",

@@ -1,0 +1,103 @@
+<div class="page-header">
+  <h1 class="page-title">{{ 'PAYROLL.PAYSLIPS.TITLE' | translate }}</h1>
+  <p class="page-subtitle">{{ 'PAYROLL.PAYSLIPS.SUBTITLE' | translate }}</p>
+</div>
+
+<div class="admin-layout">
+  <section class="card" [formGroup]="form">
+    <h2 class="card-title">{{ 'PAYROLL.PAYSLIPS.FORM.TITLE' | translate }}</h2>
+
+    <div class="field-row">
+      <div class="field-group">
+        <label class="field-label">{{ 'PAYROLL.PAYSLIPS.FORM.PAYS' | translate }}</label>
+        <app-pays-select formControlName="paysId"></app-pays-select>
+      </div>
+      <div class="field-group">
+        <label class="field-label">{{ 'PAYROLL.PAYSLIPS.FORM.YEAR' | translate }}</label>
+        <input type="number" class="field-input" formControlName="periodYear" />
+      </div>
+      <div class="field-group">
+        <label class="field-label">{{ 'PAYROLL.PAYSLIPS.FORM.MONTH' | translate }}</label>
+        <select class="field-input" formControlName="periodMonth">
+          @for (opt of monthOptions(); track opt.value) {
+            <option [value]="opt.value">{{ opt.label }}</option>
+          }
+        </select>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">{{ 'PAYROLL.PAYSLIPS.FORM.FILE_LABEL' | translate }}</label>
+      <input type="file" class="field-file" accept=".pdf,application/pdf" (change)="onFileChange($event)" />
+      <span class="field-hint">{{ 'PAYROLL.PAYSLIPS.FORM.FILE_HINT' | translate }}</span>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-primary" (click)="submit()" [disabled]="!canSubmit()">
+        @if (processing()) { {{ 'PAYROLL.PAYSLIPS.FORM.PROCESSING' | translate }} }
+        @else { {{ 'PAYROLL.PAYSLIPS.FORM.SUBMIT' | translate }} }
+      </button>
+    </div>
+
+    @if (errorMessage()) { <div class="alert alert-error">{{ errorMessage() }}</div> }
+    @if (successMessage()) { <div class="alert alert-success">{{ successMessage() }}</div> }
+  </section>
+
+  @if (result(); as r) {
+    <section class="card summary-card">
+      <div class="summary-grid">
+        <div class="summary-stat">
+          <span class="summary-value">{{ r.totalPages }}</span>
+          <span class="summary-label">{{ 'PAYROLL.PAYSLIPS.SUMMARY.TOTAL' | translate }}</span>
+        </div>
+        <div class="summary-stat summary-stat--success">
+          <span class="summary-value">{{ r.successCount }}</span>
+          <span class="summary-label">{{ 'PAYROLL.PAYSLIPS.SUMMARY.SUCCESS' | translate }}</span>
+        </div>
+        <div class="summary-stat summary-stat--error">
+          <span class="summary-value">{{ r.errorCount }}</span>
+          <span class="summary-label">{{ 'PAYROLL.PAYSLIPS.SUMMARY.ERROR' | translate }}</span>
+        </div>
+        <div class="summary-stat summary-stat--warning">
+          <span class="summary-value">{{ r.unidentifiedCount }}</span>
+          <span class="summary-label">{{ 'PAYROLL.PAYSLIPS.SUMMARY.UNIDENTIFIED' | translate }}</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="table-wrap">
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>{{ 'PAYROLL.PAYSLIPS.TABLE.PAGE' | translate }}</th>
+              <th>{{ 'PAYROLL.PAYSLIPS.TABLE.MATRICULE' | translate }}</th>
+              <th>{{ 'PAYROLL.PAYSLIPS.TABLE.EMPLOYEE' | translate }}</th>
+              <th>{{ 'PAYROLL.PAYSLIPS.TABLE.STATUS' | translate }}</th>
+              <th>{{ 'PAYROLL.PAYSLIPS.TABLE.SHAREPOINT_URL' | translate }}</th>
+              <th>{{ 'PAYROLL.PAYSLIPS.TABLE.ERROR_MESSAGE' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (d of r.details; track d.pageNumber) {
+              <tr>
+                <td>{{ d.pageNumber }}</td>
+                <td>{{ d.matricule ?? '—' }}</td>
+                <td>{{ d.employeeFullName ?? '—' }}</td>
+                <td><span [class]="statusClass(d.status)">{{ statusLabel(d.status) }}</span></td>
+                <td>
+                  @if (d.sharePointUrl) {
+                    <a [href]="d.sharePointUrl" target="_blank" rel="noopener">{{ d.sharePointUrl }}</a>
+                  } @else { — }
+                </td>
+                <td>{{ d.errorMessage ?? '—' }}</td>
+              </tr>
+            } @empty {
+              <tr><td colspan="6" class="report-empty">{{ 'PAYROLL.PAYSLIPS.TABLE.EMPTY' | translate }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+</div>

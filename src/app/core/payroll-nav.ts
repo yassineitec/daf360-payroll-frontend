@@ -38,6 +38,17 @@ export const PAYROLL_ADMIN_PERMISSIONS = [
 ];
 
 /**
+ * `/payroll/payslips` — the monthly payslip batch (split the external payroll PDF, file it
+ * to SharePoint). An RH-owned permission code, not a `PAYROLL_*` one: the whole feature runs
+ * on daf360-rh-service (employee matching + SharePoint), this screen only triggers it. Was
+ * first built in the Finance app, moved here 2026-09-15 at the user's request. Same code
+ * already granted (in the RH database) to Administrateur, DRH, RH, PDG and DAF — no new
+ * grant was needed for this move: every role currently holding a `PAYROLL_ADMIN_PERMISSIONS`
+ * code (Administrateur, PDG) already has it too.
+ */
+export const PAYROLL_PAYSLIPS_PERMISSIONS = ['RH_MANAGE_PAYSLIPS'];
+
+/**
  * The live payroll screens.
  *
  * ⚠️ Only the simulator and the administration panel are enabled. The other six modules
@@ -61,6 +72,13 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
     icon:        'admin_panel_settings',
     route:       'admin',
     permissions: PAYROLL_ADMIN_PERMISSIONS,
+  },
+  {
+    id:          'payslips',
+    label:       'Fiches de paie',
+    icon:        'receipt_long',
+    route:       'payslips',
+    permissions: PAYROLL_PAYSLIPS_PERMISSIONS,
   },
 
   // ── Disabled for now — keep in sync with app.routes.ts ──────────────────────

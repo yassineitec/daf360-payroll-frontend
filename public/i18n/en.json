@@ -228,6 +228,51 @@
       "ERROR": "Creation failed"
     },
 
+    "PAYSLIPS": {
+      "TITLE": "Payslips",
+      "SUBTITLE": "Upload the monthly payroll PDF (one payslip per page) to file it to SharePoint",
+      "FORM": {
+        "TITLE": "Process a payroll file",
+        "PAYS": "Country",
+        "YEAR": "Year",
+        "MONTH": "Month",
+        "FILE_LABEL": "PDF file",
+        "FILE_HINT": "PDF only, 50 MB max — one payslip per page",
+        "SUBMIT": "Process file",
+        "PROCESSING": "Processing…"
+      },
+      "MONTHS": {
+        "JANUARY": "January", "FEBRUARY": "February", "MARCH": "March", "APRIL": "April",
+        "MAY": "May", "JUNE": "June", "JULY": "July", "AUGUST": "August",
+        "SEPTEMBER": "September", "OCTOBER": "October", "NOVEMBER": "November", "DECEMBER": "December"
+      },
+      "SUMMARY": {
+        "TOTAL": "Pages",
+        "SUCCESS": "Processed",
+        "ERROR": "Errors",
+        "UNIDENTIFIED": "Unidentified"
+      },
+      "STATUS": {
+        "SUCCESS": "Success",
+        "ERROR": "Error",
+        "UNIDENTIFIED": "Unidentified",
+        "DUPLICATE": "Duplicate"
+      },
+      "TABLE": {
+        "PAGE": "Page",
+        "MATRICULE": "Matricule",
+        "EMPLOYEE": "Employee",
+        "STATUS": "Status",
+        "SHAREPOINT_URL": "SharePoint link",
+        "ERROR_MESSAGE": "Message",
+        "EMPTY": "Nothing to show"
+      },
+      "NOTIFY": {
+        "DONE": "Processing complete: {{success}} / {{total}} pages processed successfully",
+        "ERROR": "Could not process the file — check the format and try again"
+      }
+    },
+
     "SELECT": {
       "EMPLOYEE_PLACEHOLDER": "Search for an employee…",
       "EMPLOYEE_EMPTY": "No employee found",

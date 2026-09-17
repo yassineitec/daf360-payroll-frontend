@@ -9,6 +9,7 @@ import { PayrollShellComponent } from './layout/payroll-shell.component';
 import { provideDafAccess, permissionGuard } from '@khalilrebhiitec/daf360';
 import {
   PAYROLL_ADMIN_PERMISSIONS,
+  PAYROLL_PAYSLIPS_PERMISSIONS,
   PAYROLL_SIMULATOR_PERMISSIONS,
 } from './core/payroll-nav';
 import { payrollLandingGuard } from './core/payroll-landing.guard';
@@ -74,6 +75,13 @@ export const routes: Routes = [
         data: { permissions: PAYROLL_ADMIN_PERMISSIONS },
         loadChildren: () =>
           import('./modules/admin/admin.routes').then(m => m.ADMIN_ROUTES),
+      },
+      {
+        path: 'payslips',
+        canActivate: [permissionGuard],
+        data: { permissions: PAYROLL_PAYSLIPS_PERMISSIONS },
+        loadChildren: () =>
+          import('./modules/payslips/payslips.routes').then(m => m.PAYSLIPS_ROUTES),
       },
 
       // ── Disabled for now — keep in sync with core/payroll-nav.ts ──────────────
