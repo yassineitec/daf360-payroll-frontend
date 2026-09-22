@@ -54,9 +54,8 @@ export const routes: Routes = [
           provideEnvironmentInitializer(() => registerTranslations()),
         ],
     children: [
-      // ⚠️ Only the simulator and the administration panel are enabled. The six other
-      // modules below are built but switched off; their sidebar entries are commented out
-      // in `core/payroll-nav.ts` and their routes here. Re-enable BOTH together.
+      // All nine modules are enabled; each route here must have a matching sidebar entry in
+      // `core/payroll-nav.ts`. If a screen has to be switched off, comment out BOTH.
       //
       // Every live route carries `permissionGuard` + `data.permissions`, using the same
       // code lists the sidebar filters on (`core/payroll-nav.ts`). The module had no route
@@ -84,49 +83,49 @@ export const routes: Routes = [
           import('./modules/payslips/payslips.routes').then(m => m.PAYSLIPS_ROUTES),
       },
 
-      // ── Disabled for now — keep in sync with core/payroll-nav.ts ──────────────
-      // {
-      //   path: 'cohort',
-      //   canActivate: [permissionGuard],
-      //   data: { permissions: ['PAYROLL_RUN_SIMULATION'] },
-      //   loadChildren: () =>
-      //     import('./modules/cohort/cohort.routes').then(m => m.COHORT_ROUTES),
-      // },
-      // {
-      //   path: 'calibration',
-      //   canActivate: [permissionGuard],
-      //   data: { permissions: ['PAYROLL_RUN_CALIBRATION'] },
-      //   loadChildren: () =>
-      //     import('./modules/calibration/calibration.routes').then(m => m.CALIBRATION_ROUTES),
-      // },
-      // {
-      //   path: 'parameter-sets',
-      //   canActivate: [permissionGuard],
-      //   data: { permissions: ['PAYROLL_VIEW_PARAMSET'] },
-      //   loadChildren: () =>
-      //     import('./modules/parameter-sets/parameter-sets.routes').then(m => m.PARAMETER_SETS_ROUTES),
-      // },
-      // {
-      //   path: 'budget',
-      //   canActivate: [permissionGuard],
-      //   data: { permissions: ['PAYROLL_VIEW_BUDGET_AGGREGATE'] },
-      //   loadChildren: () =>
-      //     import('./modules/budget/budget.routes').then(m => m.BUDGET_ROUTES),
-      // },
-      // {
-      //   path: 'engine-run',
-      //   canActivate: [permissionGuard],
-      //   data: { permissions: ['PAYROLL_RUN_ENGINE'] },
-      //   loadChildren: () =>
-      //     import('./modules/engine-run/engine-run.routes').then(m => m.ENGINE_RUN_ROUTES),
-      // },
-      // {
-      //   path: 'engine-results',
-      //   canActivate: [permissionGuard],
-      //   data: { permissions: ['PAYROLL_VIEW_RESULTS'] },
-      //   loadChildren: () =>
-      //     import('./modules/engine-results/engine-results.routes').then(m => m.ENGINE_RESULTS_ROUTES),
-      // },
+      // ── Keep in sync with core/payroll-nav.ts ─────────────────────────────────
+      {
+        path: 'cohort',
+        canActivate: [permissionGuard],
+        data: { permissions: ['PAYROLL_RUN_SIMULATION'] },
+        loadChildren: () =>
+          import('./modules/cohort/cohort.routes').then(m => m.COHORT_ROUTES),
+      },
+      {
+        path: 'calibration',
+        canActivate: [permissionGuard],
+        data: { permissions: ['PAYROLL_RUN_CALIBRATION'] },
+        loadChildren: () =>
+          import('./modules/calibration/calibration.routes').then(m => m.CALIBRATION_ROUTES),
+      },
+      {
+        path: 'parameter-sets',
+        canActivate: [permissionGuard],
+        data: { permissions: ['PAYROLL_VIEW_PARAMSET'] },
+        loadChildren: () =>
+          import('./modules/parameter-sets/parameter-sets.routes').then(m => m.PARAMETER_SETS_ROUTES),
+      },
+      {
+        path: 'budget',
+        canActivate: [permissionGuard],
+        data: { permissions: ['PAYROLL_VIEW_BUDGET_AGGREGATE'] },
+        loadChildren: () =>
+          import('./modules/budget/budget.routes').then(m => m.BUDGET_ROUTES),
+      },
+      {
+        path: 'engine-run',
+        canActivate: [permissionGuard],
+        data: { permissions: ['PAYROLL_RUN_ENGINE'] },
+        loadChildren: () =>
+          import('./modules/engine-run/engine-run.routes').then(m => m.ENGINE_RUN_ROUTES),
+      },
+      {
+        path: 'engine-results',
+        canActivate: [permissionGuard],
+        data: { permissions: ['PAYROLL_VIEW_RESULTS'] },
+        loadChildren: () =>
+          import('./modules/engine-results/engine-results.routes').then(m => m.ENGINE_RESULTS_ROUTES),
+      },
 
       // Landing route — resolved, not a static `redirectTo: 'simulator'`, so a user who
       // only holds the admin codes isn't bounced to /forbidden by the link the shell just

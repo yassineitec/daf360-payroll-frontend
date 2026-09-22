@@ -51,12 +51,10 @@ export const PAYROLL_PAYSLIPS_PERMISSIONS = ['RH_MANAGE_PAYSLIPS'];
 /**
  * The live payroll screens.
  *
- * ⚠️ Only the simulator and the administration panel are enabled. The other six modules
- * (cohort, engine-run, engine-results, calibration, parameter-sets, budget) are built but
- * intentionally switched off for now — their nav entries are commented out below AND their
- * routes are commented out in `app.routes.ts`. Re-enable a screen by uncommenting BOTH,
- * never just one: an entry with no route navigates into the `**` redirect, and a route with
- * no entry is only reachable by typing the URL.
+ * All nine modules are enabled. Every entry here MUST have a matching route in
+ * `app.routes.ts` and vice-versa: an entry with no route navigates into the `**` redirect,
+ * and a route with no entry is only reachable by typing the URL. If a screen ever has to be
+ * switched off again, comment it out in BOTH files, never just one.
  */
 export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
   {
@@ -81,13 +79,49 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
     permissions: PAYROLL_PAYSLIPS_PERMISSIONS,
   },
 
-  // ── Disabled for now — keep in sync with app.routes.ts ──────────────────────
-  // { id: 'cohort',         label: 'Simulation cohorte', icon: 'groups',                route: 'cohort',         permissions: ['PAYROLL_RUN_SIMULATION'] },
-  // { id: 'engine-run',     label: 'Calcul de paie',     icon: 'payments',              route: 'engine-run',     permissions: ['PAYROLL_RUN_ENGINE'] },
-  // { id: 'engine-results', label: 'Historique de paie', icon: 'history',               route: 'engine-results', permissions: ['PAYROLL_VIEW_RESULTS'] },
-  // { id: 'calibration',    label: 'Calibration',        icon: 'tune',                  route: 'calibration',    permissions: ['PAYROLL_RUN_CALIBRATION'] },
-  // { id: 'parameter-sets', label: 'Paramètres',         icon: 'settings_applications', route: 'parameter-sets', permissions: ['PAYROLL_VIEW_PARAMSET'] },
-  // { id: 'budget',         label: 'Budget prévisionnel', icon: 'account_balance',      route: 'budget',         permissions: ['PAYROLL_VIEW_BUDGET_AGGREGATE'] },
+  // ── Keep in sync with app.routes.ts ─────────────────────────────────────────
+  {
+    id:          'cohort',
+    label:       'Simulation cohorte',
+    icon:        'groups',
+    route:       'cohort',
+    permissions: ['PAYROLL_RUN_SIMULATION'],
+  },
+  {
+    id:          'engine-run',
+    label:       'Calcul de paie',
+    icon:        'payments',
+    route:       'engine-run',
+    permissions: ['PAYROLL_RUN_ENGINE'],
+  },
+  {
+    id:          'engine-results',
+    label:       'Historique de paie',
+    icon:        'history',
+    route:       'engine-results',
+    permissions: ['PAYROLL_VIEW_RESULTS'],
+  },
+  {
+    id:          'calibration',
+    label:       'Calibration',
+    icon:        'tune',
+    route:       'calibration',
+    permissions: ['PAYROLL_RUN_CALIBRATION'],
+  },
+  {
+    id:          'parameter-sets',
+    label:       'Paramètres',
+    icon:        'settings_applications',
+    route:       'parameter-sets',
+    permissions: ['PAYROLL_VIEW_PARAMSET'],
+  },
+  {
+    id:          'budget',
+    label:       'Budget prévisionnel',
+    icon:        'account_balance',
+    route:       'budget',
+    permissions: ['PAYROLL_VIEW_BUDGET_AGGREGATE'],
+  },
 ];
 
 /**
