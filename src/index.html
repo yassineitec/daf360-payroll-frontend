@@ -6,6 +6,16 @@
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Same fonts as daf360-shell/src/index.html, for a standalone `ng serve`: without
+       them every Material Symbol renders as its literal ligature name. Split per family
+       because `display` is per-stylesheet — `block` on the icon font keeps an unloaded
+       icon invisible instead of showing the word. Keep in sync with the shell. -->
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap">
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block">
 </head>
 <body>
   <app-root></app-root>

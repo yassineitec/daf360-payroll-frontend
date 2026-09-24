@@ -1,0 +1,103 @@
+<daf-page [breadcrumbs]="true">
+  <daf-page-header
+    [title]="'PAYROLL.ENGINE_RESULTS.TITLE' | translate"
+    [subtitle]="'PAYROLL.ENGINE_RESULTS.LIST_SUBTITLE' | translate"
+    [breadcrumbs]="breadcrumbs()">
+  </daf-page-header>
+
+  <div class="page-body">
+    <!-- ── Bandeau exécutif paie : dernier mois calculé du pays filtré (voir
+         `loadKpis()`). Chaque tuile explique ce qu'elle mesure au survol — `help` /
+         `helpTitle` de `daf-metric-card`, le popover natif de la bibliothèque. ─── -->
+    @if (kpiTiles(); as k) {
+      <p class="kpi-period">
+        {{ 'PAYROLL.ENGINE_RESULTS.KPI_PERIOD' | translate: { period: k.period } }}
+        @if (isConverted()) {
+          · {{ 'PAYROLL.ENGINE_RESULTS.CURRENCY.CONVERTED_NOTE' | translate: { from: summary()?.currencyCode, to: displayCurrency() } }}
+        }
+      </p>
+      <section class="grid grid-cols-4 gap-2 sm:gap-6 kpi-section">
+        @for (tile of k.tiles; track tile.label) {
+          <daf-metric-card [label]="tile.label" [value]="tile.value" [options]="tile.options" />
+        }
+      </section>
+    } @else if (paysFilter() == null) {
+      <p class="kpi-period">{{ 'PAYROLL.ENGINE_RESULTS.KPI_PICK_COUNTRY' | translate }}</p>
+    }
+
+    <!-- ── Recherche (nom / matricule), filtre pays et bascule carte-tableau — tout
+         côté serveur, voir `load()`. ─────────────────────────────────────────── -->
+    <daf-search-toolbar
+      [placeholder]="'PAYROLL.ENGINE_RESULTS.SEARCH_EMPLOYEE_PLACEHOLDER' | translate"
+      [value]="searchText()"
+      (valueChange)="onSearchTextChange($event)"
+      [debounce]="300"
+      [filterFields]="filterFields()"
+      [filterConfig]="filterConfig()"
+      (filterApply)="applyFilters($event)"
+      [views]="viewOptions()"
+      [(view)]="viewMode">
+    </daf-search-toolbar>
+
+    @if (error()) {
+      <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+        <div class="alert alert--error">{{ error() }}</div>
+      </daf-card>
+    } @else if (loading() && employees().length === 0) {
+      <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+        <p class="empty-state">{{ 'PAYROLL.COMMON.LOADING' | translate }}</p>
+      </daf-card>
+    } @else {
+      <div [class.is-loading]="loading()">
+        @if (viewMode() === 'grid') {
+          <div class="grid grid-cols-3 gap-5">
+            @for (card of employeeCards(); track card.id) {
+              <daf-entity-card
+                [options]="card.options"
+                (cardClick)="open(card.id)"
+                (viewClick)="open(card.id)">
+              </daf-entity-card>
+            } @empty {
+              <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }" class="col-span-full">
+                <p class="empty-state">{{ 'PAYROLL.ENGINE_RESULTS.EMPTY_EMPLOYEES' | translate }}</p>
+              </daf-card>
+            }
+          </div>
+        } @else {
+          <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+            <daf-data-table
+              [columns]="employeeColumns()"
+              [rows]="employeeRows()"
+              [config]="{ actions: employeeActions(), emptyMessage: ('PAYROLL.ENGINE_RESULTS.EMPTY_EMPLOYEES' | translate), showHeader: false }">
+            </daf-data-table>
+          </daf-card>
+        }
+      </div>
+
+      <daf-pagination
+        [currentPage]="page()"
+        [totalPages]="totalPages()"
+        [totalElements]="totalElements()"
+        [pageSize]="pageSize()"
+        [pageSizeOptions]="[10, 20, 50, 100]"
+        [perPageLabel]="'PAYROLL.COMMON.PAGINATION.PER_PAGE' | translate"
+        [summaryLabel]="'PAYROLL.COMMON.PAGINATION.SUMMARY' | translate"
+        [firstPageLabel]="'PAYROLL.COMMON.PAGINATION.FIRST' | translate"
+        [lastPageLabel]="'PAYROLL.COMMON.PAGINATION.LAST' | translate"
+        [config]="{ showFirstLast: true }"
+        (pageChange)="onPageChange($event)"
+        (pageSizeChange)="onPageSizeChange($event)">
+      </daf-pagination>
+    }
+  </div>
+</daf-page>
+
+<!-- Sélecteur de devise d'affichage — daf-radial-menu en mode picker, comme dans le shell
+     finance : le bouton flottant montre la devise en cours et déploie les autres au
+     survol / tap. Hors de <daf-page> : le menu est en `position: fixed`, et un ancêtre
+     avec transform/filter deviendrait son bloc conteneur au lieu du viewport. -->
+<daf-radial-menu
+  [items]="currencyItems()"
+  [config]="currencyMenuConfig()"
+  [active]="displayCurrency() ?? ''"
+  (itemClick)="onCurrencyPick($event)" />

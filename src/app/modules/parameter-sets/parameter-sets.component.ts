@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, TemplateRef, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -13,15 +13,21 @@ import {
   PageComponent,
   PageHeaderComponent,
   RadioGroupComponent,
+  SearchToolbarComponent,
   SectionTitleComponent,
   SelectComponent,
   StatusBadgeComponent,
   TabsComponent,
   tabParam,
+  ModalService,
   type AccordionState,
   type BadgeVariant,
   type BreadcrumbItem,
+  type FilterField,
+  type FilterResult,
+  type ModalRef,
   type RadioOption,
+  type SearchToolbarFilterConfig,
   type SelectOption,
   type TableColumn,
   type TableRow,
@@ -46,7 +52,7 @@ import { PAYROLL_CREATE_PARAMSET_PERMISSIONS } from '../../core/payroll-nav';
     CommonModule, ReactiveFormsModule, TranslatePipe,
     AccordionCardComponent, ButtonComponent, CardComponent, CheckboxComponent, DataTableComponent,
     FormFieldComponent, MetricCardComponent, PageComponent, PageHeaderComponent, RadioGroupComponent,
-    SectionTitleComponent, SelectComponent, StatusBadgeComponent, TabsComponent,
+    SearchToolbarComponent, SectionTitleComponent, SelectComponent, StatusBadgeComponent, TabsComponent,
   ],
   templateUrl: './parameter-sets.component.html',
   styleUrl: './parameter-sets.component.scss',
@@ -57,6 +63,16 @@ export class ParameterSetsComponent implements OnInit {
   private readonly translate    = inject(TranslateService);
   private readonly userStore    = inject(UserStore);
   private readonly notification = inject(NotificationService);
+  private readonly modalService = inject(ModalService);
+
+  // ── Éditeurs en pop-up (bibliothèque `ModalService` — pas de composant maison) :
+  // les gabarits sont capturés une seule fois via `viewChild`, hors de la boucle
+  // `@for` des jeux de paramètres, puisque `chargesForm`/`rubriquesForm` sont un état
+  // partagé unique (celui du jeu en cours d'édition), pas un état par ligne.
+  private readonly chargesEditorTpl   = viewChild<TemplateRef<unknown>>('chargesEditorTpl');
+  private readonly rubriquesEditorTpl = viewChild<TemplateRef<unknown>>('rubriquesEditorTpl');
+  private chargesModalRef:   ModalRef | null = null;
+  private rubriquesModalRef: ModalRef | null = null;
 
   // ── Onglets : "Nouveau jeu" (formulaire, ouvert par défaut) / "Jeux existants" (filtre +
   //    liste) — `tabParam` porte l'onglet actif dans `?tab=`, deep-link et retour compris.
@@ -74,8 +90,40 @@ export class ParameterSetsComponent implements OnInit {
     this.paysList().map(p => ({ value: String(p.id), label: `${p.frenchLabel} (${p.isoCode})` })),
   );
 
+  /** Pays du profil de l'utilisateur connecté — pré-sélectionne le sélecteur pays de
+   *  l'onglet "Jeux existants" et lance le chargement tout de suite, comme sur
+   *  `/payroll/candidate-simulation` (`userStore.currentUser()?.paysId`). */
+  readonly myPaysId = computed(() => this.userStore.currentUser()?.paysId ?? null);
+
   ngOnInit(): void {
     this.api.listPays().subscribe(list => this.paysList.set(list));
+
+    const myPaysId = this.myPaysId();
+    if (myPaysId) {
+      this.filterForm.get('paysId')!.setValue(myPaysId);
+      this.load();
+    } else {
+      // Pas de pays sur le profil ⇒ aucun `load()` ne part, et c'est lui seul qui éteint
+      // `firstLoad` : sans ceci la page (onglet "Nouveau jeu" compris) restait sur le
+      // squelette de `daf-page` indéfiniment.
+      this.firstLoad.set(false);
+    }
+  }
+
+  /** Un utilisateur sans droit de création arrivait sur l'onglet "Nouveau jeu" — désactivé
+   *  dans le bandeau mais affiché quand même, puisque c'est le `fallback` de `tabParam` (et
+   *  un `?tab=create` partagé y menait aussi). Il bascule sur "Jeux existants". */
+  private readonly redirectCreateTab = effect(() => {
+    if (this.activeTab() === 'create' && !this.canCreate()) this.activeTab.set('list');
+  });
+
+  /** Pas de bouton "Charger" : choisir un pays dans le sélecteur (header) déclenche le
+   *  chargement directement — même comportement que les sélecteurs pays/employé sur
+   *  `/payroll/candidate-simulation` et `/payroll/engine-results`. */
+  onPaysChange(selected: string[]): void {
+    const paysId = selected[0] ? Number(selected[0]) : null;
+    this.filterForm.get('paysId')!.setValue(paysId);
+    if (paysId) this.load();
   }
 
   /** La création reste ouverte qu'aux rôles qui pouvaient déjà y accéder sur l'ancienne
@@ -96,8 +144,75 @@ export class ParameterSetsComponent implements OnInit {
   }
 
   readonly loading   = signal(false);
+  /** `daf-page`'s own skeleton is for the FIRST load only — a country switch afterwards
+   *  must leave the header/KPI bandeau on screen and let the list area show its own
+   *  busy state via `loading()`, same convention as finance's `firstLoad()`/`loading()`
+   *  split (e.g. `invoice-list.component.ts`). Flips to `false` once, after the first
+   *  `load()` settles (success or error), and never again. */
+  readonly firstLoad = signal(true);
   readonly paramSets = signal<ParameterSetDto[]>([]);
   readonly selected  = signal<ParameterSetDto | null>(null);
+
+  /** Bandeau exécutif — comme /payroll/candidate-simulation et /payroll/engine-results —
+   *  au-dessus de la liste, calculé sur tous les jeux chargés pour le pays (non filtré). */
+  readonly paramSetKpis = computed(() => {
+    const list = this.paramSets();
+    return {
+      total:   list.length,
+      draft:   list.filter(p => p.status === 'DRAFT').length,
+      pending: list.filter(p => p.status === 'PENDING_FINANCE').length,
+      active:  list.filter(p => p.status === 'ACTIVE').length,
+    };
+  });
+
+  // ── Barre de recherche / filtre, comme `daf-search-toolbar` sur /finance/affaires et
+  // les autres pages payroll — un seul chargement par pays (`listParameterSets`), la
+  // recherche et le filtre retravaillent `paramSets()` déjà en mémoire. Pas de bascule
+  // carte/tableau ni de pagination ici : chaque jeu est déjà un `daf-accordion-card` qui
+  // EST l'éditeur (taux, rubriques...), pas un résumé cliquable vers un autre écran — et
+  // un pays n'a jamais qu'une poignée de jeux à la fois.
+  readonly searchText = signal('');
+  readonly statusFilter = signal('');
+
+  onSearchTextChange(value: string): void {
+    this.searchText.set(value);
+  }
+
+  readonly filteredParamSets = computed(() => {
+    const query = this.searchText().trim().toLowerCase();
+    const status = this.statusFilter();
+    return this.paramSets().filter(ps => {
+      const matchesQuery = !query
+        || String(ps.fiscalYear).includes(query)
+        || String(ps.version).includes(query);
+      const matchesStatus = !status || ps.status === status;
+      return matchesQuery && matchesStatus;
+    });
+  });
+
+  readonly filterFields = computed<FilterField[]>(() => [{
+    name: 'status',
+    label: this.t('PAYROLL.PARAMETER_SETS.STATUS_FILTER_LABEL'),
+    type: 'select',
+    placeholder: this.t('PAYROLL.PARAMETER_SETS.FILTER_ALL'),
+    options: (['DRAFT', 'PENDING_FINANCE', 'ACTIVE', 'ARCHIVED'] as const)
+      .map(s => ({ value: s, label: this.t(`PAYROLL.PARAMETER_SETS.STATUS.${s}`) })),
+  }]);
+
+  readonly filterConfig = computed<SearchToolbarFilterConfig>(() => ({
+    title: this.t('PAYROLL.PARAMETER_SETS.FILTER_TITLE'),
+    applyLabel: this.t('PAYROLL.PARAMETER_SETS.FILTER_APPLY'),
+    cancelLabel: this.t('PAYROLL.PARAMETER_SETS.FILTER_CANCEL'),
+    resetLabel: this.t('PAYROLL.PARAMETER_SETS.FILTER_RESET'),
+    triggerLabel: this.t('PAYROLL.PARAMETER_SETS.FILTER_TRIGGER'),
+    // `daf-filter` seeds `initialValues` once, in its own internal shape — a `select`
+    // field is a `string[]` there (normalizes to a scalar only on `apply`).
+    initialValues: { status: this.statusFilter() ? [this.statusFilter()] : [] },
+  }));
+
+  applyFilters(result: FilterResult): void {
+    this.statusFilter.set((result['status'] as string | null) ?? '');
+  }
 
   // ── Charges sociales editor ───────────────────────────────────────────────
   readonly editingChargesId = signal<number | null>(null);
@@ -228,6 +343,7 @@ export class ParameterSetsComponent implements OnInit {
       next: ps => {
         this.paramSets.set(ps);
         this.loading.set(false);
+        this.firstLoad.set(false);
         // Auto-select the first (usually only) parameter set so the detail
         // panel — including Rubriques — is visible without an extra click.
         if (ps.length > 0 && !this.selected()) this.selected.set(ps[0]);
@@ -235,6 +351,7 @@ export class ParameterSetsComponent implements OnInit {
       error: err => {
         this.notification.error(err?.error?.message ?? this.t('PAYROLL.PARAMETER_SETS.ERROR_GENERIC'));
         this.loading.set(false);
+        this.firstLoad.set(false);
       },
     });
   }
@@ -274,7 +391,6 @@ export class ParameterSetsComponent implements OnInit {
 
   // ── Charges sociales ──────────────────────────────────────────────────────
   openChargesEditor(ps: ParameterSetDto): void {
-    if (this.editingChargesId() === ps.id) { this.closeChargesEditor(); return; }
     this.closeRubriquesEditor();
     while (this.editRates.length) this.editRates.removeAt(0);
     ps.socialChargeRates.forEach(r => this.editRates.push(this.fb.group({
@@ -290,11 +406,22 @@ export class ParameterSetsComponent implements OnInit {
       evalOrder:       [r.evalOrder ?? 0],
     })));
     this.editingChargesId.set(ps.id);
+    const tpl = this.chargesEditorTpl();
+    if (!tpl) return;
+    this.chargesModalRef = this.modalService.open({
+      title: this.t('PAYROLL.PARAMETER_SETS.CHARGES_EDITOR_MODAL_TITLE'),
+      subtitle: this.itemTitle(ps),
+      icon: 'payments',
+      size: 'xl',
+      body: tpl,
+    });
   }
 
   private closeChargesEditor(): void {
     this.editingChargesId.set(null);
     while (this.editRates.length) this.editRates.removeAt(0);
+    this.chargesModalRef?.close();
+    this.chargesModalRef = null;
   }
 
   addEditRate(): void {
@@ -333,13 +460,21 @@ export class ParameterSetsComponent implements OnInit {
 
   // ── Rubriques de paie ──────────────────────────────────────────────────────
   openRubriquesEditor(ps: ParameterSetDto): void {
-    if (this.editingRubriquesId() === ps.id) { this.closeRubriquesEditor(); return; }
     this.closeChargesEditor();
     while (this.editRubriques.length) this.editRubriques.removeAt(0);
     (ps.rubriques ?? []).forEach(r => this.editRubriques.push(this.makeRubriqueGroup(r)));
     // Auto-expand the first card so the form is immediately visible.
     this.expandedRubriques.set(new Set([0]));
     this.editingRubriquesId.set(ps.id);
+    const tpl = this.rubriquesEditorTpl();
+    if (!tpl) return;
+    this.rubriquesModalRef = this.modalService.open({
+      title: this.t('PAYROLL.PARAMETER_SETS.RUBRIQUES_EDITOR_MODAL_TITLE'),
+      subtitle: this.itemTitle(ps),
+      icon: 'receipt_long',
+      size: 'xl',
+      body: tpl,
+    });
   }
 
   private makeRubriqueGroup(r: Partial<PayrollRubriqueDto>): FormGroup {
@@ -370,6 +505,8 @@ export class ParameterSetsComponent implements OnInit {
     this.editingRubriquesId.set(null);
     this.expandedRubriques.set(new Set());
     while (this.editRubriques.length) this.editRubriques.removeAt(0);
+    this.rubriquesModalRef?.close();
+    this.rubriquesModalRef = null;
   }
 
   addEditRubrique(): void {

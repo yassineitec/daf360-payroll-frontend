@@ -3,20 +3,45 @@
     [title]="'PAYROLL.ENGINE_RESULTS.TITLE' | translate"
     [subtitle]="'PAYROLL.ENGINE_RESULTS.SUBTITLE' | translate"
     [breadcrumbs]="breadcrumbs()">
-    <!-- ── Sélecteur employé, dans le header à côté du titre — même emplacement que
-         le sélecteur pays sur /payroll/candidate-simulation (slot `pageActions`).
-         Choisir un employé déclenche la recherche directement, comme le pays là-bas —
-         plus de bouton "Rechercher". ────────────────────────────────────────────── -->
-    <div pageActions class="employee-trigger">
-      <app-employee-select
-        [formControl]="$any(employeeIdCtrl)"
-        [paysId]="null"
-        (employeeSelected)="onEmployeeSelected($event)">
-      </app-employee-select>
+    <!-- ── Retour à l'annuaire (`/payroll/engine-results`) — remplace l'ancien sélecteur
+         employé du header : on arrive ici en cliquant un collaborateur de la liste. ── -->
+    <div pageActions>
+      <daf-button
+        [label]="'PAYROLL.ENGINE_RESULTS.BACK_TO_LIST' | translate"
+        variant="ghost"
+        [options]="{ iconStart: 'arrow_back' }"
+        (onClick)="backToList()">
+      </daf-button>
     </div>
   </daf-page-header>
 
   <div class="page-body">
+    <!-- ── Bandeau d'identité du collaborateur ouvert ──────────────────────── -->
+    <daf-card [options]="{ variant: 'flat', padding: 'lg', radius: 'xl' }">
+      <div class="emp-header">
+        <daf-avatar [data]="{ name: employeeName() }" size="lg" />
+        <div class="emp-header__body">
+          <h2 class="emp-header__name">{{ employeeName() }}</h2>
+          @if (employee(); as e) {
+            <p class="emp-header__meta">
+              @if (e.employeeId) {
+                <span class="emp-chip">{{ 'PAYROLL.ENGINE_RESULTS.COL_MATRICULE' | translate }} {{ e.employeeId }}</span>
+              }
+              @for (part of [e.department, e.contractType, e.paysLabel]; track $index) {
+                @if (part) { <span>{{ part }}</span> }
+              }
+            </p>
+          }
+        </div>
+      </div>
+    </daf-card>
+
+    @if (empLoading()) {
+      <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+        <p class="empty-state">{{ 'PAYROLL.COMMON.LOADING' | translate }}</p>
+      </daf-card>
+    }
+
     <!-- ── Bandeau exécutif : directement sous le header, comme les pages finance
          (invoice-list, payments-dashboard) — une section nue en grille, sans carte
          englobante, avant le filtre de recherche. ─────────────────────────────── -->
@@ -124,7 +149,7 @@
             variant: 'flat', padding: 'lg', radius: 'xl',
             accent: r.convergenceOk ? 'success' : 'danger',
             icon: 'payments', iconFilled: true, iconColor: 'text-primary', iconBg: 'bg-primary/10',
-            title: ('PAYROLL.ENGINE_RUN.RESULT_TITLE' | translate: { employeeId: r.employeeId, month: r.periodMonth, year: r.periodYear })
+            title: ('PAYROLL.ENGINE_RESULTS.RESULT_TITLE' | translate: { name: employeeName(), month: r.periodMonth, year: r.periodYear })
           }">
           <div class="hero-row">
             <div class="hero-row__net">

@@ -65,6 +65,20 @@ export interface RubriqueResultItem {
   prorataApplied: boolean;
 }
 
+/** `GET /engine/results/summary` — période/dates à `null` tant que le pays n'a aucun résultat. */
+export interface PayrollResultsSummaryDto {
+  paysId: number;
+  currencyCode: string | null;
+  periodYear: number | null;
+  periodMonth: number | null;
+  employeeCount: number;
+  totalGross: number;
+  totalNet: number;
+  totalLoadedCost: number;
+  convergenceFailures: number;
+  lastCalculatedAt: string | null;
+}
+
 export interface RunPayrollResponse {
   resultId: number;
   employeeId: number;
@@ -165,6 +179,11 @@ export class PayrollEngineService {
 
   getResults(employeeId: number): Observable<RunPayrollResponse[]> {
     return this.http.get<RunPayrollResponse[]>(`${this.base}/results/${employeeId}`);
+  }
+
+  /** Totaux du dernier mois calculé pour un pays (KPI de `/payroll/engine-results`). */
+  getResultsSummary(paysId: number): Observable<PayrollResultsSummaryDto> {
+    return this.http.get<PayrollResultsSummaryDto>(`${this.base}/results/summary`, { params: { paysId } });
   }
 
   // ── Calibration ───────────────────────────────────────────────────────────

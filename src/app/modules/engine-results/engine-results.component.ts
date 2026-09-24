@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { PayrollEngineService, RunPayrollResponse } from '../../core/payroll-engine.service';
-import { EmployeeSelectComponent } from '../../shared/employee-select/employee-select.component';
-import type { EmployeeListItem } from '../../core/hr-profile.service';
+import { recallEmployee } from './engine-results-employee';
 import {
+  AvatarComponent,
   ButtonComponent,
   CardComponent,
   DataTableComponent,
@@ -38,8 +38,10 @@ const RUBRIQUE_TABS: { id: RubriqueCategory; label: string }[] = [
 ];
 
 /**
- * `/payroll/engine-results` — historique des résultats de paie réels par employé (recherche
- * employé, résultats calculés par le moteur, détail par rubrique — tout via les vraies API).
+ * `/payroll/engine-results/:employeeId` — historique des résultats de paie réels d'un
+ * collaborateur (résultats calculés par le moteur, détail par rubrique — tout via les
+ * vraies API). On y arrive depuis l'annuaire `/payroll/engine-results`
+ * (`EngineResultsListComponent`), qui a remplacé l'ancien sélecteur employé du header.
  * Jusqu'au 2026-09-23 cette page portait aussi un second onglet "Simulations candidats",
  * déplacé vers `/payroll/candidate-simulation` : les deux volets sont désormais deux pages
  * distinctes reliées dans le sous-menu "Historique de paie" de la sidebar plutôt que deux
@@ -56,8 +58,8 @@ const RUBRIQUE_TABS: { id: RubriqueCategory; label: string }[] = [
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    CommonModule, ReactiveFormsModule, TranslatePipe, EmployeeSelectComponent,
-    ButtonComponent, CardComponent, DataTableComponent, EntityCardComponent,
+    CommonModule, TranslatePipe,
+    AvatarComponent, ButtonComponent, CardComponent, DataTableComponent, EntityCardComponent,
     MetricCardComponent, PageComponent, PageHeaderComponent, PaginationComponent,
     SearchToolbarComponent, SectionTitleComponent, StatusBadgeComponent, TabsComponent,
   ],
@@ -67,19 +69,37 @@ const RUBRIQUE_TABS: { id: RubriqueCategory; label: string }[] = [
 export class EngineResultsComponent {
   private readonly engineApi  = inject(PayrollEngineService);
   private readonly translate  = inject(TranslateService);
+  private readonly router     = inject(Router);
+  private readonly route      = inject(ActivatedRoute);
 
   private t(key: string, params?: Record<string, unknown>): string {
     this.translate.currentLang();
     return this.translate.instant(key, params);
   }
 
+  /** `userId` RH du collaborateur, pris dans l'URL — la même clé que `getResults`. */
+  readonly employeeId = Number(this.route.snapshot.paramMap.get('employeeId'));
+  /** Fiche transmise par la liste ; `null` si la page est ouverte directement par lien. */
+  readonly employee = signal(recallEmployee(this.employeeId));
+  readonly employeeName = computed(() =>
+    this.employee()?.fullName ?? this.t('PAYROLL.ENGINE_RESULTS.EMPLOYEE_FALLBACK', { id: this.employeeId }));
+
   readonly breadcrumbs = computed((): BreadcrumbItem[] => [
     { label: this.t('PAYROLL.COMMON.BREADCRUMB_ROOT'), link: '/payroll' },
-    { label: this.t('PAYROLL.ENGINE_RESULTS.BREADCRUMB') },
+    { label: this.t('PAYROLL.ENGINE_RESULTS.BREADCRUMB'), link: '/payroll/engine-results' },
+    { label: this.employeeName() },
   ]);
 
-  // ── employee search ──────────────────────────────────────────────────
-  readonly employeeIdCtrl = new FormControl<number | null>(null);
+  constructor() {
+    if (Number.isFinite(this.employeeId) && this.employeeId > 0) this.loadEmployeeResults();
+    else this.backToList();
+  }
+
+  backToList(): void {
+    this.router.navigate(['..'], { relativeTo: this.route });
+  }
+
+  // ── résultats du collaborateur ───────────────────────────────────────
   readonly empLoading  = signal(false);
   readonly empError    = signal<string | null>(null);
   readonly empSearched = signal(false);
@@ -217,7 +237,7 @@ export class EngineResultsComponent {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `engine-results-${this.employeeIdCtrl.value ?? 'export'}.csv`;
+    link.download = `engine-results-${this.employee()?.employeeId ?? this.employeeId}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -226,19 +246,8 @@ export class EngineResultsComponent {
    *  dédié, même approche que `simulator.component.ts::print()`. */
   exportResultPdf(): void { window.print(); }
 
-  /** Pas de bouton "Rechercher" : choisir un employé dans le sélecteur (header) déclenche
-   *  la recherche directement — même comportement que le select pays sur
-   *  `/payroll/candidate-simulation`. `employeeSelected` émet APRÈS avoir mis à jour la
-   *  valeur du `FormControl` (voir `EmployeeSelectComponent.pick`), donc `employeeIdCtrl.value`
-   *  est déjà à jour ici. Ignoré sur effacement (`e === null`), comme un clic manuel sur
-   *  "Rechercher" sans employé choisi ne faisait rien non plus. */
-  onEmployeeSelected(e: EmployeeListItem | null): void {
-    if (e) this.loadEmployeeResults();
-  }
-
   loadEmployeeResults(): void {
-    const employeeId = this.employeeIdCtrl.value;
-    if (!employeeId) return;
+    const employeeId = this.employeeId;
     this.empLoading.set(true);
     this.empError.set(null);
     this.empSearched.set(false);

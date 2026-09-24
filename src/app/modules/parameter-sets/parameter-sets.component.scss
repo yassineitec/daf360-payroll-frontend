@@ -15,16 +15,35 @@
   --ps-shadow-1:      0 1px 2px rgba(13, 92, 117, 0.06), 0 2px 6px rgba(13, 92, 117, 0.06);
 }
 
-.ps-tabs-wrap { padding: 0 32px; margin-bottom: 8px; }
+/* Pas de padding horizontal ici ni sur `.ps-layout` / `.ps-create-layout` : `.shell-content`
+   pose déjà 2rem et `daf-page-header` n'en ajoute pas — 32px de plus décalaient onglets et
+   contenu par rapport au titre. Même alignement que /payroll/simulator. */
+.ps-tabs-wrap { margin-bottom: 8px; }
 
-.ps-layout { display: flex; flex-direction: column; gap: 24px; padding: 0 32px 32px; }
-.filter-row { display: flex; gap: 16px; align-items: flex-end; }
+/* ── sélecteur pays (header) : même traitement que `.pays-trigger` /
+   `.employee-trigger` sur /payroll/candidate-simulation et /payroll/engine-results —
+   compact, pas de largeur forcée par un parent flex-1, rayon d'angle aligné sur les
+   daf-button "md" (rounded-lg). */
+.ps-pays-trigger { min-width: 220px; }
+.ps-pays-trigger ::ng-deep [data-trigger] { border-radius: 0.5rem; }
+
+.ps-layout { display: flex; flex-direction: column; gap: 24px; padding-bottom: 32px; }
 .field-group { display: flex; flex-direction: column; gap: 6px; flex: 1; max-width: 200px; }
 .ps-list { display: flex; flex-direction: column; gap: 12px; }
 .ps-item-actions { display: flex; gap: 8px; }
 
+/* ── bandeau exécutif (KPIs) ──────────────────────────────────────────────
+   Même traitement que /payroll/candidate-simulation et /payroll/engine-results :
+   grille en classes Tailwind litérales (grid grid-cols-4 gap-2 sm:gap-6), tuiles
+   agrandies via `::ng-deep` scopé à `.kpi-section` (la lib n'a pas de variante
+   "grande taille" pour `daf-metric-card`). */
+.kpi-section ::ng-deep .glass-card        { padding: 1.5rem; min-height: 148px; }
+.kpi-section ::ng-deep .text-\[22px\]     { font-size: 1.75rem; }
+.kpi-section ::ng-deep .w-8.h-8.rounded-lg { width: 2.75rem; height: 2.75rem; }
+.kpi-section ::ng-deep .material-symbols-outlined.text-sm { font-size: 1.375rem; }
+
 /* ── Onglet "Nouveau jeu" ─────────────────────────────────────────────────── */
-.ps-create-layout { display: flex; flex-direction: column; gap: 24px; padding: 0 32px 32px; }
+.ps-create-layout { display: flex; flex-direction: column; gap: 24px; padding-bottom: 32px; }
 .field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; }
 .info-box { padding: 12px 16px; background: var(--ps-petrol-tint); border-left: 3px solid var(--ps-petrol); border-radius: var(--radius-md); font-size: 0.8125rem; color: var(--color-on-surface); margin-bottom: 16px; }
 

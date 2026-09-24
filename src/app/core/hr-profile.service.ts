@@ -37,4 +37,18 @@ export class HrProfileService {
     if (paysId != null) params = params.set('pays', paysId);
     return this.http.get<EmployeePage>(`${this.base}/api/hr/profiles/employees`, { params });
   }
+
+  /** Paginated variant for the `/payroll/engine-results` directory — same endpoint, but
+   *  the caller drives `page` (0-indexed) instead of always reading the first page. */
+  listEmployees(opts: {
+    search?: string; paysId?: number | null; status?: string; page: number; size: number;
+  }): Observable<EmployeePage> {
+    let params = new HttpParams().set('size', opts.size).set('page', opts.page);
+    if (opts.search?.trim()) params = params.set('search', opts.search.trim());
+    if (opts.paysId != null) params = params.set('pays', opts.paysId);
+    // Sans `status`, le service RH ne renvoie que les collaborateurs en poste
+    // (ACTIVE / ON_LEAVE / ON_MISSION, ou sans fiche) ; avec, uniquement ce statut.
+    if (opts.status) params = params.set('status', opts.status);
+    return this.http.get<EmployeePage>(`${this.base}/api/hr/profiles/employees`, { params });
+  }
 }

@@ -35,11 +35,11 @@ import {
   FormFieldComponent,
   MetricCardComponent,
   ModalService,
+  PageComponent,
   PageHeaderComponent,
   RadioGroupComponent,
   SectionTitleComponent,
   SelectComponent,
-  SkeletonComponent,
   StatusBadgeComponent,
   StepperComponent,
 } from '@khalilrebhiitec/daf360';
@@ -86,8 +86,8 @@ interface IrppBracketRow {
   imports: [
     CommonModule, ReactiveFormsModule, TranslatePipe, EmployeeSelectComponent,
     AccordionCardComponent, ButtonComponent, CardComponent, CheckboxComponent,
-    DrawerComponent, FormFieldComponent, MetricCardComponent, PageHeaderComponent,
-    RadioGroupComponent, SectionTitleComponent, SelectComponent, SkeletonComponent,
+    DrawerComponent, FormFieldComponent, MetricCardComponent, PageComponent,
+    PageHeaderComponent, RadioGroupComponent, SectionTitleComponent, SelectComponent,
     StatusBadgeComponent, StepperComponent,
   ],
   // Pas de `styleUrl` : Tailwind + composants de la lib uniquement, comme les autres
@@ -125,10 +125,10 @@ export class SimulatorComponent implements OnDestroy {
   );
 
   /**
-   * First reference load only — it swaps the work zone for `daf-skeleton` blocks. Kept
-   * strictly separate from `loading`, which every "Simuler" click flips: wiring the
-   * skeleton to that one would blank the form the user had just filled in
-   * (UI-PLAYBOOK §5). The page header stays mounted throughout.
+   * First reference load only — drives `daf-page [loading]`, which swaps the whole page
+   * (header included) for the library skeleton. Kept strictly separate from `loading`,
+   * which every "Simuler" click flips: wiring the skeleton to that one would blank the
+   * form the user had just filled in (UI-PLAYBOOK §5).
    */
   readonly firstLoad     = signal(true);
   readonly loading       = signal(false);

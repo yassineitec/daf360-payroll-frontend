@@ -2,13 +2,15 @@
 .alert--error  { background: #fee2e2; color: #991b1b; padding: .75rem 1rem; border-radius: 6px; margin-top: 1rem; font-size: .875rem; }
 .empty-state   { text-align: center; color: var(--color-on-surface-variant, #6b7280); margin: 0; }
 
-/* ── sélecteur employé : même traitement que `.pays-trigger` sur
-   /payroll/candidate-simulation — compact dans le header, pas de largeur forcée
-   par un parent flex-1, rayon d'angle aligné sur les daf-button "md" (rounded-lg).
-   `.es-trigger` est le hook exposé par `app-employee-select` pour ce cas exact
-   (cf. son propre commentaire de template). */
-.employee-trigger { min-width: 280px; }
-.employee-trigger ::ng-deep .es-trigger { border-radius: 0.5rem; }
+/* ── bandeau d'identité du collaborateur (même gabarit que `.cand-header` sur
+   /payroll/candidate-simulation) ───────────────────────────────────────── */
+.emp-header        { display: flex; align-items: center; gap: 1rem; }
+.emp-header__body  { min-width: 0; }
+.emp-header__name  { font-size: 1.25rem; font-weight: 600; margin: 0 0 .35rem; }
+.emp-header__meta  { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .9rem; margin: 0;
+                     color: var(--color-on-surface-variant, #6b7280); font-size: .875rem; }
+.emp-chip          { border-radius: 999px; padding: .1rem .55rem; font-size: .75rem; font-weight: 600;
+                     background: var(--color-surface-container-highest, #e2e3e5); }
 
 /* ── bandeau exécutif (KPIs) ──────────────────────────────────────────────
    Grille en classes Tailwind litérales dans le template (grid grid-cols-4 gap-2
