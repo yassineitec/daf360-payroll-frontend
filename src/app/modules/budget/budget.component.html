@@ -1,7 +1,8 @@
-<daf-page [loading]="loading()">
+<daf-page [loading]="loading()" [breadcrumbs]="true">
   <daf-page-header
-    title="Budget prévisionnel"
-    subtitle="Vue agrégée des coûts salariaux et projections budgétaires. Données générées automatiquement à chaque activation de barème.">
+    [title]="'PAYROLL.BUDGET.TITLE' | translate"
+    [subtitle]="'PAYROLL.BUDGET.SUBTITLE' | translate"
+    [breadcrumbs]="breadcrumbs()">
   </daf-page-header>
 
   <div class="px-6 pb-8 flex flex-col gap-6">
@@ -12,17 +13,21 @@
         <span class="material-symbols-outlined text-xl text-primary" style="font-variation-settings:'FILL' 1">
           public
         </span>
-        <h2 class="text-base font-semibold text-on-surface">Sélection du pays</h2>
+        <h2 class="text-base font-semibold text-on-surface">{{ 'PAYROLL.BUDGET.COUNTRY_SELECT_TITLE' | translate }}</h2>
       </div>
       <div class="p-5 sm:p-8 flex items-end gap-4 flex-wrap">
         <div class="flex-1 min-w-[200px]">
-          <p class="text-[13px] font-medium text-on-surface-variant mb-1.5">Pays <span class="text-danger">*</span></p>
-          <app-pays-select [formControl]="$any(paysIdCtrl)" />
+          <daf-select
+            [options]="paysOptions()"
+            [selected]="paysId() ? ['' + paysId()] : []"
+            [config]="{ label: 'PAYROLL.BUDGET.PAYS' | translate, placeholder: 'PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate, searchable: true, fullWidth: true, required: true }"
+            (selectedChange)="paysId.set($event[0] ? +$event[0] : null)">
+          </daf-select>
         </div>
         <daf-button
-          label="Charger les données"
+          [label]="'PAYROLL.BUDGET.LOAD_BUTTON' | translate"
           variant="primary"
-          [options]="{ loading: loading(), disabled: !paysIdCtrl.value || loading(), iconStart: 'download' }"
+          [options]="{ loading: loading(), disabled: !paysId() || loading(), iconStart: 'download' }"
           (onClick)="load()">
         </daf-button>
       </div>
@@ -40,15 +45,15 @@
 
       <!-- Period header badge -->
       <div class="flex items-center gap-3">
-        <span class="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-bold text-primary">
-          <span class="material-symbols-outlined text-base" style="font-variation-settings:'FILL' 1">calendar_month</span>
-          Période : {{ latestPeriod() }}
-        </span>
+        <daf-badge
+          [label]="'PAYROLL.BUDGET.PERIOD_BADGE' | translate: { period: latestPeriod() }"
+          [options]="{ variant: 'primary', size: 'md', icon: 'calendar_month' }">
+        </daf-badge>
         @if (headcount()) {
-          <span class="inline-flex items-center gap-1 rounded-full border border-outline-variant px-3 py-1 text-xs text-on-surface-variant">
-            <span class="material-symbols-outlined text-sm">group</span>
-            {{ headcount() }} employés
-          </span>
+          <daf-badge
+            [label]="'PAYROLL.BUDGET.HEADCOUNT_BADGE' | translate: { count: headcount() }"
+            [options]="{ variant: 'neutral', size: 'md', icon: 'group' }">
+          </daf-badge>
         }
       </div>
 
@@ -58,7 +63,7 @@
           <span class="material-symbols-outlined text-xl text-secondary" style="font-variation-settings:'FILL' 1">
             payments
           </span>
-          <h2 class="text-base font-semibold text-on-surface">Lignes de coût mensuel — F.04</h2>
+          <h2 class="text-base font-semibold text-on-surface">{{ 'PAYROLL.BUDGET.COST_LINES_TITLE' | translate }}</h2>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 p-5 sm:p-8">
@@ -66,7 +71,7 @@
           <!-- EMPLOYER_LOADED -->
           @if (employerLine(); as el) {
             <daf-metric-card
-              label="Coût chargé employeur"
+              [label]="'PAYROLL.BUDGET.METRIC_EMPLOYER' | translate"
               [value]="fmt(el.monthlyAmount) + ' ' + currency()"
               [options]="{ icon: 'account_balance_wallet', iconColor: 'text-primary', iconBg: 'bg-primary/10' }">
             </daf-metric-card>
@@ -75,7 +80,7 @@
           <!-- EMPLOYEE_NET -->
           @if (employeeLine(); as enl) {
             <daf-metric-card
-              label="Masse salariale nette"
+              [label]="'PAYROLL.BUDGET.METRIC_EMPLOYEE_NET' | translate"
               [value]="fmt(enl.monthlyAmount) + ' ' + currency()"
               [options]="{ icon: 'person', iconColor: 'text-secondary', iconBg: 'bg-secondary/10' }">
             </daf-metric-card>
@@ -89,7 +94,7 @@
             <div class="flex items-center gap-2 px-4 py-3 bg-surface-container-low border-b border-outline-variant">
               <span class="material-symbols-outlined text-base text-on-surface-variant">currency_exchange</span>
               <span class="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
-                Coût chargé mensuel en devises
+                {{ 'PAYROLL.BUDGET.FX_ROW_TITLE' | translate }}
               </span>
             </div>
             <div class="divide-y divide-outline-variant">
@@ -116,14 +121,14 @@
           <span class="material-symbols-outlined text-xl text-tertiary" style="font-variation-settings:'FILL' 1">
             trending_up
           </span>
-          <h2 class="text-base font-semibold text-on-surface">Projections budgétaires — F.07</h2>
+          <h2 class="text-base font-semibold text-on-surface">{{ 'PAYROLL.BUDGET.FORECAST_TITLE' | translate }}</h2>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 p-5 sm:p-8">
 
           @if (monthlyForecast(); as mf) {
             <daf-metric-card
-              label="Prévision mensuelle"
+              [label]="'PAYROLL.BUDGET.FORECAST_MONTHLY' | translate"
               [value]="fmt(mf.forecastAmount) + ' ' + currency()"
               [options]="{ icon: 'calendar_view_month', iconColor: 'text-on-surface-variant', iconBg: 'bg-surface-container' }">
             </daf-metric-card>
@@ -131,7 +136,7 @@
 
           @if (quarterlyForecast(); as qf) {
             <daf-metric-card
-              label="Prévision trimestrielle"
+              [label]="'PAYROLL.BUDGET.FORECAST_QUARTERLY' | translate"
               [value]="fmt(qf.forecastAmount) + ' ' + currency()"
               [options]="{ icon: 'calendar_view_week', iconColor: 'text-secondary', iconBg: 'bg-secondary/10' }">
             </daf-metric-card>
@@ -139,7 +144,7 @@
 
           @if (annualForecast(); as af) {
             <daf-metric-card
-              label="Prévision annuelle"
+              [label]="'PAYROLL.BUDGET.FORECAST_ANNUAL' | translate"
               [value]="fmt(af.forecastAmount) + ' ' + currency()"
               [options]="{ icon: 'calendar_today', iconColor: 'text-primary', iconBg: 'bg-primary/10' }">
             </daf-metric-card>
@@ -155,7 +160,7 @@
             <span class="material-symbols-outlined text-xl text-on-surface-variant" style="font-variation-settings:'FILL' 1">
               history
             </span>
-            <h2 class="text-base font-semibold text-on-surface">Historique des périodes</h2>
+            <h2 class="text-base font-semibold text-on-surface">{{ 'PAYROLL.BUDGET.HISTORY_TITLE' | translate }}</h2>
           </div>
 
           <div class="divide-y divide-outline-variant">
@@ -166,13 +171,13 @@
                   @for (line of linesForPeriod(period); track line.id) {
                     <div class="flex items-center gap-2 rounded-xl border border-outline-variant px-4 py-2.5 text-sm">
                       <span class="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
-                        {{ line.lineType === 'EMPLOYER_LOADED' ? 'Coût chargé' : 'Net salarial' }}
+                        {{ lineTypeLabel(line.lineType) }}
                       </span>
                       <span class="font-semibold tabular-nums text-on-surface">
                         {{ fmt(line.monthlyAmount) }} {{ line.localCurrency }}
                       </span>
                       @if (line.headcount) {
-                        <span class="text-[11px] text-on-surface-variant">· {{ line.headcount }} emp.</span>
+                        <span class="text-[11px] text-on-surface-variant">· {{ 'PAYROLL.BUDGET.HEADCOUNT_SUFFIX' | translate: { count: line.headcount } }}</span>
                       }
                     </div>
                   }

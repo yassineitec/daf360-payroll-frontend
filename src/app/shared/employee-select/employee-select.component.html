@@ -8,7 +8,7 @@
 
   <!-- `es-trigger` / `es-panel` are hooks, not styling: a consuming page that squares off
        its inputs (the simulator) targets them through `::ng-deep`. Keep them. -->
-  <div class="es-trigger flex items-center gap-2 h-11 w-full px-3 rounded-md border transition-all duration-200"
+  <div #trigger class="es-trigger flex items-center gap-2 h-11 w-full px-3 rounded-md border transition-all duration-200"
        [class]="open()
          ? 'bg-surface border-tertiary ring-2 ring-tertiary/20 shadow-sm'
          : 'bg-surface-container-low border-outline-variant hover:border-outline'">
@@ -44,8 +44,14 @@
   </div>
 
   @if (open()) {
-    <div role="listbox"
-         class="es-panel absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-md border border-outline-variant bg-surface-container-lowest py-1 shadow-lg">
+    <!-- Portaled to <body> and positioned `fixed` from the trigger's rect (see
+         `portalDropdown` in the .ts) — kept out of any ancestor `daf-card`, whose
+         `overflow-hidden` would otherwise clip this panel at the card's edge. -->
+    <div #panel role="listbox"
+         class="es-panel fixed z-[9999] max-h-64 overflow-y-auto rounded-md border border-outline-variant bg-surface-container-lowest py-1 shadow-lg"
+         [style.top.px]="dropdownTop()"
+         [style.left.px]="dropdownLeft()"
+         [style.width.px]="dropdownWidth()">
 
       @if (loading()) {
         <p class="px-3 py-2 text-label-md text-on-surface-variant">Chargement…</p>

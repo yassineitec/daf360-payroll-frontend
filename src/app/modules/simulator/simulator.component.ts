@@ -4,6 +4,8 @@ import {
   inject,
   signal,
   computed,
+  viewChild,
+  TemplateRef,
   OnDestroy,
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -31,6 +33,8 @@ import {
   CheckboxComponent,
   DrawerComponent,
   FormFieldComponent,
+  MetricCardComponent,
+  ModalService,
   PageHeaderComponent,
   RadioGroupComponent,
   SectionTitleComponent,
@@ -82,9 +86,9 @@ interface IrppBracketRow {
   imports: [
     CommonModule, ReactiveFormsModule, TranslatePipe, EmployeeSelectComponent,
     AccordionCardComponent, ButtonComponent, CardComponent, CheckboxComponent,
-    DrawerComponent, FormFieldComponent, PageHeaderComponent, RadioGroupComponent,
-    SectionTitleComponent, SelectComponent, SkeletonComponent, StatusBadgeComponent,
-    StepperComponent,
+    DrawerComponent, FormFieldComponent, MetricCardComponent, PageHeaderComponent,
+    RadioGroupComponent, SectionTitleComponent, SelectComponent, SkeletonComponent,
+    StatusBadgeComponent, StepperComponent,
   ],
   // Pas de `styleUrl` : Tailwind + composants de la lib uniquement, comme les autres
   // modules. La feuille de composant qui portait la mise en page a été supprimée.
@@ -95,7 +99,11 @@ export class SimulatorComponent implements OnDestroy {
   private readonly hrRef    = inject(HrRefApiService);
   private readonly fb       = inject(FormBuilder);
   private readonly translate = inject(TranslateService);
+  private readonly modalService = inject(ModalService);
   readonly userStore        = inject(UserStore);
+
+  /** Body of the result `daf-modal` — see `openResultModal()`. */
+  private readonly resultTemplate = viewChild.required<TemplateRef<unknown>>('resultTemplate');
   private readonly destroy$ = new Subject<void>();
 
   /**
@@ -144,6 +152,10 @@ export class SimulatorComponent implements OnDestroy {
   /** `daf-drawer` open state for the recent runs — driven from the page-header action
    *  (the drawer runs with `showToggle: false`, so this is its only way in). */
   readonly historyOpen = signal(false);
+
+  /** `daf-accordion-card` open state for the "Simuler" card — open by default so the
+   *  primary action stays one click away; the user can still collapse it. */
+  readonly simulateCardOpen = signal(true);
 
   readonly selectedCodes = signal<Set<string>>(new Set());
   /** Candidate (free-text identity) or collaborator (hydrated by the backend from RH). */
@@ -739,14 +751,28 @@ export class SimulatorComponent implements OnDestroy {
     );
   }
 
-  /** Re-open a past run in the result panel. The DTO is complete, so nothing is refetched. */
+  /** Re-open a past run in the result modal. The DTO is complete, so nothing is refetched. */
   openHistoryEntry(entry: SimulationResultDto): void {
     this.result.set(entry);
     this.error.set(null);
+    this.historyOpen.set(false);
+    this.openResultModal();
   }
 
   toggleHistory(): void {
     this.historyOpen.update(v => !v);
+  }
+
+  /** Opens the result as a blocking `daf-modal` — see the `<ng-template #resultTemplate>`
+   *  in the html and the class doc comment above it. */
+  openResultModal(): void {
+    this.modalService.open({
+      title: this.t('PAYROLL.SIMULATOR.RESULT.TITLE'),
+      icon: 'calculate',
+      size: 'lg',
+      body: this.resultTemplate(),
+      closeOnBackdrop: true,
+    });
   }
 
   /** Free navigation — `(stepClick)` fires for every step because none is disabled. */
@@ -757,8 +783,8 @@ export class SimulatorComponent implements OnDestroy {
   nextStep(): void { this.goToStep(this.currentStep() + 1); }
   prevStep(): void { this.goToStep(this.currentStep() - 1); }
 
-  /** Browser print — the stylesheet keeps only the result column (see the `@media print`
-   *  block), so this prints the simulation and not the form. */
+  /** Browser print — no dedicated `@media print` stylesheet exists yet, so this prints
+   *  whatever is currently visible (the result drawer, if open). */
   print(): void {
     window.print();
   }
@@ -855,6 +881,7 @@ export class SimulatorComponent implements OnDestroy {
       next: res => {
         this.result.set(res);
         this.loading.set(false);
+        this.openResultModal();
         const paysId = this.form.getRawValue().paysId;
         if (paysId) this.loadHistory(paysId);
       },

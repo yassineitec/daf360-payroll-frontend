@@ -1,0 +1,52 @@
+.page-body     { display: flex; flex-direction: column; gap: 1.5rem; padding: 0 2rem 2rem; }
+.filter-row    { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; }
+
+/* ── sélecteur pays : trigger compact façon bouton (type /finance/admin), même
+   rayon d'angle que les daf-button "md" (rounded-lg = 8px) pour rester au même
+   gabarit que le bouton "Rechercher" à côté — sans drapeaux (imageUrl volontairement
+   absent des options). `fullWidth: false` sur la config select donne déjà un trigger
+   à largeur de contenu ; on lui met juste un plancher pour ne pas s'écraser sur un
+   libellé pays court. */
+.pays-trigger { min-width: 220px; }
+.pays-trigger ::ng-deep [data-trigger] { border-radius: 0.5rem; }
+.alert--error  { background: #fee2e2; color: #991b1b; padding: .75rem 1rem; border-radius: 6px; margin-top: 1rem; font-size: .875rem; }
+.empty-state   { text-align: center; color: var(--color-on-surface-variant, #6b7280); margin: 0; }
+.sim-grid      { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .75rem; }
+
+/* ── bandeau exécutif (KPIs) ──────────────────────────────────────────────
+   Les tuiles `daf-metric-card` n'ont pas de variante "grande taille" dans la
+   lib — on agrandit padding/valeur/icône via `::ng-deep`, scopé à
+   `.kpi-section` pour ne pas affecter les autres tuiles (KPIs par simulation
+   dans la timeline, qui restent en `.sim-grid`). */
+.kpi-section ::ng-deep .glass-card        { padding: 1.5rem; min-height: 148px; }
+.kpi-section ::ng-deep .text-\[22px\]     { font-size: 1.75rem; }
+.kpi-section ::ng-deep .w-8.h-8.rounded-lg { width: 2.75rem; height: 2.75rem; }
+.kpi-section ::ng-deep .material-symbols-outlined.text-sm { font-size: 1.375rem; }
+
+/* ── candidate header ───────────────────────────────────── */
+.cand-header   { display: flex; align-items: center; gap: 1rem; }
+.cand-header__name { font-size: 1.25rem; font-weight: 600; margin: 0 0 .2rem; }
+.cand-header__meta { color: var(--color-on-surface-variant, #6b7280); margin: 0; font-size: .875rem; }
+
+/* ── timeline ───────────────────────────────────────────── */
+.timeline      { position: relative; padding-left: 1.5rem; }
+.timeline::before { content: ''; position: absolute; left: .6rem; top: .75rem; bottom: 0;
+                     width: 2px; background: var(--color-outline-variant, #e5e7eb); }
+.timeline__item { position: relative; margin-bottom: 1.25rem; }
+.timeline__dot  { position: absolute; left: -1.5rem; top: 1.1rem; width: .75rem; height: .75rem;
+                  border-radius: 50%; border: 2px solid var(--color-surface, #fff); }
+.timeline__body { margin-left: .25rem; }
+
+/* ── simulation card internals ──────────────────────────── */
+.sim-head      { display: flex; justify-content: space-between; align-items: center;
+                 margin-bottom: 1rem; flex-wrap: wrap; gap: .5rem; }
+.sim-head__left { display: flex; align-items: center; gap: .5rem; }
+.sim-ref       { font-weight: 600; font-size: .875rem; }
+.sim-date      { font-size: .8rem; color: var(--color-on-surface-variant, #6b7280); }
+.sim-rejection  { margin-top: .875rem; padding: .625rem .75rem;
+                  background: #fef2f2; border-left: 3px solid #ef4444; border-radius: 0 6px 6px 0;
+                  font-size: .875rem; display: flex; flex-wrap: wrap; gap: .5rem; align-items: baseline; }
+.rejection-label { color: #991b1b; font-weight: 500; }
+.rejection-note  { margin: .375rem 0 0; color: #7f1d1d; font-style: italic; width: 100%; }
+.approval-note   { margin-top: .75rem; font-style: italic; color: var(--color-on-surface-variant, #6b7280);
+                   font-size: .875rem; }

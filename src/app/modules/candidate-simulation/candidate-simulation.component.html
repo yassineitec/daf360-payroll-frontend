@@ -1,0 +1,215 @@
+<daf-page [breadcrumbs]="true">
+  <daf-page-header
+    [title]="'PAYROLL.CANDIDATE_SIMULATION.TITLE' | translate"
+    [subtitle]="'PAYROLL.CANDIDATE_SIMULATION.SUBTITLE' | translate"
+    [breadcrumbs]="breadcrumbs()">
+    <!-- ── Sélecteur pays, dans le header à côté du titre — même emplacement que
+         "Nouvelle affaire" sur /finance/affaires (slot `pageActions`). ──────── -->
+    <div pageActions class="pays-trigger">
+      <daf-select
+        [options]="paysOptions()"
+        [selected]="candidatePaysId() ? ['' + candidatePaysId()] : []"
+        [config]="paysSelectConfig()"
+        [ariaLabel]="'PAYROLL.CANDIDATE_SIMULATION.PAYS_SELECT_LABEL' | translate"
+        (selectedChange)="onPaysChange($event)">
+      </daf-select>
+    </div>
+  </daf-page-header>
+
+  <div class="page-body">
+    <!-- ── Bandeau exécutif : directement sous le header, comme les pages finance
+         (invoice-list, payments-dashboard) — une section nue en grille, sans carte
+         englobante, avant tout filtre. ──────────────────────────────────────── -->
+    @if (!selectedCandidate() && candidateList().length > 0) {
+      <section class="grid grid-cols-4 gap-2 sm:gap-6 kpi-section">
+        <daf-metric-card
+          [label]="'PAYROLL.CANDIDATE_SIMULATION.CAND_KPI_TOTAL' | translate"
+          [value]="candidateKpis().total"
+          [options]="{ icon: 'groups' }">
+        </daf-metric-card>
+        <daf-metric-card
+          [label]="'PAYROLL.CANDIDATE_SIMULATION.CAND_KPI_SIMULATIONS' | translate"
+          [value]="candidateKpis().totalSimulations"
+          [options]="{ icon: 'query_stats' }">
+        </daf-metric-card>
+        <daf-metric-card
+          [label]="'PAYROLL.CANDIDATE_SIMULATION.CAND_KPI_APPROVAL_RATE' | translate"
+          [value]="candidateKpis().approvalRate + '%'"
+          [options]="{ valueColor: 'text-success', icon: 'task_alt', iconColor: 'text-success', iconBg: 'bg-success/10' }">
+        </daf-metric-card>
+        <daf-metric-card
+          [label]="'PAYROLL.CANDIDATE_SIMULATION.CAND_KPI_PENDING' | translate"
+          [value]="candidateKpis().pending"
+          [options]="{ icon: 'schedule' }">
+        </daf-metric-card>
+      </section>
+    }
+
+    @if (selectedCandidate() || candError()) {
+      <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+        @if (selectedCandidate()) {
+          <div class="filter-row">
+            <daf-button
+              [label]="'PAYROLL.CANDIDATE_SIMULATION.BACK_TO_LIST' | translate"
+              variant="ghost"
+              [options]="{ iconStart: 'arrow_back' }"
+              (onClick)="selectedCandidate.set(null)">
+            </daf-button>
+          </div>
+        }
+        @if (candError()) {
+          <div class="alert alert--error">{{ candError() }}</div>
+        }
+      </daf-card>
+    }
+
+    <!-- ── Level 1 : candidate list — recherche/filtre/vue carte-tableau, comme
+         /finance/affaires (`daf-search-toolbar` embarque les trois). ────────── -->
+    @if (!selectedCandidate() && candidateList().length > 0) {
+      <daf-search-toolbar
+        [placeholder]="'PAYROLL.CANDIDATE_SIMULATION.SEARCH_PLACEHOLDER' | translate"
+        [value]="searchText()"
+        (valueChange)="onSearchTextChange($event)"
+        [debounce]="300"
+        [filterFields]="filterFields()"
+        [filterConfig]="filterConfig()"
+        (filterApply)="applyFilters($event)"
+        [views]="viewOptions()"
+        [(view)]="viewMode">
+      </daf-search-toolbar>
+
+      @if (viewMode() === 'grid') {
+        <div class="grid grid-cols-3 gap-5">
+          @for (card of pagedCandidateCards(); track card.id) {
+            <daf-entity-card
+              [options]="card.options"
+              (cardClick)="openCandidateById(card.id)"
+              (viewClick)="openCandidateById(card.id)">
+            </daf-entity-card>
+          } @empty {
+            <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }" class="col-span-full">
+              <p class="empty-state">{{ 'PAYROLL.CANDIDATE_SIMULATION.EMPTY_FILTERED' | translate }}</p>
+            </daf-card>
+          }
+        </div>
+      } @else {
+        <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+          <daf-data-table
+            [columns]="candidateColumns()"
+            [rows]="pagedCandidateRows()"
+            [config]="{ actions: candidateActions(), emptyMessage: ('PAYROLL.CANDIDATE_SIMULATION.EMPTY_FILTERED' | translate), showHeader: false }">
+          </daf-data-table>
+        </daf-card>
+      }
+
+      <!-- ── Pagination, comme /finance/affaires (`daf-pagination` de la bibliothèque) ── -->
+      <daf-pagination
+        [currentPage]="page()"
+        [totalPages]="totalPages()"
+        [totalElements]="candidateRows().length"
+        [pageSize]="pageSize()"
+        [pageSizeOptions]="[10, 20, 50, 100]"
+        [perPageLabel]="'PAYROLL.COMMON.PAGINATION.PER_PAGE' | translate"
+        [summaryLabel]="'PAYROLL.COMMON.PAGINATION.SUMMARY' | translate"
+        [firstPageLabel]="'PAYROLL.COMMON.PAGINATION.FIRST' | translate"
+        [lastPageLabel]="'PAYROLL.COMMON.PAGINATION.LAST' | translate"
+        [config]="{ showFirstLast: true }"
+        (pageChange)="page.set($event)"
+        (pageSizeChange)="onPageSizeChange($event)">
+      </daf-pagination>
+    }
+
+    @if (!selectedCandidate() && !candLoading() && candSearched() && candidateList().length === 0) {
+      <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+        <p class="empty-state">{{ 'PAYROLL.CANDIDATE_SIMULATION.EMPTY_CANDIDATES' | translate }}</p>
+      </daf-card>
+    }
+
+    <!-- ── Level 2 : simulation history for selected candidate ────────── -->
+    @if (selectedCandidate(); as c) {
+      <daf-card [options]="{ variant: 'flat', padding: 'lg', radius: 'xl' }">
+        <div class="cand-header">
+          <daf-avatar [data]="{ name: c.firstName + ' ' + c.lastName }" size="lg" />
+          <div>
+            <h2 class="cand-header__name">{{ c.firstName }} {{ c.lastName }}</h2>
+            <p class="cand-header__meta">
+              {{ c.appliedPosition || ('PAYROLL.CANDIDATE_SIMULATION.POSITION_UNSET' | translate) }}
+              @if (c.candidateLocation) {
+                · {{ c.candidateLocation }}
+              }
+            </p>
+          </div>
+        </div>
+      </daf-card>
+
+      @if (histLoading()) {
+        <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+          <p class="empty-state">{{ 'PAYROLL.CANDIDATE_SIMULATION.HIST_LOADING' | translate }}</p>
+        </daf-card>
+      }
+
+      @if (!histLoading() && history().length > 0) {
+        <div class="timeline">
+          @for (sim of history(); track sim.id) {
+            <div class="timeline__item">
+              <div class="timeline__dot" [class]="dotClass(sim.status)"></div>
+              <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'lg' }" class="timeline__body">
+
+                <div class="sim-head">
+                  <div class="sim-head__left">
+                    <span class="sim-ref">#{{ sim.id }} · {{ sim.contractTypeCode }} · {{ sim.fiscalYear }}</span>
+                    <daf-badge [label]="statusLabel(sim.status)" [options]="{ variant: statusVariant(sim.status), size: 'sm' }" />
+                  </div>
+                  <span class="sim-date">{{ sim.submittedAt | date:'dd/MM/yyyy HH:mm' }}</span>
+                </div>
+
+                <div class="sim-grid">
+                  <daf-metric-card [label]="'PAYROLL.CANDIDATE_SIMULATION.KPI_NET_RH' | translate" [value]="(sim.salaireNetRh | number:'1.0-0') ?? ''" />
+                  @if (sim.salaireNetCandidat) {
+                    <daf-metric-card [label]="'PAYROLL.CANDIDATE_SIMULATION.KPI_NET_CANDIDATE' | translate" [value]="(sim.salaireNetCandidat | number:'1.0-0') ?? ''" />
+                  }
+                  @if (snap(sim).gross) {
+                    <daf-metric-card [label]="'PAYROLL.CANDIDATE_SIMULATION.KPI_GROSS_ESTIMATE' | translate" [value]="(snap(sim).gross | number:'1.0-0') ?? ''" />
+                  }
+                  @if (snap(sim).loadedCost) {
+                    <daf-metric-card [label]="'PAYROLL.CANDIDATE_SIMULATION.KPI_LOADED_MONTHLY' | translate" [value]="(snap(sim).loadedCost | number:'1.0-0') ?? ''" />
+                  }
+                  @if (snap(sim).loadedCost) {
+                    <daf-metric-card
+                      [label]="'PAYROLL.CANDIDATE_SIMULATION.KPI_LOADED_ANNUAL' | translate"
+                      [value]="(snap(sim).loadedCost! * 12 | number:'1.0-0') ?? ''"
+                      [options]="{ valueColor: 'text-primary' }">
+                    </daf-metric-card>
+                  }
+                </div>
+
+                @if (sim.status === 'REJECTED') {
+                  <div class="sim-rejection">
+                    @if (sim.contrePropSalaire) {
+                      <span class="rejection-label">{{ 'PAYROLL.CANDIDATE_SIMULATION.COUNTER_PROPOSAL' | translate }}</span>
+                      <strong>{{ sim.contrePropSalaire | number:'1.0-0' }} {{ snap(sim).localCurrency ?? '' }}</strong>
+                    }
+                    @if (sim.approvalNotes) {
+                      <p class="rejection-note">"{{ sim.approvalNotes }}"</p>
+                    }
+                  </div>
+                }
+
+                @if (sim.status === 'APPROVED' && sim.approvalNotes) {
+                  <p class="approval-note">"{{ sim.approvalNotes }}"</p>
+                }
+
+              </daf-card>
+            </div>
+          }
+        </div>
+      }
+
+      @if (!histLoading() && history().length === 0) {
+        <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+          <p class="empty-state">{{ 'PAYROLL.CANDIDATE_SIMULATION.EMPTY_HISTORY' | translate }}</p>
+        </daf-card>
+      }
+    }
+  </div>
+</daf-page>

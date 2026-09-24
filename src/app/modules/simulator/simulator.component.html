@@ -4,15 +4,18 @@
   Tailwind + composants de la lib uniquement, comme partout ailleurs (cf.
   `onboarding-form` côté RH) : aucune feuille de style de composant.
 
-  Mise en page : **flexbox de bout en bout**, aucune grille. En-tête, puis zone de
-  travail `flex-col lg:flex-row` en **2/3 – 1/3** : parcours à gauche (`lg:flex-2`,
-  daf-stepper horizontal empilé au-dessus de la carte de l'étape), résultat **sticky**
-  à droite (`lg:flex-1`). Sous `lg`, le résultat passe simplement sous le parcours.
+  Mise en page : **une seule colonne**, plus de grille ni de partage 2/3 – 1/3. Le
+  parcours (daf-stepper + panneau d'étape) occupe toute la largeur ; le résultat n'est
+  plus affiché en ligne mais dans un `daf-drawer` séparé (voir plus bas), ouvert
+  automatiquement après un `submit()` réussi ou depuis l'action « Voir le résultat » de
+  l'en-tête. Le formulaire n'est donc plus jamais poussé sous le résultat sur petit
+  écran — il n'y a plus qu'un seul flux à faire tenir.
 
-  ⚠️ Le basculement est à `lg` (1024 px) et NON `xl` (1280 px) : sur un écran mis à
-  l'échelle 150 % par Windows, un 1745 px physique ne fait que ~1163 px CSS — `xl` ne se
-  déclenchait jamais et les deux colonnes restaient empilées sur des postes pourtant
-  larges. Toute remontée vers `xl` ramènera ce bug.
+  Le bouton « Simuler » vit désormais dans le parcours lui-même (sous la navigation
+  Précédent/Suivant), pas dans le panneau résultat : c'est l'action qui PRODUIT un
+  résultat, elle appartient au formulaire. Les messages de blocage/erreur du formulaire
+  (`blockingReason`, `amountError`, `error`) l'accompagnent au même endroit. Seul
+  `convergenceWarning`, qui qualifie le résultat affiché, reste dans le tiroir.
 
   ⚠️ Espacement : les champs pleine largeur (pays, montant) sont des enfants DIRECTS de
   la pile `flex flex-col gap-6` ; les paires descendent dans une rangée
@@ -44,6 +47,16 @@
 >
   <div pageActions class="flex items-center gap-2">
     <daf-button
+      [label]="'PAYROLL.SIMULATOR.ACTIONS.VIEW_RESULT' | translate"
+      variant="ghost"
+      [options]="{
+        size: 'sm',
+        iconStart: 'calculate',
+        disabled: !result(),
+      }"
+      (onClick)="openResultModal()"
+    />
+    <daf-button
       [label]="'PAYROLL.SIMULATOR.ACTIONS.HISTORY' | translate"
       variant="ghost"
       [options]="{
@@ -64,30 +77,15 @@
 
 <!-- ══ Zone de travail ═══════════════════════════════════════════════════════ -->
 @if (firstLoad()) {
-  <div class="flex flex-col lg:flex-row gap-8 pt-8">
-    <div class="flex flex-col gap-8 w-full min-w-0 lg:flex-2">
-      <daf-skeleton variant="block" radius="md" width="100%" height="72px" />
-      <daf-skeleton variant="block" radius="xl" width="100%" height="420px" />
-    </div>
-    <div class="w-full min-w-0 lg:flex-1">
-      <daf-skeleton variant="block" radius="xl" width="100%" height="380px" />
-    </div>
+  <div class="flex flex-col gap-8 pt-8">
+    <daf-skeleton variant="block" radius="md" width="100%" height="72px" />
+    <daf-skeleton variant="block" radius="xl" width="100%" height="420px" />
   </div>
 } @else {
-  <div class="flex lg:flex-row gap-8 items-start mt-8">
-    <!-- ── Colonne gauche : le parcours ────────────────────────────────────── -->
-    <!-- 2/3 de la zone de travail. `flex-2` / `flex-1` (base 0) partagent l'espace 2:1 APRÈS
-       déduction du `gap-8` — d'où un ratio exact, ce qu'un `basis-2/3` + gap n'aurait pas
-       donné (débordement). Le `min-w-0` empêche un contenu long (libellé de select,
-       tableau) de pousser la colonne au-delà de sa part.
-
-       ⚠️ Les classes de partage sont portées par le `daf-card` LUI-MÊME : c'est lui
-       l'enfant direct de la rangée, donc le seul élément que `flex-2` puisse gouverner.
-       Posées sur un `div` à l'intérieur de la carte, elles ne s'appliquaient à rien et la
-       colonne reprenait sa largeur de contenu. La carte n'a pas de style d'hôte propre
-       (tout est sur son `div` interne), un `class=` la traverse donc sans risque. -->
+  <div class="flex flex-col gap-8 mt-10">
+    <!-- ── Le parcours ──────────────────────────────────────────────────────── -->
     <daf-card
-      class="w-full min-w-0 lg:flex-2"
+      class="w-full min-w-0"
       [options]="{ variant: 'glass', padding: 'none', radius: 'xl' }"
     >
       <!-- Une SEULE carte pour toute la colonne : le rail, le panneau de l'étape et la
@@ -534,591 +532,599 @@
       </div>
     </daf-card>
 
-    <!-- ── Colonne droite : résultat, sticky ───────────────────────────────── -->
-    <!-- 1/3 de la zone de travail ; pleine largeur sous `xl`, où la colonne repasse sous
-       le parcours. Largeur relative et non plus fixe : sur un écran large le panneau de
-       résultat respire, sur un 1280 il reste au-dessus de ~380 px. -->
-    <aside
-      class="flex flex-col gap-6 w-full min-w-0 lg:flex-1 lg:sticky lg:top-0"
-      id="sim-result-printable"
+    <!-- ── Carte de lancement ───────────────────────────────────────────────
+       Séparée du parcours : une vraie 2e `daf-card` (via `daf-accordion-card`,
+       repliable comme les sections du tiroir résultat) plutôt qu'un bloc à
+       l'intérieur de la carte du parcours — sinon "carte" et "espace" ne
+       voulaient rien dire, tout vivait dans une seule et même surface. -->
+    <daf-accordion-card
+      [options]="{
+        title: 'PAYROLL.SIMULATOR.RESULT.SIMULATE' | translate,
+        icon: 'calculate',
+        state: canSimulate() ? 'active' : 'pending',
+      }"
+      [(open)]="simulateCardOpen"
     >
-      <daf-card [options]="{ variant: 'glass', padding: 'none', radius: 'xl' }">
-        <div class="flex flex-col gap-7 p-6 sm:p-8">
-          <div class="flex flex-wrap items-center gap-3">
-            <daf-section-title
-              [title]="'PAYROLL.SIMULATOR.RESULT.TITLE' | translate"
-            />
-            <span class="ml-auto text-right text-[11px] text-outline">
-              @if (result(); as r) {
-                {{
-                  "PAYROLL.SIMULATOR.RESULT.META"
-                    | translate
-                      : {
-                          contract: r.contractType,
-                          parameterSetId: r.parameterSetId,
-                          date: (r.simulatedAt | date: "dd/MM/yy HH:mm"),
-                        }
-                }}
-              } @else {
-                {{ "PAYROLL.SIMULATOR.RESULT.PENDING" | translate }}
+      <div class="flex flex-col gap-4">
+        <!-- Messages de blocage / erreur du formulaire — `error` / `blockingReason` /
+           `amountError` sont déjà traduits par le composant : ce sont des `string`
+           que la page se contente d'afficher. Vivent ici (et non dans le tiroir
+           résultat) car ils qualifient le FORMULAIRE, pas un résultat déjà obtenu. -->
+        @if (error()) {
+          <p
+            class="flex items-start gap-2 rounded-xl bg-danger/10 px-4 py-3 text-[13px] text-danger"
+          >
+            <span class="material-symbols-outlined text-[18px] shrink-0"
+              >error</span
+            >
+            {{ error() }}
+          </p>
+        } @else if (blockingReason(); as reason) {
+          <p class="text-[13px] text-on-surface-variant">{{ reason }}</p>
+        } @else if (amountError(); as amountMsg) {
+          <p class="text-[13px] text-on-surface-variant">{{ amountMsg }}</p>
+        }
+
+        <!-- Simuler — pleine largeur ; ouvre le tiroir résultat (voir `submit()`). -->
+        <daf-button
+          [label]="'PAYROLL.SIMULATOR.RESULT.SIMULATE' | translate"
+          variant="primary"
+          [options]="{
+            loading: loading(),
+            disabled: !canSimulate(),
+            iconStart: 'calculate',
+            fullWidth: true,
+          }"
+          (onClick)="submit()"
+        />
+      </div>
+    </daf-accordion-card>
+  </div>
+}
+<!-- fin @else firstLoad() -->
+
+<!--
+  Résultat — `daf-modal` (`ModalService`), pas un composant posé dans le template : le
+  contenu vit dans ce `<ng-template>` et `openResultModal()` (dans le `.ts`) l'ouvre via
+  `this.modalService.open({ ..., body: this.resultTemplate() })`. Contrairement au tiroir
+  historique plus bas, ce popup EST bloquant — il faut le fermer avant de retoucher le
+  formulaire. Ouvert automatiquement après un `submit()` réussi ou la sélection d'une
+  entrée d'historique (voir `submit()` / `openHistoryEntry()`) ; l'action « Voir le
+  résultat » de l'en-tête le rouvre sinon.
+-->
+<ng-template #resultTemplate>
+ <div class="flex flex-col gap-6">
+  <p class="text-right text-[11px] text-outline">
+    @if (result(); as r) {
+      {{
+        "PAYROLL.SIMULATOR.RESULT.META"
+          | translate
+            : {
+                contract: r.contractType,
+                parameterSetId: r.parameterSetId,
+                date: (r.simulatedAt | date: "dd/MM/yy HH:mm"),
               }
+      }}
+    } @else {
+      {{ "PAYROLL.SIMULATOR.RESULT.PENDING" | translate }}
+    }
+  </p>
+
+  <!-- Chiffres clés — 3 `daf-metric-card`, même convention que budget/cohort
+     (`[value]="money(...) "`, icône + couleur par tuile). -->
+  <div class="flex flex-col sm:flex-row gap-3">
+    <div class="flex-1 min-w-0">
+      <daf-metric-card
+        [label]="'PAYROLL.SIMULATOR.RESULT.LOADED_COST' | translate"
+        [value]="result() ? money(result()!.loadedCost, currency(), 2) : '—'"
+        [delta]="
+          result()
+            ? {
+                value:
+                  'PAYROLL.SIMULATOR.RESULT.PER_YEAR'
+                  | translate
+                    : {
+                        amount: money(result()!.loadedCost * 12, currency(), 0),
+                      },
+                direction: 'neutral',
+              }
+            : null
+        "
+        [options]="{
+          icon: 'account_balance_wallet',
+          iconColor: 'text-primary',
+          iconBg: 'bg-primary/10',
+        }"
+      />
+    </div>
+    <div class="flex-1 min-w-0">
+      <daf-metric-card
+        [label]="'PAYROLL.SIMULATOR.RESULT.GROSS_MONTHLY' | translate"
+        [value]="result() ? money(result()!.gross, currency(), 2) : '—'"
+        [delta]="
+          result()
+            ? {
+                value:
+                  'PAYROLL.SIMULATOR.RESULT.PER_YEAR'
+                  | translate: { amount: money(result()!.gross * 12, currency(), 0) },
+                direction: 'neutral',
+              }
+            : null
+        "
+        [options]="{
+          icon: 'payments',
+          iconColor: 'text-secondary',
+          iconBg: 'bg-secondary/10',
+        }"
+      />
+    </div>
+    <div class="flex-1 min-w-0">
+      <daf-metric-card
+        [label]="'PAYROLL.SIMULATOR.RESULT.NET_MONTHLY' | translate"
+        [value]="netMonthly() != null ? money(netMonthly(), currency(), 2) : '—'"
+        [delta]="
+          netMonthly() != null
+            ? {
+                value:
+                  'PAYROLL.SIMULATOR.RESULT.PER_YEAR'
+                  | translate: { amount: money(netMonthly()! * 12, currency(), 0) },
+                direction: 'neutral',
+              }
+            : null
+        "
+        [options]="{
+          icon: 'savings',
+          iconColor: 'text-tertiary',
+          iconBg: 'bg-tertiary/10',
+        }"
+      />
+    </div>
+  </div>
+
+  <p class="text-[13px] text-on-surface-variant">
+    @if (result(); as r) {
+      @if (r.costNetRatio != null) {
+        {{
+          "PAYROLL.SIMULATOR.RESULT.COST_NET_RATIO"
+            | translate: { ratio: (r.costNetRatio | number: "1.2-2") }
+        }}
+      }
+    } @else {
+      {{ "PAYROLL.SIMULATOR.RESULT.EMPTY_HINT" | translate }}
+    }
+  </p>
+
+  <!-- Décomposition : barre empilée + relevé -->
+  @if (breakdown().length) {
+    <div class="flex flex-col gap-3">
+      <p class="text-label-caps text-outline">
+        {{ "PAYROLL.SIMULATOR.RESULT.BREAKDOWN_TITLE" | translate }}
+      </p>
+
+      <div
+        class="flex h-2.5 w-full overflow-hidden rounded-full bg-surface-container"
+        role="img"
+        [attr.aria-label]="
+          'PAYROLL.SIMULATOR.RESULT.BREAKDOWN_ARIA' | translate
+        "
+      >
+        @for (seg of breakdown(); track seg.key) {
+          <span
+            class="block h-full"
+            [class]="seg.bar"
+            [style.width.%]="seg.pct"
+          ></span>
+        }
+      </div>
+
+      <div class="flex flex-col">
+        @for (seg of breakdown(); track seg.key) {
+          <div
+            class="flex items-center gap-3 border-b border-outline-variant/40 py-2 last:border-0 text-[12px] tabular-nums"
+          >
+            <span
+              class="h-2 w-2 shrink-0 rounded-full"
+              [class]="seg.dot"
+            ></span>
+            <span
+              class="flex-1 min-w-0 truncate text-on-surface-variant"
+              >{{ seg.label }}</span
+            >
+            <span class="w-14 text-right text-outline"
+              >{{ seg.pct | number: "1.0-1" }} %</span
+            >
+            <span
+              class="w-24 text-right font-semibold text-on-surface"
+              >{{ seg.amount | number: "1.2-2" }}</span
+            >
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  @if (convergenceWarning()) {
+    <p
+      class="flex items-center gap-2 rounded-xl bg-warning/10 px-4 py-3 text-[13px] text-warning"
+    >
+      <span class="material-symbols-outlined text-[18px]">warning</span>
+      {{
+        "PAYROLL.SIMULATOR.RESULT.CONVERGENCE_WARNING"
+          | translate: { iterations: result()!.iterationsUsed }
+      }}
+    </p>
+  }
+
+  <!-- ── Détails repliables ─────────────────────────────────────────────── -->
+  @if (result(); as r) {
+    <daf-accordion-card
+      [options]="{
+        title: 'PAYROLL.SIMULATOR.CASCADE.TITLE' | translate,
+        subtitle: 'PAYROLL.SIMULATOR.CASCADE.SUBTITLE' | translate,
+        icon: 'stacked_line_chart',
+        state: 'done',
+        radius: 'xl',
+      }"
+    >
+      <div class="flex flex-col gap-5">
+        <div class="flex flex-col text-[12px] tabular-nums">
+          <div
+            class="flex items-center justify-between border-b border-outline-variant/40 py-2"
+          >
+            <span class="text-on-surface">{{
+              "PAYROLL.SIMULATOR.CASCADE.S1" | translate
+            }}</span>
+            <span class="font-semibold text-on-surface">{{
+              r.inputNet | number: "1.2-2"
+            }}</span>
+          </div>
+          <p class="py-1 pl-3 text-[11px] text-outline">
+            {{
+              "PAYROLL.SIMULATOR.CASCADE.ADD_EMPLOYEE_CHARGES" | translate
+            }}
+            {{ r.netTaxable - r.inputNet | number: "1.2-2" }}
+          </p>
+          <div
+            class="flex items-center justify-between border-b border-outline-variant/40 py-2"
+          >
+            <span class="text-on-surface">{{
+              "PAYROLL.SIMULATOR.CASCADE.S2" | translate
+            }}</span>
+            <span class="font-semibold text-on-surface">{{
+              r.netTaxable | number: "1.2-2"
+            }}</span>
+          </div>
+          <p class="py-1 pl-3 text-[11px] text-outline">
+            {{ "PAYROLL.SIMULATOR.CASCADE.ADD_IRPP" | translate }}
+            {{ r.irppAmount | number: "1.2-2" }}
+          </p>
+          <div
+            class="flex items-center justify-between border-b border-outline-variant/40 py-2"
+          >
+            <span class="text-on-surface">{{
+              "PAYROLL.SIMULATOR.CASCADE.S3" | translate
+            }}</span>
+            <span class="font-semibold text-on-surface">{{
+              r.gross | number: "1.2-2"
+            }}</span>
+          </div>
+          @if (
+            r.grossWithBenefits != null && r.grossWithBenefits !== r.gross
+          ) {
+            <p class="py-1 pl-3 text-[11px] text-outline">
+              {{
+                "PAYROLL.SIMULATOR.CASCADE.ADD_EXEMPT_BENEFITS" | translate
+              }}
+              {{ r.grossWithBenefits - r.gross | number: "1.2-2" }}
+            </p>
+          }
+          <div
+            class="flex items-center justify-between border-b border-outline-variant/40 py-2"
+          >
+            <span class="text-on-surface">{{
+              "PAYROLL.SIMULATOR.CASCADE.S4" | translate
+            }}</span>
+            <span class="font-semibold text-on-surface">
+              {{ r.grossWithBenefits ?? r.gross | number: "1.2-2" }}
             </span>
           </div>
-
-          <!-- Chiffre héros -->
-          <div>
-            <p class="text-label-caps text-outline">
-              {{ "PAYROLL.SIMULATOR.RESULT.LOADED_COST" | translate }}
-            </p>
-            <p
-              class="mt-1.5 text-[40px] font-black leading-none tracking-tight tabular-nums text-on-surface"
-            >
-              {{ result() ? money(result()!.loadedCost, "", 2) : "—" }}
-              <span
-                class="ml-1.5 align-middle text-sm font-bold text-outline"
-                >{{ currency() }}</span
-              >
-            </p>
-            <p class="mt-2.5 text-[13px] text-on-surface-variant">
-              @if (result(); as r) {
-                {{
-                  "PAYROLL.SIMULATOR.RESULT.PER_YEAR"
-                    | translate
-                      : { amount: money(r.loadedCost * 12, currency(), 0) }
-                }}
-                @if (r.costNetRatio != null) {
-                  {{
-                    "PAYROLL.SIMULATOR.RESULT.COST_NET_RATIO"
-                      | translate: { ratio: (r.costNetRatio | number: "1.2-2") }
-                  }}
-                }
-              } @else {
-                {{ "PAYROLL.SIMULATOR.RESULT.EMPTY_HINT" | translate }}
-              }
-            </p>
-          </div>
-
-          <!-- Brut / Net -->
-          <div class="flex gap-5">
-            <div class="flex-1 min-w-0">
-              <p class="text-label-caps text-outline">
-                {{ "PAYROLL.SIMULATOR.RESULT.GROSS_MONTHLY" | translate }}
-              </p>
-              <p
-                class="mt-1.5 text-[18px] font-bold tabular-nums text-on-surface"
-              >
-                {{ result() ? money(result()!.gross, "", 2) : "—" }}
-              </p>
-              <p class="mt-0.5 text-[11px] text-outline">
-                @if (result(); as r) {
-                  {{
-                    "PAYROLL.SIMULATOR.RESULT.PER_YEAR"
-                      | translate
-                        : { amount: money(r.gross * 12, currency(), 0) }
-                  }}
-                } @else {
-                  —
-                }
-              </p>
-            </div>
-            <!-- `divide-x` remplacé par un filet explicite : en flex, le séparateur est porté
-               par la moitié droite, pas par le conteneur. -->
-            <div class="flex-1 min-w-0 border-l border-outline-variant/40 pl-5">
-              <p class="text-label-caps text-outline">
-                {{ "PAYROLL.SIMULATOR.RESULT.NET_MONTHLY" | translate }}
-              </p>
-              <p
-                class="mt-1.5 text-[18px] font-bold tabular-nums text-on-surface"
-              >
-                {{ netMonthly() != null ? money(netMonthly(), "", 2) : "—" }}
-              </p>
-              <p class="mt-0.5 text-[11px] text-outline">
-                @if (netMonthly() != null) {
-                  {{
-                    "PAYROLL.SIMULATOR.RESULT.PER_YEAR"
-                      | translate
-                        : { amount: money(netMonthly()! * 12, currency(), 0) }
-                  }}
-                } @else {
-                  —
-                }
-              </p>
-            </div>
-          </div>
-
-          <!-- Décomposition : barre empilée + relevé -->
-          @if (breakdown().length) {
-            <div class="flex flex-col gap-3">
-              <p class="text-label-caps text-outline">
-                {{ "PAYROLL.SIMULATOR.RESULT.BREAKDOWN_TITLE" | translate }}
-              </p>
-
-              <!-- Les segments totalisent 100 % par construction (voir `breakdown()`),
-                 donc aucune normalisation. La largeur est une valeur calculée : elle
-                 passe par un style inline, jamais par une classe assemblée.
-                 `track seg.key` et non `seg.label` : le libellé change avec la langue. -->
-              <div
-                class="flex h-2.5 w-full overflow-hidden rounded-full bg-surface-container"
-                role="img"
-                [attr.aria-label]="
-                  'PAYROLL.SIMULATOR.RESULT.BREAKDOWN_ARIA' | translate
-                "
-              >
-                @for (seg of breakdown(); track seg.key) {
-                  <span
-                    class="block h-full"
-                    [class]="seg.bar"
-                    [style.width.%]="seg.pct"
-                  ></span>
-                }
-              </div>
-
-              <div class="flex flex-col">
-                @for (seg of breakdown(); track seg.key) {
-                  <div
-                    class="flex items-center gap-3 border-b border-outline-variant/40 py-2 last:border-0 text-[12px] tabular-nums"
-                  >
-                    <span
-                      class="h-2 w-2 shrink-0 rounded-full"
-                      [class]="seg.dot"
-                    ></span>
-                    <span
-                      class="flex-1 min-w-0 truncate text-on-surface-variant"
-                      >{{ seg.label }}</span
-                    >
-                    <span class="w-14 text-right text-outline"
-                      >{{ seg.pct | number: "1.0-1" }} %</span
-                    >
-                    <span
-                      class="w-24 text-right font-semibold text-on-surface"
-                      >{{ seg.amount | number: "1.2-2" }}</span
-                    >
-                  </div>
-                }
-              </div>
-            </div>
-          }
-
-          @if (convergenceWarning()) {
-            <p
-              class="flex items-center gap-2 rounded-xl bg-warning/10 px-4 py-3 text-[13px] text-warning"
-            >
-              <span class="material-symbols-outlined text-[18px]">warning</span>
-              {{
-                "PAYROLL.SIMULATOR.RESULT.CONVERGENCE_WARNING"
-                  | translate: { iterations: result()!.iterationsUsed }
-              }}
-            </p>
-          }
-
-          <!-- `error` / `blockingReason` / `amountError` sont déjà traduits par le composant :
-             ce sont des `string` que la page se contente d'afficher. -->
-          @if (error()) {
-            <p
-              class="flex items-start gap-2 rounded-xl bg-danger/10 px-4 py-3 text-[13px] text-danger"
-            >
-              <span class="material-symbols-outlined text-[18px] shrink-0"
-                >error</span
-              >
-              {{ error() }}
-            </p>
-          } @else if (blockingReason(); as reason) {
-            <p class="text-[13px] text-on-surface-variant">{{ reason }}</p>
-          } @else if (amountError(); as amountMsg) {
-            <p class="text-[13px] text-on-surface-variant">{{ amountMsg }}</p>
-          }
-
-          <!-- Actions : primaire pleine largeur, puis deux secondaires -->
-          <div class="flex flex-col gap-3">
-            <daf-button
-              [label]="'PAYROLL.SIMULATOR.RESULT.SIMULATE' | translate"
-              variant="primary"
-              [options]="{
-                loading: loading(),
-                disabled: !canSimulate(),
-                iconStart: 'calculate',
-                fullWidth: true,
-              }"
-              (onClick)="submit()"
-            />
-            <div class="flex gap-3">
-              <div class="flex-1 min-w-0">
-                <daf-button
-                  [label]="'PAYROLL.SIMULATOR.RESULT.EXPORT_PDF' | translate"
-                  variant="ghost"
-                  [options]="{
-                    size: 'sm',
-                    iconStart: 'picture_as_pdf',
-                    loading: pdfGenerating(),
-                    disabled: !result(),
-                    fullWidth: true,
-                  }"
-                  (onClick)="exportPdf()"
-                />
-              </div>
-              <div class="flex-1 min-w-0">
-                <daf-button
-                  [label]="'PAYROLL.SIMULATOR.RESULT.PRINT' | translate"
-                  variant="ghost"
-                  [options]="{
-                    size: 'sm',
-                    iconStart: 'print',
-                    disabled: !result(),
-                    fullWidth: true,
-                  }"
-                  (onClick)="print()"
-                />
-              </div>
-            </div>
+          <p class="py-1 pl-3 text-[11px] text-outline">
+            {{
+              "PAYROLL.SIMULATOR.CASCADE.ADD_EMPLOYER_CHARGES" | translate
+            }}
+            {{ r.employerCharges | number: "1.2-2" }}
+          </p>
+          <div class="flex items-center justify-between py-2">
+            <span class="font-bold text-on-surface">{{
+              "PAYROLL.SIMULATOR.CASCADE.S5" | translate
+            }}</span>
+            <span class="font-bold text-on-surface">{{
+              r.loadedCost | number: "1.2-2"
+            }}</span>
           </div>
         </div>
-      </daf-card>
 
-      <!-- ── Détails repliables ─────────────────────────────────────────────── -->
-      @if (result(); as r) {
-        <daf-accordion-card
-          [options]="{
-            title: 'PAYROLL.SIMULATOR.CASCADE.TITLE' | translate,
-            subtitle: 'PAYROLL.SIMULATOR.CASCADE.SUBTITLE' | translate,
-            icon: 'stacked_line_chart',
-            state: 'done',
-            radius: 'xl',
-          }"
-        >
-          <div class="flex flex-col gap-5">
+        @if (
+          r.loadedCostEur != null ||
+          r.loadedCostChf != null ||
+          r.loadedCostUsd != null
+        ) {
+          <div class="flex flex-col gap-2">
+            <p class="text-label-caps text-outline">
+              {{ "PAYROLL.SIMULATOR.CASCADE.FX_TITLE" | translate }}
+            </p>
             <div class="flex flex-col text-[12px] tabular-nums">
-              <div
-                class="flex items-center justify-between border-b border-outline-variant/40 py-2"
-              >
-                <span class="text-on-surface">{{
-                  "PAYROLL.SIMULATOR.CASCADE.S1" | translate
-                }}</span>
-                <span class="font-semibold text-on-surface">{{
-                  r.inputNet | number: "1.2-2"
-                }}</span>
-              </div>
-              <p class="py-1 pl-3 text-[11px] text-outline">
-                {{
-                  "PAYROLL.SIMULATOR.CASCADE.ADD_EMPLOYEE_CHARGES" | translate
-                }}
-                {{ r.netTaxable - r.inputNet | number: "1.2-2" }}
-              </p>
-              <div
-                class="flex items-center justify-between border-b border-outline-variant/40 py-2"
-              >
-                <span class="text-on-surface">{{
-                  "PAYROLL.SIMULATOR.CASCADE.S2" | translate
-                }}</span>
-                <span class="font-semibold text-on-surface">{{
-                  r.netTaxable | number: "1.2-2"
-                }}</span>
-              </div>
-              <p class="py-1 pl-3 text-[11px] text-outline">
-                {{ "PAYROLL.SIMULATOR.CASCADE.ADD_IRPP" | translate }}
-                {{ r.irppAmount | number: "1.2-2" }}
-              </p>
-              <div
-                class="flex items-center justify-between border-b border-outline-variant/40 py-2"
-              >
-                <span class="text-on-surface">{{
-                  "PAYROLL.SIMULATOR.CASCADE.S3" | translate
-                }}</span>
-                <span class="font-semibold text-on-surface">{{
-                  r.gross | number: "1.2-2"
-                }}</span>
-              </div>
-              @if (
-                r.grossWithBenefits != null && r.grossWithBenefits !== r.gross
-              ) {
-                <p class="py-1 pl-3 text-[11px] text-outline">
-                  {{
-                    "PAYROLL.SIMULATOR.CASCADE.ADD_EXEMPT_BENEFITS" | translate
-                  }}
-                  {{ r.grossWithBenefits - r.gross | number: "1.2-2" }}
-                </p>
-              }
-              <div
-                class="flex items-center justify-between border-b border-outline-variant/40 py-2"
-              >
-                <span class="text-on-surface">{{
-                  "PAYROLL.SIMULATOR.CASCADE.S4" | translate
-                }}</span>
-                <span class="font-semibold text-on-surface">
-                  {{ r.grossWithBenefits ?? r.gross | number: "1.2-2" }}
-                </span>
-              </div>
-              <p class="py-1 pl-3 text-[11px] text-outline">
-                {{
-                  "PAYROLL.SIMULATOR.CASCADE.ADD_EMPLOYER_CHARGES" | translate
-                }}
-                {{ r.employerCharges | number: "1.2-2" }}
-              </p>
-              <div class="flex items-center justify-between py-2">
-                <span class="font-bold text-on-surface">{{
-                  "PAYROLL.SIMULATOR.CASCADE.S5" | translate
-                }}</span>
-                <span class="font-bold text-on-surface">{{
-                  r.loadedCost | number: "1.2-2"
-                }}</span>
-              </div>
-            </div>
-
-            @if (
-              r.loadedCostEur != null ||
-              r.loadedCostChf != null ||
-              r.loadedCostUsd != null
-            ) {
-              <div class="flex flex-col gap-2">
-                <p class="text-label-caps text-outline">
-                  {{ "PAYROLL.SIMULATOR.CASCADE.FX_TITLE" | translate }}
-                </p>
-                <div class="flex flex-col text-[12px] tabular-nums">
-                  @if (r.loadedCostEur != null) {
-                    <div
-                      class="flex items-center justify-between gap-3 border-b border-outline-variant/40 py-2 last:border-0"
-                    >
-                      <span class="text-on-surface"
-                        >EUR
-                        <span class="ml-1 text-[11px] text-outline">
-                          {{
-                            "PAYROLL.SIMULATOR.CASCADE.FX_RATE"
-                              | translate
-                                : {
-                                    currency: r.localCurrency,
-                                    rate: (r.fxRateEur | number: "1.4-4"),
-                                  }
-                          }}
-                        </span>
-                      </span>
-                      <span class="font-semibold text-on-surface">{{
-                        r.loadedCostEur | number: "1.2-2"
-                      }}</span>
-                    </div>
-                  }
-                  @if (r.loadedCostChf != null) {
-                    <div
-                      class="flex items-center justify-between gap-3 border-b border-outline-variant/40 py-2 last:border-0"
-                    >
-                      <span class="text-on-surface"
-                        >CHF
-                        <span class="ml-1 text-[11px] text-outline">
-                          {{
-                            "PAYROLL.SIMULATOR.CASCADE.FX_RATE"
-                              | translate
-                                : {
-                                    currency: r.localCurrency,
-                                    rate: (r.fxRateChf | number: "1.4-4"),
-                                  }
-                          }}
-                        </span>
-                      </span>
-                      <span class="font-semibold text-on-surface">{{
-                        r.loadedCostChf | number: "1.2-2"
-                      }}</span>
-                    </div>
-                  }
-                  @if (r.loadedCostUsd != null) {
-                    <div
-                      class="flex items-center justify-between gap-3 border-b border-outline-variant/40 py-2 last:border-0"
-                    >
-                      <span class="text-on-surface"
-                        >USD
-                        <span class="ml-1 text-[11px] text-outline">
-                          {{
-                            "PAYROLL.SIMULATOR.CASCADE.FX_RATE"
-                              | translate
-                                : {
-                                    currency: r.localCurrency,
-                                    rate: (r.fxRateUsd | number: "1.4-4"),
-                                  }
-                          }}
-                        </span>
-                      </span>
-                      <span class="font-semibold text-on-surface">{{
-                        r.loadedCostUsd | number: "1.2-2"
-                      }}</span>
-                    </div>
-                  }
+              @if (r.loadedCostEur != null) {
+                <div
+                  class="flex items-center justify-between gap-3 border-b border-outline-variant/40 py-2 last:border-0"
+                >
+                  <span class="text-on-surface"
+                    >EUR
+                    <span class="ml-1 text-[11px] text-outline">
+                      {{
+                        "PAYROLL.SIMULATOR.CASCADE.FX_RATE"
+                          | translate
+                            : {
+                                currency: r.localCurrency,
+                                rate: (r.fxRateEur | number: "1.4-4"),
+                              }
+                      }}
+                    </span>
+                  </span>
+                  <span class="font-semibold text-on-surface">{{
+                    r.loadedCostEur | number: "1.2-2"
+                  }}</span>
                 </div>
-              </div>
-            }
+              }
+              @if (r.loadedCostChf != null) {
+                <div
+                  class="flex items-center justify-between gap-3 border-b border-outline-variant/40 py-2 last:border-0"
+                >
+                  <span class="text-on-surface"
+                    >CHF
+                    <span class="ml-1 text-[11px] text-outline">
+                      {{
+                        "PAYROLL.SIMULATOR.CASCADE.FX_RATE"
+                          | translate
+                            : {
+                                currency: r.localCurrency,
+                                rate: (r.fxRateChf | number: "1.4-4"),
+                              }
+                      }}
+                    </span>
+                  </span>
+                  <span class="font-semibold text-on-surface">{{
+                    r.loadedCostChf | number: "1.2-2"
+                  }}</span>
+                </div>
+              }
+              @if (r.loadedCostUsd != null) {
+                <div
+                  class="flex items-center justify-between gap-3 border-b border-outline-variant/40 py-2 last:border-0"
+                >
+                  <span class="text-on-surface"
+                    >USD
+                    <span class="ml-1 text-[11px] text-outline">
+                      {{
+                        "PAYROLL.SIMULATOR.CASCADE.FX_RATE"
+                          | translate
+                            : {
+                                currency: r.localCurrency,
+                                rate: (r.fxRateUsd | number: "1.4-4"),
+                              }
+                      }}
+                    </span>
+                  </span>
+                  <span class="font-semibold text-on-surface">{{
+                    r.loadedCostUsd | number: "1.2-2"
+                  }}</span>
+                </div>
+              }
+            </div>
           </div>
-        </daf-accordion-card>
+        }
+      </div>
+    </daf-accordion-card>
 
-        @if (parsedRubriques().length) {
-          <daf-accordion-card
-            [options]="{
-              title: 'PAYROLL.SIMULATOR.RUBRIQUES.TITLE' | translate,
-              subtitle:
-                'PAYROLL.SIMULATOR.RUBRIQUES.SUBTITLE'
-                | translate: { count: parsedRubriques().length },
-              icon: 'list_alt',
-              state: 'active',
-              statusLabel: parsedRubriques().length + '',
-              radius: 'xl',
-            }"
+    @if (parsedRubriques().length) {
+      <daf-accordion-card
+        [options]="{
+          title: 'PAYROLL.SIMULATOR.RUBRIQUES.TITLE' | translate,
+          subtitle:
+            'PAYROLL.SIMULATOR.RUBRIQUES.SUBTITLE'
+            | translate: { count: parsedRubriques().length },
+          icon: 'list_alt',
+          state: 'active',
+          statusLabel: parsedRubriques().length + '',
+          radius: 'xl',
+        }"
+      >
+        <div class="flex flex-col text-[12px] tabular-nums">
+          <div
+            class="flex items-center gap-3 border-b border-outline-variant pb-2 text-label-caps text-outline"
           >
+            <span class="flex-1 min-w-0">{{
+              "PAYROLL.SIMULATOR.RUBRIQUES.COL_CODE" | translate
+            }}</span>
+            <span class="flex-1 min-w-0">{{
+              "PAYROLL.SIMULATOR.RUBRIQUES.COL_NATURE" | translate
+            }}</span>
+            <span class="w-16 shrink-0">{{
+              "PAYROLL.SIMULATOR.RUBRIQUES.COL_MODE" | translate
+            }}</span>
+            <span class="w-24 shrink-0 text-right">{{
+              "PAYROLL.SIMULATOR.RUBRIQUES.COL_AMOUNT" | translate
+            }}</span>
+          </div>
+          @for (rb of parsedRubriques(); track rb.code) {
+            <div
+              class="flex items-center gap-3 border-b border-outline-variant/40 py-2 last:border-0"
+            >
+              <span
+                class="flex-1 min-w-0 truncate font-mono font-semibold text-on-surface"
+                >{{ rb.code }}</span
+              >
+              <span
+                class="flex-1 min-w-0 truncate text-on-surface-variant"
+                >{{ rb.nature ?? "—" }}</span
+              >
+              <span class="w-16 shrink-0 truncate text-outline">{{
+                rb.calcMode === "FORMULE" ? "ƒ(x)" : rb.calcMode
+              }}</span>
+              <span
+                class="w-24 shrink-0 text-right font-semibold whitespace-nowrap"
+                [class]="
+                  rb.direction === 'DEBIT'
+                    ? 'text-danger'
+                    : 'text-on-surface'
+                "
+              >
+                {{ rb.direction === "CREDIT" ? "+" : "−"
+                }}{{ rb.amount | number: "1.2-2" }}
+              </span>
+            </div>
+          }
+        </div>
+      </daf-accordion-card>
+    }
+  }
+
+  @if (psState() === "READY") {
+    <daf-accordion-card
+      [options]="{
+        title: 'PAYROLL.SIMULATOR.REFERENTIAL.TITLE' | translate,
+        subtitle: 'PAYROLL.SIMULATOR.REFERENTIAL.SUBTITLE' | translate,
+        icon: 'rule_settings',
+        state: 'pending',
+        radius: 'xl',
+      }"
+    >
+      <div class="flex flex-col gap-6">
+        <div class="flex flex-col gap-2">
+          <p class="text-label-caps text-outline">
+            {{ "PAYROLL.SIMULATOR.REFERENTIAL.IRPP_TITLE" | translate }}
+          </p>
+          @if (irppBrackets().length) {
             <div class="flex flex-col text-[12px] tabular-nums">
-              <!-- Sans pistes de grille, l'alignement colonne-à-colonne tient aux largeurs
-                 fixes des deux dernières cellules ; les deux premières se partagent le
-                 reste à parts égales. Toute modif doit garder en-tête et lignes en phase. -->
+              @for (b of irppBrackets(); track b.lower) {
+                <div
+                  class="flex items-center justify-between gap-3 border-b border-outline-variant/40 py-2 last:border-0"
+                >
+                  <span class="text-on-surface"
+                    >{{ money(b.lower, "", 0) }} —
+                    {{ bracketUpper(b) }}</span
+                  >
+                  <span class="font-semibold text-on-surface">{{
+                    percent(b.rate)
+                  }}</span>
+                </div>
+              }
+            </div>
+          } @else {
+            <p class="text-[13px] text-on-surface-variant">
+              {{ "PAYROLL.SIMULATOR.REFERENTIAL.IRPP_EMPTY" | translate }}
+            </p>
+          }
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <p class="text-label-caps text-outline">
+            {{ "PAYROLL.SIMULATOR.REFERENTIAL.CHARGES_TITLE" | translate }}
+            @if (contractSelection().length) {
+              · {{ contractSelection()[0] }}
+            }
+          </p>
+          @if (applicableCharges().length) {
+            <div class="flex flex-col text-[12px] tabular-nums">
               <div
                 class="flex items-center gap-3 border-b border-outline-variant pb-2 text-label-caps text-outline"
               >
                 <span class="flex-1 min-w-0">{{
-                  "PAYROLL.SIMULATOR.RUBRIQUES.COL_CODE" | translate
+                  "PAYROLL.SIMULATOR.REFERENTIAL.COL_CHARGE" | translate
                 }}</span>
-                <span class="flex-1 min-w-0">{{
-                  "PAYROLL.SIMULATOR.RUBRIQUES.COL_NATURE" | translate
+                <span class="w-16 shrink-0 text-right">{{
+                  "PAYROLL.SIMULATOR.REFERENTIAL.COL_EMPLOYEE" | translate
                 }}</span>
-                <span class="w-16 shrink-0">{{
-                  "PAYROLL.SIMULATOR.RUBRIQUES.COL_MODE" | translate
-                }}</span>
-                <span class="w-24 shrink-0 text-right">{{
-                  "PAYROLL.SIMULATOR.RUBRIQUES.COL_AMOUNT" | translate
+                <span class="w-16 shrink-0 text-right">{{
+                  "PAYROLL.SIMULATOR.REFERENTIAL.COL_EMPLOYER" | translate
                 }}</span>
               </div>
-              @for (rb of parsedRubriques(); track rb.code) {
+              @for (c of applicableCharges(); track c.chargeCode) {
                 <div
                   class="flex items-center gap-3 border-b border-outline-variant/40 py-2 last:border-0"
                 >
                   <span
-                    class="flex-1 min-w-0 truncate font-mono font-semibold text-on-surface"
-                    >{{ rb.code }}</span
+                    class="flex-1 min-w-0 truncate text-on-surface"
+                    [title]="c.chargeLabel"
                   >
-                  <span
-                    class="flex-1 min-w-0 truncate text-on-surface-variant"
-                    >{{ rb.nature ?? "—" }}</span
-                  >
-                  <span class="w-16 shrink-0 truncate text-outline">{{
-                    rb.calcMode === "FORMULE" ? "ƒ(x)" : rb.calcMode
-                  }}</span>
-                  <span
-                    class="w-24 shrink-0 text-right font-semibold whitespace-nowrap"
-                    [class]="
-                      rb.direction === 'DEBIT'
-                        ? 'text-danger'
-                        : 'text-on-surface'
-                    "
-                  >
-                    {{ rb.direction === "CREDIT" ? "+" : "−"
-                    }}{{ rb.amount | number: "1.2-2" }}
-                  </span>
-                </div>
-              }
-            </div>
-          </daf-accordion-card>
-        }
-      }
-
-      @if (psState() === "READY") {
-        <daf-accordion-card
-          [options]="{
-            title: 'PAYROLL.SIMULATOR.REFERENTIAL.TITLE' | translate,
-            subtitle: 'PAYROLL.SIMULATOR.REFERENTIAL.SUBTITLE' | translate,
-            icon: 'rule_settings',
-            state: 'pending',
-            radius: 'xl',
-          }"
-        >
-          <div class="flex flex-col gap-6">
-            <div class="flex flex-col gap-2">
-              <p class="text-label-caps text-outline">
-                {{ "PAYROLL.SIMULATOR.REFERENTIAL.IRPP_TITLE" | translate }}
-              </p>
-              @if (irppBrackets().length) {
-                <div class="flex flex-col text-[12px] tabular-nums">
-                  @for (b of irppBrackets(); track b.lower) {
-                    <div
-                      class="flex items-center justify-between gap-3 border-b border-outline-variant/40 py-2 last:border-0"
-                    >
-                      <span class="text-on-surface"
-                        >{{ money(b.lower, "", 0) }} —
-                        {{ bracketUpper(b) }}</span
-                      >
-                      <span class="font-semibold text-on-surface">{{
-                        percent(b.rate)
-                      }}</span>
-                    </div>
-                  }
-                </div>
-              } @else {
-                <p class="text-[13px] text-on-surface-variant">
-                  {{ "PAYROLL.SIMULATOR.REFERENTIAL.IRPP_EMPTY" | translate }}
-                </p>
-              }
-            </div>
-
-            <div class="flex flex-col gap-2">
-              <p class="text-label-caps text-outline">
-                {{ "PAYROLL.SIMULATOR.REFERENTIAL.CHARGES_TITLE" | translate }}
-                @if (contractSelection().length) {
-                  · {{ contractSelection()[0] }}
-                }
-              </p>
-              @if (applicableCharges().length) {
-                <div class="flex flex-col text-[12px] tabular-nums">
-                  <div
-                    class="flex items-center gap-3 border-b border-outline-variant pb-2 text-label-caps text-outline"
-                  >
-                    <span class="flex-1 min-w-0">{{
-                      "PAYROLL.SIMULATOR.REFERENTIAL.COL_CHARGE" | translate
-                    }}</span>
-                    <span class="w-16 shrink-0 text-right">{{
-                      "PAYROLL.SIMULATOR.REFERENTIAL.COL_EMPLOYEE" | translate
-                    }}</span>
-                    <span class="w-16 shrink-0 text-right">{{
-                      "PAYROLL.SIMULATOR.REFERENTIAL.COL_EMPLOYER" | translate
-                    }}</span>
-                  </div>
-                  @for (c of applicableCharges(); track c.chargeCode) {
-                    <div
-                      class="flex items-center gap-3 border-b border-outline-variant/40 py-2 last:border-0"
-                    >
-                      <span
-                        class="flex-1 min-w-0 truncate text-on-surface"
-                        [title]="c.chargeLabel"
-                      >
-                        {{ c.chargeCode }}
-                        @if (
-                          c.baseCalculation === "CAPPED_GROSS" &&
-                          c.capAmount != null
-                        ) {
-                          <span class="ml-1 text-[11px] text-outline">
-                            {{
-                              "PAYROLL.SIMULATOR.REFERENTIAL.CAP"
-                                | translate
-                                  : { amount: money(c.capAmount, "", 0) }
-                            }}
-                          </span>
-                        }
+                    {{ c.chargeCode }}
+                    @if (
+                      c.baseCalculation === "CAPPED_GROSS" &&
+                      c.capAmount != null
+                    ) {
+                      <span class="ml-1 text-[11px] text-outline">
+                        {{
+                          "PAYROLL.SIMULATOR.REFERENTIAL.CAP"
+                            | translate
+                              : { amount: money(c.capAmount, "", 0) }
+                        }}
                       </span>
-                      <span
-                        class="w-16 shrink-0 text-right font-semibold text-on-surface"
-                        >{{ percent(c.employeeRate) }}</span
-                      >
-                      <span
-                        class="w-16 shrink-0 text-right font-semibold text-on-surface"
-                        >{{ percent(c.employerRate) }}</span
-                      >
-                    </div>
-                  }
+                    }
+                  </span>
+                  <span
+                    class="w-16 shrink-0 text-right font-semibold text-on-surface"
+                    >{{ percent(c.employeeRate) }}</span
+                  >
+                  <span
+                    class="w-16 shrink-0 text-right font-semibold text-on-surface"
+                    >{{ percent(c.employerRate) }}</span
+                  >
                 </div>
-              } @else {
-                <p class="text-[13px] text-on-surface-variant">
-                  {{
-                    "PAYROLL.SIMULATOR.REFERENTIAL.CHARGES_EMPTY" | translate
-                  }}
-                </p>
               }
             </div>
-          </div>
-        </daf-accordion-card>
-      }
-    </aside>
+          } @else {
+            <p class="text-[13px] text-on-surface-variant">
+              {{
+                "PAYROLL.SIMULATOR.REFERENTIAL.CHARGES_EMPTY" | translate
+              }}
+            </p>
+          }
+        </div>
+      </div>
+    </daf-accordion-card>
+  }
+
+  <div class="flex gap-3 border-t border-outline-variant/40 pt-5 mt-1">
+    <div class="flex-1 min-w-0">
+      <daf-button
+        [label]="'PAYROLL.SIMULATOR.RESULT.EXPORT_PDF' | translate"
+        variant="ghost"
+        [options]="{
+          size: 'sm',
+          iconStart: 'picture_as_pdf',
+          loading: pdfGenerating(),
+          disabled: !result(),
+          fullWidth: true,
+        }"
+        (onClick)="exportPdf()"
+      />
+    </div>
+    <div class="flex-1 min-w-0">
+      <daf-button
+        [label]="'PAYROLL.SIMULATOR.RESULT.PRINT' | translate"
+        variant="ghost"
+        [options]="{
+          size: 'sm',
+          iconStart: 'print',
+          disabled: !result(),
+          fullWidth: true,
+        }"
+        (onClick)="print()"
+      />
+    </div>
   </div>
-}
-<!-- fin @else firstLoad() -->
+ </div>
+</ng-template>
 
 <!--
   Simulations récentes — `daf-drawer` AU NIVEAU RACINE, hors de toute carte : le panneau

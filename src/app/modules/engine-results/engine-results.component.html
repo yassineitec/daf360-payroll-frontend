@@ -1,0 +1,192 @@
+<daf-page [breadcrumbs]="true">
+  <daf-page-header
+    [title]="'PAYROLL.ENGINE_RESULTS.TITLE' | translate"
+    [subtitle]="'PAYROLL.ENGINE_RESULTS.SUBTITLE' | translate"
+    [breadcrumbs]="breadcrumbs()">
+    <!-- ── Sélecteur employé, dans le header à côté du titre — même emplacement que
+         le sélecteur pays sur /payroll/candidate-simulation (slot `pageActions`).
+         Choisir un employé déclenche la recherche directement, comme le pays là-bas —
+         plus de bouton "Rechercher". ────────────────────────────────────────────── -->
+    <div pageActions class="employee-trigger">
+      <app-employee-select
+        [formControl]="$any(employeeIdCtrl)"
+        [paysId]="null"
+        (employeeSelected)="onEmployeeSelected($event)">
+      </app-employee-select>
+    </div>
+  </daf-page-header>
+
+  <div class="page-body">
+    <!-- ── Bandeau exécutif : directement sous le header, comme les pages finance
+         (invoice-list, payments-dashboard) — une section nue en grille, sans carte
+         englobante, avant le filtre de recherche. ─────────────────────────────── -->
+    @if (results().length > 0) {
+      <section class="grid grid-cols-4 gap-2 sm:gap-6 kpi-section">
+        <daf-metric-card
+          [label]="'PAYROLL.ENGINE_RESULTS.KPI_TOTAL_GROSS' | translate"
+          [value]="(employeeKpis().totalGross | number:'1.0-0') ?? ''"
+          [options]="{ icon: 'account_balance_wallet' }">
+        </daf-metric-card>
+        <daf-metric-card
+          [label]="'PAYROLL.ENGINE_RESULTS.KPI_TOTAL_NET' | translate"
+          [value]="(employeeKpis().totalNet | number:'1.0-0') ?? ''"
+          [options]="{ icon: 'savings' }">
+        </daf-metric-card>
+        <div class="kpi-grid__highlight">
+          <daf-metric-card
+            [label]="'PAYROLL.ENGINE_RESULTS.KPI_TOTAL_LOADED_COST' | translate"
+            [value]="(employeeKpis().totalLoadedCost | number:'1.0-0') ?? ''"
+            [options]="{ valueColor: 'text-primary', icon: 'account_balance' }">
+          </daf-metric-card>
+        </div>
+        <daf-metric-card
+          [label]="'PAYROLL.ENGINE_RESULTS.KPI_CONVERGENCE_RATE' | translate"
+          [value]="employeeKpis().convergenceOkCount + '/' + employeeKpis().total"
+          [options]="{
+            valueColor: employeeKpis().convergenceOkCount === employeeKpis().total ? 'text-success' : 'text-danger',
+            icon: 'verified',
+            iconColor: employeeKpis().convergenceOkCount === employeeKpis().total ? 'text-success' : 'text-danger',
+            iconBg: employeeKpis().convergenceOkCount === employeeKpis().total ? 'bg-success/10' : 'bg-danger/10'
+          }">
+        </daf-metric-card>
+      </section>
+    }
+
+    @if (empError()) {
+      <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+        <div class="alert alert--error">{{ empError() }}</div>
+      </daf-card>
+    }
+
+    <!-- ── Liste des périodes — recherche/filtre/vue carte-tableau, comme
+         /finance/affaires et /payroll/candidate-simulation (`daf-search-toolbar`
+         embarque les trois). Pleine largeur : plus de layout master-detail. ────── -->
+    @if (results().length > 0) {
+      <daf-search-toolbar
+        [placeholder]="'PAYROLL.ENGINE_RESULTS.SEARCH_PLACEHOLDER' | translate"
+        [value]="searchText()"
+        (valueChange)="onSearchTextChange($event)"
+        [debounce]="300"
+        [actions]="[{ id: 'export-csv', label: ('PAYROLL.ENGINE_RESULTS.EXPORT_CSV' | translate), icon: 'download', position: 'right' }]"
+        (action)="onToolbarAction($event)"
+        [filterFields]="filterFields()"
+        [filterConfig]="filterConfig()"
+        (filterApply)="applyFilters($event)"
+        [views]="viewOptions()"
+        [(view)]="viewMode">
+      </daf-search-toolbar>
+
+      @if (viewMode() === 'grid') {
+        <div class="grid grid-cols-3 gap-5">
+          @for (card of pagedResultCards(); track card.id) {
+            <daf-entity-card
+              [options]="card.options"
+              (cardClick)="toggleDetail(card.id)"
+              (viewClick)="toggleDetail(card.id)">
+            </daf-entity-card>
+          } @empty {
+            <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }" class="col-span-full">
+              <p class="empty-state">{{ 'PAYROLL.ENGINE_RESULTS.EMPTY_FILTERED' | translate }}</p>
+            </daf-card>
+          }
+        </div>
+      } @else {
+        <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+          <daf-data-table
+            [columns]="resultColumns()"
+            [rows]="pagedResultRows()"
+            [config]="{ actions: resultActions(), emptyMessage: ('PAYROLL.ENGINE_RESULTS.EMPTY_FILTERED' | translate), showHeader: false }">
+          </daf-data-table>
+        </daf-card>
+      }
+
+      <!-- ── Pagination, comme /finance/affaires (`daf-pagination` de la bibliothèque) ── -->
+      <daf-pagination
+        [currentPage]="page()"
+        [totalPages]="totalPages()"
+        [totalElements]="resultRows().length"
+        [pageSize]="pageSize()"
+        [pageSizeOptions]="[10, 20, 50, 100]"
+        [perPageLabel]="'PAYROLL.COMMON.PAGINATION.PER_PAGE' | translate"
+        [summaryLabel]="'PAYROLL.COMMON.PAGINATION.SUMMARY' | translate"
+        [firstPageLabel]="'PAYROLL.COMMON.PAGINATION.FIRST' | translate"
+        [lastPageLabel]="'PAYROLL.COMMON.PAGINATION.LAST' | translate"
+        [config]="{ showFirstLast: true }"
+        (pageChange)="page.set($event)"
+        (pageSizeChange)="onPageSizeChange($event)">
+      </daf-pagination>
+
+      <!-- ── Détail redessiné, en pleine largeur sous la liste : carte hero +
+           décomposition par nature ──────────────────────────────────────── -->
+      @if (expandedResultDetail(); as r) {
+        <daf-card
+          [options]="{
+            variant: 'flat', padding: 'lg', radius: 'xl',
+            accent: r.convergenceOk ? 'success' : 'danger',
+            icon: 'payments', iconFilled: true, iconColor: 'text-primary', iconBg: 'bg-primary/10',
+            title: ('PAYROLL.ENGINE_RUN.RESULT_TITLE' | translate: { employeeId: r.employeeId, month: r.periodMonth, year: r.periodYear })
+          }">
+          <div class="hero-row">
+            <div class="hero-row__net">
+              <daf-metric-card [label]="'PAYROLL.ENGINE_RUN.STRATE_NET_PAY' | translate" [value]="(r.strate5 | number:'1.2-2') ?? ''" [options]="{ valueColor: 'text-primary' }" />
+            </div>
+            <daf-badge
+              [label]="(r.convergenceOk ? 'PAYROLL.ENGINE_RUN.CONVERGENCE_OK' : 'PAYROLL.ENGINE_RUN.CONVERGENCE_FAILED') | translate"
+              [options]="{ variant: r.convergenceOk ? 'success' : 'danger', size: 'md' }">
+            </daf-badge>
+            @if (r.iterationsUsed) {
+              <span class="hero-iterations">{{ 'PAYROLL.ENGINE_RUN.ITERATIONS_SUFFIX' | translate: { count: r.iterationsUsed } }}</span>
+            }
+            <div class="hero-row__actions">
+              <daf-button
+                [label]="'PAYROLL.ENGINE_RESULTS.EXPORT_PDF' | translate"
+                variant="ghost"
+                [options]="{ iconStart: 'print' }"
+                (onClick)="exportResultPdf()">
+              </daf-button>
+            </div>
+          </div>
+        </daf-card>
+
+        <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+          <daf-section-title title="Résumé" />
+          <div class="metrics-grid">
+            <daf-metric-card [label]="'PAYROLL.ENGINE_RUN.STRATE_GROSS' | translate" [value]="(r.strate1 | number:'1.2-2') ?? ''" />
+            <daf-metric-card [label]="'PAYROLL.ENGINE_RUN.STRATE_BENEFITS' | translate" [value]="(r.strate2 | number:'1.2-2') ?? ''" />
+            <daf-metric-card [label]="'PAYROLL.ENGINE_RUN.STRATE_EMPLOYEE_CHARGES' | translate" [value]="(r.strate3 | number:'1.2-2') ?? ''" />
+            <daf-metric-card [label]="'PAYROLL.ENGINE_RUN.STRATE_TAXABLE_NET' | translate" [value]="(r.strate4 | number:'1.2-2') ?? ''" />
+            <daf-metric-card [label]="'PAYROLL.ENGINE_RUN.STRATE_LOADED_COST' | translate" [value]="(r.loadedCost | number:'1.2-2') ?? ''" />
+            <daf-metric-card [label]="'PAYROLL.ENGINE_RUN.STRATE_IRPP' | translate" [value]="(r.aggregateIrpp | number:'1.2-2') ?? ''" />
+          </div>
+        </daf-card>
+
+        <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+          <daf-section-title [title]="'PAYROLL.ENGINE_RESULTS.DETAIL_TITLE' | translate" />
+          <daf-tabs
+            [tabs]="rubriqueTabs"
+            [active]="activeRubriqueCategory()"
+            (activeChange)="activeRubriqueCategory.set($any($event))"
+            variant="pill"
+            [idPrefix]="'rubrique-cat'">
+          </daf-tabs>
+          <div class="lines-list">
+            @for (line of activeRubriqueLines(); track line.rubriqueCode) {
+              <div class="line-row">
+                <span class="line-code">{{ line.rubriqueCode }}</span>
+                <span class="line-label">{{ line.labelFr }}</span>
+                <span class="line-mode">{{ line.modeCalcul }}</span>
+                <span class="line-amount">{{ line.amount | number:'1.2-2' }}</span>
+              </div>
+            } @empty {
+              <p class="empty-state">{{ 'PAYROLL.ENGINE_RESULTS.EMPTY_EMPLOYEE_RESULTS' | translate }}</p>
+            }
+          </div>
+        </daf-card>
+      }
+    } @else if (!empLoading() && empSearched()) {
+      <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+        <p class="empty-state">{{ 'PAYROLL.ENGINE_RESULTS.EMPTY_EMPLOYEE_RESULTS' | translate }}</p>
+      </daf-card>
+    }
+  </div>
+</daf-page>

@@ -22,8 +22,12 @@ export const payrollLandingGuard: CanActivateFn = (
   const perms  = inject(PermissionService);
   const router = inject(Router);
 
-  const first = PAYROLL_NAV_DEFS.find(
-    def => !def.permissions.length || perms.hasAny(def.permissions),
+  // A `children` group (e.g. "Historique de paie") carries no `route` of its own and an
+  // empty `permissions` — flatten to its leaves first, in place, so `.find()` below never
+  // lands on the group itself and tries to build `/payroll/undefined`.
+  const routable = PAYROLL_NAV_DEFS.flatMap(def => def.children ?? [def]);
+  const first = routable.find(
+    def => !!def.route && (!def.permissions.length || perms.hasAny(def.permissions)),
   );
 
   if (!first) return router.parseUrl('/forbidden');

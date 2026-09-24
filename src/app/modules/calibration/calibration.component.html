@@ -1,88 +1,88 @@
-<div class="page-header">
-  <h1 class="page-title">Calibration mensuelle</h1>
-  <p class="page-subtitle">Comparaison prévu / réel et déclenchement de la mise à jour des paramètres</p>
-</div>
+<daf-page [loading]="loading()" [breadcrumbs]="true">
+  <daf-page-header
+    [title]="'PAYROLL.CALIBRATION.TITLE' | translate"
+    [subtitle]="'PAYROLL.CALIBRATION.SUBTITLE' | translate"
+    [breadcrumbs]="breadcrumbs()">
+  </daf-page-header>
 
-<div class="cal-layout">
-  <!-- Open cycle form -->
-  <section class="card" [formGroup]="openForm">
-    <h2 class="card-title">Ouvrir un cycle</h2>
-    <div class="field-row">
-      <div class="field-group">
-        <label class="field-label">Pays</label>
-        <app-pays-select formControlName="paysId"></app-pays-select>
-      </div>
-      <div class="field-group">
-        <label class="field-label">Période (AAAA-MM)</label>
-        <input type="text" class="field-input" formControlName="period" placeholder="2025-01" />
-      </div>
-    </div>
-    <div class="form-actions">
-      <button class="btn btn-primary" (click)="openCycle()" [disabled]="openForm.invalid || loading()">
-        Ouvrir le cycle
-      </button>
-      <button class="btn btn-ghost" type="button" (click)="loadCycles()">
-        Charger les cycles
-      </button>
-    </div>
-    @if (error()) { <div class="alert alert-error">{{ error() }}</div> }
-  </section>
+  <div class="page-body">
+    <!-- Open cycle -->
+    <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+      <daf-section-title [title]="'PAYROLL.CALIBRATION.OPEN_CYCLE_TITLE' | translate" />
 
-  <!-- Upload actuals -->
-  <section class="card">
-    <h2 class="card-title">Importer les réalisés partenaire (CSV)</h2>
-    <div class="field-group">
-      <label class="field-label">ID du cycle</label>
-      <input type="number" class="field-input"
-             [value]="uploadCycleId() ?? ''"
-             (input)="uploadCycleId.set(+($any($event.target).value))"
-             placeholder="ID cycle" />
-    </div>
-    <div class="field-group">
-      <label class="field-label">Fichier CSV</label>
-      <input type="file" accept=".csv" class="field-input" (change)="onFileChange($event)" />
-      <span class="field-hint">Format : profileUserId,actualLoadedCost,contractType</span>
-    </div>
-    <button class="btn btn-primary" (click)="uploadActuals()"
-            [disabled]="!uploadCycleId() || !uploadFile() || loading()">
-      Importer
-    </button>
-  </section>
+      <div class="form-grid">
+        <daf-select
+          [options]="paysOptions()"
+          [selected]="paysId() ? ['' + paysId()] : []"
+          [config]="{ label: 'PAYROLL.CALIBRATION.PAYS' | translate, placeholder: 'PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate, searchable: true, fullWidth: true, required: true }"
+          (selectedChange)="paysId.set($event[0] ? +$event[0] : null)">
+        </daf-select>
 
-  <!-- Cycles list -->
-  @if (cycles().length) {
-    <section class="card">
-      <h2 class="card-title">Cycles ({{ cycles().length }})</h2>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Période</th>
-              <th>Statut</th>
-              <th>Prévu</th>
-              <th>Réel</th>
-              <th>Écart %</th>
-              <th>Effectif</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (c of cycles(); track c.id) {
-              <tr>
-                <td>{{ c.id }}</td>
-                <td>{{ c.period }}</td>
-                <td><span [class]="statusClass(c.status)">{{ c.status }}</span></td>
-                <td>{{ c.predictedTotalLoadedCost != null ? (c.predictedTotalLoadedCost | number:'1.0-0') : '—' }}</td>
-                <td>{{ c.actualTotalLoadedCost != null ? (c.actualTotalLoadedCost | number:'1.0-0') : '—' }}</td>
-                <td [class.text-warn]="(c.variancePct ?? 0) > 1">
-                  {{ c.variancePct != null ? (c.variancePct | number:'1.2-2') + '%' : '—' }}
-                </td>
-                <td>{{ c.headcount ?? '—' }}</td>
-              </tr>
-            }
-          </tbody>
-        </table>
+        <daf-form-field
+          [options]="{ label: 'PAYROLL.CALIBRATION.PERIOD_LABEL' | translate, placeholder: '2025-01', required: true }"
+          [value]="period()"
+          (valueChange)="period.set(($event ?? '').toString())">
+        </daf-form-field>
       </div>
-    </section>
-  }
-</div>
+
+      <div class="form-actions">
+        <daf-button
+          [label]="'PAYROLL.CALIBRATION.OPEN_CYCLE_BUTTON' | translate"
+          variant="primary"
+          [options]="{ loading: loading(), disabled: !canOpenCycle() || loading() }"
+          (onClick)="openCycle()">
+        </daf-button>
+        <daf-button
+          [label]="'PAYROLL.CALIBRATION.LOAD_CYCLES_BUTTON' | translate"
+          variant="ghost"
+          [options]="{ disabled: !paysId() }"
+          (onClick)="loadCycles()">
+        </daf-button>
+      </div>
+
+      @if (error()) {
+        <div class="alert alert--error">{{ error() }}</div>
+      }
+    </daf-card>
+
+    <!-- Upload actuals -->
+    <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+      <daf-section-title [title]="'PAYROLL.CALIBRATION.UPLOAD_TITLE' | translate" />
+
+      <div class="form-grid">
+        <daf-form-field
+          [options]="{ label: 'PAYROLL.CALIBRATION.CYCLE_ID_LABEL' | translate, type: 'number', placeholder: 'PAYROLL.CALIBRATION.CYCLE_ID_PLACEHOLDER' | translate }"
+          [value]="uploadCycleId()"
+          (valueChange)="uploadCycleId.set($event ? +$event : null)">
+        </daf-form-field>
+      </div>
+
+      <daf-file-upload
+        [config]="{
+          label: 'PAYROLL.CALIBRATION.CSV_FILE_LABEL' | translate,
+          accept: '.csv',
+          hint: 'PAYROLL.CALIBRATION.CSV_FORMAT_HINT' | translate,
+          disabled: loading()
+        }"
+        [(files)]="uploadedFiles">
+      </daf-file-upload>
+
+      <div class="form-actions">
+        <daf-button
+          [label]="'PAYROLL.CALIBRATION.UPLOAD_BUTTON' | translate"
+          variant="primary"
+          [options]="{ loading: loading(), disabled: !canUpload() || loading() }"
+          (onClick)="uploadActuals()">
+        </daf-button>
+      </div>
+    </daf-card>
+
+    <!-- Cycles list -->
+    @if (cycles().length) {
+      <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+        <daf-section-title [title]="'PAYROLL.CALIBRATION.CYCLES_TITLE' | translate: { count: cycles().length }" />
+        <daf-data-table [columns]="cycleColumns()" [rows]="cycleRows()"></daf-data-table>
+      </daf-card>
+    }
+  </div>
+</daf-page>

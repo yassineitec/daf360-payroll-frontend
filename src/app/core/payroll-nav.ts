@@ -10,12 +10,19 @@
 
 export interface PayrollNavDef {
   id:    string;
-  label: string;
+  /** i18n key under PAYROLL.layout.NAV.*, resolved in the shell — never a literal label. */
+  labelKey: string;
   icon:  string;
-  /** Child segment of `/payroll`, matching the route `path` in `app.routes.ts`. */
-  route: string;
+  /**
+   * Child segment of `/payroll`, matching the route `path` in `app.routes.ts`. Omitted on an
+   * entry with `children`: a parent group doesn't navigate, it only expands — same contract
+   * as the library's `NavItem`.
+   */
+  route?: string;
   /** Any-of. Empty ⇒ no permission required. Mirrors the guard's default `mode: 'any'`. */
   permissions: string[];
+  /** Sub-entries rendered as an expandable group. One level only, like `NavItem.children`. */
+  children?: PayrollNavDef[];
 }
 
 /** `/payroll/simulator` — running a simulation. Reference reads (pays, active parameter
@@ -24,7 +31,10 @@ export interface PayrollNavDef {
 export const PAYROLL_SIMULATOR_PERMISSIONS = ['PAYROLL_RUN_SIMULATION'];
 
 /**
- * `/payroll/admin` — creating a parameter set.
+ * Creating a parameter set — the "+ Nouveau jeu de paramètres" panel folded into
+ * `/payroll/parameter-sets` (was its own `/payroll/admin` page until the two were merged:
+ * creating and then managing/approving a parameter set were split across two menu entries
+ * for what is really one workflow on one entity).
  *
  * It used to be gated on `PAYROLL_SUPER_ADMIN` alone, but the only call the panel makes,
  * `POST /parameter-sets`, is annotated `hasAuthority('PAYROLL_APPROVE_PARAMSET')` — so a
@@ -32,7 +42,7 @@ export const PAYROLL_SIMULATOR_PERMISSIONS = ['PAYROLL_RUN_SIMULATION'];
  * approver who could actually use it never saw the entry. Both codes now open it, and the
  * backend stays the authority on the write itself.
  */
-export const PAYROLL_ADMIN_PERMISSIONS = [
+export const PAYROLL_CREATE_PARAMSET_PERMISSIONS = [
   'PAYROLL_APPROVE_PARAMSET',
   'PAYROLL_SUPER_ADMIN',
 ];
@@ -51,29 +61,25 @@ export const PAYROLL_PAYSLIPS_PERMISSIONS = ['RH_MANAGE_PAYSLIPS'];
 /**
  * The live payroll screens.
  *
- * All nine modules are enabled. Every entry here MUST have a matching route in
- * `app.routes.ts` and vice-versa: an entry with no route navigates into the `**` redirect,
- * and a route with no entry is only reachable by typing the URL. If a screen ever has to be
- * switched off again, comment it out in BOTH files, never just one.
+ * Nine modules are enabled — `admin` was folded into `parameter-sets` (see
+ * `PAYROLL_CREATE_PARAMSET_PERMISSIONS`), so it no longer has its own entry or route.
+ * Every entry here MUST have a matching route in `app.routes.ts` and vice-versa: an entry
+ * with no route navigates into the `**` redirect, and a route with no entry is only
+ * reachable by typing the URL. If a screen ever has to be switched off again, comment it
+ * out in BOTH files, never just one. (A `children` group itself has no route of its own —
+ * only its leaves count as modules here.)
  */
 export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
   {
     id:          'simulator',
-    label:       'Simulateur manuel',
+    labelKey:    'PAYROLL.layout.NAV.SIMULATOR',
     icon:        'calculate',
     route:       'simulator',
     permissions: PAYROLL_SIMULATOR_PERMISSIONS,
   },
   {
-    id:          'admin',
-    label:       'Administration',
-    icon:        'admin_panel_settings',
-    route:       'admin',
-    permissions: PAYROLL_ADMIN_PERMISSIONS,
-  },
-  {
     id:          'payslips',
-    label:       'Fiches de paie',
+    labelKey:    'PAYROLL.layout.NAV.PAYSLIPS',
     icon:        'receipt_long',
     route:       'payslips',
     permissions: PAYROLL_PAYSLIPS_PERMISSIONS,
@@ -82,42 +88,62 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
   // ── Keep in sync with app.routes.ts ─────────────────────────────────────────
   {
     id:          'cohort',
-    label:       'Simulation cohorte',
+    labelKey:    'PAYROLL.layout.NAV.COHORT',
     icon:        'groups',
     route:       'cohort',
     permissions: ['PAYROLL_RUN_SIMULATION'],
   },
   {
     id:          'engine-run',
-    label:       'Calcul de paie',
+    labelKey:    'PAYROLL.layout.NAV.ENGINE_RUN',
     icon:        'payments',
     route:       'engine-run',
     permissions: ['PAYROLL_RUN_ENGINE'],
   },
+  /**
+   * Expandable group — was a single `engine-results` entry with 2 internal tabs
+   * (employee results / candidate simulations), split 2026-09-23 into 2 real pages so
+   * each is directly linkable and no longer hides half its content behind a tab click.
+   */
   {
-    id:          'engine-results',
-    label:       'Historique de paie',
+    id:          'payroll-history',
+    labelKey:    'PAYROLL.layout.NAV.PAYROLL_HISTORY_GROUP',
     icon:        'history',
-    route:       'engine-results',
-    permissions: ['PAYROLL_VIEW_RESULTS'],
+    permissions: [],
+    children: [
+      {
+        id:          'engine-results',
+        labelKey:    'PAYROLL.layout.NAV.ENGINE_RESULTS',
+        icon:        'payments',
+        route:       'engine-results',
+        permissions: ['PAYROLL_VIEW_RESULTS'],
+      },
+      {
+        id:          'candidate-simulation',
+        labelKey:    'PAYROLL.layout.NAV.CANDIDATE_SIMULATION',
+        icon:        'groups',
+        route:       'candidate-simulation',
+        permissions: ['PAYROLL_VIEW_RESULTS'],
+      },
+    ],
   },
   {
     id:          'calibration',
-    label:       'Calibration',
+    labelKey:    'PAYROLL.layout.NAV.CALIBRATION',
     icon:        'tune',
     route:       'calibration',
     permissions: ['PAYROLL_RUN_CALIBRATION'],
   },
   {
     id:          'parameter-sets',
-    label:       'Paramètres',
+    labelKey:    'PAYROLL.layout.NAV.PARAMETER_SETS',
     icon:        'settings_applications',
     route:       'parameter-sets',
     permissions: ['PAYROLL_VIEW_PARAMSET'],
   },
   {
     id:          'budget',
-    label:       'Budget prévisionnel',
+    labelKey:    'PAYROLL.layout.NAV.BUDGET',
     icon:        'account_balance',
     route:       'budget',
     permissions: ['PAYROLL_VIEW_BUDGET_AGGREGATE'],
@@ -133,11 +159,15 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
  * ever highlighted. Same fix as `fact-shell` and `hr-shell`.
  *
  * Longest route first, so a future nested segment wins over its parent prefix.
+ *
+ * `defs` can carry one level of `children` (see `PayrollNavDef`) — flattened first, since a
+ * group entry itself has no `route` to match against.
  */
 export function activeNavRoute(url: string, defs: PayrollNavDef[] = PAYROLL_NAV_DEFS): string {
   const path = (url ?? '').split(/[?#]/)[0];
-  const match = [...defs]
-    .sort((a, b) => b.route.length - a.route.length)
+  const routable = defs.flatMap(def => def.children ?? [def]).filter(def => !!def.route);
+  const match = [...routable]
+    .sort((a, b) => b.route!.length - a.route!.length)
     .find(def => new RegExp(`(^|/)${def.route}(/|$)`).test(path));
-  return match ? match.route : '';
+  return match ? match.route! : '';
 }

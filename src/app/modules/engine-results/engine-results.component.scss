@@ -1,0 +1,48 @@
+.page-body     { display: flex; flex-direction: column; gap: 1.5rem; padding: 0 2rem 2rem; }
+.alert--error  { background: #fee2e2; color: #991b1b; padding: .75rem 1rem; border-radius: 6px; margin-top: 1rem; font-size: .875rem; }
+.empty-state   { text-align: center; color: var(--color-on-surface-variant, #6b7280); margin: 0; }
+
+/* ── sélecteur employé : même traitement que `.pays-trigger` sur
+   /payroll/candidate-simulation — compact dans le header, pas de largeur forcée
+   par un parent flex-1, rayon d'angle aligné sur les daf-button "md" (rounded-lg).
+   `.es-trigger` est le hook exposé par `app-employee-select` pour ce cas exact
+   (cf. son propre commentaire de template). */
+.employee-trigger { min-width: 280px; }
+.employee-trigger ::ng-deep .es-trigger { border-radius: 0.5rem; }
+
+/* ── bandeau exécutif (KPIs) ──────────────────────────────────────────────
+   Grille en classes Tailwind litérales dans le template (grid grid-cols-4 gap-2
+   sm:gap-6), comme les pages finance (invoice-list, payments-dashboard). Les
+   tuiles `daf-metric-card` n'ont pas de variante "grande taille" dans la lib —
+   on agrandit padding/valeur/icône via `::ng-deep`, scopé à `.kpi-section` pour
+   ne pas affecter les autres tuiles (résumé des strates, etc.). Le "highlight"
+   ci-dessous met en avant le coût chargé avec une bordure primaire subtile,
+   sans toucher au daf-metric-card lui-même. */
+.kpi-section ::ng-deep .glass-card        { padding: 1.5rem; min-height: 148px; }
+.kpi-section ::ng-deep .text-\[22px\]     { font-size: 1.75rem; }
+.kpi-section ::ng-deep .w-8.h-8.rounded-lg { width: 2.75rem; height: 2.75rem; }
+.kpi-section ::ng-deep .material-symbols-outlined.text-sm { font-size: 1.375rem; }
+
+.kpi-grid__highlight {
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--color-primary, #1d2b3e) 35%, transparent);
+}
+
+/* ── détail redessiné (hero + décomposition), en pleine largeur sous la liste ────── */
+.hero-row    { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
+.hero-row__net ::ng-deep .text-\[22px\] { font-size: 2.25rem; }
+.hero-row__actions { margin-left: auto; }
+.hero-iterations { font-size: .8125rem; color: var(--color-on-surface-variant, #6b7280); }
+
+/* 3 colonnes × 2 lignes — les 6 strates analytiques lisibles sans défilement */
+.metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+
+.lines-list  { display: flex; flex-direction: column; margin-top: 1rem; }
+.line-row    { display: flex; align-items: center; gap: .75rem; padding: .625rem 0;
+               border-bottom: 1px solid var(--color-outline-variant, #c5c6cd); font-size: .8125rem; }
+.line-row:last-child { border-bottom: none; }
+.line-code   { font-family: monospace; font-size: .75rem; background: var(--color-surface-container, #eceef0);
+               padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
+.line-label  { flex: 1; min-width: 0; }
+.line-mode   { color: var(--color-on-surface-variant, #6b7280); font-size: .75rem; flex-shrink: 0; }
+.line-amount { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 110px; text-align: right; flex-shrink: 0; }

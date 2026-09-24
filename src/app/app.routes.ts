@@ -8,7 +8,6 @@ import { InlineTranslateLoader, PAYROLL_TRANSLATIONS } from './core/inline-trans
 import { PayrollShellComponent } from './layout/payroll-shell.component';
 import { provideDafAccess, permissionGuard } from '@khalilrebhiitec/daf360';
 import {
-  PAYROLL_ADMIN_PERMISSIONS,
   PAYROLL_PAYSLIPS_PERMISSIONS,
   PAYROLL_SIMULATOR_PERMISSIONS,
 } from './core/payroll-nav';
@@ -54,8 +53,10 @@ export const routes: Routes = [
           provideEnvironmentInitializer(() => registerTranslations()),
         ],
     children: [
-      // All nine modules are enabled; each route here must have a matching sidebar entry in
+      // Nine modules are enabled; each route here must have a matching sidebar entry in
       // `core/payroll-nav.ts`. If a screen has to be switched off, comment out BOTH.
+      // `admin` was folded into `parameter-sets` (the "+ Nouveau jeu" panel) and no longer
+      // has its own route.
       //
       // Every live route carries `permissionGuard` + `data.permissions`, using the same
       // code lists the sidebar filters on (`core/payroll-nav.ts`). The module had no route
@@ -67,13 +68,6 @@ export const routes: Routes = [
         data: { permissions: PAYROLL_SIMULATOR_PERMISSIONS },
         loadChildren: () =>
           import('./modules/simulator/simulator.routes').then(m => m.SIMULATOR_ROUTES),
-      },
-      {
-        path: 'admin',
-        canActivate: [permissionGuard],
-        data: { permissions: PAYROLL_ADMIN_PERMISSIONS },
-        loadChildren: () =>
-          import('./modules/admin/admin.routes').then(m => m.ADMIN_ROUTES),
       },
       {
         path: 'payslips',
@@ -125,6 +119,13 @@ export const routes: Routes = [
         data: { permissions: ['PAYROLL_VIEW_RESULTS'] },
         loadChildren: () =>
           import('./modules/engine-results/engine-results.routes').then(m => m.ENGINE_RESULTS_ROUTES),
+      },
+      {
+        path: 'candidate-simulation',
+        canActivate: [permissionGuard],
+        data: { permissions: ['PAYROLL_VIEW_RESULTS'] },
+        loadChildren: () =>
+          import('./modules/candidate-simulation/candidate-simulation.routes').then(m => m.CANDIDATE_SIMULATION_ROUTES),
       },
 
       // Landing route — resolved, not a static `redirectTo: 'simulator'`, so a user who

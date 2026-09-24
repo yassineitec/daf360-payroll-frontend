@@ -1,487 +1,657 @@
-<div class="page-header">
-  <h1 class="page-title">Paramètres de paie</h1>
-  <p class="page-subtitle">Gestion des barèmes IRPP, charges sociales et rubriques de paie</p>
-</div>
+<daf-page [loading]="loading()" [breadcrumbs]="true">
+  <daf-page-header
+    [title]="'PAYROLL.PARAMETER_SETS.TITLE' | translate"
+    [subtitle]="'PAYROLL.PARAMETER_SETS.SUBTITLE' | translate"
+    [breadcrumbs]="breadcrumbs()">
+  </daf-page-header>
 
-<div class="ps-layout">
-  <section class="card" [formGroup]="filterForm">
-    <div class="filter-row">
-      <div class="field-group">
-        <label class="field-label">Pays</label>
-        <app-pays-select formControlName="paysId"></app-pays-select>
-      </div>
-      <button class="btn btn-primary" (click)="load()" [disabled]="filterForm.invalid || loading()">
-        Charger
-      </button>
-    </div>
-    @if (error()) { <div class="alert alert-error">{{ error() }}</div> }
-  </section>
+  <div class="ps-tabs-wrap">
+    <daf-tabs [tabs]="tabs()" [(active)]="activeTab" [tabsLabel]="'PAYROLL.PARAMETER_SETS.TITLE' | translate" />
+  </div>
 
-  @if (paramSets().length) {
-    <section class="card">
-      <h2 class="card-title">Jeux de paramètres ({{ paramSets().length }})</h2>
-      <div class="ps-list">
-        @for (ps of paramSets(); track ps.id) {
-          <div class="ps-item" [class.ps-item--selected]="selected()?.id === ps.id" (click)="select(ps)">
-            <div class="ps-item-header">
-              <span class="ps-item-expand-icon">{{ selected()?.id === ps.id ? '▼' : '▶' }}</span>
-              <span class="ps-item-label">v{{ ps.version }} — {{ ps.fiscalYear }}</span>
-              <span [class]="statusClass(ps)">{{ statusLabel(ps) }}</span>
+  @switch (activeTab()) {
+
+    <!-- ══════════════════════════ Onglet "Nouveau jeu" ══════════════════════════ -->
+    @case ('create') {
+      <div class="ps-create-layout">
+        <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }" [formGroup]="newSetForm">
+
+          <div class="field-row">
+            <div class="field-group">
+              <daf-select
+                [options]="paysOptions()"
+                [selected]="newSetForm.get('paysId')!.value ? ['' + newSetForm.get('paysId')!.value] : []"
+                [config]="{ label: 'PAYROLL.ADMIN.PAYS' | translate, placeholder: 'PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate, searchable: true, fullWidth: true, required: true }"
+                (selectedChange)="newSetForm.get('paysId')!.setValue($event[0] ? +$event[0] : null)">
+              </daf-select>
             </div>
-            <div class="ps-item-meta">
-              Tolérance convergence : {{ ps.convergenceTolerance }} · Seuil calibration : {{ ps.calibrationThresholdPct }}%
-            </div>
-            <div class="ps-item-actions" (click)="$event.stopPropagation()">
-              @if (ps.status === 'DRAFT') {
-                <button class="btn-sm btn-sm--primary" (click)="submit(ps.id)">Soumettre</button>
-              }
-              @if (ps.status === 'PENDING_FINANCE' && !ps.approvedByHr) {
-                <button class="btn-sm btn-sm--secondary" (click)="approveHr(ps.id)">Approuver — Directeur Pays</button>
-              }
-              @if (ps.status === 'PENDING_FINANCE' && !ps.approvedByFinance) {
-                <button class="btn-sm btn-sm--secondary" (click)="approveFinance(ps.id)">Approuver — DAF</button>
-              }
-            </div>
+            <daf-form-field
+              [options]="{ label: 'PAYROLL.ADMIN.FISCAL_YEAR' | translate, type: 'number' }"
+              [value]="newSetForm.get('fiscalYear')!.value"
+              (valueChange)="newSetForm.get('fiscalYear')!.setValue(+($event ?? 0))">
+            </daf-form-field>
           </div>
 
-          @if (selected()?.id === ps.id) {
-            <div class="ps-detail" (click)="$event.stopPropagation()">
+          <div class="field-row">
+            <daf-form-field
+              [options]="{ label: 'PAYROLL.ADMIN.TOLERANCE' | translate, type: 'number' }"
+              [value]="newSetForm.get('convergenceTolerance')!.value"
+              (valueChange)="newSetForm.get('convergenceTolerance')!.setValue(+($event ?? 0))">
+            </daf-form-field>
+            <daf-form-field
+              [options]="{ label: 'PAYROLL.ADMIN.MAX_ITERATIONS' | translate, type: 'number' }"
+              [value]="newSetForm.get('maxConvergenceIterations')!.value"
+              (valueChange)="newSetForm.get('maxConvergenceIterations')!.setValue(+($event ?? 0))">
+            </daf-form-field>
+            <daf-form-field
+              [options]="{ label: 'PAYROLL.ADMIN.CALIBRATION_THRESHOLD' | translate, type: 'number' }"
+              [value]="newSetForm.get('calibrationThresholdPct')!.value"
+              (valueChange)="newSetForm.get('calibrationThresholdPct')!.setValue(+($event ?? 0))">
+            </daf-form-field>
+          </div>
 
-              <!-- ── Charges sociales ─────────────────────────────────────── -->
-              <div class="detail-section-header">
-                <h3>Charges sociales ({{ ps.socialChargeRates.length }})</h3>
-                <button class="btn-sm btn-sm--secondary" type="button" (click)="openChargesEditor(ps)">
-                  @if (editingChargesId() === ps.id) { Annuler } @else { Modifier }
-                </button>
+          <div class="code-console">
+            <div class="code-console__bar">
+              <span class="code-console__filename">
+                <span class="material-symbols-outlined">data_object</span>
+                {{ 'PAYROLL.ADMIN.IRPP_FILENAME' | translate }}
+              </span>
+              <div class="code-console__actions">
+                <daf-badge
+                  [label]="(isJsonValid(newSetForm.get('irppBrackets')!.value) ? 'PAYROLL.ADMIN.JSON_VALID' : 'PAYROLL.ADMIN.JSON_INVALID') | translate"
+                  [options]="{ variant: isJsonValid(newSetForm.get('irppBrackets')!.value) ? 'success' : 'danger', size: 'sm', icon: isJsonValid(newSetForm.get('irppBrackets')!.value) ? 'check_circle' : 'error' }">
+                </daf-badge>
+                <daf-button
+                  [label]="'PAYROLL.ADMIN.REFORMAT' | translate"
+                  variant="ghost"
+                  [options]="{ size: 'sm', iconStart: 'code', disabled: !isJsonValid(newSetForm.get('irppBrackets')!.value) }"
+                  (onClick)="formatIrppJson()">
+                </daf-button>
               </div>
+            </div>
+            <daf-form-field
+              class="code-console__field"
+              [options]="{
+                label: 'PAYROLL.ADMIN.IRPP_BRACKETS' | translate,
+                type: 'textarea',
+                rows: 6,
+                hint: 'PAYROLL.ADMIN.IRPP_HINT' | translate,
+                placeholder: '[{\'lower\':0,\'upper\':5000,\'rate\':0.00},{\'lower\':5000,\'upper\':20000,\'rate\':0.26}]'
+              }"
+              [value]="newSetForm.get('irppBrackets')!.value"
+              (valueChange)="newSetForm.get('irppBrackets')!.setValue(($event ?? '').toString())">
+            </daf-form-field>
+          </div>
 
-              @if (editingChargesId() !== ps.id) {
-                @if (ps.socialChargeRates.length) {
-                  <div class="table-wrap">
-                    <table class="data-table">
-                      <thead><tr><th>Type</th><th>Code</th><th>Libellé</th><th>Part sal.</th><th>Part pat.</th><th>Base</th></tr></thead>
-                      <tbody>
-                        @for (r of ps.socialChargeRates; track r.chargeCode) {
-                          <tr>
-                            <td>{{ r.contractType }}</td>
-                            <td><code class="code-pill">{{ r.chargeCode }}</code></td>
-                            <td>{{ r.chargeLabel }}</td>
-                            <td class="num">
-                              @if (r.baseCalculation === 'FORMULE') {
-                                <code class="formula-preview">{{ r.formulaEe || '—' }}</code>
-                              } @else {
-                                {{ (r.employeeRate * 100) | number:'1.2-2' }}%
-                              }
-                            </td>
-                            <td class="num">
-                              @if (r.baseCalculation === 'FORMULE') {
-                                <code class="formula-preview">{{ r.formulaEr || '—' }}</code>
-                              } @else {
-                                {{ (r.employerRate * 100) | number:'1.2-2' }}%
-                              }
-                            </td>
-                            <td>{{ r.baseCalculation }}</td>
-                          </tr>
-                        }
-                      </tbody>
-                    </table>
+          <daf-form-field
+            [options]="{ label: 'PAYROLL.ADMIN.RATIONALE' | translate, placeholder: 'PAYROLL.ADMIN.RATIONALE_PLACEHOLDER' | translate }"
+            [value]="newSetForm.get('changeRationale')!.value"
+            (valueChange)="newSetForm.get('changeRationale')!.setValue(($event ?? '').toString())">
+          </daf-form-field>
+
+          <!-- Charges sociales -->
+          <div class="charges-section">
+            <div class="charges-header">
+              <daf-section-title [title]="'PAYROLL.ADMIN.CHARGES_TITLE' | translate: { count: newSetRates.length }" />
+              <daf-button
+                [label]="'PAYROLL.ADMIN.ADD_CHARGE' | translate"
+                variant="teal"
+                [options]="{ size: 'sm', iconStart: 'add' }"
+                (onClick)="addNewSetRate()">
+              </daf-button>
+            </div>
+
+            @if (newSetRates.length === 0) {
+              <p class="charges-empty">{{ 'PAYROLL.ADMIN.CHARGES_EMPTY' | translate }}</p>
+            } @else {
+              <div class="rates-wrap">
+                <div class="rates-head">
+                  <span>{{ 'PAYROLL.ADMIN.COL_TYPE' | translate }}</span><span>{{ 'PAYROLL.ADMIN.COL_CODE' | translate }}</span><span>{{ 'PAYROLL.ADMIN.COL_LABEL' | translate }}</span>
+                  <span>{{ 'PAYROLL.ADMIN.COL_EMPLOYEE_RATE' | translate }}</span><span>{{ 'PAYROLL.ADMIN.COL_EMPLOYER_RATE' | translate }}</span><span>{{ 'PAYROLL.ADMIN.COL_BASE' | translate }}</span>
+                  <span>{{ 'PAYROLL.ADMIN.COL_CAP' | translate }}</span><span></span>
+                </div>
+                @for (ctrl of newSetRates.controls; track $index; let i = $index) {
+                  <div class="rates-row">
+                    <daf-select
+                      [options]="contractTypeOptions()"
+                      [selected]="[newSetRateGroup(i).get('contractType')!.value]"
+                      [config]="{ fullWidth: true }"
+                      (selectedChange)="newSetRateGroup(i).get('contractType')!.setValue($event[0])">
+                    </daf-select>
+                    <daf-form-field
+                      [options]="{ placeholder: 'CNSS' }"
+                      [value]="newSetRateGroup(i).get('chargeCode')!.value"
+                      (valueChange)="newSetRateGroup(i).get('chargeCode')!.setValue(($event ?? '').toString())">
+                    </daf-form-field>
+                    <daf-form-field
+                      [options]="{ placeholder: 'PAYROLL.ADMIN.CHARGE_LABEL_PLACEHOLDER' | translate }"
+                      [value]="newSetRateGroup(i).get('chargeLabel')!.value"
+                      (valueChange)="newSetRateGroup(i).get('chargeLabel')!.setValue(($event ?? '').toString())">
+                    </daf-form-field>
+                    <daf-form-field
+                      [options]="{ type: 'number', placeholder: '0.0918' }"
+                      [value]="newSetRateGroup(i).get('employeeRate')!.value"
+                      (valueChange)="newSetRateGroup(i).get('employeeRate')!.setValue(+($event ?? 0))">
+                    </daf-form-field>
+                    <daf-form-field
+                      [options]="{ type: 'number', placeholder: '0.1657' }"
+                      [value]="newSetRateGroup(i).get('employerRate')!.value"
+                      (valueChange)="newSetRateGroup(i).get('employerRate')!.setValue(+($event ?? 0))">
+                    </daf-form-field>
+                    <daf-select
+                      [options]="baseCalcOptions()"
+                      [selected]="[newSetRateGroup(i).get('baseCalculation')!.value]"
+                      [config]="{ fullWidth: true }"
+                      (selectedChange)="newSetRateGroup(i).get('baseCalculation')!.setValue($event[0])">
+                    </daf-select>
+                    <daf-form-field
+                      [options]="{ type: 'number', placeholder: '—' }"
+                      [value]="newSetRateGroup(i).get('capAmount')!.value"
+                      (valueChange)="newSetRateGroup(i).get('capAmount')!.setValue($event === '' || $event == null ? null : +$event)">
+                    </daf-form-field>
+                    <daf-button
+                      variant="ghost"
+                      [options]="{ size: 'sm', iconStart: 'close', title: 'PAYROLL.ADMIN.REMOVE' | translate }"
+                      (onClick)="removeNewSetRate(i)">
+                    </daf-button>
                   </div>
-                } @else {
-                  <p class="detail-empty">Aucune charge configurée — cliquez sur « Modifier » pour en ajouter.</p>
                 }
-              }
+              </div>
+            }
+          </div>
 
-              @if (editingChargesId() === ps.id) {
-                <div class="charges-editor" [formGroup]="chargesForm">
-                  <div class="editor-toolbar">
-                    <button type="button" class="btn-sm btn-sm--secondary" (click)="addEditRate()">+ Ajouter une ligne</button>
-                    <button type="button" class="btn-sm btn-sm--primary" (click)="saveCharges(ps.id)" [disabled]="savingCharges()">
-                      @if (savingCharges()) { Enregistrement… } @else { Enregistrer }
-                    </button>
+          <div class="info-box">
+            <strong>{{ 'PAYROLL.ADMIN.WORKFLOW_LABEL' | translate }}</strong> {{ 'PAYROLL.ADMIN.WORKFLOW_TEXT' | translate }}
+          </div>
+
+          <div class="form-actions">
+            <daf-button
+              [label]="(savingNewSet() ? 'PAYROLL.ADMIN.SUBMITTING' : 'PAYROLL.ADMIN.SUBMIT') | translate"
+              variant="teal"
+              [options]="{ loading: savingNewSet(), disabled: newSetForm.invalid || savingNewSet() }"
+              (onClick)="submitNewSet()">
+            </daf-button>
+          </div>
+        </daf-card>
+      </div>
+    }
+
+    <!-- ══════════════════════════ Onglet "Jeux existants" ══════════════════════════ -->
+    @case ('list') {
+      <div class="ps-layout">
+        <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }" [formGroup]="filterForm">
+          <div class="filter-row">
+            <div class="field-group">
+              <daf-select
+                [options]="paysOptions()"
+                [selected]="filterForm.get('paysId')!.value ? ['' + filterForm.get('paysId')!.value] : []"
+                [config]="{ label: 'PAYROLL.PARAMETER_SETS.PAYS' | translate, placeholder: 'PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate, searchable: true, fullWidth: true, required: true }"
+                (selectedChange)="filterForm.get('paysId')!.setValue($event[0] ? +$event[0] : null)">
+              </daf-select>
+            </div>
+            <daf-button
+              [label]="'PAYROLL.PARAMETER_SETS.LOAD_BUTTON' | translate"
+              variant="primary"
+              [options]="{ disabled: filterForm.invalid || loading(), loading: loading() }"
+              (onClick)="load()">
+            </daf-button>
+          </div>
+        </daf-card>
+
+        @if (paramSets().length) {
+          <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+            <daf-section-title [title]="'PAYROLL.PARAMETER_SETS.PARAM_SETS_TITLE' | translate: { count: paramSets().length }" />
+            <div class="ps-list">
+              @for (ps of paramSets(); track ps.id) {
+                <daf-accordion-card
+                  [options]="{
+                    title: itemTitle(ps),
+                    subtitle: ('PAYROLL.PARAMETER_SETS.PS_META' | translate: { tolerance: ps.convergenceTolerance, threshold: ps.calibrationThresholdPct }),
+                    icon: 'tune',
+                    statusLabel: statusLabel(ps),
+                    state: accordionState(ps)
+                  }"
+                  [open]="selected()?.id === ps.id"
+                  (openChange)="onAccordionToggle(ps, $event)">
+
+                  <div headerAction class="ps-item-actions" (click)="$event.stopPropagation()">
+                    @if (ps.status === 'DRAFT') {
+                      <daf-button [label]="'PAYROLL.PARAMETER_SETS.SUBMIT_BUTTON' | translate" variant="primary" [options]="{ size: 'sm' }" (onClick)="submit(ps.id)" />
+                    }
+                    @if (ps.status === 'PENDING_FINANCE' && !ps.approvedByHr) {
+                      <daf-button [label]="'PAYROLL.PARAMETER_SETS.APPROVE_HR_BUTTON' | translate" variant="secondary" [options]="{ size: 'sm' }" (onClick)="approveHr(ps.id)" />
+                    }
+                    @if (ps.status === 'PENDING_FINANCE' && !ps.approvedByFinance) {
+                      <daf-button [label]="'PAYROLL.PARAMETER_SETS.APPROVE_FINANCE_BUTTON' | translate" variant="secondary" [options]="{ size: 'sm' }" (onClick)="approveFinance(ps.id)" />
+                    }
                   </div>
-                  @if (editRates.length === 0) {
-                    <p class="detail-empty">Aucune charge — cliquez sur « Ajouter une ligne ».</p>
-                  } @else {
-                    <div class="rates-wrap">
-                      <div class="rates-head">
-                        <span>Type</span><span>Code</span><span>Libellé</span>
-                        <span>Part sal.</span><span>Part pat.</span><span>Base</span>
-                        <span>Plaf. / Ordre</span><span></span>
-                      </div>
-                      <ng-container formArrayName="rates">
-                        @for (ctrl of editRates.controls; track $index; let i = $index) {
-                          <!-- Wrap row + formula expansion in one ng-container so both share formGroupName -->
-                          <ng-container [formGroupName]="i">
-                            <div class="rates-row" [class.rates-row--formula]="editRateGroup(i).get('baseCalculation')!.value === 'FORMULE'">
-                              <select class="ri" formControlName="contractType">
-                                @for (ct of contractTypes; track ct) { <option [value]="ct">{{ ct }}</option> }
-                              </select>
-                              <input class="ri" formControlName="chargeCode" placeholder="CNSS" style="text-transform:uppercase" />
-                              <input class="ri" formControlName="chargeLabel" placeholder="Caisse nationale..." />
-                              @if (editRateGroup(i).get('baseCalculation')!.value !== 'FORMULE') {
-                                <input class="ri" type="number" step="0.0001" formControlName="employeeRate" placeholder="0.0918" />
-                                <input class="ri" type="number" step="0.0001" formControlName="employerRate" placeholder="0.1657" />
-                              } @else {
-                                <span class="ri ri--hint">↓ EE</span>
-                                <span class="ri ri--hint">↓ ER</span>
-                              }
-                              <select class="ri" formControlName="baseCalculation">
-                                @for (opt of baseCalcOptions; track opt.value) { <option [value]="opt.value">{{ opt.label }}</option> }
-                              </select>
-                              @if (editRateGroup(i).get('baseCalculation')!.value !== 'FORMULE') {
-                                <input class="ri" type="number" formControlName="capAmount" placeholder="—" />
-                              } @else {
-                                <input class="ri" type="number" formControlName="evalOrder" placeholder="0" title="Ordre d'évaluation (0 = premier)" />
-                              }
-                              <button type="button" class="btn-remove" title="Supprimer" (click)="removeEditRate(i)">✕</button>
-                            </div>
 
-                            <!-- Formula expansion — shown only when baseCalculation = FORMULE -->
-                            @if (editRateGroup(i).get('baseCalculation')!.value === 'FORMULE') {
-                              <div class="rate-formula-block">
-                                <div class="rate-formula-field">
-                                  <label class="rate-formula-label">Formule part salariale (EE) *</label>
-                                  <input class="field-input formula-input" formControlName="formulaEe"
-                                         placeholder="ex : BRUT * 0.0918"
-                                         autocomplete="off" spellcheck="false" />
-                                  <div class="formula-vars">
-                                    @for (v of chargeVariableHints(i); track v.name) {
-                                      <button type="button" class="formula-var-chip" [title]="v.desc"
-                                              (click)="insertChargeFormulaVar(i, 'formulaEe', v.name)">{{ v.name }}</button>
+                    <!-- ── Charges sociales ─────────────────────────────────────── -->
+                    <div class="detail-section-header">
+                      <daf-section-title [title]="'PAYROLL.PARAMETER_SETS.CHARGES_TITLE' | translate: { count: ps.socialChargeRates.length }" />
+                      <daf-button
+                        [label]="(editingChargesId() === ps.id ? 'PAYROLL.PARAMETER_SETS.CANCEL' : 'PAYROLL.PARAMETER_SETS.EDIT') | translate"
+                        variant="secondary"
+                        [options]="{ size: 'sm' }"
+                        (onClick)="openChargesEditor(ps)">
+                      </daf-button>
+                    </div>
+
+                    @if (editingChargesId() !== ps.id) {
+                      @if (ps.socialChargeRates.length) {
+                        <div class="charges-kpi-row">
+                          <daf-metric-card
+                            [label]="'PAYROLL.PARAMETER_SETS.KPI_EMPLOYEE_TOTAL' | translate"
+                            [value]="(chargeTotals(ps).employeeTotal | number:'1.2-2') + ' %'"
+                            [options]="{ icon: 'person', iconColor: 'text-primary', iconBg: 'bg-primary/10' }">
+                          </daf-metric-card>
+                          <daf-metric-card
+                            [label]="'PAYROLL.PARAMETER_SETS.KPI_EMPLOYER_TOTAL' | translate"
+                            [value]="(chargeTotals(ps).employerTotal | number:'1.2-2') + ' %'"
+                            [options]="{ icon: 'domain', iconColor: 'text-tertiary', iconBg: 'bg-tertiary/10' }">
+                          </daf-metric-card>
+                          <daf-metric-card
+                            [label]="'PAYROLL.PARAMETER_SETS.KPI_TAX_WEDGE' | translate"
+                            [value]="(chargeTotals(ps).wedge | number:'1.2-2') + ' %'"
+                            [options]="{ icon: 'balance', iconColor: 'text-on-surface', iconBg: 'bg-surface-container' }">
+                          </daf-metric-card>
+                        </div>
+                        <daf-data-table [columns]="chargesColumns()" [rows]="chargesRows(ps)" />
+                      } @else {
+                        <p class="detail-empty">{{ 'PAYROLL.PARAMETER_SETS.CHARGES_EMPTY_READONLY' | translate }}</p>
+                      }
+                    }
+
+                    @if (editingChargesId() === ps.id) {
+                      <div class="charges-editor" [formGroup]="chargesForm">
+                        <div class="editor-toolbar">
+                          <daf-button [label]="'PAYROLL.PARAMETER_SETS.ADD_CHARGE_LINE' | translate" variant="secondary" [options]="{ size: 'sm' }" (onClick)="addEditRate()" />
+                          <daf-button
+                            [label]="(savingCharges() ? 'PAYROLL.PARAMETER_SETS.SAVING' : 'PAYROLL.PARAMETER_SETS.SAVE') | translate"
+                            variant="primary"
+                            [options]="{ size: 'sm', loading: savingCharges(), disabled: savingCharges() }"
+                            (onClick)="saveCharges(ps.id)">
+                          </daf-button>
+                        </div>
+                        @if (editRates.length === 0) {
+                          <p class="detail-empty">{{ 'PAYROLL.PARAMETER_SETS.CHARGES_EMPTY_EDITOR' | translate }}</p>
+                        } @else {
+                          <div class="rates-wrap">
+                            <div class="rates-head">
+                              <span>{{ 'PAYROLL.PARAMETER_SETS.COL_TYPE' | translate }}</span><span>{{ 'PAYROLL.PARAMETER_SETS.COL_CODE' | translate }}</span><span>{{ 'PAYROLL.PARAMETER_SETS.COL_LABEL' | translate }}</span>
+                              <span>{{ 'PAYROLL.PARAMETER_SETS.COL_EMPLOYEE_SHARE' | translate }}</span><span>{{ 'PAYROLL.PARAMETER_SETS.COL_EMPLOYER_SHARE' | translate }}</span><span>{{ 'PAYROLL.PARAMETER_SETS.COL_BASE' | translate }}</span>
+                              <span>{{ 'PAYROLL.PARAMETER_SETS.COL_CAP_OR_ORDER' | translate }}</span><span></span>
+                            </div>
+                            <ng-container formArrayName="rates">
+                              @for (ctrl of editRates.controls; track $index; let i = $index) {
+                                <!-- Wrap row + formula expansion in one ng-container so both share formGroupName -->
+                                <ng-container [formGroupName]="i">
+                                  <div class="rates-row" [class.rates-row--formula]="editRateGroup(i).get('baseCalculation')!.value === 'FORMULE'">
+                                    <daf-select
+                                      [options]="contractTypeOptions()"
+                                      [selected]="[editRateGroup(i).get('contractType')!.value]"
+                                      [config]="{ fullWidth: true }"
+                                      (selectedChange)="editRateGroup(i).get('contractType')!.setValue($event[0])">
+                                    </daf-select>
+                                    <daf-form-field
+                                      [options]="{ placeholder: 'CNSS' }"
+                                      [value]="editRateGroup(i).get('chargeCode')!.value"
+                                      (valueChange)="editRateGroup(i).get('chargeCode')!.setValue(($event ?? '').toString())">
+                                    </daf-form-field>
+                                    <daf-form-field
+                                      [options]="{ placeholder: 'PAYROLL.PARAMETER_SETS.CHARGE_LABEL_PLACEHOLDER' | translate }"
+                                      [value]="editRateGroup(i).get('chargeLabel')!.value"
+                                      (valueChange)="editRateGroup(i).get('chargeLabel')!.setValue(($event ?? '').toString())">
+                                    </daf-form-field>
+                                    @if (editRateGroup(i).get('baseCalculation')!.value !== 'FORMULE') {
+                                      <daf-form-field
+                                        [options]="{ type: 'number', placeholder: '0.0918' }"
+                                        [value]="editRateGroup(i).get('employeeRate')!.value"
+                                        (valueChange)="editRateGroup(i).get('employeeRate')!.setValue(+($event ?? 0))">
+                                      </daf-form-field>
+                                      <daf-form-field
+                                        [options]="{ type: 'number', placeholder: '0.1657' }"
+                                        [value]="editRateGroup(i).get('employerRate')!.value"
+                                        (valueChange)="editRateGroup(i).get('employerRate')!.setValue(+($event ?? 0))">
+                                      </daf-form-field>
+                                    } @else {
+                                      <span class="ri ri--hint">{{ 'PAYROLL.PARAMETER_SETS.HINT_EE_DOWN' | translate }}</span>
+                                      <span class="ri ri--hint">{{ 'PAYROLL.PARAMETER_SETS.HINT_ER_DOWN' | translate }}</span>
                                     }
-                                  </div>
-                                </div>
-                                <div class="rate-formula-field">
-                                  <label class="rate-formula-label">Formule part patronale (ER) *</label>
-                                  <input class="field-input formula-input" formControlName="formulaEr"
-                                         placeholder="ex : BRUT * 0.1657"
-                                         autocomplete="off" spellcheck="false" />
-                                  <div class="formula-vars">
-                                    @for (v of chargeVariableHints(i); track v.name) {
-                                      <button type="button" class="formula-var-chip" [title]="v.desc"
-                                              (click)="insertChargeFormulaVar(i, 'formulaEr', v.name)">{{ v.name }}</button>
+                                    <daf-select
+                                      [options]="baseCalcOptions()"
+                                      [selected]="[editRateGroup(i).get('baseCalculation')!.value]"
+                                      [config]="{ fullWidth: true }"
+                                      (selectedChange)="editRateGroup(i).get('baseCalculation')!.setValue($event[0])">
+                                    </daf-select>
+                                    @if (editRateGroup(i).get('baseCalculation')!.value !== 'FORMULE') {
+                                      <daf-form-field
+                                        [options]="{ type: 'number', placeholder: '—' }"
+                                        [value]="editRateGroup(i).get('capAmount')!.value"
+                                        (valueChange)="editRateGroup(i).get('capAmount')!.setValue($event === '' || $event == null ? null : +$event)">
+                                      </daf-form-field>
+                                    } @else {
+                                      <daf-form-field
+                                        [options]="{ type: 'number', placeholder: '0', hint: 'PAYROLL.PARAMETER_SETS.EVAL_ORDER_TITLE' | translate }"
+                                        [value]="editRateGroup(i).get('evalOrder')!.value"
+                                        (valueChange)="editRateGroup(i).get('evalOrder')!.setValue(+($event ?? 0))">
+                                      </daf-form-field>
                                     }
+                                    <daf-button
+                                      variant="ghost"
+                                      [options]="{ size: 'sm', iconStart: 'close', title: 'PAYROLL.PARAMETER_SETS.REMOVE' | translate }"
+                                      (onClick)="removeEditRate(i)">
+                                    </daf-button>
                                   </div>
+
+                                  <!-- Formula expansion — shown only when baseCalculation = FORMULE -->
+                                  @if (editRateGroup(i).get('baseCalculation')!.value === 'FORMULE') {
+                                    <div class="rate-formula-block">
+                                      <div class="rate-formula-field">
+                                        <daf-form-field
+                                          [options]="{
+                                            label: 'PAYROLL.PARAMETER_SETS.FORMULA_EE_LABEL' | translate,
+                                            placeholder: 'PAYROLL.PARAMETER_SETS.FORMULA_EE_PLACEHOLDER' | translate
+                                          }"
+                                          [value]="editRateGroup(i).get('formulaEe')!.value"
+                                          (valueChange)="editRateGroup(i).get('formulaEe')!.setValue(($event ?? '').toString())">
+                                        </daf-form-field>
+                                        <div class="formula-vars">
+                                          @for (v of chargeVariableHints(i); track v.name) {
+                                            <daf-button [label]="v.name" variant="ghost" [options]="{ size: 'sm', title: v.desc }" (onClick)="insertChargeFormulaVar(i, 'formulaEe', v.name)" />
+                                          }
+                                        </div>
+                                      </div>
+                                      <div class="rate-formula-field">
+                                        <daf-form-field
+                                          [options]="{
+                                            label: 'PAYROLL.PARAMETER_SETS.FORMULA_ER_LABEL' | translate,
+                                            placeholder: 'PAYROLL.PARAMETER_SETS.FORMULA_ER_PLACEHOLDER' | translate
+                                          }"
+                                          [value]="editRateGroup(i).get('formulaEr')!.value"
+                                          (valueChange)="editRateGroup(i).get('formulaEr')!.setValue(($event ?? '').toString())">
+                                        </daf-form-field>
+                                        <div class="formula-vars">
+                                          @for (v of chargeVariableHints(i); track v.name) {
+                                            <daf-button [label]="v.name" variant="ghost" [options]="{ size: 'sm', title: v.desc }" (onClick)="insertChargeFormulaVar(i, 'formulaEr', v.name)" />
+                                          }
+                                        </div>
+                                      </div>
+                                      <p class="editor-hint" style="flex:1 1 100%;margin-top:6px">
+                                        {{ 'PAYROLL.PARAMETER_SETS.FORMULA_ORDER_HINT' | translate }}
+                                      </p>
+                                    </div>
+                                  }
+                                </ng-container>
+                              }
+                            </ng-container>
+                          </div>
+                        }
+                      </div>
+                    }
+
+                    <!-- ── Avantages en nature (legacy) ────────────────────────── -->
+                    @if (ps.benefits.length) {
+                      <div class="detail-section-header" style="margin-top:20px">
+                        <daf-section-title [title]="'PAYROLL.PARAMETER_SETS.BENEFITS_TITLE' | translate: { count: ps.benefits.length }" />
+                      </div>
+                      <daf-data-table [columns]="benefitsColumns()" [rows]="benefitsRows(ps)" />
+                    }
+
+                    <!-- ── Rubriques de paie ────────────────────────────────────── -->
+                    <div class="detail-section-header" style="margin-top:20px">
+                      <daf-section-title [title]="'PAYROLL.PARAMETER_SETS.RUBRIQUES_TITLE' | translate: { count: ps.rubriques.length }" />
+                      <daf-button
+                        [label]="(editingRubriquesId() === ps.id ? 'PAYROLL.PARAMETER_SETS.CANCEL' : 'PAYROLL.PARAMETER_SETS.EDIT') | translate"
+                        variant="secondary"
+                        [options]="{ size: 'sm' }"
+                        (onClick)="openRubriquesEditor(ps)">
+                      </daf-button>
+                    </div>
+
+                    <!-- Read-only rubriques view -->
+                    @if (editingRubriquesId() !== ps.id) {
+                      @if (ps.rubriques.length) {
+                        <daf-data-table [columns]="rubriquesColumns()" [rows]="rubriquesRows(ps)" />
+                      } @else {
+                        <p class="detail-empty">{{ 'PAYROLL.PARAMETER_SETS.RUBRIQUES_EMPTY_READONLY' | translate }}</p>
+                      }
+                    }
+
+                    <!-- Rubriques guided card editor -->
+                    @if (editingRubriquesId() === ps.id) {
+                      <div class="rubriques-editor" [formGroup]="rubriquesForm">
+                        <div class="editor-toolbar">
+                          <daf-button [label]="'PAYROLL.PARAMETER_SETS.ADD_RUBRIQUE' | translate" variant="secondary" [options]="{ size: 'sm' }" (onClick)="addEditRubrique()" />
+                          <daf-button
+                            [label]="(savingRubriques() ? 'PAYROLL.PARAMETER_SETS.SAVING' : 'PAYROLL.PARAMETER_SETS.SAVE_ALL') | translate"
+                            variant="primary"
+                            [options]="{ size: 'sm', loading: savingRubriques(), disabled: savingRubriques() }"
+                            (onClick)="saveRubriques(ps.id)">
+                          </daf-button>
+                        </div>
+
+                        @if (editRubriques.length === 0) {
+                          <p class="detail-empty">{{ 'PAYROLL.PARAMETER_SETS.RUBRIQUES_EMPTY_EDITOR' | translate }}</p>
+                        } @else {
+                          <div class="preview-control">
+                            <daf-form-field
+                              [options]="{ label: 'PAYROLL.PARAMETER_SETS.TEST_GROSS_LABEL' | translate, type: 'number' }"
+                              [value]="testGross()"
+                              (valueChange)="testGross.set(+($event ?? 0) || 3000)">
+                            </daf-form-field>
+                            <span class="preview-gross-unit">TND / mois</span>
+                          </div>
+
+                          <ng-container formArrayName="items">
+                            @for (ctrl of editRubriques.controls; track $index; let i = $index) {
+                              <daf-accordion-card
+                                [formGroupName]="i"
+                                [options]="{
+                                  title: (editRubriqueGroup(i).get('code')!.value || '…') + ' — ' + (editRubriqueGroup(i).get('labelFr')!.value || ('PAYROLL.PARAMETER_SETS.NEW_RUBRIQUE_PLACEHOLDER' | translate)),
+                                  subtitle: calcModeLabel(editRubriqueGroup(i).get('calcMode')!.value),
+                                  icon: rubriqueIcon(editRubriqueGroup(i).get('nature')!.value),
+                                  statusLabel: natureLabel(editRubriqueGroup(i).get('nature')!.value),
+                                  state: rubriqueAccordionState(editRubriqueGroup(i).get('nature')!.value, editRubriqueGroup(i).get('isActive')!.value),
+                                  variant: 'outlined',
+                                  radius: 'lg'
+                                }"
+                                [open]="isRubriqueExpanded(i)"
+                                (openChange)="toggleRubriqueCard(i)">
+
+                                <div headerAction class="rch-header-action" (click)="$event.stopPropagation()">
+                                  <span class="rch-value">{{ previewAmount(i) }} TND</span>
+                                  <daf-button
+                                    variant="ghost"
+                                    [options]="{ size: 'sm', iconStart: 'close', title: 'PAYROLL.PARAMETER_SETS.REMOVE_RUBRIQUE' | translate }"
+                                    (onClick)="removeEditRubrique(i)">
+                                  </daf-button>
                                 </div>
-                                <p class="editor-hint" style="flex:1 1 100%;margin-top:6px">
-                                  ℹ️ Les charges avec un ordre inférieur sont calculées en premier et leurs résultats (ex : <code>CNSS_EE</code>) sont disponibles dans la formule.
-                                  Un cycle de dépendances est détecté automatiquement à la simulation.
-                                </p>
-                              </div>
+
+                                    <div class="rg-section">
+                                      <h4 class="rg-section-title">{{ 'PAYROLL.PARAMETER_SETS.SECTION_IDENTIFICATION' | translate }}</h4>
+                                      <div class="rg-row">
+                                        <div class="rg-field rg-field--sm">
+                                          <daf-form-field
+                                            [options]="{ label: 'PAYROLL.PARAMETER_SETS.CODE_LABEL' | translate, placeholder: 'CNSS_SAL' }"
+                                            [value]="editRubriqueGroup(i).get('code')!.value"
+                                            (valueChange)="editRubriqueGroup(i).get('code')!.setValue(($event ?? '').toString())">
+                                          </daf-form-field>
+                                        </div>
+                                        <div class="rg-field rg-field--lg">
+                                          <daf-form-field
+                                            [options]="{ label: 'PAYROLL.PARAMETER_SETS.LABEL_FR_LABEL' | translate, placeholder: 'PAYROLL.PARAMETER_SETS.LABEL_FR_PLACEHOLDER' | translate }"
+                                            [value]="editRubriqueGroup(i).get('labelFr')!.value"
+                                            (valueChange)="editRubriqueGroup(i).get('labelFr')!.setValue(($event ?? '').toString())">
+                                          </daf-form-field>
+                                        </div>
+                                        <div class="rg-field rg-field--lg">
+                                          <daf-form-field
+                                            [options]="{ label: 'PAYROLL.PARAMETER_SETS.LABEL_EN_LABEL' | translate, placeholder: 'PAYROLL.PARAMETER_SETS.LABEL_EN_PLACEHOLDER' | translate }"
+                                            [value]="editRubriqueGroup(i).get('labelEn')!.value"
+                                            (valueChange)="editRubriqueGroup(i).get('labelEn')!.setValue(($event ?? '').toString())">
+                                          </daf-form-field>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div class="rg-section">
+                                      <h4 class="rg-section-title">{{ 'PAYROLL.PARAMETER_SETS.SECTION_NATURE' | translate }}</h4>
+                                      <daf-radio-group
+                                        [options]="natureRadioOptions()"
+                                        [config]="{ layout: 'horizontal' }"
+                                        [selected]="editRubriqueGroup(i).get('nature')!.value"
+                                        (selectedChange)="editRubriqueGroup(i).get('nature')!.setValue($event)">
+                                      </daf-radio-group>
+                                      <p class="editor-hint" style="margin-top:8px">{{ 'PAYROLL.PARAMETER_SETS.NATURE_HINT' | translate }}</p>
+                                    </div>
+
+                                    <div class="rg-section">
+                                      <h4 class="rg-section-title">{{ 'PAYROLL.PARAMETER_SETS.SECTION_CALC_MODE' | translate }}</h4>
+                                      <daf-radio-group
+                                        [options]="calcModeRadioOptions()"
+                                        [config]="{ layout: 'horizontal' }"
+                                        [selected]="editRubriqueGroup(i).get('calcMode')!.value"
+                                        (selectedChange)="editRubriqueGroup(i).get('calcMode')!.setValue($event)">
+                                      </daf-radio-group>
+
+                                      @if (editRubriqueGroup(i).get('calcMode')!.value === 'FIXE_MENSUEL' ||
+                                           editRubriqueGroup(i).get('calcMode')!.value === 'FIXE_JOURNALIER') {
+                                        <div class="rg-row rg-row--mt">
+                                          <div class="rg-field rg-field--md">
+                                            <daf-form-field
+                                              [options]="{
+                                                label: 'PAYROLL.PARAMETER_SETS.AMOUNT_LABEL' | translate: { period: (editRubriqueGroup(i).get('calcMode')!.value === 'FIXE_JOURNALIER' ? ('PAYROLL.PARAMETER_SETS.PER_DAY' | translate) : ('PAYROLL.PARAMETER_SETS.PER_MONTH' | translate)) },
+                                                type: 'number',
+                                                placeholder: '0.00'
+                                              }"
+                                              [value]="editRubriqueGroup(i).get('amount')!.value"
+                                              (valueChange)="editRubriqueGroup(i).get('amount')!.setValue(+($event ?? 0))">
+                                            </daf-form-field>
+                                          </div>
+                                        </div>
+                                      }
+
+                                      @if (editRubriqueGroup(i).get('calcMode')!.value === 'POURCENTAGE_BRUT' ||
+                                           editRubriqueGroup(i).get('calcMode')!.value === 'POURCENTAGE_CHARGES' ||
+                                           editRubriqueGroup(i).get('calcMode')!.value === 'POURCENTAGE_PLAFONNE') {
+                                        <div class="rg-row rg-row--mt">
+                                          <div class="rg-field rg-field--sm">
+                                            <daf-form-field
+                                              [options]="{ label: 'PAYROLL.PARAMETER_SETS.RATE_LABEL' | translate, type: 'number', placeholder: '9.18' }"
+                                              [value]="editRubriqueGroup(i).get('ratePercent')!.value"
+                                              (valueChange)="editRubriqueGroup(i).get('ratePercent')!.setValue(+($event ?? 0))">
+                                            </daf-form-field>
+                                          </div>
+                                          @if (editRubriqueGroup(i).get('calcMode')!.value === 'POURCENTAGE_PLAFONNE') {
+                                            <div class="rg-field rg-field--md">
+                                              <daf-form-field
+                                                [options]="{ label: 'PAYROLL.PARAMETER_SETS.CAP_LABEL' | translate, type: 'number', placeholder: '3 500.00' }"
+                                                [value]="editRubriqueGroup(i).get('capAmount')!.value"
+                                                (valueChange)="editRubriqueGroup(i).get('capAmount')!.setValue(+($event ?? 0))">
+                                              </daf-form-field>
+                                            </div>
+                                          }
+                                        </div>
+                                      }
+
+                                      @if (editRubriqueGroup(i).get('calcMode')!.value === 'FORMULE') {
+                                        <div class="rg-row rg-row--mt">
+                                          <div class="rg-field rg-field--full">
+                                            <daf-form-field
+                                              [options]="{
+                                                label: 'PAYROLL.PARAMETER_SETS.FORMULA_EXPR_LABEL' | translate,
+                                                placeholder: 'PAYROLL.PARAMETER_SETS.FORMULA_EXPR_PLACEHOLDER' | translate
+                                              }"
+                                              [value]="editRubriqueGroup(i).get('formulaExpression')!.value"
+                                              (valueChange)="editRubriqueGroup(i).get('formulaExpression')!.setValue(($event ?? '').toString())">
+                                            </daf-form-field>
+                                            <p class="editor-hint formula-hint">
+                                              {{ 'PAYROLL.PARAMETER_SETS.FORMULA_OPERATORS_HINT' | translate }}
+                                            </p>
+                                            <div class="formula-vars">
+                                              @for (v of formulaVariableHints(); track v.name) {
+                                                <daf-button [label]="v.name" variant="ghost" [options]="{ size: 'sm', title: v.desc }" (onClick)="insertFormulaVar(i, v.name)" />
+                                              }
+                                              @if (priorRubriqueVars(i).length > 0) {
+                                                <span class="formula-vars-divider">{{ 'PAYROLL.PARAMETER_SETS.PRIOR_RUBRIQUES_LABEL' | translate }}</span>
+                                                @for (v of priorRubriqueVars(i); track v.name) {
+                                                  <daf-button [label]="v.name" variant="ghost" [options]="{ size: 'sm', title: v.desc }" (onClick)="insertFormulaVar(i, v.name)" />
+                                                }
+                                              }
+                                            </div>
+                                            <p class="editor-hint" style="margin-top:6px">
+                                              {{ 'PAYROLL.PARAMETER_SETS.FORMULA_PREVIEW_HINT' | translate }}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      }
+                                    </div>
+
+                                    <div class="rg-section">
+                                      <h4 class="rg-section-title">{{ 'PAYROLL.PARAMETER_SETS.SECTION_TAX_CHARGES' | translate }}</h4>
+                                      <div class="rg-checkbox-group">
+                                        <daf-checkbox
+                                          [options]="{ label: 'PAYROLL.PARAMETER_SETS.IRPP_CHECKBOX_TITLE' | translate, hint: 'PAYROLL.PARAMETER_SETS.IRPP_CHECKBOX_DESC' | translate }"
+                                          [checked]="editRubriqueGroup(i).get('isSubjectToIrpp')!.value"
+                                          (checkedChange)="editRubriqueGroup(i).get('isSubjectToIrpp')!.setValue($event)">
+                                        </daf-checkbox>
+                                        <daf-checkbox
+                                          [options]="{ label: 'PAYROLL.PARAMETER_SETS.CHARGES_CHECKBOX_TITLE' | translate, hint: 'PAYROLL.PARAMETER_SETS.CHARGES_CHECKBOX_DESC' | translate }"
+                                          [checked]="editRubriqueGroup(i).get('isSubjectToSocialCharges')!.value"
+                                          (checkedChange)="editRubriqueGroup(i).get('isSubjectToSocialCharges')!.setValue($event)">
+                                        </daf-checkbox>
+                                      </div>
+                                    </div>
+
+                                    <div class="rg-section">
+                                      <h4 class="rg-section-title">{{ 'PAYROLL.PARAMETER_SETS.SECTION_CONTRACT_TYPES' | translate }}</h4>
+                                      <div class="rg-checkbox-group">
+                                        <daf-checkbox
+                                          [options]="{ label: 'PAYROLL.PARAMETER_SETS.CT_ALL_TITLE' | translate, hint: 'PAYROLL.PARAMETER_SETS.CT_ALL_DESC' | translate }"
+                                          [checked]="editRubriqueGroup(i).get('ctAll')!.value"
+                                          (checkedChange)="editRubriqueGroup(i).get('ctAll')!.setValue($event)">
+                                        </daf-checkbox>
+                                        @if (!editRubriqueGroup(i).get('ctAll')!.value) {
+                                          <div class="rg-contract-types">
+                                            <daf-checkbox [options]="{ label: 'CDI' }" [checked]="editRubriqueGroup(i).get('ctCDI')!.value" (checkedChange)="editRubriqueGroup(i).get('ctCDI')!.setValue($event)" />
+                                            <daf-checkbox [options]="{ label: 'CDD' }" [checked]="editRubriqueGroup(i).get('ctCDD')!.value" (checkedChange)="editRubriqueGroup(i).get('ctCDD')!.setValue($event)" />
+                                            <daf-checkbox [options]="{ label: ('PAYROLL.PARAMETER_SETS.CT_STAGE' | translate) }" [checked]="editRubriqueGroup(i).get('ctSTAGE')!.value" (checkedChange)="editRubriqueGroup(i).get('ctSTAGE')!.setValue($event)" />
+                                            <daf-checkbox [options]="{ label: 'CIVP' }" [checked]="editRubriqueGroup(i).get('ctCIVP')!.value" (checkedChange)="editRubriqueGroup(i).get('ctCIVP')!.setValue($event)" />
+                                          </div>
+                                        }
+                                      </div>
+                                    </div>
+
+                                    <div class="rg-section">
+                                      <h4 class="rg-section-title">{{ 'PAYROLL.PARAMETER_SETS.SECTION_STATUS' | translate }}</h4>
+                                      <daf-checkbox
+                                        [options]="{ label: 'PAYROLL.PARAMETER_SETS.ACTIVE_CHECKBOX_TITLE' | translate, hint: 'PAYROLL.PARAMETER_SETS.ACTIVE_CHECKBOX_DESC' | translate }"
+                                        [checked]="editRubriqueGroup(i).get('isActive')!.value"
+                                        (checkedChange)="editRubriqueGroup(i).get('isActive')!.setValue($event)">
+                                      </daf-checkbox>
+                                    </div>
+
+                                    <div class="rg-preview-section">
+                                      <span class="rg-preview-label">
+                                        {{ 'PAYROLL.PARAMETER_SETS.PREVIEW_LABEL' | translate: { gross: testGross().toLocaleString('fr-FR') } }}
+                                      </span>
+                                      <span class="rg-preview-amount">{{ previewAmount(i) }} TND</span>
+                                    </div>
+
+                              </daf-accordion-card>
                             }
                           </ng-container>
                         }
-                      </ng-container>
-                    </div>
-                  }
-                </div>
+                      </div>
+                    }
+
+                </daf-accordion-card>
               }
-
-              <!-- ── Avantages en nature (legacy) ────────────────────────── -->
-              @if (ps.benefits.length) {
-                <div class="detail-section-header" style="margin-top:20px">
-                  <h3>Avantages en nature ({{ ps.benefits.length }})</h3>
-                </div>
-                <div class="table-wrap">
-                  <table class="data-table">
-                    <thead><tr><th>Code</th><th>Libellé</th><th>Valeur/mois</th><th>Imposable</th></tr></thead>
-                    <tbody>
-                      @for (b of ps.benefits; track b.benefitCode) {
-                        <tr>
-                          <td>{{ b.benefitCode }}</td>
-                          <td>{{ b.benefitLabelFr }}</td>
-                          <td>{{ b.monthlyValue | number:'1.0-0' }}</td>
-                          <td>{{ b.isTaxable ? 'Oui' : 'Non' }}</td>
-                        </tr>
-                      }
-                    </tbody>
-                  </table>
-                </div>
-              }
-
-              <!-- ── Rubriques de paie ────────────────────────────────────── -->
-              <div class="detail-section-header" style="margin-top:20px">
-                <h3>Rubriques de paie ({{ ps.rubriques.length }})</h3>
-                <button class="btn-sm btn-sm--secondary" type="button" (click)="openRubriquesEditor(ps)">
-                  @if (editingRubriquesId() === ps.id) { Annuler } @else { Modifier }
-                </button>
-              </div>
-
-              <!-- Read-only rubriques view -->
-              @if (editingRubriquesId() !== ps.id) {
-                @if (ps.rubriques.length) {
-                  <div class="table-wrap">
-                    <table class="data-table">
-                      <thead>
-                        <tr>
-                          <th>Code</th>
-                          <th>Libellé</th>
-                          <th>Nature</th>
-                          <th>Mode calcul</th>
-                          <th>Valeur / Taux</th>
-                          <th>Direction</th>
-                          <th>IRPP</th>
-                          <th>Charges</th>
-                          <th>Contrats</th>
-                          <th>Actif</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        @for (r of ps.rubriques; track r.code) {
-                          <tr [class.row-inactive]="!r.isActive">
-                            <td><code class="code-pill">{{ r.code }}</code></td>
-                            <td>{{ r.labelFr }}</td>
-                            <td><span [class]="natureClass(r.nature)">{{ natureLabel(r.nature) }}</span></td>
-                            <td>{{ formatCalcMode(r.calcMode) }}</td>
-                            <td class="num">{{ rubriqueValue(r) }}</td>
-                            <td><span [class]="directionClass(r.direction)">{{ r.direction }}</span></td>
-                            <td class="center">{{ r.isSubjectToIrpp ? '✓' : '—' }}</td>
-                            <td class="center">{{ r.isSubjectToSocialCharges ? '✓' : '—' }}</td>
-                            <td>{{ r.contractTypes || 'Tous' }}</td>
-                            <td class="center">{{ r.isActive ? '✓' : '—' }}</td>
-                          </tr>
-                        }
-                      </tbody>
-                    </table>
-                  </div>
-                } @else {
-                  <p class="detail-empty">Aucune rubrique configurée — cliquez sur « Modifier » pour en ajouter.</p>
-                }
-              }
-
-              <!-- Rubriques guided card editor -->
-              @if (editingRubriquesId() === ps.id) {
-                <div class="rubriques-editor" [formGroup]="rubriquesForm">
-                  <div class="editor-toolbar">
-                    <button type="button" class="btn-sm btn-sm--secondary" (click)="addEditRubrique()">+ Ajouter une rubrique</button>
-                    <button type="button" class="btn-sm btn-sm--primary" (click)="saveRubriques(ps.id)" [disabled]="savingRubriques()">
-                      @if (savingRubriques()) { Enregistrement… } @else { Enregistrer tout }
-                    </button>
-                  </div>
-
-                  @if (editRubriques.length === 0) {
-                    <p class="detail-empty">Aucune rubrique — cliquez sur « Ajouter une rubrique ».</p>
-                  } @else {
-                    <div class="preview-control">
-                      <span class="field-label">Salaire brut de test :</span>
-                      <input type="number" class="ri preview-gross-input"
-                             [value]="testGross()"
-                             (input)="testGross.set(+$any($event.target).value || 3000)"
-                             min="1" step="100" />
-                      <span class="preview-gross-unit">TND / mois</span>
-                    </div>
-
-                    <ng-container formArrayName="items">
-                      @for (ctrl of editRubriques.controls; track $index; let i = $index) {
-                        <div class="rubrique-card" [class.rubrique-card--expanded]="isRubriqueExpanded(i)" [formGroupName]="i">
-
-                          <div class="rubrique-card-header" (click)="toggleRubriqueCard(i)">
-                            <div class="rch-left">
-                              <span class="rch-arrow">{{ isRubriqueExpanded(i) ? '▼' : '▶' }}</span>
-                              <code class="code-pill">{{ editRubriqueGroup(i).get('code')!.value || '…' }}</code>
-                              <span class="rch-label">{{ editRubriqueGroup(i).get('labelFr')!.value || 'Nouvelle rubrique' }}</span>
-                              <span [class]="natureClass(editRubriqueGroup(i).get('nature')!.value)">
-                                {{ natureLabel(editRubriqueGroup(i).get('nature')!.value) }}
-                              </span>
-                              <span class="rch-mode">{{ calcModeLabel(editRubriqueGroup(i).get('calcMode')!.value) }}</span>
-                            </div>
-                            <div class="rch-right">
-                              <span class="rch-value">{{ previewAmount(i) }} TND</span>
-                              <button type="button" class="btn-remove" title="Supprimer cette rubrique"
-                                      (click)="$event.stopPropagation(); removeEditRubrique(i)">✕</button>
-                            </div>
-                          </div>
-
-                          @if (isRubriqueExpanded(i)) {
-                            <div class="rubrique-card-body">
-
-                              <div class="rg-section">
-                                <h4 class="rg-section-title">Identification</h4>
-                                <div class="rg-row">
-                                  <div class="rg-field rg-field--sm">
-                                    <label class="field-label">Code interne *</label>
-                                    <input class="field-input" formControlName="code"
-                                           placeholder="CNSS_SAL" style="text-transform:uppercase" />
-                                  </div>
-                                  <div class="rg-field rg-field--lg">
-                                    <label class="field-label">Libellé (français) *</label>
-                                    <input class="field-input" formControlName="labelFr"
-                                           placeholder="ex : Cotisation CNSS salariale" />
-                                  </div>
-                                  <div class="rg-field rg-field--lg">
-                                    <label class="field-label">Libellé (anglais)</label>
-                                    <input class="field-input" formControlName="labelEn"
-                                           placeholder="ex : CNSS employee contribution" />
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div class="rg-section">
-                                <h4 class="rg-section-title">Nature de la rubrique</h4>
-                                <div class="rg-radio-group">
-                                  @for (opt of natureOptions; track opt.value) {
-                                    <label class="rg-radio-card"
-                                           [class.rg-radio-card--selected]="editRubriqueGroup(i).get('nature')!.value === opt.value">
-                                      <input type="radio" formControlName="nature" [value]="opt.value" />
-                                      <span class="rg-radio-title">{{ opt.label }}</span>
-                                      <span class="rg-radio-desc">{{ opt.description }}</span>
-                                    </label>
-                                  }
-                                </div>
-                                <p class="editor-hint" style="margin-top:8px">Les retenues sont soustraites du salaire (DÉBIT) — les avantages, indemnités et primes sont ajoutés (CRÉDIT). La direction est calculée automatiquement.</p>
-                              </div>
-
-                              <div class="rg-section">
-                                <h4 class="rg-section-title">Comment est-elle calculée ?</h4>
-                                <div class="rg-radio-group">
-                                  @for (opt of calcModeOptions; track opt.value) {
-                                    <label class="rg-radio-card"
-                                           [class.rg-radio-card--selected]="editRubriqueGroup(i).get('calcMode')!.value === opt.value">
-                                      <input type="radio" formControlName="calcMode" [value]="opt.value" />
-                                      <span class="rg-radio-title">{{ opt.label }}</span>
-                                      <span class="rg-radio-desc">{{ opt.description }}</span>
-                                    </label>
-                                  }
-                                </div>
-
-                                @if (editRubriqueGroup(i).get('calcMode')!.value === 'FIXE_MENSUEL' ||
-                                     editRubriqueGroup(i).get('calcMode')!.value === 'FIXE_JOURNALIER') {
-                                  <div class="rg-row rg-row--mt">
-                                    <div class="rg-field rg-field--md">
-                                      <label class="field-label">
-                                        Montant ({{ editRubriqueGroup(i).get('calcMode')!.value === 'FIXE_JOURNALIER' ? 'par jour' : 'par mois' }})
-                                      </label>
-                                      <input class="field-input" type="number" step="0.01" formControlName="amount" placeholder="0.00" />
-                                    </div>
-                                  </div>
-                                }
-
-                                @if (editRubriqueGroup(i).get('calcMode')!.value === 'POURCENTAGE_BRUT' ||
-                                     editRubriqueGroup(i).get('calcMode')!.value === 'POURCENTAGE_CHARGES' ||
-                                     editRubriqueGroup(i).get('calcMode')!.value === 'POURCENTAGE_PLAFONNE') {
-                                  <div class="rg-row rg-row--mt">
-                                    <div class="rg-field rg-field--sm">
-                                      <label class="field-label">Taux (%)</label>
-                                      <input class="field-input" type="number" step="0.01"
-                                             formControlName="ratePercent" placeholder="9.18" />
-                                    </div>
-                                    @if (editRubriqueGroup(i).get('calcMode')!.value === 'POURCENTAGE_PLAFONNE') {
-                                      <div class="rg-field rg-field--md">
-                                        <label class="field-label">Plafond mensuel</label>
-                                        <input class="field-input" type="number" step="0.01"
-                                               formControlName="capAmount" placeholder="3 500.00" />
-                                      </div>
-                                    }
-                                  </div>
-                                }
-
-                                @if (editRubriqueGroup(i).get('calcMode')!.value === 'FORMULE') {
-                                  <div class="rg-row rg-row--mt">
-                                    <div class="rg-field rg-field--full">
-                                      <label class="field-label">Expression de calcul *</label>
-                                      <input class="field-input formula-input"
-                                             formControlName="formulaExpression"
-                                             placeholder="ex : BRUT * 0.02 + CNSS_EE * 0.50"
-                                             autocomplete="off" spellcheck="false" />
-                                      <p class="editor-hint formula-hint">
-                                        Opérateurs : <code>+</code> <code>-</code> <code>*</code> <code>/</code> <code>( )</code>
-                                        — Cliquez sur une variable pour l'insérer dans la formule :
-                                      </p>
-                                      <div class="formula-vars">
-                                        @for (v of formulaVariableHints(); track v.name) {
-                                          <button type="button" class="formula-var-chip"
-                                                  [title]="v.desc"
-                                                  (click)="insertFormulaVar(i, v.name)">{{ v.name }}</button>
-                                        }
-                                        @if (priorRubriqueVars(i).length > 0) {
-                                          <span class="formula-vars-divider">Rubriques précédentes :</span>
-                                          @for (v of priorRubriqueVars(i); track v.name) {
-                                            <button type="button" class="formula-var-chip formula-var-chip--rubrique"
-                                                    [title]="v.desc"
-                                                    (click)="insertFormulaVar(i, v.name)">{{ v.name }}</button>
-                                          }
-                                        }
-                                      </div>
-                                      <p class="editor-hint" style="margin-top:6px">
-                                        ℹ️ L'aperçu en temps réel n'est pas disponible en mode formule — lancez une simulation pour voir le résultat exact.
-                                      </p>
-                                    </div>
-                                  </div>
-                                }
-                              </div>
-
-                              <div class="rg-section">
-                                <h4 class="rg-section-title">Fiscalité &amp; charges sociales</h4>
-                                <div class="rg-checkbox-group">
-                                  <label class="rg-checkbox-item">
-                                    <input type="checkbox" formControlName="isSubjectToIrpp" />
-                                    <span>
-                                      <strong>Soumis à l'IRPP</strong>
-                                      <small>Cette rubrique est intégrée dans le calcul de l'impôt sur le revenu</small>
-                                    </span>
-                                  </label>
-                                  <label class="rg-checkbox-item">
-                                    <input type="checkbox" formControlName="isSubjectToSocialCharges" />
-                                    <span>
-                                      <strong>Élargit l'assiette des charges sociales</strong>
-                                      <small>Cette rubrique s'ajoute à la base de calcul des cotisations sociales</small>
-                                    </span>
-                                  </label>
-                                </div>
-                              </div>
-
-                              <div class="rg-section">
-                                <h4 class="rg-section-title">Types de contrat applicables</h4>
-                                <div class="rg-checkbox-group">
-                                  <label class="rg-checkbox-item">
-                                    <input type="checkbox" formControlName="ctAll" />
-                                    <span>
-                                      <strong>Tous les types de contrat</strong>
-                                      <small>CDI, CDD, Stage, CIVP — aucune restriction</small>
-                                    </span>
-                                  </label>
-                                  @if (!editRubriqueGroup(i).get('ctAll')!.value) {
-                                    <div class="rg-contract-types">
-                                      <label class="rg-tag-check"><input type="checkbox" formControlName="ctCDI" /> CDI</label>
-                                      <label class="rg-tag-check"><input type="checkbox" formControlName="ctCDD" /> CDD</label>
-                                      <label class="rg-tag-check"><input type="checkbox" formControlName="ctSTAGE" /> Stage</label>
-                                      <label class="rg-tag-check"><input type="checkbox" formControlName="ctCIVP" /> CIVP</label>
-                                    </div>
-                                  }
-                                </div>
-                              </div>
-
-                              <div class="rg-section">
-                                <h4 class="rg-section-title">Statut</h4>
-                                <label class="rg-checkbox-item">
-                                  <input type="checkbox" formControlName="isActive" />
-                                  <span>
-                                    <strong>Rubrique active</strong>
-                                    <small>Décocher pour désactiver sans supprimer</small>
-                                  </span>
-                                </label>
-                              </div>
-
-                              <div class="rg-preview-section">
-                                <span class="rg-preview-label">
-                                  Aperçu — pour un salaire brut de {{ testGross().toLocaleString('fr-FR') }} TND
-                                </span>
-                                <span class="rg-preview-amount">{{ previewAmount(i) }} TND</span>
-                              </div>
-
-                            </div>
-                          }
-                        </div>
-                      }
-                    </ng-container>
-                  }
-                </div>
-              }
-
             </div>
-          }
+          </daf-card>
         }
       </div>
-    </section>
+    }
   }
-</div>
+</daf-page>

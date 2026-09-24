@@ -1,103 +1,138 @@
-<div class="page-header">
-  <h1 class="page-title">{{ 'PAYROLL.PAYSLIPS.TITLE' | translate }}</h1>
-  <p class="page-subtitle">{{ 'PAYROLL.PAYSLIPS.SUBTITLE' | translate }}</p>
-</div>
+<daf-page [loading]="loading()" [kpis]="0" [breadcrumbs]="true" headerSize="md">
+  <daf-page-header
+    [title]="'PAYROLL.PAYSLIPS.TITLE' | translate"
+    [subtitle]="'PAYROLL.PAYSLIPS.SUBTITLE' | translate"
+    [breadcrumbs]="breadcrumbs()"
+    size="md">
+  </daf-page-header>
 
-<div class="admin-layout">
-  <section class="card" [formGroup]="form">
-    <h2 class="card-title">{{ 'PAYROLL.PAYSLIPS.FORM.TITLE' | translate }}</h2>
-
-    <div class="field-row">
-      <div class="field-group">
-        <label class="field-label">{{ 'PAYROLL.PAYSLIPS.FORM.PAYS' | translate }}</label>
-        <app-pays-select formControlName="paysId"></app-pays-select>
-      </div>
-      <div class="field-group">
-        <label class="field-label">{{ 'PAYROLL.PAYSLIPS.FORM.YEAR' | translate }}</label>
-        <input type="number" class="field-input" formControlName="periodYear" />
-      </div>
-      <div class="field-group">
-        <label class="field-label">{{ 'PAYROLL.PAYSLIPS.FORM.MONTH' | translate }}</label>
-        <select class="field-input" formControlName="periodMonth">
-          @for (opt of monthOptions(); track opt.value) {
-            <option [value]="opt.value">{{ opt.label }}</option>
-          }
-        </select>
-      </div>
-    </div>
-
-    <div class="field-group">
-      <label class="field-label">{{ 'PAYROLL.PAYSLIPS.FORM.FILE_LABEL' | translate }}</label>
-      <input type="file" class="field-file" accept=".pdf,application/pdf" (change)="onFileChange($event)" />
-      <span class="field-hint">{{ 'PAYROLL.PAYSLIPS.FORM.FILE_HINT' | translate }}</span>
-    </div>
-
-    <div class="form-actions">
-      <button class="btn btn-primary" (click)="submit()" [disabled]="!canSubmit()">
-        @if (processing()) { {{ 'PAYROLL.PAYSLIPS.FORM.PROCESSING' | translate }} }
-        @else { {{ 'PAYROLL.PAYSLIPS.FORM.SUBMIT' | translate }} }
-      </button>
-    </div>
-
-    @if (errorMessage()) { <div class="alert alert-error">{{ errorMessage() }}</div> }
-    @if (successMessage()) { <div class="alert alert-success">{{ successMessage() }}</div> }
-  </section>
-
+  <!-- ══════════════════════ BANDEAU KPI — pleine largeur, en haut de page ══════════════════════
+       Même pattern que /payroll/engine-run (et /finance/affaires/1?tab=overview) : le résumé
+       du traitement domine toute la largeur de la page, avant le split sidebar/résultats. -->
   @if (result(); as r) {
-    <section class="card summary-card">
-      <div class="summary-grid">
-        <div class="summary-stat">
-          <span class="summary-value">{{ r.totalPages }}</span>
-          <span class="summary-label">{{ 'PAYROLL.PAYSLIPS.SUMMARY.TOTAL' | translate }}</span>
-        </div>
-        <div class="summary-stat summary-stat--success">
-          <span class="summary-value">{{ r.successCount }}</span>
-          <span class="summary-label">{{ 'PAYROLL.PAYSLIPS.SUMMARY.SUCCESS' | translate }}</span>
-        </div>
-        <div class="summary-stat summary-stat--error">
-          <span class="summary-value">{{ r.errorCount }}</span>
-          <span class="summary-label">{{ 'PAYROLL.PAYSLIPS.SUMMARY.ERROR' | translate }}</span>
-        </div>
-        <div class="summary-stat summary-stat--warning">
-          <span class="summary-value">{{ r.unidentifiedCount }}</span>
-          <span class="summary-label">{{ 'PAYROLL.PAYSLIPS.SUMMARY.UNIDENTIFIED' | translate }}</span>
-        </div>
+    <daf-card
+      [options]="{ variant: 'flat', padding: 'lg', radius: 'xl', accent: needsAttention() ? 'warning' : 'success' }"
+      class="kpi-banner kpi-banner--top">
+      <div class="kpi-banner__status">
+        <daf-badge
+          [label]="(needsAttention() ? 'PAYROLL.PAYSLIPS.SUMMARY.NEEDS_ATTENTION' : 'PAYROLL.PAYSLIPS.SUMMARY.ALL_CLEAR') | translate"
+          [options]="{ variant: needsAttention() ? 'warning' : 'success', size: 'md' }">
+        </daf-badge>
       </div>
-    </section>
-
-    <section class="card">
-      <div class="table-wrap">
-        <table class="report-table">
-          <thead>
-            <tr>
-              <th>{{ 'PAYROLL.PAYSLIPS.TABLE.PAGE' | translate }}</th>
-              <th>{{ 'PAYROLL.PAYSLIPS.TABLE.MATRICULE' | translate }}</th>
-              <th>{{ 'PAYROLL.PAYSLIPS.TABLE.EMPLOYEE' | translate }}</th>
-              <th>{{ 'PAYROLL.PAYSLIPS.TABLE.STATUS' | translate }}</th>
-              <th>{{ 'PAYROLL.PAYSLIPS.TABLE.SHAREPOINT_URL' | translate }}</th>
-              <th>{{ 'PAYROLL.PAYSLIPS.TABLE.ERROR_MESSAGE' | translate }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (d of r.details; track d.pageNumber) {
-              <tr>
-                <td>{{ d.pageNumber }}</td>
-                <td>{{ d.matricule ?? '—' }}</td>
-                <td>{{ d.employeeFullName ?? '—' }}</td>
-                <td><span [class]="statusClass(d.status)">{{ statusLabel(d.status) }}</span></td>
-                <td>
-                  @if (d.sharePointUrl) {
-                    <a [href]="d.sharePointUrl" target="_blank" rel="noopener">{{ d.sharePointUrl }}</a>
-                  } @else { — }
-                </td>
-                <td>{{ d.errorMessage ?? '—' }}</td>
-              </tr>
-            } @empty {
-              <tr><td colspan="6" class="report-empty">{{ 'PAYROLL.PAYSLIPS.TABLE.EMPTY' | translate }}</td></tr>
-            }
-          </tbody>
-        </table>
+      <div class="kpi-grid">
+        <daf-metric-card
+          [label]="'PAYROLL.PAYSLIPS.SUMMARY.TOTAL' | translate"
+          [value]="'' + r.totalPages"
+          [options]="{ icon: 'description', iconBg: 'bg-primary/10', iconColor: 'text-primary' }">
+        </daf-metric-card>
+        <daf-metric-card
+          [label]="'PAYROLL.PAYSLIPS.SUMMARY.SUCCESS' | translate"
+          [value]="'' + r.successCount"
+          [options]="{ valueColor: 'text-secondary', icon: 'check_circle', iconBg: 'bg-secondary/10', iconColor: 'text-secondary' }">
+        </daf-metric-card>
+        <daf-metric-card
+          [label]="'PAYROLL.PAYSLIPS.SUMMARY.ERROR' | translate"
+          [value]="'' + r.errorCount"
+          [options]="{ valueColor: 'text-danger', icon: 'error', iconBg: 'bg-danger/10', iconColor: 'text-danger' }">
+        </daf-metric-card>
+        <daf-metric-card
+          [label]="'PAYROLL.PAYSLIPS.SUMMARY.UNIDENTIFIED' | translate"
+          [value]="'' + r.unidentifiedCount"
+          [options]="{ valueColor: 'text-tertiary', icon: 'help', iconBg: 'bg-tertiary/10', iconColor: 'text-tertiary' }">
+        </daf-metric-card>
       </div>
-    </section>
+    </daf-card>
   }
-</div>
+
+  <div class="cockpit">
+    <!-- ══════════════════════ SIDEBAR — PARAMÈTRES DU TRAITEMENT ══════════════════════ -->
+    <aside class="cockpit-sidebar">
+      <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }" class="sidebar-card">
+
+        <div class="sidebar-header">
+          <div class="sidebar-header__top">
+            <h2 class="sidebar-header__title">{{ 'PAYROLL.PAYSLIPS.FORM.TITLE' | translate }}</h2>
+            <daf-badge [label]="readyBadge().label" [options]="{ variant: readyBadge().variant, size: 'sm' }" />
+          </div>
+          <p class="sidebar-header__subtitle">{{ 'PAYROLL.PAYSLIPS.FORM.SUBTITLE' | translate }}</p>
+        </div>
+
+        <div class="sidebar-field">
+          <daf-select
+            [options]="paysOptions()"
+            [selected]="paysId() ? ['' + paysId()] : []"
+            [config]="{ label: 'PAYROLL.PAYSLIPS.FORM.PAYS' | translate, placeholder: 'PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate, searchable: true, fullWidth: true, required: true }"
+            (selectedChange)="paysId.set($event[0] ? +$event[0] : null)">
+          </daf-select>
+        </div>
+
+        <div class="sidebar-row">
+          <daf-select
+            [options]="monthOptions()"
+            [selected]="['' + periodMonth()]"
+            [config]="{ label: 'PAYROLL.PAYSLIPS.FORM.MONTH' | translate, fullWidth: true }"
+            (selectedChange)="periodMonth.set(+$event[0])">
+          </daf-select>
+
+          <daf-select
+            [options]="yearOptions()"
+            [selected]="['' + periodYear()]"
+            [config]="{ label: 'PAYROLL.PAYSLIPS.FORM.YEAR' | translate, fullWidth: true }"
+            (selectedChange)="periodYear.set(+$event[0])">
+          </daf-select>
+        </div>
+
+        <div class="sidebar-field">
+          <daf-file-upload
+            [config]="{
+              label: 'PAYROLL.PAYSLIPS.FORM.FILE_LABEL' | translate,
+              accept: '.pdf,application/pdf',
+              maxSizeMb: 50,
+              hint: 'PAYROLL.PAYSLIPS.FORM.FILE_HINT' | translate,
+              required: true,
+              disabled: processing()
+            }"
+            [(files)]="uploadedFiles">
+          </daf-file-upload>
+        </div>
+
+        <div class="sidebar-actions">
+          <daf-button
+            [label]="(processing() ? 'PAYROLL.PAYSLIPS.FORM.PROCESSING' : 'PAYROLL.PAYSLIPS.FORM.SUBMIT') | translate"
+            variant="teal"
+            [options]="{ loading: processing(), disabled: !canSubmit(), iconStart: 'upload_file', fullWidth: true }"
+            (onClick)="submit()">
+          </daf-button>
+        </div>
+      </daf-card>
+    </aside>
+
+    <!-- ══════════════════════ ZONE PRINCIPALE — DÉTAIL DU TRAITEMENT ══════════════════════ -->
+    <main class="cockpit-main">
+      @if (!result() && !processing()) {
+        <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+          <p class="empty-state">{{ 'PAYROLL.PAYSLIPS.EMPTY_RESULT_HINT' | translate }}</p>
+        </daf-card>
+      }
+
+      @if (result()) {
+        <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+          <daf-section-title [title]="'PAYROLL.PAYSLIPS.TABLE.TITLE' | translate" />
+
+          <daf-data-table
+            [columns]="detailColumns()"
+            [rows]="detailRows()"
+            [config]="{ emptyMessage: 'PAYROLL.PAYSLIPS.TABLE.EMPTY' | translate }">
+            <ng-template [dafCell]="'sharePointUrl'" let-row>
+              @if (row['sharePointUrl']) {
+                <a [href]="row['sharePointUrl']" target="_blank" rel="noopener" class="text-primary">{{ row['sharePointUrl'] }}</a>
+              } @else {
+                <span>—</span>
+              }
+            </ng-template>
+          </daf-data-table>
+        </daf-card>
+      }
+    </main>
+  </div>
+</daf-page>

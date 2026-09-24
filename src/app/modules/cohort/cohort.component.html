@@ -1,7 +1,8 @@
-<daf-page [loading]="loading()">
+<daf-page [loading]="loading()" [breadcrumbs]="true">
   <daf-page-header
-    title="Simulation cohorte — Impact budgétaire"
-    subtitle="Simulez l'impact d'une révision salariale sur un périmètre d'employés actifs. Aucun salaire individuel n'est affiché.">
+    [title]="'PAYROLL.COHORT.TITLE' | translate"
+    [subtitle]="'PAYROLL.COHORT.SUBTITLE' | translate"
+    [breadcrumbs]="breadcrumbs()">
   </daf-page-header>
 
   <div class="px-6 pb-8 flex flex-col gap-6">
@@ -11,47 +12,49 @@
 
       <div class="px-5 py-4 border-b border-outline-variant flex items-center gap-3">
         <span class="material-symbols-outlined text-xl text-primary" style="font-variation-settings:'FILL' 1">group_work</span>
-        <h2 class="text-base font-semibold text-on-surface">Périmètre &amp; modificateur</h2>
+        <h2 class="text-base font-semibold text-on-surface">{{ 'PAYROLL.COHORT.SCOPE_TITLE' | translate }}</h2>
       </div>
 
       <div class="p-5 sm:p-8 flex flex-col gap-6">
 
         <!-- Pays -->
         <div>
-          <p class="text-[13px] font-medium text-on-surface-variant mb-1.5">
-            Pays <span class="text-danger">*</span>
-          </p>
-          <app-pays-select [formControl]="$any(paysIdCtrl)" />
+          <daf-select
+            [options]="paysOptions()"
+            [selected]="paysId() ? ['' + paysId()] : []"
+            [config]="{ label: 'PAYROLL.COHORT.PAYS' | translate, placeholder: 'PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate, searchable: true, fullWidth: true, required: true }"
+            (selectedChange)="paysId.set($event[0] ? +$event[0] : null)">
+          </daf-select>
         </div>
 
         <!-- Demographic filters -->
         <div>
           <div class="flex items-center gap-3 mb-4">
             <span class="text-[11px] font-bold uppercase tracking-[0.07em] text-on-surface-variant whitespace-nowrap">
-              Filtres démographiques
+              {{ 'PAYROLL.COHORT.DEMOGRAPHIC_FILTERS' | translate }}
             </span>
             <div class="flex-1 h-px bg-outline-variant"></div>
-            <span class="text-[11px] text-on-surface-variant italic whitespace-nowrap">vide = tous les actifs</span>
+            <span class="text-[11px] text-on-surface-variant italic whitespace-nowrap">{{ 'PAYROLL.COHORT.FILTERS_HINT' | translate }}</span>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <daf-form-field
-              [options]="{ label: 'Grade', type: 'text', placeholder: 'ex : Senior' }"
+              [options]="{ label: 'PAYROLL.COHORT.GRADE_LABEL' | translate, type: 'text', placeholder: 'PAYROLL.COHORT.GRADE_PLACEHOLDER' | translate }"
               [value]="grade()"
               (valueChange)="grade.set(($event ?? '') + '')">
             </daf-form-field>
             <daf-form-field
-              [options]="{ label: 'Discipline', type: 'text', placeholder: 'ex : Engineering' }"
+              [options]="{ label: 'PAYROLL.COHORT.DISCIPLINE_LABEL' | translate, type: 'text', placeholder: 'PAYROLL.COHORT.DISCIPLINE_PLACEHOLDER' | translate }"
               [value]="discipline()"
               (valueChange)="discipline.set(($event ?? '') + '')">
             </daf-form-field>
             <daf-select
-              [options]="contractTypeOptions"
+              [options]="contractTypeOptions()"
               [selected]="[contractType()]"
-              [config]="{ label: 'Type de contrat', fullWidth: true }"
+              [config]="{ label: 'PAYROLL.COHORT.CONTRACT_TYPE_LABEL' | translate, fullWidth: true }"
               (selectedChange)="contractType.set($event[0])">
             </daf-select>
             <daf-form-field
-              [options]="{ label: 'Entité', type: 'text', placeholder: 'ex : ITEC Tunisia' }"
+              [options]="{ label: 'PAYROLL.COHORT.ENTITE_LABEL' | translate, type: 'text', placeholder: 'PAYROLL.COHORT.ENTITE_PLACEHOLDER' | translate }"
               [value]="entite()"
               (valueChange)="entite.set(($event ?? '') + '')">
             </daf-form-field>
@@ -62,28 +65,28 @@
         <div>
           <div class="flex items-center gap-3 mb-4">
             <span class="text-[11px] font-bold uppercase tracking-[0.07em] text-on-surface-variant whitespace-nowrap">
-              Modificateur salarial
+              {{ 'PAYROLL.COHORT.MODIFIER_TITLE' | translate }}
             </span>
             <div class="flex-1 h-px bg-outline-variant"></div>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <daf-select
-              [options]="modifierTypeOptions"
+              [options]="modifierTypeOptions()"
               [selected]="[modifierType()]"
-              [config]="{ label: 'Type', fullWidth: true }"
+              [config]="{ label: 'PAYROLL.COHORT.MODIFIER_TYPE_LABEL' | translate, fullWidth: true }"
               (selectedChange)="modifierType.set($event[0])">
             </daf-select>
             <div class="flex flex-col gap-1">
               <daf-form-field
-                [options]="{ label: modifierType() === 'PCT' ? 'Valeur (%)' : 'Montant (devise locale)', type: 'number', placeholder: 'ex : 5' }"
+                [options]="{ label: (modifierType() === 'PCT' ? 'PAYROLL.COHORT.MODIFIER_VALUE_PCT_LABEL' : 'PAYROLL.COHORT.MODIFIER_VALUE_ABS_LABEL') | translate, type: 'number', placeholder: 'PAYROLL.COHORT.MODIFIER_VALUE_PLACEHOLDER' | translate }"
                 [value]="modifierValue().toString()"
                 (valueChange)="modifierValue.set(+($event ?? 0))">
               </daf-form-field>
               <p class="text-[11px] text-on-surface-variant">
                 @if (modifierType() === 'PCT') {
-                  5 = +5% · −3 = −3% du net versé
+                  {{ 'PAYROLL.COHORT.MODIFIER_HINT_PCT' | translate }}
                 } @else {
-                  Montant à ajouter / soustraire au salaire net
+                  {{ 'PAYROLL.COHORT.MODIFIER_HINT_ABS' | translate }}
                 }
               </p>
             </div>
@@ -95,9 +98,9 @@
       <!-- Actions -->
       <div class="px-5 pb-5 sm:px-8 sm:pb-8 flex items-center gap-4 flex-wrap">
         <daf-button
-          label="Simuler l'impact"
+          [label]="'PAYROLL.COHORT.SUBMIT' | translate"
           variant="primary"
-          [options]="{ loading: loading(), disabled: !paysIdCtrl.value || loading(), iconStart: 'calculate' }"
+          [options]="{ loading: loading(), disabled: !paysId() || loading(), iconStart: 'calculate' }"
           (onClick)="submit()">
         </daf-button>
 
@@ -119,21 +122,21 @@
         <div class="px-5 py-4 border-b border-outline-variant flex items-center justify-between flex-wrap gap-3">
           <div class="flex items-center gap-3">
             <span class="material-symbols-outlined text-xl text-tertiary" style="font-variation-settings:'FILL' 1">analytics</span>
-            <h2 class="text-base font-semibold text-on-surface">Résultats de simulation</h2>
+            <h2 class="text-base font-semibold text-on-surface">{{ 'PAYROLL.COHORT.RESULTS_TITLE' | translate }}</h2>
           </div>
           <div class="flex flex-wrap items-center gap-2">
             <span class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
               <span class="material-symbols-outlined text-sm">group</span>
-              {{ r.headcount }} employés simulés
+              {{ 'PAYROLL.COHORT.HEADCOUNT_BADGE' | translate: { count: r.headcount } }}
             </span>
             @if (r.appliedFilters.grade) {
               <span class="rounded-full border border-outline-variant px-2.5 py-0.5 text-[11px] text-on-surface-variant">
-                Grade : {{ r.appliedFilters.grade }}
+                {{ 'PAYROLL.COHORT.FILTER_GRADE' | translate: { value: r.appliedFilters.grade } }}
               </span>
             }
             @if (r.appliedFilters.discipline) {
               <span class="rounded-full border border-outline-variant px-2.5 py-0.5 text-[11px] text-on-surface-variant">
-                Discipline : {{ r.appliedFilters.discipline }}
+                {{ 'PAYROLL.COHORT.FILTER_DISCIPLINE' | translate: { value: r.appliedFilters.discipline } }}
               </span>
             }
             @if (r.appliedFilters.contractType) {
@@ -154,26 +157,26 @@
         <!-- KPI metric cards -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 p-5 sm:p-8">
           <daf-metric-card
-            label="Coût mensuel actuel"
+            [label]="'PAYROLL.COHORT.METRIC_CURRENT' | translate"
             [value]="fmt(r.currentMonthlyCost) + ' ' + (r.localCurrency ?? '')"
             [options]="{ icon: 'payments', iconColor: 'text-on-surface-variant', iconBg: 'bg-surface-container' }">
           </daf-metric-card>
 
           <daf-metric-card
-            label="Coût mensuel projeté"
+            [label]="'PAYROLL.COHORT.METRIC_PROJECTED' | translate"
             [value]="fmt(r.projectedMonthlyCost) + ' ' + (r.localCurrency ?? '')"
             [options]="{ icon: 'trending_up', iconColor: 'text-primary', iconBg: 'bg-primary/10' }">
           </daf-metric-card>
 
           <daf-metric-card
-            label="Δ mensuel"
+            [label]="'PAYROLL.COHORT.METRIC_DELTA_MONTHLY' | translate"
             [value]="(r.deltaMonthly > 0 ? '+' : '') + fmt(r.deltaMonthly) + ' ' + (r.localCurrency ?? '')"
             [options]="{ icon: 'compare_arrows', iconColor: r.deltaMonthly >= 0 ? 'text-success' : 'text-danger', iconBg: r.deltaMonthly >= 0 ? 'bg-success/10' : 'bg-danger/10' }"
             [delta]="deltaMetric(r, true)">
           </daf-metric-card>
 
           <daf-metric-card
-            label="Impact annuel"
+            [label]="'PAYROLL.COHORT.METRIC_DELTA_ANNUAL' | translate"
             [value]="(r.deltaAnnual > 0 ? '+' : '') + fmt(r.deltaAnnual) + ' ' + (r.localCurrency ?? '')"
             [options]="{ icon: 'calendar_today', iconColor: r.deltaAnnual >= 0 ? 'text-success' : 'text-danger', iconBg: r.deltaAnnual >= 0 ? 'bg-success/10' : 'bg-danger/10' }"
             [delta]="deltaMetric(r, false)">
@@ -186,7 +189,7 @@
             <div class="flex items-center gap-2 px-4 py-3 bg-surface-container-low border-b border-outline-variant">
               <span class="material-symbols-outlined text-base text-on-surface-variant">currency_exchange</span>
               <span class="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
-                Conversions devises — coût mensuel chargé
+                {{ 'PAYROLL.COHORT.FX_TITLE' | translate }}
               </span>
             </div>
             <div class="divide-y divide-outline-variant">
