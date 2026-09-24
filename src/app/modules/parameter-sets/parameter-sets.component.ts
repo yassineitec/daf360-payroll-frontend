@@ -90,24 +90,14 @@ export class ParameterSetsComponent implements OnInit {
     this.paysList().map(p => ({ value: String(p.id), label: `${p.frenchLabel} (${p.isoCode})` })),
   );
 
-  /** Pays du profil de l'utilisateur connecté — pré-sélectionne le sélecteur pays de
-   *  l'onglet "Jeux existants" et lance le chargement tout de suite, comme sur
-   *  `/payroll/candidate-simulation` (`userStore.currentUser()?.paysId`). */
-  readonly myPaysId = computed(() => this.userStore.currentUser()?.paysId ?? null);
-
   ngOnInit(): void {
     this.api.listPays().subscribe(list => this.paysList.set(list));
 
-    const myPaysId = this.myPaysId();
-    if (myPaysId) {
-      this.filterForm.get('paysId')!.setValue(myPaysId);
-      this.load();
-    } else {
-      // Pas de pays sur le profil ⇒ aucun `load()` ne part, et c'est lui seul qui éteint
-      // `firstLoad` : sans ceci la page (onglet "Nouveau jeu" compris) restait sur le
-      // squelette de `daf-page` indéfiniment.
-      this.firstLoad.set(false);
-    }
+    // Aucun pays pré-sélectionné (pas même celui du profil), comme sur
+    // `/payroll/candidate-simulation` : l'utilisateur choisit dans le bouton filtre, ce qui
+    // lance `load()`. Aucun `load()` ne part donc ici, et c'est lui seul qui éteint
+    // `firstLoad` : sans ceci la page restait sur le squelette de `daf-page`.
+    this.firstLoad.set(false);
   }
 
   /** Un utilisateur sans droit de création arrivait sur l'onglet "Nouveau jeu" — désactivé
@@ -117,13 +107,14 @@ export class ParameterSetsComponent implements OnInit {
     if (this.activeTab() === 'create' && !this.canCreate()) this.activeTab.set('list');
   });
 
-  /** Pas de bouton "Charger" : choisir un pays dans le sélecteur (header) déclenche le
-   *  chargement directement — même comportement que les sélecteurs pays/employé sur
-   *  `/payroll/candidate-simulation` et `/payroll/engine-results`. */
-  onPaysChange(selected: string[]): void {
-    const paysId = selected[0] ? Number(selected[0]) : null;
+  /** Pays de l'onglet "Jeux existants", choisi dans le bouton filtre (avec le statut),
+   *  comme sur `/payroll/candidate-simulation`. Miroir signal de `filterForm.paysId`, pour
+   *  que `filterConfig` / `emptyMessage` se recalculent quand il change. */
+  readonly listPaysId = signal<number | null>(null);
+
+  private setListPays(paysId: number | null): void {
+    this.listPaysId.set(paysId);
     this.filterForm.get('paysId')!.setValue(paysId);
-    if (paysId) this.load();
   }
 
   /** La création reste ouverte qu'aux rôles qui pouvaient déjà y accéder sur l'ancienne
@@ -190,7 +181,16 @@ export class ParameterSetsComponent implements OnInit {
     });
   });
 
+  /** Pays + statut dans le même bouton filtre. Le pays est chargé côté serveur (un
+   *  changement relance `load()`), le statut filtre la liste déjà en mémoire. */
   readonly filterFields = computed<FilterField[]>(() => [{
+    name: 'pays',
+    label: this.t('PAYROLL.PARAMETER_SETS.PAYS'),
+    type: 'select',
+    searchable: true,
+    placeholder: this.t('PAYROLL.SELECT.PAYS_PLACEHOLDER'),
+    options: this.paysOptions(),
+  }, {
     name: 'status',
     label: this.t('PAYROLL.PARAMETER_SETS.STATUS_FILTER_LABEL'),
     type: 'select',
@@ -207,12 +207,30 @@ export class ParameterSetsComponent implements OnInit {
     triggerLabel: this.t('PAYROLL.PARAMETER_SETS.FILTER_TRIGGER'),
     // `daf-filter` seeds `initialValues` once, in its own internal shape — a `select`
     // field is a `string[]` there (normalizes to a scalar only on `apply`).
-    initialValues: { status: this.statusFilter() ? [this.statusFilter()] : [] },
+    initialValues: {
+      pays:   this.listPaysId() ? [String(this.listPaysId())] : [],
+      status: this.statusFilter() ? [this.statusFilter()] : [],
+    },
   }));
 
   applyFilters(result: FilterResult): void {
     this.statusFilter.set((result['status'] as string | null) ?? '');
+    const raw = result['pays'] as string | null;
+    const paysId = raw ? Number(raw) : null;
+    if (paysId !== this.listPaysId()) {
+      this.setListPays(paysId);
+      this.selected.set(null);
+      this.load();
+    }
   }
+
+  /** Message de la liste vide : pas encore de pays, chargement, pays sans jeu, ou filtre. */
+  readonly emptyMessage = computed(() => {
+    if (!this.listPaysId())          return this.t('PAYROLL.PARAMETER_SETS.NO_PAYS_SELECTED');
+    if (this.loading())              return this.t('PAYROLL.COMMON.LOADING');
+    if (!this.paramSets().length)    return this.t('PAYROLL.PARAMETER_SETS.EMPTY_FOR_PAYS');
+    return this.t('PAYROLL.PARAMETER_SETS.EMPTY_FILTERED');
+  });
 
   // ── Charges sociales editor ───────────────────────────────────────────────
   readonly editingChargesId = signal<number | null>(null);
@@ -323,7 +341,7 @@ export class ParameterSetsComponent implements OnInit {
 
         // Bascule vers l'onglet liste, filtrée sur le pays du jeu qu'on vient de créer —
         // même confort que l'ancien panneau, qui l'ajoutait directement à la liste affichée.
-        this.filterForm.get('paysId')!.setValue(ps.paysId);
+        this.setListPays(ps.paysId);
         this.activeTab.set('list');
         this.load();
       },
@@ -337,7 +355,11 @@ export class ParameterSetsComponent implements OnInit {
   // ── Data loading ──────────────────────────────────────────────────────────
   load(): void {
     const paysId = this.filterForm.get('paysId')?.value;
-    if (!paysId) return;
+    if (!paysId) {
+      // Pays retiré du filtre : l'onglet revient à son état vide (KPI à 0, liste vide).
+      this.paramSets.set([]);
+      return;
+    }
     this.loading.set(true);
     this.api.listParameterSets(paysId).subscribe({
       next: ps => {
@@ -376,17 +398,6 @@ export class ParameterSetsComponent implements OnInit {
 
   itemTitle(ps: ParameterSetDto): string {
     return `v${ps.version} — ${ps.fiscalYear}`;
-  }
-
-  /** `daf-accordion-card` `state` for a parameter set — mirrors `statusVariant()`'s
-   *  colour so the accent stripe and the status pill never disagree. */
-  accordionState(ps: ParameterSetDto): AccordionState {
-    switch (ps.status) {
-      case 'ACTIVE':          return 'done';
-      case 'PENDING_FINANCE': return 'active';
-      case 'ARCHIVED':        return 'locked';
-      default:                return 'pending'; // DRAFT
-    }
   }
 
   // ── Charges sociales ──────────────────────────────────────────────────────

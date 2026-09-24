@@ -5,23 +5,6 @@
     [title]="'PAYROLL.PARAMETER_SETS.TITLE' | translate"
     [subtitle]="'PAYROLL.PARAMETER_SETS.SUBTITLE' | translate"
     [breadcrumbs]="breadcrumbs()">
-    <!-- ── Sélecteur pays, dans le header à côté du titre — même emplacement/type que
-         les sélecteurs pays/employé sur /payroll/candidate-simulation et
-         /payroll/engine-results (slot `pageActions`). Choisir un pays déclenche le
-         chargement directement, plus de bouton "Charger". Seulement sur l'onglet
-         "Jeux existants" — pas de sens sur "Nouveau jeu", qui a son propre sélecteur
-         pays dans le formulaire de création. ─────────────────────────────────────── -->
-    @if (activeTab() === 'list') {
-      <div pageActions class="ps-pays-trigger">
-        <daf-select
-          [options]="paysOptions()"
-          [selected]="filterForm.get('paysId')!.value ? ['' + filterForm.get('paysId')!.value] : []"
-          [config]="{ placeholder: 'PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate, searchable: true, fullWidth: false, disabled: loading() }"
-          [ariaLabel]="'PAYROLL.PARAMETER_SETS.PAYS' | translate"
-          (selectedChange)="onPaysChange($event)">
-        </daf-select>
-      </div>
-    }
   </daf-page-header>
 
   <div class="ps-tabs-wrap">
@@ -33,17 +16,21 @@
     <!-- ══════════════════════════ Onglet "Nouveau jeu" ══════════════════════════ -->
     @case ('create') {
       <div class="ps-create-layout">
-        <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }" [formGroup]="newSetForm">
+        <!-- Même structure que le formulaire de référence de la bibliothèque (demo-app,
+             section "Formulaires") : daf-card `default`, titre de section, puis une colonne
+             de blocs espacés uniformément (`.ps-form`) au lieu de marges au cas par cas. -->
+        <daf-card [options]="{ variant: 'default', padding: 'lg', radius: 'xl' }" [formGroup]="newSetForm">
+         <div class="ps-form">
+
+          <daf-section-title [title]="'PAYROLL.ADMIN.CARD_TITLE' | translate" />
 
           <div class="field-row">
-            <div class="field-group">
-              <daf-select
-                [options]="paysOptions()"
-                [selected]="newSetForm.get('paysId')!.value ? ['' + newSetForm.get('paysId')!.value] : []"
-                [config]="{ label: 'PAYROLL.ADMIN.PAYS' | translate, placeholder: 'PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate, searchable: true, fullWidth: true, required: true }"
-                (selectedChange)="newSetForm.get('paysId')!.setValue($event[0] ? +$event[0] : null)">
-              </daf-select>
-            </div>
+            <daf-select
+              [options]="paysOptions()"
+              [selected]="newSetForm.get('paysId')!.value ? ['' + newSetForm.get('paysId')!.value] : []"
+              [config]="{ label: 'PAYROLL.ADMIN.PAYS' | translate, placeholder: 'PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate, searchable: true, fullWidth: true, required: true }"
+              (selectedChange)="newSetForm.get('paysId')!.setValue($event[0] ? +$event[0] : null)">
+            </daf-select>
             <daf-form-field
               [options]="{ label: 'PAYROLL.ADMIN.FISCAL_YEAR' | translate, type: 'number' }"
               [value]="newSetForm.get('fiscalYear')!.value"
@@ -191,6 +178,7 @@
               (onClick)="submitNewSet()">
             </daf-button>
           </div>
+         </div>
         </daf-card>
       </div>
     }
@@ -200,9 +188,10 @@
       <div class="ps-layout">
         <!-- ── Bandeau exécutif : comme /payroll/candidate-simulation et
              /payroll/engine-results — une section nue en grille, sans carte
-             englobante. ─────────────────────────────────────────────────── -->
-        @if (paramSets().length) {
-          <section class="grid grid-cols-4 gap-2 sm:gap-6 kpi-section">
+             englobante. TOUJOURS affiché : à 0 tant qu'aucun pays n'est choisi dans
+             le bouton filtre, mis à jour dès qu'il l'est. ─────────────────── -->
+        <section class="grid grid-cols-4 gap-2 sm:gap-6 kpi-section transition-opacity"
+                 [class.opacity-60]="loading()">
             <daf-metric-card
               [label]="'PAYROLL.PARAMETER_SETS.KPI_TOTAL_SETS' | translate"
               [value]="paramSetKpis().total"
@@ -224,9 +213,9 @@
               [options]="{ valueColor: 'text-success', icon: 'check_circle', iconColor: 'text-success', iconBg: 'bg-success/10' }">
             </daf-metric-card>
           </section>
-        }
 
-        @if (paramSets().length) {
+          <!-- Recherche + bouton filtre (PAYS et statut) — toujours affichés, même vides :
+               c'est ici que le pays se choisit. -->
           <daf-search-toolbar
             [placeholder]="'PAYROLL.PARAMETER_SETS.SEARCH_PLACEHOLDER' | translate"
             [value]="searchText()"
@@ -237,17 +226,17 @@
             (filterApply)="applyFilters($event)">
           </daf-search-toolbar>
 
-          <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+          <!-- Accordéons de la bibliothèque tels quels, empilés sans carte englobante et sans
+               `state` : pas de liseré ni de pastille colorés, le statut reste dans le libellé. -->
+          <div class="ps-list">
             <daf-section-title [title]="'PAYROLL.PARAMETER_SETS.PARAM_SETS_TITLE' | translate: { count: filteredParamSets().length }" />
-            <div class="ps-list">
               @for (ps of filteredParamSets(); track ps.id) {
                 <daf-accordion-card
                   [options]="{
                     title: itemTitle(ps),
                     subtitle: ('PAYROLL.PARAMETER_SETS.PS_META' | translate: { tolerance: ps.convergenceTolerance, threshold: ps.calibrationThresholdPct }),
                     icon: 'tune',
-                    statusLabel: statusLabel(ps),
-                    state: accordionState(ps)
+                    statusLabel: statusLabel(ps)
                   }"
                   [open]="selected()?.id === ps.id"
                   (openChange)="onAccordionToggle(ps, $event)">
@@ -325,11 +314,9 @@
 
                 </daf-accordion-card>
               } @empty {
-                <p class="detail-empty">{{ 'PAYROLL.PARAMETER_SETS.EMPTY_FILTERED' | translate }}</p>
+                <p class="detail-empty">{{ emptyMessage() }}</p>
               }
-            </div>
-          </daf-card>
-        }
+          </div>
       </div>
 
       <!-- ══════════════════════════════════════════════════════════════════════════

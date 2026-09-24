@@ -1,11 +1,11 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  TemplateRef,
   inject,
   signal,
   computed,
   viewChild,
-  TemplateRef,
   OnDestroy,
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -31,7 +31,7 @@ import {
   ButtonComponent,
   CardComponent,
   CheckboxComponent,
-  DrawerComponent,
+  DataTableComponent,
   FormFieldComponent,
   MetricCardComponent,
   ModalService,
@@ -46,10 +46,13 @@ import {
 import type {
   BadgeOptions,
   BreadcrumbItem,
+  ModalRef,
   PageHeaderBadge,
   RadioOption,
   SelectOption,
   StepperStep,
+  TableColumn,
+  TableRow,
 } from '@khalilrebhiitec/daf360';
 
 /** Who the simulation is for. Drives which identity fields are collected, and whether
@@ -86,7 +89,7 @@ interface IrppBracketRow {
   imports: [
     CommonModule, ReactiveFormsModule, TranslatePipe, EmployeeSelectComponent,
     AccordionCardComponent, ButtonComponent, CardComponent, CheckboxComponent,
-    DrawerComponent, FormFieldComponent, MetricCardComponent, PageComponent,
+    DataTableComponent, FormFieldComponent, MetricCardComponent, PageComponent,
     PageHeaderComponent, RadioGroupComponent, SectionTitleComponent, SelectComponent,
     StatusBadgeComponent, StepperComponent,
   ],
@@ -102,8 +105,12 @@ export class SimulatorComponent implements OnDestroy {
   private readonly modalService = inject(ModalService);
   readonly userStore        = inject(UserStore);
 
-  /** Body of the result `daf-modal` — see `openResultModal()`. */
-  private readonly resultTemplate = viewChild.required<TemplateRef<unknown>>('resultTemplate');
+  /**
+   * Result view — shown IN PLACE of the form on this page (no popup): `true` after a
+   * successful `submit()`, a history entry, or the header's "Voir le résultat";
+   * `backToForm()` brings the form back with its values untouched.
+   */
+  readonly resultView = signal(false);
   private readonly destroy$ = new Subject<void>();
 
   /**
@@ -149,13 +156,10 @@ export class SimulatorComponent implements OnDestroy {
   /** `GET /api/payroll/simulations/individual/history` — permission-gated (see below). */
   readonly history     = signal<SimulationResultDto[]>([]);
 
-  /** `daf-drawer` open state for the recent runs — driven from the page-header action
-   *  (the drawer runs with `showToggle: false`, so this is its only way in). */
-  readonly historyOpen = signal(false);
-
-  /** `daf-accordion-card` open state for the "Simuler" card — open by default so the
-   *  primary action stays one click away; the user can still collapse it. */
-  readonly simulateCardOpen = signal(true);
+  /** Recent runs popup — library `ModalService`, body = the `#historyTpl` list, opened
+   *  from the page-header action "Simulations récentes". */
+  private readonly historyTpl = viewChild<TemplateRef<unknown>>('historyTpl');
+  private historyModalRef: ModalRef | null = null;
 
   readonly selectedCodes = signal<Set<string>>(new Set());
   /** Candidate (free-text identity) or collaborator (hydrated by the backend from RH). */
@@ -288,6 +292,64 @@ export class SimulatorComponent implements OnDestroy {
     const r = this.result();
     return r ? parseRubriquesApplied(r.rubriquesApplied) : [];
   });
+
+  // ── daf-data-table columns/rows — result view (read-only) ─────────────────
+  // Same approach as the parameter-sets page, which shows the same charges/rubriques.
+
+  readonly rubriquesColumns = computed((): TableColumn[] => [
+    { key: 'code',     label: this.t('PAYROLL.SIMULATOR.RUBRIQUES.COL_CODE') },
+    { key: 'nature',   label: this.t('PAYROLL.SIMULATOR.RUBRIQUES.COL_NATURE') },
+    { key: 'calcMode', label: this.t('PAYROLL.SIMULATOR.RUBRIQUES.COL_MODE') },
+    // Signed amount: DEBIT negative. `signColor` paints it red, CREDIT green.
+    {
+      key: 'amount', label: this.t('PAYROLL.SIMULATOR.RUBRIQUES.COL_AMOUNT'),
+      type: 'number', align: 'right',
+      format: {
+        locale: this.numberLocale(), minimumFractionDigits: 2, maximumFractionDigits: 2,
+        signColor: true, signDisplay: true,
+      },
+    },
+  ]);
+
+  readonly rubriquesRows = computed((): TableRow[] =>
+    this.parsedRubriques().map(rb => ({
+      id:       rb.code,
+      code:     rb.code,
+      nature:   rb.nature ?? '—',
+      calcMode: rb.calcMode === 'FORMULE' ? 'ƒ(x)' : rb.calcMode,
+      amount:   rb.direction === 'DEBIT' ? -rb.amount : rb.amount,
+    })),
+  );
+
+  readonly irppColumns = computed((): TableColumn[] => [
+    { key: 'bracket', label: this.t('PAYROLL.SIMULATOR.REFERENTIAL.COL_BRACKET') },
+    { key: 'rate',    label: this.t('PAYROLL.SIMULATOR.REFERENTIAL.COL_RATE'), align: 'right' },
+  ]);
+
+  readonly irppRows = computed((): TableRow[] =>
+    this.irppBrackets().map(b => ({
+      id:      b.lower,
+      bracket: `${this.money(b.lower, '', 0)} — ${this.bracketUpper(b)}`,
+      rate:    this.percent(b.rate),
+    })),
+  );
+
+  readonly chargesColumns = computed((): TableColumn[] => [
+    { key: 'charge',   label: this.t('PAYROLL.SIMULATOR.REFERENTIAL.COL_CHARGE') },
+    { key: 'employee', label: this.t('PAYROLL.SIMULATOR.REFERENTIAL.COL_EMPLOYEE'), align: 'right' },
+    { key: 'employer', label: this.t('PAYROLL.SIMULATOR.REFERENTIAL.COL_EMPLOYER'), align: 'right' },
+  ]);
+
+  readonly chargesRows = computed((): TableRow[] =>
+    this.applicableCharges().map(c => ({
+      id:       c.chargeCode,
+      charge:   c.baseCalculation === 'CAPPED_GROSS' && c.capAmount != null
+                  ? `${c.chargeCode} · ${this.t('PAYROLL.SIMULATOR.REFERENTIAL.CAP', { amount: this.money(c.capAmount, '', 0) })}`
+                  : c.chargeCode,
+      employee: this.percent(c.employeeRate),
+      employer: this.percent(c.employerRate),
+    })),
+  );
 
   /** History is behind its own codes — RUN_SIMULATION alone gets a 403 there, so the
    *  panel is only requested and only rendered when the user may read it. */
@@ -751,28 +813,45 @@ export class SimulatorComponent implements OnDestroy {
     );
   }
 
-  /** Re-open a past run in the result modal. The DTO is complete, so nothing is refetched. */
+  /** Re-open a past run in the result view. The DTO is complete, so nothing is refetched. */
   openHistoryEntry(entry: SimulationResultDto): void {
     this.result.set(entry);
     this.error.set(null);
-    this.historyOpen.set(false);
-    this.openResultModal();
+    this.closeHistory();
+    this.showResult();
   }
 
-  toggleHistory(): void {
-    this.historyOpen.update(v => !v);
-  }
-
-  /** Opens the result as a blocking `daf-modal` — see the `<ng-template #resultTemplate>`
-   *  in the html and the class doc comment above it. */
-  openResultModal(): void {
-    this.modalService.open({
-      title: this.t('PAYROLL.SIMULATOR.RESULT.TITLE'),
-      icon: 'calculate',
-      size: 'lg',
-      body: this.resultTemplate(),
-      closeOnBackdrop: true,
+  openHistory(): void {
+    const tpl = this.historyTpl();
+    if (!tpl) return;
+    this.historyModalRef = this.modalService.open({
+      title: this.t('PAYROLL.SIMULATOR.HISTORY.TITLE'),
+      icon:  'history',
+      size:  'md',
+      body:  tpl,
+      buttons: [
+        {
+          label:   this.t('PAYROLL.COMMON.CLOSE'),
+          variant: 'secondary',
+          action:  ref => { ref.close(); this.historyModalRef = null; },
+        },
+      ],
     });
+  }
+
+  private closeHistory(): void {
+    this.historyModalRef?.close();
+    this.historyModalRef = null;
+  }
+
+  /** Replaces the form with the result view — see `resultView`. */
+  showResult(): void {
+    this.resultView.set(true);
+  }
+
+  /** Back to the form, on the step the user left it. */
+  backToForm(): void {
+    this.resultView.set(false);
   }
 
   /** Free navigation — `(stepClick)` fires for every step because none is disabled. */
@@ -784,7 +863,7 @@ export class SimulatorComponent implements OnDestroy {
   prevStep(): void { this.goToStep(this.currentStep() - 1); }
 
   /** Browser print — no dedicated `@media print` stylesheet exists yet, so this prints
-   *  whatever is currently visible (the result drawer, if open). */
+   *  whatever is currently visible (the result view, if shown). */
   print(): void {
     window.print();
   }
@@ -881,7 +960,7 @@ export class SimulatorComponent implements OnDestroy {
       next: res => {
         this.result.set(res);
         this.loading.set(false);
-        this.openResultModal();
+        this.showResult();
         const paysId = this.form.getRawValue().paysId;
         if (paysId) this.loadHistory(paysId);
       },
@@ -930,6 +1009,7 @@ export class SimulatorComponent implements OnDestroy {
     this.mode.set('NET_TO_BRUT');
     this.period.set('MONTHLY');
     this.currentStep.set(0);
+    this.resultView.set(false);
     this.result.set(null);
     this.error.set(null);
     this.activePs.set(null);
@@ -941,6 +1021,8 @@ export class SimulatorComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    // The popup is mounted under the app root, outside this view.
+    this.closeHistory();
     this.destroy$.next();
     this.destroy$.complete();
   }

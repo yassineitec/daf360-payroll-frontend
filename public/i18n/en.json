@@ -39,7 +39,8 @@
       "ACTIONS": {
         "VIEW_RESULT": "View result",
         "HISTORY": "Recent simulations",
-        "RESET": "Reset"
+        "RESET": "Reset",
+        "BACK_TO_FORM": "Edit simulation"
       },
 
       "MODE": {
@@ -199,6 +200,8 @@
         "IRPP_TITLE": "IRPP scale",
         "IRPP_EMPTY": "No scale set on this parameter set.",
         "CHARGES_TITLE": "Social charges",
+        "COL_BRACKET": "Bracket",
+        "COL_RATE": "Rate",
         "COL_CHARGE": "Charge",
         "COL_EMPLOYEE": "Employee",
         "COL_EMPLOYER": "Employer",
@@ -262,25 +265,34 @@
     "PAYSLIPS": {
       "TITLE": "Payslips",
       "BREADCRUMB": "Payslips",
-      "SUBTITLE": "Upload the monthly payroll PDF (one payslip per page) to file it to SharePoint",
-      "STATUS_READY": "Ready",
-      "STATUS_NOT_READY": "Needs setup",
+      "SUBTITLE": "Import, process and distribute payslips to the employees' SharePoint folders.",
       "EMPTY_RESULT_HINT": "Fill in the parameters on the left, then process the file to see results here.",
       "FORM": {
-        "TITLE": "Process a payroll file",
-        "SUBTITLE": "Pick the country, the period, then the file to process.",
+        "TITLE": "Import a payslip batch",
+        "SUBTITLE": "Set the period and attach the multi-employee payroll file",
         "PAYS": "Country",
         "YEAR": "Year",
         "MONTH": "Month",
         "FILE_LABEL": "PDF file",
         "FILE_HINT": "PDF only, 50 MB max — one payslip per page",
-        "SUBMIT": "Process file",
-        "PROCESSING": "Processing…"
+        "SUBMIT": "Process and distribute",
+        "PROCESSING": "Processing…",
+        "SUBMIT_COUNT": "Process and distribute ({{count}} payslips)",
+        "SHAREPOINT_NOTE": "Each payslip is filed to the employee's HR SharePoint folder"
       },
       "MONTHS": {
-        "JANUARY": "January", "FEBRUARY": "February", "MARCH": "March", "APRIL": "April",
-        "MAY": "May", "JUNE": "June", "JULY": "July", "AUGUST": "August",
-        "SEPTEMBER": "September", "OCTOBER": "October", "NOVEMBER": "November", "DECEMBER": "December"
+        "JANUARY": "January",
+        "FEBRUARY": "February",
+        "MARCH": "March",
+        "APRIL": "April",
+        "MAY": "May",
+        "JUNE": "June",
+        "JULY": "July",
+        "AUGUST": "August",
+        "SEPTEMBER": "September",
+        "OCTOBER": "October",
+        "NOVEMBER": "November",
+        "DECEMBER": "December"
       },
       "SUMMARY": {
         "TITLE": "Processing summary",
@@ -305,11 +317,50 @@
         "STATUS": "Status",
         "SHAREPOINT_URL": "SharePoint link",
         "ERROR_MESSAGE": "Message",
-        "EMPTY": "Nothing to show"
+        "EMPTY": "Nothing to show",
+        "OPEN": "Open"
       },
       "NOTIFY": {
         "DONE": "Processing complete: {{success}} / {{total}} pages processed successfully",
         "ERROR": "Could not process the file — check the format and try again"
+      },
+      "SHAREPOINT": {
+        "TITLE": "HR SharePoint",
+        "SUBTITLE": "Employee folders"
+      },
+      "FILE": {
+        "READY": "Ready for distribution",
+        "PICK_PAYS": "Pick the country",
+        "PAGES": "{{count}} payslips / pages detected",
+        "ONE_PER_PAGE": "One payslip per page — matched by matricule when processed",
+        "REPLACE": "Replace file",
+        "REMOVE": "Remove",
+        "NEW_BATCH": "Load another batch"
+      },
+      "HISTORY": {
+        "TITLE": "Recent imports",
+        "SUBTITLE": "Latest batches processed from this browser",
+        "FILTER_ALL": "All statuses",
+        "FILTER_SUCCESS": "Success",
+        "FILTER_PARTIAL": "Partial",
+        "FILTER_TRIGGER": "Filter",
+        "FILTER_TITLE": "Filter imports",
+        "FILTER_STATUS": "Status",
+        "FILTER_APPLY": "Apply",
+        "FILTER_CANCEL": "Cancel",
+        "FILTER_RESET": "Reset",
+        "CLEAR": "Clear",
+        "DATE": "Date & time",
+        "PAYS": "Country",
+        "PERIOD": "Period",
+        "FILE": "File name",
+        "COUNT": "Payslips",
+        "STATUS": "SharePoint status",
+        "COUNT_VALUE": "{{count}} payslips",
+        "STATUS_SUCCESS": "Success ({{success}}/{{total}} synced)",
+        "STATUS_PARTIAL": "Partial ({{success}}/{{total}} synced)",
+        "EMPTY": "No imports yet",
+        "VIEW": "View details"
       }
     },
 
@@ -483,6 +534,13 @@
       "TAB_DEBIT": "Deductions",
       "TABS_ARIA": "Filter items by category",
       "SEARCH_PLACEHOLDER": "Filter by code or label...",
+      "FILTER_TRIGGER": "Filter",
+      "FILTER_TITLE": "Filter items",
+      "FILTER_CATEGORY": "Category",
+      "FILTER_APPLY": "Apply",
+      "FILTER_CANCEL": "Cancel",
+      "FILTER_RESET": "Reset",
+      "EMPTY_RUBRIQUES": "No item matches the search.",
       "BREADCRUMB_ARIA": "Breadcrumb — Payroll run",
 
       "LIFECYCLE": {
@@ -603,6 +661,7 @@
       "CAND_COL_STATUS": "Status",
       "DETAIL_LINK": "Detail →",
       "EMPTY_CANDIDATES": "No candidate with a simulation found.",
+      "NO_PAYS_SELECTED": "Choose a country in the filter to show candidates.",
       "EMPTY_FILTERED": "No candidate matches the search.",
       "SEARCH_PLACEHOLDER": "Search a candidate...",
       "FILTER_TRIGGER": "Filter",
@@ -658,6 +717,8 @@
       "FILTER_RESET": "Reset",
       "FILTER_ALL": "All",
       "EMPTY_FILTERED": "No parameter set matches the search.",
+      "NO_PAYS_SELECTED": "Choose a country in the filter to show its parameter sets.",
+      "EMPTY_FOR_PAYS": "No parameter set for this country.",
       "KPI_EMPLOYEE_TOTAL": "Employee charges",
       "KPI_EMPLOYER_TOTAL": "Employer charges",
       "KPI_TAX_WEDGE": "Global tax wedge",

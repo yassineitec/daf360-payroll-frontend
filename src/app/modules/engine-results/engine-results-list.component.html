@@ -6,23 +6,24 @@
   </daf-page-header>
 
   <div class="page-body">
-    <!-- ── Bandeau exécutif paie : dernier mois calculé du pays filtré (voir
+    <!-- ── Bandeau exécutif paie : dernier mois calculé du pays filtré ou de tous les pays (voir
          `loadKpis()`). Chaque tuile explique ce qu'elle mesure au survol — `help` /
          `helpTitle` de `daf-metric-card`, le popover natif de la bibliothèque. ─── -->
     @if (kpiTiles(); as k) {
       <p class="kpi-period">
         {{ 'PAYROLL.ENGINE_RESULTS.KPI_PERIOD' | translate: { period: k.period } }}
         @if (isConverted()) {
-          · {{ 'PAYROLL.ENGINE_RESULTS.CURRENCY.CONVERTED_NOTE' | translate: { from: summary()?.currencyCode, to: displayCurrency() } }}
+          · {{ 'PAYROLL.ENGINE_RESULTS.CURRENCY.CONVERTED_NOTE' | translate: { from: convertedFrom(), to: displayCurrency() } }}
         }
       </p>
-      <section class="grid grid-cols-4 gap-2 sm:gap-6 kpi-section">
+      <section
+        class="grid grid-cols-4 gap-2 sm:gap-6 kpi-section transition-opacity"
+        [class.opacity-60]="kpiLoading()"
+        [attr.aria-busy]="kpiLoading()">
         @for (tile of k.tiles; track tile.label) {
           <daf-metric-card [label]="tile.label" [value]="tile.value" [options]="tile.options" />
         }
       </section>
-    } @else if (paysFilter() == null) {
-      <p class="kpi-period">{{ 'PAYROLL.ENGINE_RESULTS.KPI_PICK_COUNTRY' | translate }}</p>
     }
 
     <!-- ── Recherche (nom / matricule), filtre pays et bascule carte-tableau — tout

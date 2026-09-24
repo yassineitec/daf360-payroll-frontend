@@ -5,17 +5,15 @@
   `onboarding-form` côté RH) : aucune feuille de style de composant.
 
   Mise en page : **une seule colonne**, plus de grille ni de partage 2/3 – 1/3. Le
-  parcours (daf-stepper + panneau d'étape) occupe toute la largeur ; le résultat n'est
-  plus affiché en ligne mais dans un `daf-drawer` séparé (voir plus bas), ouvert
-  automatiquement après un `submit()` réussi ou depuis l'action « Voir le résultat » de
-  l'en-tête. Le formulaire n'est donc plus jamais poussé sous le résultat sur petit
-  écran — il n'y a plus qu'un seul flux à faire tenir.
+  parcours (daf-stepper + panneau d'étape) occupe toute la largeur. Le résultat
+  s'affiche À LA PLACE du formulaire sur cette même page (`resultView`), après un
+  `submit()` réussi ou depuis l'action « Voir le résultat » de l'en-tête ;
+  « Modifier la simulation » ramène le formulaire. Pas de popup.
 
-  Le bouton « Simuler » vit désormais dans le parcours lui-même (sous la navigation
-  Précédent/Suivant), pas dans le panneau résultat : c'est l'action qui PRODUIT un
-  résultat, elle appartient au formulaire. Les messages de blocage/erreur du formulaire
-  (`blockingReason`, `amountError`, `error`) l'accompagnent au même endroit. Seul
-  `convergenceWarning`, qui qualifie le résultat affiché, reste dans le tiroir.
+  Le bouton « Simuler » remplace « Suivant » à la dernière étape du parcours : c'est
+  l'action qui PRODUIT un résultat, elle appartient au formulaire. Les messages de
+  blocage/erreur (`blockingReason`, `amountError`, `error`) s'affichent juste
+  au-dessus, à cette même étape.
 
   ⚠️ Espacement : les champs pleine largeur (pays, montant) sont des enfants DIRECTS de
   la pile `flex flex-col gap-6` ; les paires descendent dans une rangée
@@ -24,9 +22,9 @@
   s'étire pas de lui-même en contexte flex comme il le faisait dans une piste de grille.
   Le `min-w-0` est ce qui empêche un libellé long de déborder la colonne.
 
-  Les relevés (rubriques, charges sociales) alignent leurs colonnes par largeurs fixes
-  (`w-16` / `w-24` + `shrink-0`) au lieu de pistes partagées : en-tête et lignes doivent
-  donc être modifiés ensemble.
+  Les relevés de la vue résultat (rubriques, barème IRPP, charges sociales) sont des
+  `daf-data-table` : colonnes et lignes sont construites dans le `.ts`
+  (`rubriquesColumns` / `irppColumns` / `chargesColumns` et leurs `…Rows`).
 
   ⚠️ i18n : AUCUN libellé en dur. Ce que le gabarit rend passe par `| translate` ; ce que
   la lib reçoit en `string` (options radio, badges, titres d'étapes, messages bloquants)
@@ -64,9 +62,9 @@
       [options]="{
         size: 'sm',
         iconStart: 'calculate',
-        disabled: !result(),
+        disabled: !result() || resultView(),
       }"
-      (onClick)="openResultModal()"
+      (onClick)="showResult()"
     />
     <daf-button
       [label]="'PAYROLL.SIMULATOR.ACTIONS.HISTORY' | translate"
@@ -76,7 +74,7 @@
         iconStart: 'history',
         disabled: !canViewHistory(),
       }"
-      (onClick)="toggleHistory()"
+      (onClick)="openHistory()"
     />
     <daf-button
       [label]="'PAYROLL.SIMULATOR.ACTIONS.RESET' | translate"
@@ -87,8 +85,16 @@
   </div>
 </daf-page-header>
 
-<!-- ══ Zone de travail ═══════════════════════════════════════════════════════ -->
+<!-- ══ Zone de travail ═══════════════════════════════════════════════════════
+     Soit le parcours (formulaire), soit le résultat — jamais les deux : un
+     `submit()` réussi bascule `resultView` à true et le résultat prend la place du
+     formulaire sur cette même page. « Modifier la simulation » (`backToForm()`)
+     ramène le formulaire, valeurs intactes. -->
   <div class="flex flex-col gap-8">
+    @if (resultView()) {
+    <!-- ── Le résultat — une pile de cartes séparées, voir `#resultTemplate` ── -->
+    <ng-container [ngTemplateOutlet]="resultTemplate" />
+    } @else {
     <!-- ── Le parcours ──────────────────────────────────────────────────────── -->
     <daf-card
       class="w-full min-w-0"
@@ -509,6 +515,26 @@
             }
           }
 
+          <!-- Messages de blocage / erreur du formulaire, à l'étape 3 (celle du bouton
+               « Simuler ») — `error` / `blockingReason` / `amountError` sont déjà
+               traduits par le composant. -->
+          @if (currentStep() === steps().length - 1) {
+            @if (error()) {
+              <p
+                class="flex items-start gap-2 rounded-xl bg-danger/10 px-4 py-3 text-[13px] text-danger"
+              >
+                <span class="material-symbols-outlined text-[18px] shrink-0"
+                  >error</span
+                >
+                {{ error() }}
+              </p>
+            } @else if (blockingReason(); as reason) {
+              <p class="text-[13px] text-on-surface-variant">{{ reason }}</p>
+            } @else if (amountError(); as amountMsg) {
+              <p class="text-[13px] text-on-surface-variant">{{ amountMsg }}</p>
+            }
+          }
+
           <!-- Navigation du parcours — la lib ne la dessine pas sous `header-only`. -->
           <div
             class="flex items-center justify-between gap-4 border-t border-outline-variant/40 pt-6"
@@ -523,100 +549,94 @@
               }"
               (onClick)="prevStep()"
             />
-            <daf-button
-              [label]="'PAYROLL.SIMULATOR.STEPPER.NEXT' | translate"
-              variant="ghost"
-              [options]="{
-                size: 'sm',
-                iconEnd: 'arrow_forward',
-                disabled: currentStep() === steps().length - 1,
-              }"
-              (onClick)="nextStep()"
-            />
+            <!-- Dernière étape : « Suivant » devient « Simuler » — lance `submit()`,
+                 qui affiche le résultat à la place de ce formulaire. -->
+            @if (currentStep() === steps().length - 1) {
+              <daf-button
+                [label]="'PAYROLL.SIMULATOR.RESULT.SIMULATE' | translate"
+                variant="primary"
+                [options]="{
+                  size: 'sm',
+                  iconStart: 'calculate',
+                  loading: loading(),
+                  disabled: !canSimulate(),
+                }"
+                (onClick)="submit()"
+              />
+            } @else {
+              <daf-button
+                [label]="'PAYROLL.SIMULATOR.STEPPER.NEXT' | translate"
+                variant="ghost"
+                [options]="{
+                  size: 'sm',
+                  iconEnd: 'arrow_forward',
+                }"
+                (onClick)="nextStep()"
+              />
+            }
           </div>
         </div>
       </div>
     </daf-card>
 
-    <!-- ── Carte de lancement ───────────────────────────────────────────────
-       Séparée du parcours : une vraie 2e `daf-card` (via `daf-accordion-card`,
-       repliable comme les sections du tiroir résultat) plutôt qu'un bloc à
-       l'intérieur de la carte du parcours — sinon "carte" et "espace" ne
-       voulaient rien dire, tout vivait dans une seule et même surface. -->
-    <daf-accordion-card
-      [options]="{
-        title: 'PAYROLL.SIMULATOR.RESULT.SIMULATE' | translate,
-        icon: 'calculate',
-        state: canSimulate() ? 'active' : 'pending',
-      }"
-      [(open)]="simulateCardOpen"
-    >
-      <div class="flex flex-col gap-4">
-        <!-- Messages de blocage / erreur du formulaire — `error` / `blockingReason` /
-           `amountError` sont déjà traduits par le composant : ce sont des `string`
-           que la page se contente d'afficher. Vivent ici (et non dans le tiroir
-           résultat) car ils qualifient le FORMULAIRE, pas un résultat déjà obtenu. -->
-        @if (error()) {
-          <p
-            class="flex items-start gap-2 rounded-xl bg-danger/10 px-4 py-3 text-[13px] text-danger"
-          >
-            <span class="material-symbols-outlined text-[18px] shrink-0"
-              >error</span
-            >
-            {{ error() }}
-          </p>
-        } @else if (blockingReason(); as reason) {
-          <p class="text-[13px] text-on-surface-variant">{{ reason }}</p>
-        } @else if (amountError(); as amountMsg) {
-          <p class="text-[13px] text-on-surface-variant">{{ amountMsg }}</p>
-        }
-
-        <!-- Simuler — pleine largeur ; ouvre le tiroir résultat (voir `submit()`). -->
-        <daf-button
-          [label]="'PAYROLL.SIMULATOR.RESULT.SIMULATE' | translate"
-          variant="primary"
-          [options]="{
-            loading: loading(),
-            disabled: !canSimulate(),
-            iconStart: 'calculate',
-            fullWidth: true,
-          }"
-          (onClick)="submit()"
-        />
-      </div>
-    </daf-accordion-card>
+    }
   </div>
 </daf-page>
 
 <!--
-  Résultat — `daf-modal` (`ModalService`), pas un composant posé dans le template : le
-  contenu vit dans ce `<ng-template>` et `openResultModal()` (dans le `.ts`) l'ouvre via
-  `this.modalService.open({ ..., body: this.resultTemplate() })`. Contrairement au tiroir
-  historique plus bas, ce popup EST bloquant — il faut le fermer avant de retoucher le
-  formulaire. Ouvert automatiquement après un `submit()` réussi ou la sélection d'une
-  entrée d'historique (voir `submit()` / `openHistoryEntry()`) ; l'action « Voir le
-  résultat » de l'en-tête le rouvre sinon.
+  Contenu de la vue résultat (voir la zone de travail, `resultView`). Une pile de
+  surfaces SÉPARÉES plutôt qu'une grande carte qui englobe tout : carte titre, tuiles
+  KPI posées directement sur le fond de page (pas de carte blanche derrière — ce sont
+  déjà des tuiles vitrées), carte décomposition, cartes repliables, carte d'actions.
 -->
 <ng-template #resultTemplate>
  <div class="flex flex-col gap-6">
-  <p class="text-right text-[11px] text-outline">
-    @if (result(); as r) {
-      {{
-        "PAYROLL.SIMULATOR.RESULT.META"
-          | translate
-            : {
-                contract: r.contractType,
-                parameterSetId: r.parameterSetId,
-                date: (r.simulatedAt | date: "dd/MM/yy HH:mm"),
-              }
-      }}
-    } @else {
-      {{ "PAYROLL.SIMULATOR.RESULT.PENDING" | translate }}
-    }
-  </p>
+  <!-- ── Titre + retour au formulaire ─────────────────────────────────────── -->
+  <daf-card
+    class="w-full min-w-0"
+    [options]="{ variant: 'glass', padding: 'none', radius: 'xl' }"
+  >
+    <div class="flex flex-wrap items-center gap-3 px-6 py-5 sm:px-8">
+      <div
+        class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center shrink-0"
+      >
+        <span class="material-symbols-outlined text-primary text-[20px]"
+          >calculate</span
+        >
+      </div>
+      <div class="flex flex-col min-w-0">
+        <h2 class="text-headline-lg text-on-surface leading-snug m-0 p-0">
+          {{ "PAYROLL.SIMULATOR.RESULT.TITLE" | translate }}
+        </h2>
+        <p class="text-[11px] text-outline m-0">
+          @if (result(); as r) {
+            {{
+              "PAYROLL.SIMULATOR.RESULT.META"
+                | translate
+                  : {
+                      contract: r.contractType,
+                      parameterSetId: r.parameterSetId,
+                      date: (r.simulatedAt | date: "dd/MM/yy HH:mm"),
+                    }
+            }}
+          } @else {
+            {{ "PAYROLL.SIMULATOR.RESULT.PENDING" | translate }}
+          }
+        </p>
+      </div>
+      <span class="ml-auto">
+        <daf-button
+          [label]="'PAYROLL.SIMULATOR.ACTIONS.BACK_TO_FORM' | translate"
+          variant="ghost"
+          [options]="{ size: 'sm', iconStart: 'arrow_back' }"
+          (onClick)="backToForm()"
+        />
+      </span>
+    </div>
+  </daf-card>
 
-  <!-- Chiffres clés — 3 `daf-metric-card`, même convention que budget/cohort
-     (`[value]="money(...) "`, icône + couleur par tuile). -->
+  <!-- Chiffres clés — 3 `daf-metric-card` directement sur le fond de page, même
+     convention que budget/cohort (`[value]="money(...) "`, icône + couleur par tuile). -->
   <div class="flex flex-col sm:flex-row gap-3">
     <div class="flex-1 min-w-0">
       <daf-metric-card
@@ -686,7 +706,7 @@
     </div>
   </div>
 
-  <p class="text-[13px] text-on-surface-variant">
+  <p class="text-[13px] text-on-surface-variant px-1 -mt-2">
     @if (result(); as r) {
       @if (r.costNetRatio != null) {
         {{
@@ -699,12 +719,16 @@
     }
   </p>
 
-  <!-- Décomposition : barre empilée + relevé -->
+  <!-- ── Décomposition : barre empilée + relevé — sa propre carte ─────────── -->
   @if (breakdown().length) {
-    <div class="flex flex-col gap-3">
-      <p class="text-label-caps text-outline">
-        {{ "PAYROLL.SIMULATOR.RESULT.BREAKDOWN_TITLE" | translate }}
-      </p>
+    <daf-card
+      class="w-full min-w-0"
+      [options]="{ variant: 'glass', padding: 'none', radius: 'xl' }"
+    >
+    <div class="flex flex-col gap-3 px-6 py-5 sm:px-8">
+      <daf-section-title
+        [title]="'PAYROLL.SIMULATOR.RESULT.BREAKDOWN_TITLE' | translate"
+      />
 
       <div
         class="flex h-2.5 w-full overflow-hidden rounded-full bg-surface-container"
@@ -746,6 +770,7 @@
         }
       </div>
     </div>
+    </daf-card>
   }
 
   @if (convergenceWarning()) {
@@ -855,9 +880,9 @@
           r.loadedCostUsd != null
         ) {
           <div class="flex flex-col gap-2">
-            <p class="text-label-caps text-outline">
-              {{ "PAYROLL.SIMULATOR.CASCADE.FX_TITLE" | translate }}
-            </p>
+            <daf-section-title
+              [title]="'PAYROLL.SIMULATOR.CASCADE.FX_TITLE' | translate"
+            />
             <div class="flex flex-col text-[12px] tabular-nums">
               @if (r.loadedCostEur != null) {
                 <div
@@ -944,52 +969,11 @@
           radius: 'xl',
         }"
       >
-        <div class="flex flex-col text-[12px] tabular-nums">
-          <div
-            class="flex items-center gap-3 border-b border-outline-variant pb-2 text-label-caps text-outline"
-          >
-            <span class="flex-1 min-w-0">{{
-              "PAYROLL.SIMULATOR.RUBRIQUES.COL_CODE" | translate
-            }}</span>
-            <span class="flex-1 min-w-0">{{
-              "PAYROLL.SIMULATOR.RUBRIQUES.COL_NATURE" | translate
-            }}</span>
-            <span class="w-16 shrink-0">{{
-              "PAYROLL.SIMULATOR.RUBRIQUES.COL_MODE" | translate
-            }}</span>
-            <span class="w-24 shrink-0 text-right">{{
-              "PAYROLL.SIMULATOR.RUBRIQUES.COL_AMOUNT" | translate
-            }}</span>
-          </div>
-          @for (rb of parsedRubriques(); track rb.code) {
-            <div
-              class="flex items-center gap-3 border-b border-outline-variant/40 py-2 last:border-0"
-            >
-              <span
-                class="flex-1 min-w-0 truncate font-mono font-semibold text-on-surface"
-                >{{ rb.code }}</span
-              >
-              <span
-                class="flex-1 min-w-0 truncate text-on-surface-variant"
-                >{{ rb.nature ?? "—" }}</span
-              >
-              <span class="w-16 shrink-0 truncate text-outline">{{
-                rb.calcMode === "FORMULE" ? "ƒ(x)" : rb.calcMode
-              }}</span>
-              <span
-                class="w-24 shrink-0 text-right font-semibold whitespace-nowrap"
-                [class]="
-                  rb.direction === 'DEBIT'
-                    ? 'text-danger'
-                    : 'text-on-surface'
-                "
-              >
-                {{ rb.direction === "CREDIT" ? "+" : "−"
-                }}{{ rb.amount | number: "1.2-2" }}
-              </span>
-            </div>
-          }
-        </div>
+        <daf-data-table
+          [columns]="rubriquesColumns()"
+          [rows]="rubriquesRows()"
+          [config]="{ showHeader: false }"
+        />
       </daf-accordion-card>
     }
   }
@@ -1006,25 +990,15 @@
     >
       <div class="flex flex-col gap-6">
         <div class="flex flex-col gap-2">
-          <p class="text-label-caps text-outline">
-            {{ "PAYROLL.SIMULATOR.REFERENTIAL.IRPP_TITLE" | translate }}
-          </p>
+          <daf-section-title
+            [title]="'PAYROLL.SIMULATOR.REFERENTIAL.IRPP_TITLE' | translate"
+          />
           @if (irppBrackets().length) {
-            <div class="flex flex-col text-[12px] tabular-nums">
-              @for (b of irppBrackets(); track b.lower) {
-                <div
-                  class="flex items-center justify-between gap-3 border-b border-outline-variant/40 py-2 last:border-0"
-                >
-                  <span class="text-on-surface"
-                    >{{ money(b.lower, "", 0) }} —
-                    {{ bracketUpper(b) }}</span
-                  >
-                  <span class="font-semibold text-on-surface">{{
-                    percent(b.rate)
-                  }}</span>
-                </div>
-              }
-            </div>
+            <daf-data-table
+              [columns]="irppColumns()"
+              [rows]="irppRows()"
+              [config]="{ showHeader: false }"
+            />
           } @else {
             <p class="text-[13px] text-on-surface-variant">
               {{ "PAYROLL.SIMULATOR.REFERENTIAL.IRPP_EMPTY" | translate }}
@@ -1033,60 +1007,18 @@
         </div>
 
         <div class="flex flex-col gap-2">
-          <p class="text-label-caps text-outline">
-            {{ "PAYROLL.SIMULATOR.REFERENTIAL.CHARGES_TITLE" | translate }}
-            @if (contractSelection().length) {
-              · {{ contractSelection()[0] }}
-            }
-          </p>
+          <daf-section-title
+            [title]="
+              ('PAYROLL.SIMULATOR.REFERENTIAL.CHARGES_TITLE' | translate) +
+              (contractSelection().length ? ' · ' + contractSelection()[0] : '')
+            "
+          />
           @if (applicableCharges().length) {
-            <div class="flex flex-col text-[12px] tabular-nums">
-              <div
-                class="flex items-center gap-3 border-b border-outline-variant pb-2 text-label-caps text-outline"
-              >
-                <span class="flex-1 min-w-0">{{
-                  "PAYROLL.SIMULATOR.REFERENTIAL.COL_CHARGE" | translate
-                }}</span>
-                <span class="w-16 shrink-0 text-right">{{
-                  "PAYROLL.SIMULATOR.REFERENTIAL.COL_EMPLOYEE" | translate
-                }}</span>
-                <span class="w-16 shrink-0 text-right">{{
-                  "PAYROLL.SIMULATOR.REFERENTIAL.COL_EMPLOYER" | translate
-                }}</span>
-              </div>
-              @for (c of applicableCharges(); track c.chargeCode) {
-                <div
-                  class="flex items-center gap-3 border-b border-outline-variant/40 py-2 last:border-0"
-                >
-                  <span
-                    class="flex-1 min-w-0 truncate text-on-surface"
-                    [title]="c.chargeLabel"
-                  >
-                    {{ c.chargeCode }}
-                    @if (
-                      c.baseCalculation === "CAPPED_GROSS" &&
-                      c.capAmount != null
-                    ) {
-                      <span class="ml-1 text-[11px] text-outline">
-                        {{
-                          "PAYROLL.SIMULATOR.REFERENTIAL.CAP"
-                            | translate
-                              : { amount: money(c.capAmount, "", 0) }
-                        }}
-                      </span>
-                    }
-                  </span>
-                  <span
-                    class="w-16 shrink-0 text-right font-semibold text-on-surface"
-                    >{{ percent(c.employeeRate) }}</span
-                  >
-                  <span
-                    class="w-16 shrink-0 text-right font-semibold text-on-surface"
-                    >{{ percent(c.employerRate) }}</span
-                  >
-                </div>
-              }
-            </div>
+            <daf-data-table
+              [columns]="chargesColumns()"
+              [rows]="chargesRows()"
+              [config]="{ showHeader: false }"
+            />
           } @else {
             <p class="text-[13px] text-on-surface-variant">
               {{
@@ -1099,7 +1031,12 @@
     </daf-accordion-card>
   }
 
-  <div class="flex gap-3 border-t border-outline-variant/40 pt-5 mt-1">
+  <!-- ── Actions — seules dans leur carte ─────────────────────────────────── -->
+  <daf-card
+    class="w-full min-w-0"
+    [options]="{ variant: 'glass', padding: 'none', radius: 'xl' }"
+  >
+  <div class="flex flex-col sm:flex-row gap-3 px-6 py-5 sm:px-8">
     <div class="flex-1 min-w-0">
       <daf-button
         [label]="'PAYROLL.SIMULATOR.RESULT.EXPORT_PDF' | translate"
@@ -1128,29 +1065,17 @@
       />
     </div>
   </div>
+  </daf-card>
  </div>
 </ng-template>
 
 <!--
-  Simulations récentes — `daf-drawer` AU NIVEAU RACINE, hors de toute carte : le panneau
-  est `position: fixed`, et une carte vitrée (backdrop-filter) crée un bloc conteneur qui
-  le piégerait à l'intérieur (UI-PLAYBOOK §10e).
-  `closeOnBackdrop` / `closeOnEscape` : un clic à côté ou Échap ferme le tiroir.
-  `showToggle: false` : on entre par l'action « Simulations récentes » de l'en-tête.
+  Simulations récentes — corps du pop-up de la lib (`ModalService`, voir `openHistory()`),
+  ouvert par l'action « Simulations récentes » de l'en-tête. Le bouton « Fermer » est
+  celui du pop-up ; un clic sur une entrée ferme le pop-up et affiche le résultat.
 -->
-<daf-drawer
-  [(open)]="historyOpen"
-  [config]="{
-    title: 'PAYROLL.SIMULATOR.HISTORY.TITLE' | translate,
-    icon: 'history',
-    side: 'right',
-    width: '420px',
-    showToggle: false,
-    closeOnBackdrop: true,
-    closeOnEscape: true,
-    closeLabel: 'PAYROLL.COMMON.CLOSE' | translate,
-  }"
->
+<ng-template #historyTpl>
+ <div class="flex flex-col gap-4">
   @if (!canViewHistory()) {
     <p class="text-[13px] text-on-surface-variant">
       {{ "PAYROLL.SIMULATOR.HISTORY.NO_PERMISSION" | translate }}
@@ -1221,13 +1146,5 @@
       }
     </div>
   }
-
-  <div drawerFooter>
-    <daf-button
-      [label]="'PAYROLL.COMMON.CLOSE' | translate"
-      variant="ghost"
-      [options]="{ size: 'sm', fullWidth: true }"
-      (onClick)="toggleHistory()"
-    />
-  </div>
-</daf-drawer>
+ </div>
+</ng-template>

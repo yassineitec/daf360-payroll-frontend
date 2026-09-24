@@ -186,6 +186,11 @@ export class PayrollEngineService {
     return this.http.get<PayrollResultsSummaryDto>(`${this.base}/results/summary`, { params: { paysId } });
   }
 
+  /** Un résumé par pays paie, chacun dans sa devise — à convertir avant de les additionner. */
+  getAllResultsSummaries(): Observable<PayrollResultsSummaryDto[]> {
+    return this.http.get<PayrollResultsSummaryDto[]>(`${this.base}/results/summary/all`);
+  }
+
   // ── Calibration ───────────────────────────────────────────────────────────
   openEngineCalibration(paysId: number, period: string, paramSetId?: number): Observable<EngineCalibrationDto> {
     let params = new HttpParams().set('paysId', paysId).set('period', period);

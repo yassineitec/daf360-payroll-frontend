@@ -1,29 +1,64 @@
-/* ── Bandeau KPI pleine largeur, en haut de page (avant le split cockpit) ────── */
-.kpi-banner--top { margin: 0 2rem 1.5rem; }
-.kpi-banner            { display: flex; flex-direction: column; gap: 1rem; }
-.kpi-banner__status    { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
-.kpi-grid              { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1.25rem; }
+$muted:   var(--color-on-surface-variant, #6b7280);
+$outline: var(--color-outline-variant, #e5e7eb);
+$success: var(--color-success, #0f7b5f);
 
-/* ── Split-screen cockpit ─────────────────────────────────────────────── */
-.cockpit         { display: flex; align-items: flex-start; gap: 1.5rem; padding: 0 2rem 2rem; }
-.cockpit-sidebar { flex: 0 0 360px; position: sticky; top: 1.5rem; }
-.cockpit-main    { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 1.5rem; }
-@media (max-width: 1024px) {
-  .cockpit          { flex-direction: column; }
-  .cockpit-sidebar  { flex-basis: auto; width: 100%; position: static; }
-}
+/* ── Carte d'import ────────────────────────────────────────────────── */
+.import          { display: flex; flex-direction: column; gap: 1.5rem; }
 
-/* ── Sidebar ──────────────────────────────────────────────────────────── */
-.sidebar-card    { display: flex; flex-direction: column; gap: 1.25rem; }
-.sidebar-header__top    { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
-.sidebar-header__title  { margin: 0; font-size: 1.0625rem; font-weight: 600; }
-.sidebar-header__subtitle { margin: .25rem 0 0; font-size: .8125rem; color: var(--color-on-surface-variant, #6b7280); }
+.import__header  { display: flex; align-items: center; gap: 1rem; padding-bottom: 1.25rem;
+                   border-bottom: 1px solid $outline; }
+.import__icon    { flex: 0 0 auto; width: 3rem; height: 3rem; border-radius: .75rem;
+                   display: flex; align-items: center; justify-content: center;
+                   background: var(--color-primary-container, #e0ecff); color: var(--color-primary, #1e3a8a); }
+.import__heading { flex: 1 1 auto; min-width: 0; }
+.import__title   { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--color-on-surface, #111827); }
+.import__subtitle { margin: .125rem 0 0; font-size: .875rem; color: $muted; }
 
-.sidebar-field        { display: flex; flex-direction: column; gap: .375rem; }
-.sidebar-row          { display: flex; gap: .75rem; }
-.sidebar-row > *      { flex: 1; min-width: 0; }
+.import__fields  { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; }
+@media (max-width: 900px) { .import__fields { grid-template-columns: 1fr; } }
 
-.sidebar-actions      { display: flex; flex-direction: column; gap: .625rem; margin-top: .25rem; }
+.import__footer  { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.import__note    { display: flex; align-items: center; gap: .5rem; margin: 0; font-size: .875rem; color: $muted; }
+.import__note .material-symbols-outlined { font-size: 1.25rem; color: var(--color-teal, #0f766e); }
+.import__actions { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
 
-/* ── Main / résultats ─────────────────────────────────────────────────── */
-.empty-state   { text-align: center; color: var(--color-on-surface-variant, #6b7280); margin: 2rem 0; }
+.hidden-input    { display: none; }
+
+/* ── Fiche du fichier sélectionné ───────────────────────────────────── */
+.file-card       { display: flex; align-items: center; gap: 1.25rem; padding: 1.5rem 2rem;
+                   border: 1px solid $outline; border-radius: 1rem;
+                   background: var(--color-surface-container-low, #f8fafc); flex-wrap: wrap; }
+.file-card--error { border-color: var(--color-danger, #dc2626); }
+.file-card__icon { flex: 0 0 auto; width: 4rem; height: 4rem; border-radius: .875rem;
+                   display: flex; align-items: center; justify-content: center;
+                   background: var(--color-surface-container-lowest, #fff); border: 1px solid $outline;
+                   color: var(--color-danger, #dc2626); }
+.file-card__icon .material-symbols-outlined { font-size: 2rem; }
+.file-card__body { flex: 1 1 18rem; min-width: 0; display: flex; flex-direction: column; gap: .375rem; }
+.file-card__name-row { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; min-width: 0; }
+.file-card__name { font-size: 1.25rem; font-weight: 700; color: var(--color-on-surface, #111827);
+                   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.file-card__meta { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin: 0;
+                   font-size: .875rem; color: $muted; }
+.file-card__meta .dot { opacity: .6; }
+.file-card__check { display: flex; align-items: center; gap: .375rem; margin: 0;
+                    font-size: .875rem; font-weight: 600; color: $success; }
+.file-card__check .material-symbols-outlined { font-size: 1.125rem; font-variation-settings: 'FILL' 1; }
+.file-card__actions { display: flex; gap: .75rem; flex-wrap: wrap; }
+
+/* ── Sections (rapport, historique) ─────────────────────────────────── */
+.section         { display: flex; flex-direction: column; gap: 1rem; }
+.section__head   { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.section__title  { margin: 0; font-size: 1.375rem; font-weight: 700; color: var(--color-on-surface, #111827); }
+.section__subtitle { margin: .125rem 0 0; font-size: .875rem; color: $muted; }
+.section__tools  { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+
+.kpi-grid        { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1.25rem; }
+
+.sp-link         { display: inline-flex; align-items: center; gap: .25rem; font-weight: 600;
+                   color: var(--color-primary, #1e3a8a); }
+.sp-link .material-symbols-outlined { font-size: 1rem; }
+
+.history-file    { display: inline-flex; align-items: center; gap: .5rem; max-width: 18rem; }
+.history-file .material-symbols-outlined { font-size: 1.125rem; color: var(--color-danger, #dc2626); }
+.history-file__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -9,14 +9,16 @@ import {
   DafCellDirective,
   DataTableComponent,
   FileUploadComponent,
+  FilterComponent,
   MetricCardComponent,
   PageComponent,
   PageHeaderComponent,
-  SectionTitleComponent,
   SelectComponent,
   StatusBadgeComponent,
   type BadgeVariant,
   type BreadcrumbItem,
+  type FilterField,
+  type FilterResult,
   type SelectOption,
   type TableColumn,
   type TableRow,
@@ -31,6 +33,26 @@ const MONTH_KEYS = [
   'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER',
 ];
 
+/** localStorage key of the recent-imports log — see {@link PayslipBatchComponent.history}. */
+const HISTORY_KEY = 'daf360.payroll.payslips.history';
+const HISTORY_MAX = 20;
+const MAX_SIZE_MB = 50;
+
+/** One processed batch, as kept in the recent-imports log. */
+interface PayslipHistoryEntry {
+  id: string;
+  processedAt: string;   // ISO
+  paysId: number;
+  paysLabel: string;
+  paysIso: string;
+  periodYear: number;
+  periodMonth: number;
+  fileName: string;
+  result: PayslipBatchResult;
+}
+
+type HistoryStatusFilter = 'ALL' | 'SUCCESS' | 'PARTIAL';
+
 /**
  * `/payroll/payslips` — upload the monthly multi-page payslip PDF (one employee per page,
  * from the external payroll system) and get back a per-page report: which pages matched an
@@ -38,13 +60,15 @@ const MONTH_KEYS = [
  * (UNIDENTIFIED = no matricule found on the page, ERROR = matricule not in our data,
  * DUPLICATE = matricule seen twice in this same file).
  *
- * Lives in the Payroll app — the processing itself still runs entirely on
- * daf360-rh-service (see PayslipBatchService), same cross-app call shape as the
- * candidate-simulation / hr-profile services already used here.
+ * Layout: one full-width import card (period row → file → action bar), then the report of
+ * the batch just processed, then the recent-imports log.
  *
- * Built entirely from the `@khalilrebhiitec/daf360` library — same pattern as
- * `engine-run`/`engine-results` — instead of the hand-rolled form/table markup this page
- * used to carry.
+ * The processing itself runs entirely on daf360-rh-service (see PayslipBatchService). That
+ * service keeps no batch history, so the recent-imports log is kept client-side (this
+ * browser only, last {@link HISTORY_MAX} batches) — enough to reopen a report after a
+ * reload, not an audit trail.
+ *
+ * Built entirely from the `@khalilrebhiitec/daf360` library.
  */
 @Component({
   selector: 'app-payslip-batch',
@@ -54,7 +78,7 @@ const MONTH_KEYS = [
     CommonModule, TranslatePipe,
     ButtonComponent, CardComponent, DafCellDirective, DataTableComponent, FileUploadComponent,
     MetricCardComponent, PageComponent, PageHeaderComponent,
-    SectionTitleComponent, SelectComponent, StatusBadgeComponent,
+    FilterComponent, SelectComponent, StatusBadgeComponent,
   ],
   templateUrl: './payslip-batch.component.html',
   styleUrl: './payslip-batch.component.scss',
@@ -77,8 +101,7 @@ export class PayslipBatchComponent implements OnInit {
     { label: this.t('PAYROLL.PAYSLIPS.BREADCRUMB') },
   ]);
 
-  // ── Pays : `daf-select`, même besoin déjà couvert par la bibliothèque dans
-  //    engine-run/engine-results — liste chargée une fois.
+  // ── Pays : `daf-select`, liste chargée une fois.
   private readonly paysList = signal<PaysDto[]>([]);
   readonly paysId = signal<number | null>(null);
   readonly paysOptions = computed<SelectOption[]>(() =>
@@ -86,12 +109,12 @@ export class PayslipBatchComponent implements OnInit {
   );
 
   // First-load gate for `daf-page [loading]` — the pays dropdown is unusable until this
-  // resolves. Kept separate from `processing` below: that one drives the submit button
-  // only, and must never swap the whole page (including the form the user is mid-upload
-  // on) for the skeleton.
+  // resolves. Kept separate from `processing`, which must never swap the whole page for
+  // the skeleton.
   readonly loading = signal(false);
 
   ngOnInit(): void {
+    this.history.set(this.readHistory());
     this.loading.set(true);
     this.payrollApi.listPays().subscribe({
       next: list => { this.paysList.set(list); this.loading.set(false); },
@@ -110,29 +133,85 @@ export class PayslipBatchComponent implements OnInit {
     }));
   });
 
-  /** `daf-select`, not `daf-form-field` — Année sits right next to Mois in the sidebar's
-   *  two-column row, and a number input's label/height don't match a select's, which read
-   *  as visually inconsistent side by side. A handful of recent years covers the payroll
-   *  batches this page actually processes (current + catch-up filing). */
+  /** A handful of recent years covers the payroll batches this page actually processes
+   *  (current + catch-up filing). */
   readonly yearOptions = computed<SelectOption[]>(() => {
     const current = new Date().getFullYear();
     return Array.from({ length: 5 }, (_, i) => current - i)
       .map(y => ({ value: String(y), label: String(y) }));
   });
 
+  // ── Fichier ──────────────────────────────────────────────────────────────
   readonly uploadedFiles = signal<UploadedFile[]>([]);
   readonly processing    = signal(false);
   readonly result        = signal<PayslipBatchResult | null>(null);
+  /** Which batch `result` belongs to — the file card and the report header both name it. */
+  readonly resultFileName = signal<string | null>(null);
+
+  readonly maxSizeMb = MAX_SIZE_MB;
+  readonly selectedFile = computed(() => this.uploadedFiles()[0] ?? null);
+
+  /** Page count read from the PDF itself before upload, `null` when it can't be read
+   *  (compressed object streams hide the page objects from a plain text scan). Only a
+   *  preview for the file card and the submit label — the server's count is the truth. */
+  readonly detectedPages = signal<number | null>(null);
+
+  onFilesChange(files: UploadedFile[]): void {
+    this.uploadedFiles.set(files);
+    this.detectedPages.set(null);
+    const f = files[0];
+    if (!f || f.error) return;
+    f.file.text()
+      .then(text => {
+        if (this.uploadedFiles()[0] !== f) return;   // replaced meanwhile
+        const count = (text.match(/\/Type\s*\/Page(?![a-zA-Z])/g) ?? []).length;
+        this.detectedPages.set(count > 0 ? count : null);
+      })
+      .catch(() => { /* preview only */ });
+  }
+
+  /** « Remplacer le fichier » — the hidden picker behind that button. Same shape and
+   *  size check as `daf-file-upload`, so the rest of the page can't tell them apart. */
+  onReplacePicked(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    this.onFilesChange([{
+      name: file.name, size: file.size, type: file.type, file,
+      error: file.size > MAX_SIZE_MB * 1024 * 1024 ? `Dépasse ${MAX_SIZE_MB} Mo` : undefined,
+    }]);
+  }
+
+  clearFile(): void {
+    this.onFilesChange([]);
+  }
+
+  /** « Charger un autre lot » — back to an empty form, the period is kept. */
+  startNewBatch(): void {
+    this.clearFile();
+    this.result.set(null);
+    this.resultFileName.set(null);
+  }
+
+  formatSize(bytes: number): string {
+    if (bytes < 1024)        return `${bytes} o`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+  }
 
   readonly canSubmit = computed(() => {
-    const files = this.uploadedFiles();
-    return !this.processing() && !!this.paysId() &&
-      files.length === 1 && !files[0].error;
+    const f = this.selectedFile();
+    return !this.processing() && !!this.paysId() && !!f && !f.error;
   });
 
-  readonly readyBadge = computed(() => this.canSubmit()
-    ? { label: this.t('PAYROLL.PAYSLIPS.STATUS_READY'), variant: 'success' as BadgeVariant }
-    : { label: this.t('PAYROLL.PAYSLIPS.STATUS_NOT_READY'), variant: 'neutral' as BadgeVariant });
+  readonly submitLabel = computed(() => {
+    if (this.processing()) return this.t('PAYROLL.PAYSLIPS.FORM.PROCESSING');
+    const n = this.detectedPages();
+    return n
+      ? this.t('PAYROLL.PAYSLIPS.FORM.SUBMIT_COUNT', { count: n })
+      : this.t('PAYROLL.PAYSLIPS.FORM.SUBMIT');
+  });
 
   readonly needsAttention = computed(() => {
     const r = this.result();
@@ -141,12 +220,15 @@ export class PayslipBatchComponent implements OnInit {
 
   submit(): void {
     if (!this.canSubmit()) return;
-    const file = this.uploadedFiles()[0].file;
+    const file = this.selectedFile()!.file;
+    const paysId = this.paysId()!;
+    const year = this.periodYear();
+    const month = this.periodMonth();
 
     this.processing.set(true);
     this.result.set(null);
 
-    this.svc.processBatch(file, this.paysId()!, this.periodYear(), this.periodMonth()).pipe(
+    this.svc.processBatch(file, paysId, year, month).pipe(
       catchError(err => {
         this.notification.error(this.extractErrorMessage(err));
         return of(null);
@@ -155,12 +237,16 @@ export class PayslipBatchComponent implements OnInit {
       this.processing.set(false);
       if (!result) return;
       this.result.set(result);
+      this.resultFileName.set(file.name);
+      this.clearFile();
+      this.addToHistory(paysId, year, month, file.name, result);
       this.notification.success(this.t('PAYROLL.PAYSLIPS.NOTIFY.DONE', {
         success: result.successCount, total: result.totalPages,
       }));
     });
   }
 
+  // ── Rapport du lot ───────────────────────────────────────────────────────
   private statusVariant(status: PayslipPageStatus): BadgeVariant {
     switch (status) {
       case 'SUCCESS':      return 'success';
@@ -190,6 +276,114 @@ export class PayslipBatchComponent implements OnInit {
       errorMessage:  d.errorMessage ?? '—',
     })),
   );
+
+  // ── Historique des importations ──────────────────────────────────────────
+  readonly history = signal<PayslipHistoryEntry[]>([]);
+  readonly historyFilter = signal<HistoryStatusFilter>('ALL');
+
+  // `daf-filter` : champ vide = tous les statuts ('ALL').
+  readonly historyFilterFields = computed<FilterField[]>(() => [{
+    name: 'status',
+    label: this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_STATUS'),
+    type: 'select',
+    placeholder: this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_ALL'),
+    options: [
+      { value: 'SUCCESS', label: this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_SUCCESS') },
+      { value: 'PARTIAL', label: this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_PARTIAL') },
+    ],
+  }]);
+
+  applyHistoryFilter(result: FilterResult): void {
+    this.historyFilter.set(((result['status'] as string | null) || 'ALL') as HistoryStatusFilter);
+  }
+
+  private isFullSuccess(r: PayslipBatchResult): boolean {
+    return r.totalPages > 0 && r.successCount === r.totalPages;
+  }
+
+  readonly historyColumns = computed<TableColumn[]>(() => [
+    { key: 'processedAt', label: this.t('PAYROLL.PAYSLIPS.HISTORY.DATE'), type: 'date', sortable: true,
+      format: { dateStyle: 'short', timeStyle: 'short' } },
+    { key: 'pays',        label: this.t('PAYROLL.PAYSLIPS.HISTORY.PAYS'), type: 'badge' },
+    { key: 'period',      label: this.t('PAYROLL.PAYSLIPS.HISTORY.PERIOD') },
+    { key: 'fileName',    label: this.t('PAYROLL.PAYSLIPS.HISTORY.FILE'), type: 'custom' },
+    { key: 'count',       label: this.t('PAYROLL.PAYSLIPS.HISTORY.COUNT') },
+    { key: 'status',      label: this.t('PAYROLL.PAYSLIPS.HISTORY.STATUS'), type: 'badge' },
+  ]);
+
+  readonly historyRows = computed<TableRow[]>(() => {
+    const filter = this.historyFilter();
+    return this.history()
+      .filter(h => filter === 'ALL' || (filter === 'SUCCESS') === this.isFullSuccess(h.result))
+      .map(h => {
+        const ok = this.isFullSuccess(h.result);
+        return {
+          id:          h.id,
+          processedAt: h.processedAt,
+          pays:        { label: h.paysIso || h.paysLabel, options: { variant: 'neutral' as const, size: 'sm' as const } },
+          period:      `${this.t(`PAYROLL.PAYSLIPS.MONTHS.${MONTH_KEYS[h.periodMonth - 1]}`)} ${h.periodYear}`,
+          fileName:    h.fileName,
+          count:       this.t('PAYROLL.PAYSLIPS.HISTORY.COUNT_VALUE', { count: h.result.totalPages }),
+          status: {
+            label: this.t(ok ? 'PAYROLL.PAYSLIPS.HISTORY.STATUS_SUCCESS' : 'PAYROLL.PAYSLIPS.HISTORY.STATUS_PARTIAL', {
+              success: h.result.successCount, total: h.result.totalPages,
+            }),
+            options: { variant: (ok ? 'success' : 'warning') as BadgeVariant, size: 'sm' as const, dot: true },
+          },
+        };
+      });
+  });
+
+  readonly historyConfig = computed(() => ({
+    emptyMessage: this.t('PAYROLL.PAYSLIPS.HISTORY.EMPTY'),
+    defaultSort: { key: 'processedAt', dir: 'desc' as const },
+    actions: [{
+      id: 'view',
+      icon: 'visibility',
+      tooltip: this.t('PAYROLL.PAYSLIPS.HISTORY.VIEW'),
+      onClick: (row: TableRow) => this.openHistoryEntry(String(row['id'])),
+    }],
+  }));
+
+  private openHistoryEntry(id: string): void {
+    const entry = this.history().find(h => h.id === id);
+    if (!entry) return;
+    this.result.set(entry.result);
+    this.resultFileName.set(entry.fileName);
+    document.getElementById('payslip-report')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  private addToHistory(paysId: number, year: number, month: number, fileName: string, result: PayslipBatchResult): void {
+    const pays = this.paysList().find(p => p.id === paysId);
+    const entry: PayslipHistoryEntry = {
+      id:          `${Date.now()}`,
+      processedAt: new Date().toISOString(),
+      paysId,
+      paysLabel:   pays?.frenchLabel ?? String(paysId),
+      paysIso:     pays?.isoCode ?? '',
+      periodYear:  year,
+      periodMonth: month,
+      fileName,
+      result,
+    };
+    const next = [entry, ...this.history()].slice(0, HISTORY_MAX);
+    this.history.set(next);
+    this.writeHistory(next);
+  }
+
+  private readHistory(): PayslipHistoryEntry[] {
+    try {
+      const raw = localStorage.getItem(HISTORY_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private writeHistory(entries: PayslipHistoryEntry[]): void {
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(entries)); } catch { /* quota / private mode */ }
+  }
 
   private extractErrorMessage(err: unknown): string {
     const httpErr = err as { error?: { message?: string } };

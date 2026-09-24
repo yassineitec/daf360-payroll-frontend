@@ -39,7 +39,8 @@
       "ACTIONS": {
         "VIEW_RESULT": "Voir le résultat",
         "HISTORY": "Simulations récentes",
-        "RESET": "Réinitialiser"
+        "RESET": "Réinitialiser",
+        "BACK_TO_FORM": "Modifier la simulation"
       },
 
       "MODE": {
@@ -199,6 +200,8 @@
         "IRPP_TITLE": "Barème IRPP",
         "IRPP_EMPTY": "Barème non renseigné sur ce jeu.",
         "CHARGES_TITLE": "Charges sociales",
+        "COL_BRACKET": "Tranche",
+        "COL_RATE": "Taux",
         "COL_CHARGE": "Charge",
         "COL_EMPLOYEE": "Salarié",
         "COL_EMPLOYER": "Employeur",
@@ -262,25 +265,34 @@
     "PAYSLIPS": {
       "TITLE": "Fiches de paie",
       "BREADCRUMB": "Fiches de paie",
-      "SUBTITLE": "Importez le PDF mensuel de paie (une fiche par page) pour le répartir vers SharePoint",
-      "STATUS_READY": "Prêt",
-      "STATUS_NOT_READY": "À configurer",
+      "SUBTITLE": "Importez, traitez et distribuez les fiches de paie vers les dossiers SharePoint des collaborateurs.",
       "EMPTY_RESULT_HINT": "Renseignez les paramètres à gauche puis traitez le fichier pour voir les résultats ici.",
       "FORM": {
-        "TITLE": "Traiter un fichier de paie",
-        "SUBTITLE": "Sélectionnez le pays, la période, puis le fichier à traiter.",
+        "TITLE": "Importer un lot de fiches de paie",
+        "SUBTITLE": "Configurez la période et associez le fichier de paie multi-collaborateurs",
         "PAYS": "Pays",
         "YEAR": "Année",
         "MONTH": "Mois",
         "FILE_LABEL": "Fichier PDF",
         "FILE_HINT": "PDF uniquement, 50 Mo max — une fiche de paie par page",
-        "SUBMIT": "Traiter le fichier",
-        "PROCESSING": "Traitement en cours…"
+        "SUBMIT": "Traiter et distribuer",
+        "PROCESSING": "Traitement en cours…",
+        "SUBMIT_COUNT": "Traiter et distribuer ({{count}} fiches)",
+        "SHAREPOINT_NOTE": "Chaque fiche est déposée dans le dossier SharePoint RH du collaborateur"
       },
       "MONTHS": {
-        "JANUARY": "Janvier", "FEBRUARY": "Février", "MARCH": "Mars", "APRIL": "Avril",
-        "MAY": "Mai", "JUNE": "Juin", "JULY": "Juillet", "AUGUST": "Août",
-        "SEPTEMBER": "Septembre", "OCTOBER": "Octobre", "NOVEMBER": "Novembre", "DECEMBER": "Décembre"
+        "JANUARY": "Janvier",
+        "FEBRUARY": "Février",
+        "MARCH": "Mars",
+        "APRIL": "Avril",
+        "MAY": "Mai",
+        "JUNE": "Juin",
+        "JULY": "Juillet",
+        "AUGUST": "Août",
+        "SEPTEMBER": "Septembre",
+        "OCTOBER": "Octobre",
+        "NOVEMBER": "Novembre",
+        "DECEMBER": "Décembre"
       },
       "SUMMARY": {
         "TITLE": "Résumé du traitement",
@@ -305,11 +317,50 @@
         "STATUS": "Statut",
         "SHAREPOINT_URL": "Lien SharePoint",
         "ERROR_MESSAGE": "Message",
-        "EMPTY": "Aucun résultat à afficher"
+        "EMPTY": "Aucun résultat à afficher",
+        "OPEN": "Ouvrir"
       },
       "NOTIFY": {
         "DONE": "Traitement terminé : {{success}} / {{total}} pages traitées avec succès",
         "ERROR": "Impossible de traiter le fichier — vérifiez le format et réessayez"
+      },
+      "SHAREPOINT": {
+        "TITLE": "SharePoint RH",
+        "SUBTITLE": "Dossiers collaborateurs"
+      },
+      "FILE": {
+        "READY": "Prêt pour distribution",
+        "PICK_PAYS": "Choisissez le pays",
+        "PAGES": "{{count}} fiches / pages détectées",
+        "ONE_PER_PAGE": "Une fiche par page — rapprochement par matricule au traitement",
+        "REPLACE": "Remplacer le fichier",
+        "REMOVE": "Retirer",
+        "NEW_BATCH": "Charger un autre lot"
+      },
+      "HISTORY": {
+        "TITLE": "Historique des importations récentes",
+        "SUBTITLE": "Derniers lots traités depuis ce navigateur",
+        "FILTER_ALL": "Tous les statuts",
+        "FILTER_SUCCESS": "Succès",
+        "FILTER_PARTIAL": "Partiel",
+        "FILTER_TRIGGER": "Filtrer",
+        "FILTER_TITLE": "Filtrer les importations",
+        "FILTER_STATUS": "Statut",
+        "FILTER_APPLY": "Appliquer",
+        "FILTER_CANCEL": "Annuler",
+        "FILTER_RESET": "Réinitialiser",
+        "CLEAR": "Effacer",
+        "DATE": "Date & heure",
+        "PAYS": "Pays",
+        "PERIOD": "Période",
+        "FILE": "Nom du fichier",
+        "COUNT": "Nombre de fiches",
+        "STATUS": "Statut SharePoint",
+        "COUNT_VALUE": "{{count}} fiches",
+        "STATUS_SUCCESS": "Succès ({{success}}/{{total}} synchronisées)",
+        "STATUS_PARTIAL": "Partiel ({{success}}/{{total}} synchronisées)",
+        "EMPTY": "Aucune importation pour le moment",
+        "VIEW": "Voir le détail"
       }
     },
 
@@ -483,6 +534,13 @@
       "TAB_DEBIT": "Retenues",
       "TABS_ARIA": "Filtrer les rubriques par catégorie",
       "SEARCH_PLACEHOLDER": "Filtrer par code ou libellé...",
+      "FILTER_TRIGGER": "Filtrer",
+      "FILTER_TITLE": "Filtrer les rubriques",
+      "FILTER_CATEGORY": "Catégorie",
+      "FILTER_APPLY": "Appliquer",
+      "FILTER_CANCEL": "Annuler",
+      "FILTER_RESET": "Réinitialiser",
+      "EMPTY_RUBRIQUES": "Aucune rubrique ne correspond à la recherche.",
       "BREADCRUMB_ARIA": "Fil d'Ariane — Calcul de paie",
 
       "LIFECYCLE": {
@@ -603,6 +661,7 @@
       "CAND_COL_STATUS": "Statut",
       "DETAIL_LINK": "Détail →",
       "EMPTY_CANDIDATES": "Aucun candidat avec simulation trouvé.",
+      "NO_PAYS_SELECTED": "Choisissez un pays dans le filtre pour afficher les candidats.",
       "EMPTY_FILTERED": "Aucun candidat ne correspond à la recherche.",
       "SEARCH_PLACEHOLDER": "Rechercher un candidat...",
       "FILTER_TRIGGER": "Filtrer",
@@ -658,6 +717,8 @@
       "FILTER_RESET": "Réinitialiser",
       "FILTER_ALL": "Tous",
       "EMPTY_FILTERED": "Aucun jeu de paramètres ne correspond à la recherche.",
+      "NO_PAYS_SELECTED": "Choisissez un pays dans le filtre pour afficher ses jeux de paramètres.",
+      "EMPTY_FOR_PAYS": "Aucun jeu de paramètres pour ce pays.",
       "KPI_EMPLOYEE_TOTAL": "Charges salariales",
       "KPI_EMPLOYER_TOTAL": "Charges patronales",
       "KPI_TAX_WEDGE": "Coin fiscal global",

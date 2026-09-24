@@ -6,7 +6,6 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { catchError, forkJoin, map, of } from 'rxjs';
 import { HrProfileService, type EmployeeListItem } from '../../core/hr-profile.service';
 import { PayrollEngineService, type PayrollResultsSummaryDto } from '../../core/payroll-engine.service';
-import { UserStore } from '../../core/user.store';
 import { CURRENCY_GLYPHS, CurrencyService, SUPPORTED_CURRENCIES } from '../../core/currency.service';
 import {
   CardComponent,
@@ -60,7 +59,6 @@ interface PaysItem { id: number; iso_code: string; french_label: string; }
 export class EngineResultsListComponent implements OnInit {
   private readonly hrService = inject(HrProfileService);
   private readonly engineApi = inject(PayrollEngineService);
-  private readonly userStore = inject(UserStore);
   private readonly currency  = inject(CurrencyService);
   private readonly http      = inject(HttpClient);
   private readonly router    = inject(Router);
@@ -96,52 +94,72 @@ export class EngineResultsListComponent implements OnInit {
     this.http.get<PaysItem[]>(`${environment.hrApiUrl}/api/hr/config/hs/pays-list`)
       .pipe(catchError(() => of([] as PaysItem[])))
       .subscribe(list => this.paysList.set(list));
-    // Pays du profil connecté par défaut, comme /payroll/candidate-simulation : les KPI
-    // paie ont besoin d'un pays (une seule devise). Le filtre reste modifiable.
-    this.paysFilter.set(this.userStore.currentUser()?.paysId ?? null);
+    // Aucun filtre pays par défaut : la liste affiche tout le personnel et le bandeau KPI
+    // les totaux de tous les pays ; choisir un pays recharge ces mêmes tuiles pour lui.
     this.load();
     this.loadKpis();
   }
 
   // ── Bandeau KPI paie ─────────────────────────────────────────────────
-  // Totaux du dernier mois calculé (`/engine/results/summary`) pour le pays filtré —
-  // un montant n'a de sens que dans une seule devise, d'où l'absence de bandeau sur
-  // "tous les pays". La couverture compare les collaborateurs calculés à l'effectif en
+  // Totaux du dernier mois calculé : pour le pays filtré (`/engine/results/summary`), ou
+  // pour tous les pays paie sans filtre (`/engine/results/summary/all`, un résumé par
+  // pays). Chaque pays arrive dans sa propre devise et pour son propre dernier mois : les
+  // montants sont convertis dans la devise d'affichage AVANT d'être additionnés — jamais
+  // de TND + EUR bruts. La couverture compare les collaborateurs calculés à l'effectif en
   // poste du service RH (même endpoint que la liste, `size=1` : seul `totalElements`
   // compte). Suit le filtre pays, pas la recherche texte.
-  readonly summary  = signal<PayrollResultsSummaryDto | null>(null);
+  /** `null` tant que rien n'est chargé (ou service en échec) ; sinon les pays ayant des résultats. */
+  readonly summaries = signal<PayrollResultsSummaryDto[] | null>(null);
   readonly headcount = signal<number | null>(null);
+  /** Rechargement en cours — les tuiles gardent les valeurs précédentes, estompées. */
+  readonly kpiLoading = signal(false);
   private kpiSeq = 0;
 
   loadKpis(): void {
     const current = ++this.kpiSeq;
     const paysId = this.paysFilter();
-    this.summary.set(null);
-    this.headcount.set(null);
-    if (paysId == null) return;
+    // Pas de remise à `null` ici : les tuiles restent affichées pendant le chargement,
+    // leur contenu est simplement remplacé à l'arrivée de la réponse.
+    this.kpiLoading.set(true);
+    const summaries$ = paysId != null
+      ? this.engineApi.getResultsSummary(paysId).pipe(map(s => [s]))
+      : this.engineApi.getAllResultsSummaries().pipe(map(list => list.filter(s => s.employeeCount > 0)));
     forkJoin({
-      summary: this.engineApi.getResultsSummary(paysId).pipe(catchError(() => of(null))),
+      summaries: summaries$.pipe(catchError(() => of(null))),
       headcount: this.hrService.listEmployees({ paysId, page: 0, size: 1 }).pipe(
         map(p => p.totalElements ?? 0),
         catchError(() => of(null)),
       ),
     }).subscribe(r => {
       if (current !== this.kpiSeq) return;
-      this.summary.set(r.summary);
+      this.summaries.set(r.summaries);
       this.headcount.set(r.headcount);
+      this.kpiLoading.set(false);
     });
   }
 
+  /** Devises d'origine des totaux, sans doublon. */
+  readonly sourceCurrencies = computed(() =>
+    [...new Set((this.summaries() ?? []).map(s => s.currencyCode).filter((c): c is string => !!c))]);
+
   // ── Devise d'affichage (daf-radial-menu, comme le sélecteur devise de finance) ──
-  // Les totaux arrivent dans la devise du pays ; le menu les convertit au taux du jour.
-  // `displayCurrency()` = devise réellement affichée (le choix, sinon celle du pays).
-  readonly displayCurrency = computed(() =>
-    this.currency.display() ?? this.summary()?.currencyCode ?? null);
-  readonly isConverted = computed(() => {
-    const src = this.summary()?.currencyCode;
-    const shown = this.displayCurrency();
-    return !!src && !!shown && src !== shown;
+  // Les totaux arrivent dans la devise de chaque pays ; le menu les convertit au taux du
+  // jour. `displayCurrency()` = devise réellement affichée : le choix du menu, sinon la
+  // devise commune des pays affichés, sinon EUR quand plusieurs devises se mélangent.
+  readonly displayCurrency = computed(() => {
+    const chosen = this.currency.display();
+    if (chosen) return chosen;
+    const sources = this.sourceCurrencies();
+    if (sources.length === 1) return sources[0];
+    return sources.length > 1 ? 'EUR' : null;
   });
+  readonly isConverted = computed(() => {
+    const shown = this.displayCurrency();
+    return !!shown && this.sourceCurrencies().some(c => c !== shown);
+  });
+  /** Devises converties vers `displayCurrency()`, pour la mention sous le titre. */
+  readonly convertedFrom = computed(() =>
+    this.sourceCurrencies().filter(c => c !== this.displayCurrency()).join(', '));
 
   readonly currencyItems = computed<RadialMenuItem[]>(() =>
     SUPPORTED_CURRENCIES.map(code => ({
@@ -153,17 +171,25 @@ export class EngineResultsListComponent implements OnInit {
   readonly currencyMenuConfig = computed<RadialMenuConfig>(() => ({
     label: this.t('PAYROLL.ENGINE_RESULTS.CURRENCY.TITLE'),
     maxVisible: SUPPORTED_CURRENCIES.length,
-    // Rien à convertir sans totaux (pas de pays filtré, ou service en échec).
-    disabled: !this.summary()?.currencyCode,
+    // Rien à convertir sans totaux (aucun résultat, ou service en échec).
+    disabled: this.sourceCurrencies().length === 0,
   }));
 
   onCurrencyPick(item: RadialMenuItem): void {
     this.currency.setDisplay(item.id);
   }
 
-  private money(v: number, source: string | null): string {
+  /** Somme d'un montant sur tous les pays, chacun converti dans la devise d'affichage. */
+  private total(field: 'totalGross' | 'totalLoadedCost'): number {
     const target = this.displayCurrency();
-    const amount = source && target ? this.currency.convert(v ?? 0, source, target) : (v ?? 0);
+    return (this.summaries() ?? []).reduce((acc, s) => {
+      const v = s[field] ?? 0;
+      return acc + (s.currencyCode && target ? this.currency.convert(v, s.currencyCode, target) : v);
+    }, 0);
+  }
+
+  private money(amount: number): string {
+    const target = this.displayCurrency();
     const locale = this.translate.getCurrentLang() === 'en' ? 'en-US' : 'fr-FR';
     if (target) {
       try {
@@ -175,13 +201,41 @@ export class EngineResultsListComponent implements OnInit {
     return target ? `${n} ${target}` : n;
   }
 
-  /** Les quatre tuiles, prêtes pour le template — `null` sans pays ou sans réponse. */
+  /** Dernier mois calculé ; une plage quand les pays n'en sont pas au même mois. */
+  private periodLabel(list: PayrollResultsSummaryDto[]): string {
+    const keys = list
+      .filter(s => s.periodYear && s.periodMonth)
+      .map(s => s.periodYear! * 100 + s.periodMonth!)
+      .sort((a, b) => a - b);
+    if (keys.length === 0) return this.t('PAYROLL.ENGINE_RESULTS.KPI_NO_PERIOD');
+    const fmt = (k: number) => `${String(k % 100).padStart(2, '0')}/${Math.floor(k / 100)}`;
+    const first = keys[0], last = keys[keys.length - 1];
+    return first === last ? fmt(last) : `${fmt(first)} – ${fmt(last)}`;
+  }
+
+  /** Les quatre tuiles, prêtes pour le template — TOUJOURS affichées : « — » tant que
+   *  rien n'est chargé ou si le service est en échec. */
   readonly kpiTiles = computed(() => {
-    const s = this.summary();
-    if (!s) return null;
-    const period = s.periodMonth && s.periodYear
-      ? `${String(s.periodMonth).padStart(2, '0')}/${s.periodYear}`
-      : this.t('PAYROLL.ENGINE_RESULTS.KPI_NO_PERIOD');
+    const list = this.summaries();
+    if (!list) {
+      const empty = '—';
+      return {
+        period: empty,
+        tiles: [
+          { label: this.t('PAYROLL.ENGINE_RESULTS.KPI_GROSS_PAYROLL'),        value: empty, options: { icon: 'account_balance_wallet' } },
+          { label: this.t('PAYROLL.ENGINE_RESULTS.KPI_LOADED_COST'),          value: empty, options: { icon: 'account_balance' } },
+          { label: this.t('PAYROLL.ENGINE_RESULTS.KPI_COVERAGE'),             value: empty, options: { icon: 'fact_check' } },
+          { label: this.t('PAYROLL.ENGINE_RESULTS.KPI_CONVERGENCE_FAILURES'), value: empty, options: { icon: 'verified' } },
+        ] satisfies { label: string; value: string | number; options: MetricCardOptions }[],
+      };
+    }
+    const s = {
+      totalGross:          this.total('totalGross'),
+      totalLoadedCost:     this.total('totalLoadedCost'),
+      employeeCount:       list.reduce((acc, x) => acc + x.employeeCount, 0),
+      convergenceFailures: list.reduce((acc, x) => acc + x.convergenceFailures, 0),
+    };
+    const period = this.periodLabel(list);
     const headcount = this.headcount();
     const failures = s.convergenceFailures;
     return {
@@ -189,7 +243,7 @@ export class EngineResultsListComponent implements OnInit {
       tiles: [
         {
           label: this.t('PAYROLL.ENGINE_RESULTS.KPI_GROSS_PAYROLL'),
-          value: this.money(s.totalGross, s.currencyCode),
+          value: this.money(s.totalGross),
           options: {
             icon: 'account_balance_wallet',
             helpTitle: this.t('PAYROLL.ENGINE_RESULTS.KPI_GROSS_PAYROLL'),
@@ -198,7 +252,7 @@ export class EngineResultsListComponent implements OnInit {
         },
         {
           label: this.t('PAYROLL.ENGINE_RESULTS.KPI_LOADED_COST'),
-          value: this.money(s.totalLoadedCost, s.currencyCode),
+          value: this.money(s.totalLoadedCost),
           options: {
             valueColor: 'text-primary', icon: 'account_balance',
             helpTitle: this.t('PAYROLL.ENGINE_RESULTS.KPI_LOADED_COST'),
@@ -283,6 +337,7 @@ export class EngineResultsListComponent implements OnInit {
     name: 'pays',
     label: this.t('PAYROLL.ENGINE_RESULTS.FILTER_PAYS'),
     type: 'select',
+    searchable: true,
     placeholder: this.t('PAYROLL.ENGINE_RESULTS.FILTER_ALL'),
     options: this.paysList().map(p => ({ value: String(p.id), label: `${p.french_label} (${p.iso_code})` })),
   }]);

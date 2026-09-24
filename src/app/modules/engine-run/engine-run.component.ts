@@ -16,14 +16,15 @@ import {
   SectionTitleComponent,
   SelectComponent,
   StatusBadgeComponent,
-  TabsComponent,
   deriveInitials,
   type BadgeVariant,
   type BreadcrumbItem,
   type MetricDelta,
   type PageHeaderBadge,
   type SelectOption,
-  type TabItem,
+  type FilterField,
+  type FilterResult,
+  type SearchToolbarFilterConfig,
   type TableColumn,
   type TableRow,
 } from '@khalilrebhiitec/daf360';
@@ -94,7 +95,7 @@ function flagEmoji(isoCode: string | null | undefined): string {
     CommonModule, ReactiveFormsModule, TranslatePipe, EmployeeSelectComponent,
     AvatarComponent, ButtonComponent, CardComponent, DataTableComponent, FormFieldComponent,
     MetricCardComponent, MultiDatePickerComponent, PageComponent, PageHeaderComponent, SearchToolbarComponent,
-    SectionTitleComponent, SelectComponent, StatusBadgeComponent, TabsComponent,
+    SectionTitleComponent, SelectComponent, StatusBadgeComponent,
   ],
   template: `
     <daf-page [loading]="pageLoading()" [kpis]="0" [breadcrumbs]="true" headerSize="md">
@@ -120,56 +121,6 @@ function flagEmoji(isoCode: string | null | undefined): string {
           </daf-button>
         </div>
       </daf-page-header>
-
-      <!-- ══════════════════════ BANDEAU KPI — pleine largeur, en haut de page ══════════════════════
-           Comme /finance/affaires/1?tab=overview, dont les indicateurs dominent le haut de la
-           colonne de contenu avant tout split : ces 4 cartes sortent de la zone .cockpit-main
-           (où elles n'occupaient que la largeur de la colonne de résultats, à côté de la sidebar)
-           pour s'afficher sur toute la largeur de la page, avant le split sidebar/résultats. -->
-      @if (result(); as r) {
-        <daf-card
-          [options]="{ variant: 'flat', padding: 'lg', radius: 'xl', accent: r.convergenceOk ? 'success' : 'danger' }"
-          class="kpi-banner kpi-banner--top">
-          <div class="kpi-banner__status">
-            <daf-badge
-              [label]="(r.convergenceOk ? 'PAYROLL.ENGINE_RUN.CONVERGENCE_OK' : 'PAYROLL.ENGINE_RUN.CONVERGENCE_FAILED') | translate"
-              [options]="{ variant: r.convergenceOk ? 'success' : 'danger', size: 'md' }">
-            </daf-badge>
-            @if (r.iterationsUsed) {
-              <span class="kpi-banner__note">{{ 'PAYROLL.ENGINE_RUN.ITERATIONS_SUFFIX' | translate: { count: r.iterationsUsed } }}</span>
-            }
-            @if (compareResult(); as c) {
-              <span class="kpi-banner__note">{{ 'PAYROLL.ENGINE_RUN.COMPARE_TAG' | translate: { year: c.periodYear } }}</span>
-            }
-          </div>
-          <div class="kpi-grid">
-            <daf-metric-card
-              [label]="'PAYROLL.ENGINE_RUN.KPI_NET_PAY' | translate"
-              [value]="(r.strate5 | number:'1.2-2') ?? ''"
-              [delta]="netPayDelta()"
-              [options]="{ valueColor: 'text-primary', icon: 'payments', iconBg: 'bg-primary/10', iconColor: 'text-primary' }">
-            </daf-metric-card>
-            <daf-metric-card
-              [label]="'PAYROLL.ENGINE_RUN.KPI_EMPLOYER_COST' | translate"
-              [value]="(r.loadedCost | number:'1.2-2') ?? ''"
-              [delta]="loadedCostDelta()"
-              [options]="{ icon: 'account_balance', iconBg: 'bg-teal/10', iconColor: 'text-teal' }">
-            </daf-metric-card>
-            <daf-metric-card
-              [label]="'PAYROLL.ENGINE_RUN.KPI_TAXABLE_NET' | translate"
-              [value]="(r.strate4 | number:'1.2-2') ?? ''"
-              [delta]="taxableNetDelta()"
-              [options]="{ icon: 'account_balance_wallet', iconBg: 'bg-tertiary/10', iconColor: 'text-tertiary' }">
-            </daf-metric-card>
-            <daf-metric-card
-              [label]="'PAYROLL.ENGINE_RUN.STRATE_IRPP' | translate"
-              [value]="(r.aggregateIrpp | number:'1.2-2') ?? ''"
-              [delta]="irppDelta()"
-              [options]="{ icon: 'request_quote', iconBg: 'bg-warning/10', iconColor: 'text-warning' }">
-            </daf-metric-card>
-          </div>
-        </daf-card>
-      }
 
       <div class="cockpit">
         <!-- ══════════════════════ SIDEBAR — PARAMÈTRES DE CALCUL ══════════════════════ -->
@@ -268,6 +219,44 @@ function flagEmoji(isoCode: string | null | undefined): string {
 
         <!-- ══════════════════════ ZONE PRINCIPALE — RÉSULTATS ══════════════════════ -->
         <main class="cockpit-main">
+          <!-- ── Bandeau KPI — en tête de la colonne résultats, à côté de la carte de
+               calcul, comme /finance/affaires/:id?tab=overview (panneau à gauche, tuiles
+               en haut de la colonne principale) : lancer un calcul ne repousse plus la
+               carte de paramètres vers le bas. ── -->
+          @if (result(); as r) {
+            <div class="kpi-banner">
+              @if (compareResult(); as c) {
+                <span class="kpi-banner__note">{{ 'PAYROLL.ENGINE_RUN.COMPARE_TAG' | translate: { year: c.periodYear } }}</span>
+              }
+              <div class="kpi-grid">
+                <daf-metric-card
+                  [label]="'PAYROLL.ENGINE_RUN.KPI_NET_PAY' | translate"
+                  [value]="(r.strate5 | number:'1.2-2') ?? ''"
+                  [delta]="netPayDelta()"
+                  [options]="{ valueColor: 'text-primary', icon: 'payments', iconBg: 'bg-primary/10', iconColor: 'text-primary' }">
+                </daf-metric-card>
+                <daf-metric-card
+                  [label]="'PAYROLL.ENGINE_RUN.KPI_EMPLOYER_COST' | translate"
+                  [value]="(r.loadedCost | number:'1.2-2') ?? ''"
+                  [delta]="loadedCostDelta()"
+                  [options]="{ icon: 'account_balance', iconBg: 'bg-teal/10', iconColor: 'text-teal' }">
+                </daf-metric-card>
+                <daf-metric-card
+                  [label]="'PAYROLL.ENGINE_RUN.KPI_TAXABLE_NET' | translate"
+                  [value]="(r.strate4 | number:'1.2-2') ?? ''"
+                  [delta]="taxableNetDelta()"
+                  [options]="{ icon: 'account_balance_wallet', iconBg: 'bg-tertiary/10', iconColor: 'text-tertiary' }">
+                </daf-metric-card>
+                <daf-metric-card
+                  [label]="'PAYROLL.ENGINE_RUN.STRATE_IRPP' | translate"
+                  [value]="(r.aggregateIrpp | number:'1.2-2') ?? ''"
+                  [delta]="irppDelta()"
+                  [options]="{ icon: 'request_quote', iconBg: 'bg-warning/10', iconColor: 'text-warning' }">
+                </daf-metric-card>
+              </div>
+            </div>
+          }
+
           @if (!result() && !running()) {
             <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
               <p class="empty-state">{{ 'PAYROLL.ENGINE_RUN.EMPTY_RESULT_HINT' | translate }}</p>
@@ -303,24 +292,23 @@ function flagEmoji(isoCode: string | null | undefined): string {
               </div>
             </daf-card>
 
-            <!-- ── Détail des rubriques ────────────────────────────────────────────── -->
+            <!-- ── Détail des rubriques — modèle de la bibliothèque, comme /payroll/engine-results
+                 et /finance/affaires : 'daf-search-toolbar' (sa propre carte) avec la catégorie
+                 dans son panneau de filtre, puis le tableau dans une 'daf-card'. ── -->
+            <daf-search-toolbar
+              [placeholder]="'PAYROLL.ENGINE_RUN.SEARCH_PLACEHOLDER' | translate"
+              [(value)]="rubriqueSearch"
+              [debounce]="200"
+              [filterFields]="rubriqueFilterFields()"
+              [filterConfig]="rubriqueFilterConfig()"
+              (filterApply)="applyRubriqueFilter($event)">
+            </daf-search-toolbar>
+
             <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
-              <div class="rubrique-toolbar">
-                <daf-tabs #rubriqueTabsRef
-                  [tabs]="rubriqueTabItems()" [(active)]="rubriqueTab"
-                  idPrefix="engine-run-rubriques"
-                  [tabsLabel]="'PAYROLL.ENGINE_RUN.TABS_ARIA' | translate" />
-                <daf-search-toolbar class="min-w-0 flex-1" [card]="false"
-                  [placeholder]="'PAYROLL.ENGINE_RUN.SEARCH_PLACEHOLDER' | translate"
-                  [(value)]="rubriqueSearch"
-                  [debounce]="200">
-                </daf-search-toolbar>
-              </div>
-              <div role="tabpanel"
-                   [id]="rubriqueTabsRef.panelId(rubriqueTab())"
-                   [attr.aria-labelledby]="rubriqueTabsRef.tabId(rubriqueTab())">
-                <daf-data-table [columns]="rubriqueColumns()" [rows]="rubriqueRows()" />
-              </div>
+              <daf-data-table
+                [columns]="rubriqueColumns()"
+                [rows]="rubriqueRows()"
+                [config]="{ emptyMessage: ('PAYROLL.ENGINE_RUN.EMPTY_RUBRIQUES' | translate) }" />
             </daf-card>
           }
         </main>
@@ -330,11 +318,8 @@ function flagEmoji(isoCode: string | null | undefined): string {
   styles: [`
     .topbar-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 
-    /* ── Bandeau KPI pleine largeur, en haut de page (avant le split cockpit) ────── */
-    .kpi-banner--top { margin: 0 2rem 1.5rem; }
-
     /* ── Split-screen cockpit ─────────────────────────────────────────────── */
-    .cockpit         { display: flex; align-items: flex-start; gap: 1.5rem; padding: 0 2rem 2rem; }
+    .cockpit         { display: flex; align-items: flex-start; gap: 1.5rem; padding: 0 0 2rem; }
     .cockpit-sidebar { flex: 0 0 360px; position: sticky; top: 1.5rem; }
     .cockpit-main    { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 1.5rem; }
     @media (max-width: 1024px) {
@@ -380,13 +365,15 @@ function flagEmoji(isoCode: string | null | undefined): string {
     /* ── Main / résultats ─────────────────────────────────────────────────── */
     .empty-state   { text-align: center; color: var(--color-on-surface-variant, #6b7280); margin: 2rem 0; }
 
-    .kpi-banner            { display: flex; flex-direction: column; gap: 1rem; }
-    .kpi-banner__status    { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+    .kpi-banner            { display: flex; flex-direction: column; gap: .5rem; }
     .kpi-banner__note      { font-size: .8125rem; color: var(--color-on-surface-variant, #6b7280); }
-    .kpi-grid              { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1.25rem; }
+    /* 4 colonnes égales dans la colonne résultats (plus étroite que la page : un
+       auto-fill à 230px y cassait en 3 + 1), 2 × 2 quand la place manque. */
+    .kpi-grid              { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+    @media (max-width: 1280px) {
+      .kpi-grid            { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
 
-    .rubrique-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-                         flex-wrap: wrap; margin-bottom: 1rem; }
   `],
 })
 export class EngineRunComponent implements OnInit {
@@ -656,7 +643,7 @@ export class EngineRunComponent implements OnInit {
     ].filter(s => s.amount > 0.005);
   });
 
-  // ── Détail des rubriques : onglets par nature réelle (aucune catégorie "Fiscalité /
+  // ── Détail des rubriques : catégories par nature réelle (aucune catégorie "Fiscalité /
   //    PAS" n'existe dans les données — seules AVANTAGE/INDEMNITE/PRIME/RETENUE le sont). ──
   readonly rubriqueSearch = signal('');
   readonly rubriqueTab    = signal<RubriqueTab>('all');
@@ -667,14 +654,35 @@ export class EngineRunComponent implements OnInit {
     return { all: details.length, credit: details.length - debit, debit };
   });
 
-  readonly rubriqueTabItems = computed((): TabItem[] => {
+  /** Catégorie dans le panneau de filtre de la barre (select de la lib), avec le nombre
+   *  de rubriques par catégorie ; vide = toutes les rubriques. */
+  readonly rubriqueFilterFields = computed<FilterField[]>(() => {
     const c = this.rubriqueTabCounts();
-    return [
-      { id: 'all',    label: this.t('PAYROLL.ENGINE_RUN.TAB_ALL'),    count: c.all || null },
-      { id: 'credit', label: this.t('PAYROLL.ENGINE_RUN.TAB_CREDIT'), count: c.credit || null },
-      { id: 'debit',  label: this.t('PAYROLL.ENGINE_RUN.TAB_DEBIT'),  count: c.debit || null },
-    ];
+    return [{
+      name: 'category',
+      label: this.t('PAYROLL.ENGINE_RUN.FILTER_CATEGORY'),
+      type: 'select',
+      placeholder: `${this.t('PAYROLL.ENGINE_RUN.TAB_ALL')} (${c.all})`,
+      options: [
+        { value: 'credit', label: `${this.t('PAYROLL.ENGINE_RUN.TAB_CREDIT')} (${c.credit})` },
+        { value: 'debit',  label: `${this.t('PAYROLL.ENGINE_RUN.TAB_DEBIT')} (${c.debit})` },
+      ],
+    }];
   });
+
+  readonly rubriqueFilterConfig = computed<SearchToolbarFilterConfig>(() => ({
+    title:        this.t('PAYROLL.ENGINE_RUN.FILTER_TITLE'),
+    applyLabel:   this.t('PAYROLL.ENGINE_RUN.FILTER_APPLY'),
+    cancelLabel:  this.t('PAYROLL.ENGINE_RUN.FILTER_CANCEL'),
+    resetLabel:   this.t('PAYROLL.ENGINE_RUN.FILTER_RESET'),
+    triggerLabel: this.t('PAYROLL.ENGINE_RUN.FILTER_TRIGGER'),
+    align: 'right',
+  }));
+
+  applyRubriqueFilter(result: FilterResult): void {
+    const v = result['category'];
+    this.rubriqueTab.set(v === 'credit' || v === 'debit' ? v : 'all');
+  }
 
   natureVariant(nature: string): BadgeVariant {
     switch (nature) {

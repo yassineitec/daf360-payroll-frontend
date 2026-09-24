@@ -1,4 +1,4 @@
-.page-body     { display: flex; flex-direction: column; gap: 1.5rem; padding: 0 2rem 2rem; max-width: 960px; }
+.page-body     { display: flex; flex-direction: column; gap: 1.5rem; padding: 0 0 2rem; }
 .form-grid     { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem; align-items: end; }
 .form-actions  { display: flex; gap: .75rem; margin-top: 1rem; }
 .alert         { padding: .75rem 1rem; border-radius: 6px; margin-top: 1rem; font-size: .875rem; }

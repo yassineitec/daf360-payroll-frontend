@@ -1,4 +1,4 @@
-.page-body     { display: flex; flex-direction: column; gap: 1.5rem; padding: 0 2rem 2rem; }
+.page-body     { display: flex; flex-direction: column; gap: 1.5rem; padding: 0 0 2rem; }
 .filter-row    { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; }
 
 /* ── sélecteur pays : trigger compact façon bouton (type /finance/admin), même
@@ -7,8 +7,6 @@
    absent des options). `fullWidth: false` sur la config select donne déjà un trigger
    à largeur de contenu ; on lui met juste un plancher pour ne pas s'écraser sur un
    libellé pays court. */
-.pays-trigger { min-width: 220px; }
-.pays-trigger ::ng-deep [data-trigger] { border-radius: 0.5rem; }
 .alert--error  { background: #fee2e2; color: #991b1b; padding: .75rem 1rem; border-radius: 6px; margin-top: 1rem; font-size: .875rem; }
 .empty-state   { text-align: center; color: var(--color-on-surface-variant, #6b7280); margin: 0; }
 .sim-grid      { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .75rem; }

@@ -4,7 +4,6 @@ import { HttpClient } from '@angular/common/http';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { catchError, of } from 'rxjs';
 import { CandidateSimulationService, CandidateSimulationSummaryDto, CandidateCostApprovalDto } from '../../core/candidate-simulation.service';
-import { UserStore } from '../../core/user.store';
 import {
   AvatarComponent,
   ButtonComponent,
@@ -16,7 +15,6 @@ import {
   PageHeaderComponent,
   PaginationComponent,
   SearchToolbarComponent,
-  SelectComponent,
   StatusBadgeComponent,
   type BadgeVariant,
   type BreadcrumbItem,
@@ -49,7 +47,7 @@ interface PaysItem { id: number; iso_code: string; french_label: string; }
     CommonModule, TranslatePipe,
     AvatarComponent, ButtonComponent, CardComponent, DataTableComponent, EntityCardComponent,
     MetricCardComponent, PageComponent, PageHeaderComponent, PaginationComponent,
-    SearchToolbarComponent, SelectComponent, StatusBadgeComponent,
+    SearchToolbarComponent, StatusBadgeComponent,
   ],
   templateUrl: './candidate-simulation.component.html',
   styleUrl: './candidate-simulation.component.scss',
@@ -58,7 +56,6 @@ export class CandidateSimulationComponent implements OnInit {
   private readonly candSvc   = inject(CandidateSimulationService);
   private readonly http      = inject(HttpClient);
   private readonly translate = inject(TranslateService);
-  private readonly userStore = inject(UserStore);
 
   private t(key: string, params?: Record<string, unknown>): string {
     this.translate.currentLang();
@@ -70,12 +67,6 @@ export class CandidateSimulationComponent implements OnInit {
     { label: this.t('PAYROLL.CANDIDATE_SIMULATION.BREADCRUMB') },
   ]);
 
-  /** Pays du profil de l'utilisateur connecté — pré-sélectionne le select en haut de page
-   *  et déclenche la première recherche, comme dans daf360-rh-frontend (ex.
-   *  `candidate-form.component.ts`, `candidates.component.ts`) où le même
-   *  `userStore.currentUser()?.paysId` filtre déjà par défaut sur le pays de l'utilisateur. */
-  readonly myPaysId = computed(() => this.userStore.currentUser()?.paysId ?? null);
-
   readonly candidatePaysId   = signal<number | null>(null);
   readonly candLoading       = signal(false);
   readonly candError         = signal<string | null>(null);
@@ -85,31 +76,10 @@ export class CandidateSimulationComponent implements OnInit {
   readonly histLoading       = signal(false);
   readonly history           = signal<CandidateCostApprovalDto[]>([]);
   private readonly paysList  = signal<PaysItem[]>([]);
+  /** TOUS les pays du référentiel RH, sans filtre par rôle ni par pays du profil. */
   readonly paysOptions = computed<SelectOption[]>(() =>
     this.paysList().map(p => ({ value: String(p.id), label: `${p.french_label} (${p.iso_code})` })),
   );
-  /**
-   * Compact, bordered "button-style" trigger — same idea as the country picker on
-   * `/finance/admin` (`app-pays-flag-select`), without flags: `fullWidth: false` drops
-   * the trigger's forced full-width sizing (see `pays-trigger` in the template, which no
-   * longer stretches the select via `flex-1`), so it sits at content width like the page's
-   * other buttons instead of spanning the filter row. No `imageUrl` on `paysOptions()` —
-   * flags are a real, supported `SelectOption` field, deliberately left unset.
-   *
-   * No `label`: the select now lives in `daf-page-header`'s `pageActions` slot, next to
-   * the title — same spot as "Nouvelle affaire" on `/finance/affaires` — where a floating
-   * caption above the trigger would look out of place next to a plain action button. The
-   * label text still reaches screen readers via `[ariaLabel]` on the template's `<daf-select>`.
-   */
-  readonly paysSelectConfig = computed(() => ({
-    placeholder: this.t('PAYROLL.CANDIDATE_SIMULATION.PAYS_SELECT_PLACEHOLDER'),
-    searchable: true,
-    fullWidth: false,
-    // Pas de bouton "Rechercher" pour empêcher un second choix pendant que la requête
-    // du précédent est encore en vol — le select se réactive une fois la réponse reçue.
-    disabled: this.candLoading(),
-  }));
-
   readonly candidateKpis = computed(() => {
     const list = this.candidateList();
     const total = list.length;
@@ -164,7 +134,16 @@ export class CandidateSimulationComponent implements OnInit {
     });
   });
 
+  /** Pays + statut dans le même bouton filtre. Le pays est chargé côté serveur (un
+   *  changement relance `loadCandidates()`), le statut filtre la liste déjà en mémoire. */
   readonly filterFields = computed<FilterField[]>(() => [{
+    name: 'pays',
+    label: this.t('PAYROLL.CANDIDATE_SIMULATION.PAYS_SELECT_LABEL'),
+    type: 'select',
+    searchable: true,
+    placeholder: this.t('PAYROLL.CANDIDATE_SIMULATION.PAYS_SELECT_PLACEHOLDER'),
+    options: this.paysOptions(),
+  }, {
     name: 'status',
     label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_STATUS'),
     type: 'select',
@@ -180,13 +159,30 @@ export class CandidateSimulationComponent implements OnInit {
     triggerLabel: this.t('PAYROLL.CANDIDATE_SIMULATION.FILTER_TRIGGER'),
     // `daf-filter` seeds `initialValues` once, in its own internal shape — a `select`
     // field is a `string[]` there (normalizes to a scalar only on `apply`).
-    initialValues: { status: this.statusFilter() ? [this.statusFilter()] : [] },
+    initialValues: {
+      pays:   this.candidatePaysId() ? [String(this.candidatePaysId())] : [],
+      status: this.statusFilter() ? [this.statusFilter()] : [],
+    },
   }));
 
   applyFilters(result: FilterResult): void {
     this.statusFilter.set((result['status'] as string | null) ?? '');
     this.page.set(0);
+    const raw = result['pays'] as string | null;
+    const paysId = raw ? Number(raw) : null;
+    if (paysId !== this.candidatePaysId()) {
+      this.candidatePaysId.set(paysId);
+      this.loadCandidates();
+    }
   }
+
+  /** Message de la liste vide : pas encore de pays, chargement, ou pays sans candidat. */
+  readonly emptyMessage = computed(() => {
+    if (!this.candidatePaysId()) return this.t('PAYROLL.CANDIDATE_SIMULATION.NO_PAYS_SELECTED');
+    if (this.candLoading())      return this.t('PAYROLL.COMMON.LOADING');
+    if (this.candidateList().length === 0) return this.t('PAYROLL.CANDIDATE_SIMULATION.EMPTY_CANDIDATES');
+    return this.t('PAYROLL.CANDIDATE_SIMULATION.EMPTY_FILTERED');
+  });
 
   readonly viewOptions = computed<ToolbarToggleOption[]>(() => [
     { id: 'list', icon: 'table_rows', tooltip: this.t('PAYROLL.CANDIDATE_SIMULATION.VIEW_LIST') },
@@ -228,26 +224,19 @@ export class CandidateSimulationComponent implements OnInit {
       .pipe(catchError(() => of([] as PaysItem[])))
       .subscribe(list => this.paysList.set(list));
 
-    // Pré-sélectionne le pays du profil connecté et lance la recherche tout de suite —
-    // le select reste modifiable pour consulter un autre pays ensuite.
-    const myPaysId = this.myPaysId();
-    if (myPaysId) {
-      this.candidatePaysId.set(myPaysId);
-      this.loadCandidates();
-    }
-  }
-
-  /** Pas de bouton "Rechercher" : choisir un pays dans le select déclenche la recherche
-   *  directement. */
-  onPaysChange(selected: string[]): void {
-    const paysId = selected[0] ? Number(selected[0]) : null;
-    this.candidatePaysId.set(paysId);
-    if (paysId) this.loadCandidates();
+    // Aucun pays pré-sélectionné (pas même celui du profil) : l'utilisateur choisit dans
+    // le bouton filtre, et ce choix lance la recherche (`applyFilters`).
   }
 
   loadCandidates(): void {
     const paysId = this.candidatePaysId();
-    if (!paysId) return;
+    if (!paysId) {
+      // Pays retiré du filtre : la page revient à son état vide (KPI à 0, liste vide).
+      this.candidateList.set([]);
+      this.candSearched.set(false);
+      this.candError.set(null);
+      return;
+    }
     this.candLoading.set(true);
     this.candError.set(null);
     this.candSearched.set(false);
@@ -256,6 +245,7 @@ export class CandidateSimulationComponent implements OnInit {
     this.candSvc.getCandidatesWithHistory(paysId).subscribe({
       next: list => { this.candidateList.set(list); this.candLoading.set(false); this.candSearched.set(true); },
       error: e   => {
+        this.candidateList.set([]);
         this.candError.set(e?.error?.message ?? this.t('PAYROLL.CANDIDATE_SIMULATION.ERROR_CANDIDATES'));
         this.candLoading.set(false);
       },
@@ -263,10 +253,11 @@ export class CandidateSimulationComponent implements OnInit {
   }
 
   readonly candidateColumns = computed<TableColumn[]>(() => [
-    { key: 'name',        label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_NAME') },
+    // Colonne candidat en `avatar` (initiales + nom), comme l'exemple de la bibliothèque.
+    { key: 'name',        label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_NAME'), type: 'avatar' },
     { key: 'position',    label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_POSITION') },
     { key: 'entity',      label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_ENTITY') },
-    { key: 'simulations', label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_SIMULATIONS'), align: 'center' },
+    { key: 'simulations', label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_SIMULATIONS'), type: 'number' },
     { key: 'latest',      label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_LATEST'), type: 'date', format: { dateStyle: 'short' } },
     { key: 'status',      label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_STATUS'), type: 'badge' },
   ]);
@@ -275,7 +266,7 @@ export class CandidateSimulationComponent implements OnInit {
     this.filteredCandidates().map(c => ({
       id:            c.candidateId,
       candidateId:   c.candidateId,
-      name:          `${c.firstName} ${c.lastName}`,
+      name:          { name: `${c.firstName} ${c.lastName}` },
       position:      c.appliedPosition || '—',
       entity:        c.candidateLocation || '—',
       simulations:   c.simulationCount,
