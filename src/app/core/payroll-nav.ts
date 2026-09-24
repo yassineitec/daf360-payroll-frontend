@@ -58,6 +58,14 @@ export const PAYROLL_CREATE_PARAMSET_PERMISSIONS = [
  */
 export const PAYROLL_PAYSLIPS_PERMISSIONS = ['RH_MANAGE_PAYSLIPS'];
 
+/** `/payroll/employee-config` — assigning a payroll configuration (country, contract type,
+ *  benefits, current net salary) to a specific employee. Viewing needs either code;
+ *  the backend's own PUT enforces MANAGE specifically. */
+export const PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS = [
+  'PAYROLL_VIEW_EMPLOYEE_CONFIG',
+  'PAYROLL_MANAGE_EMPLOYEE_CONFIG',
+];
+
 /**
  * The live payroll screens.
  *
@@ -83,6 +91,13 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
     icon:        'receipt_long',
     route:       'payslips',
     permissions: PAYROLL_PAYSLIPS_PERMISSIONS,
+  },
+  {
+    id:          'employee-config',
+    labelKey:    'PAYROLL.layout.NAV.EMPLOYEE_CONFIG',
+    icon:        'manage_accounts',
+    route:       'employee-config',
+    permissions: PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS,
   },
 
   // ── Keep in sync with app.routes.ts ─────────────────────────────────────────

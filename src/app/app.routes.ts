@@ -8,6 +8,7 @@ import { InlineTranslateLoader, PAYROLL_TRANSLATIONS } from './core/inline-trans
 import { PayrollShellComponent } from './layout/payroll-shell.component';
 import { provideDafAccess, permissionGuard } from '@khalilrebhiitec/daf360';
 import {
+  PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS,
   PAYROLL_PAYSLIPS_PERMISSIONS,
   PAYROLL_SIMULATOR_PERMISSIONS,
 } from './core/payroll-nav';
@@ -75,6 +76,13 @@ export const routes: Routes = [
         data: { permissions: PAYROLL_PAYSLIPS_PERMISSIONS },
         loadChildren: () =>
           import('./modules/payslips/payslips.routes').then(m => m.PAYSLIPS_ROUTES),
+      },
+      {
+        path: 'employee-config',
+        canActivate: [permissionGuard],
+        data: { permissions: PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS },
+        loadChildren: () =>
+          import('./modules/employee-config/employee-config.routes').then(m => m.EMPLOYEE_CONFIG_ROUTES),
       },
 
       // ── Keep in sync with core/payroll-nav.ts ─────────────────────────────────

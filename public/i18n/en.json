@@ -20,6 +20,7 @@
         "SIMULATOR": "Manual simulator",
         "ADMIN": "Administration",
         "PAYSLIPS": "Payslips",
+        "EMPLOYEE_CONFIG": "Employee configuration",
         "COHORT": "Cohort simulation",
         "ENGINE_RUN": "Payroll run",
         "PAYROLL_HISTORY_GROUP": "Payroll history",
@@ -218,6 +219,38 @@
         "EMPLOYEE_ENTRY": "Employee #{{id}}",
         "UNLABELLED": "Unlabelled"
       }
+    },
+
+    "EMPLOYEE_CONFIG": {
+      "TITLE": "Employee Configuration",
+      "SELECT_EMPLOYEE": "Select an employee",
+      "SELECT_COUNTRY": "Select a country…",
+      "COUNTRY": "Country",
+      "CONTRACT_TYPE": "Contract Type",
+      "BENEFITS": "Benefits in Kind",
+      "CURRENT_SALARY": "Current Net Salary",
+      "REASON": "Reason for Change",
+      "SAVE": "Save",
+      "SAVE_SUCCESS": "Configuration saved.",
+      "SAVE_ERROR": "Error saving configuration.",
+      "LOAD_ERROR": "Error loading configuration.",
+      "EMPLOYEE_LIST": "Employee list",
+      "EMPLOYEE_LIST_ERROR": "Could not load the employee list.",
+      "GROSS_SALARY": "Gross salary",
+      "CALCULATE_NET": "Calculate net",
+      "CALCULATE_ERROR": "Could not calculate net salary.",
+      "BONUSES": "Exceptional bonuses",
+      "ADD_BONUS": "Add a bonus",
+      "BONUS_VALIDATION_ERROR": "Amount and label are required.",
+      "BONUS_SAVE_ERROR": "Could not save the bonus.",
+      "BONUS_DELETE_ERROR": "Could not delete the bonus.",
+      "BONUS_LOAD_ERROR": "Could not load bonuses.",
+      "CURRENCY": "Currency",
+      "BONUS_AMOUNT": "Amount",
+      "BONUS_MONTH": "Month",
+      "BONUS_YEAR": "Year",
+      "BONUS_LABEL": "Label",
+      "BONUS_COMMENT": "Comment (optional)"
     },
 
     "ADMIN": {

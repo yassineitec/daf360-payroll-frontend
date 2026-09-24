@@ -20,6 +20,7 @@
         "SIMULATOR": "Simulateur manuel",
         "ADMIN": "Administration",
         "PAYSLIPS": "Fiches de paie",
+        "EMPLOYEE_CONFIG": "Configuration employé",
         "COHORT": "Simulation cohorte",
         "ENGINE_RUN": "Calcul de paie",
         "PAYROLL_HISTORY_GROUP": "Historique de paie",
@@ -218,6 +219,38 @@
         "EMPLOYEE_ENTRY": "Collaborateur #{{id}}",
         "UNLABELLED": "Sans libellé"
       }
+    },
+
+    "EMPLOYEE_CONFIG": {
+      "TITLE": "Configuration employé",
+      "SELECT_EMPLOYEE": "Sélectionner un employé",
+      "SELECT_COUNTRY": "Sélectionner un pays…",
+      "COUNTRY": "Pays",
+      "CONTRACT_TYPE": "Type de contrat",
+      "BENEFITS": "Avantages en nature",
+      "CURRENT_SALARY": "Salaire net actuel",
+      "REASON": "Motif du changement",
+      "SAVE": "Enregistrer",
+      "SAVE_SUCCESS": "Configuration enregistrée.",
+      "SAVE_ERROR": "Erreur lors de l'enregistrement.",
+      "LOAD_ERROR": "Erreur lors du chargement.",
+      "EMPLOYEE_LIST": "Liste des employés",
+      "EMPLOYEE_LIST_ERROR": "Impossible de charger la liste des employés.",
+      "GROSS_SALARY": "Salaire brut",
+      "CALCULATE_NET": "Calculer le net",
+      "CALCULATE_ERROR": "Impossible de calculer le salaire net.",
+      "BONUSES": "Primes exceptionnelles",
+      "ADD_BONUS": "Ajouter une prime",
+      "BONUS_VALIDATION_ERROR": "Montant et libellé sont requis.",
+      "BONUS_SAVE_ERROR": "Impossible d'enregistrer la prime.",
+      "BONUS_DELETE_ERROR": "Impossible de supprimer la prime.",
+      "BONUS_LOAD_ERROR": "Impossible de charger les primes.",
+      "CURRENCY": "Devise",
+      "BONUS_AMOUNT": "Montant",
+      "BONUS_MONTH": "Mois",
+      "BONUS_YEAR": "Année",
+      "BONUS_LABEL": "Libellé",
+      "BONUS_COMMENT": "Commentaire (optionnel)"
     },
 
     "ADMIN": {

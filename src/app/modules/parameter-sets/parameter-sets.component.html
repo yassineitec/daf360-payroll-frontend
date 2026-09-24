@@ -649,10 +649,9 @@
                           </daf-checkbox>
                           @if (!editRubriqueGroup(i).get('ctAll')!.value) {
                             <div class="rg-contract-types">
-                              <daf-checkbox [options]="{ label: 'CDI' }" [checked]="editRubriqueGroup(i).get('ctCDI')!.value" (checkedChange)="editRubriqueGroup(i).get('ctCDI')!.setValue($event)" />
-                              <daf-checkbox [options]="{ label: 'CDD' }" [checked]="editRubriqueGroup(i).get('ctCDD')!.value" (checkedChange)="editRubriqueGroup(i).get('ctCDD')!.setValue($event)" />
-                              <daf-checkbox [options]="{ label: ('PAYROLL.PARAMETER_SETS.CT_STAGE' | translate) }" [checked]="editRubriqueGroup(i).get('ctSTAGE')!.value" (checkedChange)="editRubriqueGroup(i).get('ctSTAGE')!.setValue($event)" />
-                              <daf-checkbox [options]="{ label: 'CIVP' }" [checked]="editRubriqueGroup(i).get('ctCIVP')!.value" (checkedChange)="editRubriqueGroup(i).get('ctCIVP')!.setValue($event)" />
+                              @for (ct of contractTypes(); track ct.code) {
+                                <daf-checkbox [options]="{ label: ct.code }" [checked]="editRubriqueGroup(i).get('ctByCode')?.get(ct.code)?.value ?? false" (checkedChange)="editRubriqueGroup(i).get('ctByCode')?.get(ct.code)?.setValue($event)" />
+                              }
                             </div>
                           }
                         </div>
