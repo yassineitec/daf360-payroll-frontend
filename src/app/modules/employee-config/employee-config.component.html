@@ -1,213 +1,242 @@
-<div class="flex flex-col gap-6 p-6 max-w-2xl">
-  <h1 class="text-xl font-bold">{{ 'PAYROLL.EMPLOYEE_CONFIG.TITLE' | translate }}</h1>
+<daf-page [breadcrumbs]="true">
+  <!-- Pas de bouton "Retour à la liste" : le fil d'Ariane (`Configuration employé`)
+       ramène déjà à `/payroll/employee-config`. Titre = le collaborateur ouvert. -->
+  <daf-page-header
+    [title]="employeeName()"
+    [subtitle]="employeeSubtitle()"
+    [breadcrumbs]="breadcrumbs()">
+  </daf-page-header>
 
-  <div class="flex flex-col gap-1.5">
-    <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-      {{ 'PAYROLL.EMPLOYEE_CONFIG.SELECT_EMPLOYEE' | translate }}
-    </label>
-    <app-employee-select
-      [ngModel]="selectedUserId()"
-      (ngModelChange)="onEmployeeSelected($event)" />
-  </div>
+  <div class="page-body">
 
-  <div class="flex flex-col gap-1.5">
-    <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-      {{ 'PAYROLL.EMPLOYEE_CONFIG.EMPLOYEE_LIST' | translate }}
-    </label>
-    @if (employeeListLoading()) {
-      <p class="text-sm text-gray-500">…</p>
-    } @else if (employeePage(); as page) {
-      <div class="max-h-64 overflow-y-auto rounded-lg border border-gray-200">
-        @for (e of page.content; track e.userId) {
-          <button type="button"
-            class="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50"
-            [class.bg-teal-50]="e.userId === selectedUserId()"
-            (click)="onEmployeeSelected(e.userId)">
-            <span>{{ e.fullName }}</span>
-            @if (e.employeeId) {
-              <span class="text-xs text-gray-400">{{ e.employeeId }}</span>
+      @if (loading()) {
+        <daf-card [options]="{ variant: 'default', padding: 'lg', radius: 'xl' }">
+          <div class="ec-form">
+            @for (i of [0, 1]; track i) {
+              <div class="ec-block">
+                <daf-skeleton variant="text" width="30%" height="12px" />
+                <div class="field-row">
+                  <daf-skeleton radius="md" height="44px" />
+                  <daf-skeleton radius="md" height="44px" />
+                </div>
+              </div>
             }
-          </button>
-        }
-      </div>
-    }
-    @if (employeeListError()) {
-      <span class="text-sm text-red-700">{{ employeeListError() }}</span>
-    }
-  </div>
-
-  @if (loading()) {
-    <p class="text-sm text-gray-500">…</p>
-  }
-
-  @if (config(); as cfg) {
-    <div class="flex flex-col gap-4 rounded-xl border border-gray-200 p-5">
-      <div class="flex flex-col gap-1.5">
-        <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-          {{ 'PAYROLL.EMPLOYEE_CONFIG.COUNTRY' | translate }}
-        </label>
-        <select class="rounded-lg border border-gray-300 px-3 py-2"
-          [ngModel]="cfg.paysId" (ngModelChange)="onPaysChange(+$event)">
-          @if (cfg.paysId == null) {
-            <option [value]="null" disabled selected>{{ 'PAYROLL.EMPLOYEE_CONFIG.SELECT_COUNTRY' | translate }}</option>
-          }
-          @for (p of paysList(); track p.id) {
-            <option [value]="p.id">{{ p.frenchLabel }} ({{ p.isoCode }})</option>
-          }
-        </select>
-      </div>
-
-      <div class="flex flex-col gap-1.5">
-        <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-          {{ 'PAYROLL.EMPLOYEE_CONFIG.CONTRACT_TYPE' | translate }}
-        </label>
-        <select class="rounded-lg border border-gray-300 px-3 py-2"
-          [ngModel]="cfg.contractType" (ngModelChange)="onContractTypeChange($event)">
-          @for (ct of contractTypes(); track ct.code) {
-            <option [value]="ct.code">{{ ct.code }}</option>
-          }
-        </select>
-      </div>
-
-      @if (benefits().length) {
-        <div class="flex flex-col gap-1.5">
-          <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-            {{ 'PAYROLL.EMPLOYEE_CONFIG.BENEFITS' | translate }}
-          </label>
-          <div class="flex flex-col gap-2">
-            @for (b of benefits(); track b.benefitCode) {
-              <label class="flex items-center gap-2 text-sm">
-                <input type="checkbox"
-                  [checked]="isBenefitSelected(b.benefitCode)"
-                  (change)="toggleBenefit(b.benefitCode)" />
-                {{ b.benefitLabelFr }}
-              </label>
-            }
+            <daf-skeleton radius="md" height="72px" />
           </div>
-        </div>
+        </daf-card>
+      } @else if (loadError()) {
+        <daf-section-card>
+          <div class="alert alert--error">{{ loadError() }}</div>
+        </daf-section-card>
       }
 
-      <div class="flex flex-col gap-1.5">
-        <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-          {{ 'PAYROLL.EMPLOYEE_CONFIG.GROSS_SALARY' | translate }}
-        </label>
-        <div class="flex items-center gap-2">
-          <input type="number" class="flex-1 rounded-lg border border-gray-300 px-3 py-2"
-            [ngModel]="cfg.currentGrossSalary"
-            (ngModelChange)="onGrossSalaryChange($any($event))" />
-          <button type="button"
-            class="shrink-0 rounded-lg bg-gray-200 px-3 py-2 text-sm disabled:opacity-50"
-            [disabled]="calculatingNet() || cfg.currentGrossSalary == null"
-            (click)="calculateNet()">
-            {{ 'PAYROLL.EMPLOYEE_CONFIG.CALCULATE_NET' | translate }}
-          </button>
+      @if (config(); as cfg) {
+
+        <div class="ec-tabs-wrap">
+          <daf-tabs
+            [tabs]="tabs()"
+            [(active)]="activeTab"
+            [tabsLabel]="employeeName()"
+            [idPrefix]="'employee-config-tabs'" />
         </div>
-      </div>
 
-      <div class="flex flex-col gap-1.5">
-        <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-          {{ 'PAYROLL.EMPLOYEE_CONFIG.CURRENT_SALARY' | translate }}
-        </label>
-        <input type="number" class="rounded-lg border border-gray-300 px-3 py-2"
-          [ngModel]="cfg.currentNetSalary"
-          (ngModelChange)="onSalaryChange($any($event))" />
-      </div>
+        <!-- Pas de titre dans les cartes : il répétait l'onglet juste au-dessus (même choix
+             que le détail de parameter-sets). -->
+        @switch (activeTab()) {
 
-      <div class="flex flex-col gap-2 rounded-xl border border-gray-200 p-4">
-        <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-          {{ 'PAYROLL.EMPLOYEE_CONFIG.BONUSES' | translate }}
-        </label>
-        @for (b of bonuses(); track b.id) {
-          <div class="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm">
-            <span>{{ b.periodMonth }}/{{ b.periodYear }} — {{ b.label }} ({{ b.amount }} {{ b.currency }})</span>
-            <button type="button" class="text-red-600" (click)="deleteBonus(b.id)">✕</button>
-          </div>
-        }
-        <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
-          <div class="flex flex-col gap-1">
-            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-              {{ 'PAYROLL.EMPLOYEE_CONFIG.BONUS_AMOUNT' | translate }}
-            </label>
-            <input type="number" [placeholder]="'PAYROLL.EMPLOYEE_CONFIG.BONUS_AMOUNT' | translate"
-              class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
-              [ngModel]="newBonusAmount()" (ngModelChange)="newBonusAmount.set($any($event))" />
-          </div>
-          <div class="flex flex-col gap-1">
-            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-              {{ 'PAYROLL.EMPLOYEE_CONFIG.CURRENCY' | translate }}
-            </label>
-            <select class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
-              [ngModel]="newBonusCurrency()" (ngModelChange)="newBonusCurrency.set($event)">
-              @for (c of bonusCurrencies; track c) {
-                <option [value]="c">{{ c }}</option>
+        <!-- ══ Onglet « Configuration de paie » — enregistrée par le bouton du bas, avec motif ══ -->
+        @case ('config') {
+        <!-- Même structure que le formulaire « Nouveau jeu » de parameter-sets (formulaire de
+             référence de la bibliothèque) : daf-card `default`, puis une colonne de blocs
+             espacés uniformément, chaque bloc ouvert par un titre simple (`.ec-section-title`, sans la barre d'accent de
+             daf-section-title). -->
+        <daf-card [options]="{ variant: 'default', padding: 'lg', radius: 'xl' }">
+          <div class="ec-form">
+
+            <!-- 1. Affectation -->
+            <div class="ec-block">
+              <h3 class="ec-section-title">{{ 'PAYROLL.EMPLOYEE_CONFIG.SECTION_ASSIGNMENT' | translate }}</h3>
+              <div class="field-row">
+                <daf-select
+                  [options]="paysOptions()"
+                  [selected]="cfg.paysId != null ? ['' + cfg.paysId] : []"
+                  [config]="{ label: 'PAYROLL.EMPLOYEE_CONFIG.COUNTRY' | translate, placeholder: 'PAYROLL.EMPLOYEE_CONFIG.SELECT_COUNTRY' | translate, searchable: true, fullWidth: true, required: true }"
+                  (selectedChange)="$event[0] && onPaysChange(+$event[0])">
+                </daf-select>
+                <daf-select
+                  [options]="contractTypeOptions()"
+                  [selected]="cfg.contractType ? [cfg.contractType] : []"
+                  [config]="{
+                    label: 'PAYROLL.EMPLOYEE_CONFIG.CONTRACT_TYPE' | translate,
+                    placeholder: (cfg.paysId == null ? 'PAYROLL.EMPLOYEE_CONFIG.CONTRACT_NEEDS_COUNTRY' : 'PAYROLL.EMPLOYEE_CONFIG.SELECT_CONTRACT') | translate,
+                    disabled: cfg.paysId == null,
+                    fullWidth: true
+                  }"
+                  (selectedChange)="$event[0] && onContractTypeChange($event[0])">
+                </daf-select>
+              </div>
+            </div>
+
+            <!-- 2. Salaire — le bouton de calcul sous les deux champs, comme les actions
+                 en ligne du barème IRPP de parameter-sets. -->
+            <div class="ec-block">
+              <h3 class="ec-section-title">{{ 'PAYROLL.EMPLOYEE_CONFIG.SALARY_SECTION' | translate }}</h3>
+              <div class="field-row">
+                <daf-form-field
+                  [options]="{ label: 'PAYROLL.EMPLOYEE_CONFIG.GROSS_SALARY' | translate, type: 'number', align: 'end', suffixText: salaryCurrency(), placeholder: '0.00', fullWidth: true }"
+                  [value]="cfg.currentGrossSalary"
+                  (valueChange)="onGrossSalaryChange(toNumber($event))">
+                </daf-form-field>
+                <daf-form-field
+                  [options]="{ label: 'PAYROLL.EMPLOYEE_CONFIG.CURRENT_SALARY' | translate, type: 'number', align: 'end', suffixText: salaryCurrency(), placeholder: '0.00', fullWidth: true }"
+                  [value]="cfg.currentNetSalary"
+                  (valueChange)="onSalaryChange(toNumber($event))">
+                </daf-form-field>
+              </div>
+              <div class="ec-inline-actions">
+                <daf-button
+                  [label]="'PAYROLL.EMPLOYEE_CONFIG.CALCULATE_NET' | translate"
+                  variant="ghost"
+                  [options]="{ size: 'sm', iconStart: 'calculate', loading: calculatingNet(), disabled: calculatingNet() || cfg.currentGrossSalary == null }"
+                  (onClick)="calculateNet()">
+                </daf-button>
+                <p class="ec-hint">{{ 'PAYROLL.EMPLOYEE_CONFIG.CALCULATE_NET_HINT' | translate }}</p>
+              </div>
+            </div>
+
+            <!-- 3. Avantages en nature — issus du jeu de paramètres actif du pays. -->
+            <div class="ec-block">
+              <h3 class="ec-section-title">{{ ('PAYROLL.EMPLOYEE_CONFIG.BENEFITS' | translate) + (benefits().length ? ' · ' + selectedBenefitCount() + ' / ' + benefits().length : '') }}</h3>
+              @if (benefits().length) {
+                <div class="ec-benefits">
+                  @for (b of benefits(); track b.benefitCode) {
+                    <daf-checkbox
+                      [options]="{ label: benefitLabel(b), hint: benefitHint(b) }"
+                      [checked]="isBenefitSelected(b.benefitCode)"
+                      (checkedChange)="toggleBenefit(b.benefitCode)">
+                    </daf-checkbox>
+                  }
+                </div>
+              } @else {
+                <p class="ec-hint">
+                  {{ (cfg.paysId == null ? 'PAYROLL.EMPLOYEE_CONFIG.BENEFITS_NEED_COUNTRY' : 'PAYROLL.EMPLOYEE_CONFIG.BENEFITS_EMPTY') | translate }}
+                </p>
               }
-            </select>
-          </div>
-          <div class="flex flex-col gap-1">
-            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-              {{ 'PAYROLL.EMPLOYEE_CONFIG.BONUS_MONTH' | translate }}
-            </label>
-            <input type="number" [placeholder]="'PAYROLL.EMPLOYEE_CONFIG.BONUS_MONTH' | translate" min="1" max="12"
-              class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
-              [ngModel]="newBonusMonth()" (ngModelChange)="newBonusMonth.set($any($event))" />
-          </div>
-          <div class="flex flex-col gap-1">
-            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-              {{ 'PAYROLL.EMPLOYEE_CONFIG.BONUS_YEAR' | translate }}
-            </label>
-            <input type="number" [placeholder]="'PAYROLL.EMPLOYEE_CONFIG.BONUS_YEAR' | translate"
-              class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
-              [ngModel]="newBonusYear()" (ngModelChange)="newBonusYear.set($any($event))" />
-          </div>
-          <div class="flex flex-col gap-1">
-            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-              {{ 'PAYROLL.EMPLOYEE_CONFIG.BONUS_LABEL' | translate }}
-            </label>
-            <input type="text" [placeholder]="'PAYROLL.EMPLOYEE_CONFIG.BONUS_LABEL' | translate"
-              class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
-              [ngModel]="newBonusLabel()" (ngModelChange)="newBonusLabel.set($event)" />
-          </div>
-        </div>
-        <div class="flex flex-col gap-1">
-          <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-            {{ 'PAYROLL.EMPLOYEE_CONFIG.BONUS_COMMENT' | translate }}
-          </label>
-          <input type="text" [placeholder]="'PAYROLL.EMPLOYEE_CONFIG.BONUS_COMMENT' | translate"
-            class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
-            [ngModel]="newBonusComment()" (ngModelChange)="newBonusComment.set($event)" />
-        </div>
-        <button type="button" class="self-start rounded-lg bg-teal-700 px-3 py-1.5 text-sm text-white"
-          (click)="addBonus()">
-          {{ 'PAYROLL.EMPLOYEE_CONFIG.ADD_BONUS' | translate }}
-        </button>
-        @if (bonusError()) {
-          <span class="text-sm text-red-700">{{ bonusError() }}</span>
-        }
-      </div>
+            </div>
 
-      <div class="flex flex-col gap-1.5">
-        <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-          {{ 'PAYROLL.EMPLOYEE_CONFIG.REASON' | translate }}
-        </label>
-        <input type="text" class="rounded-lg border border-gray-300 px-3 py-2"
-          [ngModel]="reason()" (ngModelChange)="reason.set($event)" />
-      </div>
+            <!-- 4. Motif — obligatoire, conservé dans l'historique. -->
+            <div class="ec-block">
+              <h3 class="ec-section-title">{{ 'PAYROLL.EMPLOYEE_CONFIG.SECTION_REASON' | translate }}</h3>
+              <daf-form-field
+                [options]="{ label: 'PAYROLL.EMPLOYEE_CONFIG.REASON' | translate, type: 'textarea', rows: 2, required: true, fullWidth: true, placeholder: 'PAYROLL.EMPLOYEE_CONFIG.REASON_PLACEHOLDER' | translate, hint: 'PAYROLL.EMPLOYEE_CONFIG.REASON_HINT' | translate }"
+                [value]="reason()"
+                (valueChange)="reason.set(($event ?? '') + '')">
+              </daf-form-field>
+            </div>
 
-      <div class="flex items-center gap-3">
-        <button type="button"
-          class="rounded-lg bg-teal-700 px-4 py-2 text-white disabled:opacity-50"
-          [disabled]="saving() || reason().trim() === '' || cfg.paysId == null"
-          (click)="save()">
-          {{ 'PAYROLL.EMPLOYEE_CONFIG.SAVE' | translate }}
-        </button>
+            <div class="form-actions">
+              <daf-button
+                [label]="'PAYROLL.EMPLOYEE_CONFIG.RESET' | translate"
+                variant="secondary"
+                [options]="{ iconStart: 'undo', disabled: saving() || (!dirty() && reason() === '') }"
+                (onClick)="resetConfig()">
+              </daf-button>
+              <daf-button
+                [label]="'PAYROLL.EMPLOYEE_CONFIG.SAVE' | translate"
+                variant="teal"
+                [options]="{ iconStart: 'save', loading: saving(), disabled: saving() || reason().trim() === '' || cfg.paysId == null }"
+                (onClick)="save()">
+              </daf-button>
+            </div>
+          </div>
+        </daf-card>
+        }
 
-        @if (success()) {
-          <span class="text-sm text-teal-700">{{ success() }}</span>
+        <!-- ══ Onglet « Primes exceptionnelles » — chaque ajout / suppression est enregistré
+             immédiatement, hors du bouton « Enregistrer » de l'autre onglet. Même structure
+             que l'onglet Configuration (daf-card `default`, blocs à titre simple). ══ -->
+        @case ('bonuses') {
+        <daf-card [options]="{ variant: 'default', padding: 'lg', radius: 'xl' }">
+          <div class="ec-form">
+
+            <!-- 1. Nouvelle prime -->
+            <div class="ec-block">
+              <h3 class="ec-section-title">{{ 'PAYROLL.EMPLOYEE_CONFIG.SECTION_NEW_BONUS' | translate }}</h3>
+              <div class="field-row">
+                <daf-form-field
+                  [options]="{ label: 'PAYROLL.EMPLOYEE_CONFIG.BONUS_LABEL' | translate, type: 'text', required: true, fullWidth: true, placeholder: 'PAYROLL.EMPLOYEE_CONFIG.BONUS_LABEL_PLACEHOLDER' | translate, error: bonusErrors().label }"
+                  [value]="newBonusLabel()"
+                  (valueChange)="newBonusLabel.set(($event ?? '') + '')">
+                </daf-form-field>
+                <daf-form-field
+                  [options]="{ label: 'PAYROLL.EMPLOYEE_CONFIG.BONUS_AMOUNT' | translate, type: 'number', align: 'end', required: true, fullWidth: true, placeholder: '0.00', suffixText: newBonusCurrency(), error: bonusErrors().amount }"
+                  [value]="newBonusAmount()"
+                  (valueChange)="newBonusAmount.set(toNumber($event))">
+                </daf-form-field>
+                <daf-select
+                  [options]="currencyOptions"
+                  [selected]="[newBonusCurrency()]"
+                  [config]="{ label: 'PAYROLL.EMPLOYEE_CONFIG.CURRENCY' | translate, fullWidth: true }"
+                  (selectedChange)="$event[0] && newBonusCurrency.set($event[0])">
+                </daf-select>
+              </div>
+              <div class="field-row">
+                <daf-select
+                  [options]="monthOptions()"
+                  [selected]="newBonusMonth() != null ? ['' + newBonusMonth()] : []"
+                  [config]="{ label: 'PAYROLL.EMPLOYEE_CONFIG.BONUS_MONTH' | translate, fullWidth: true, required: true, error: bonusErrors().month }"
+                  (selectedChange)="newBonusMonth.set($event[0] ? +$event[0] : null)">
+                </daf-select>
+                <daf-form-field
+                  [options]="{ label: 'PAYROLL.EMPLOYEE_CONFIG.BONUS_YEAR' | translate, type: 'number', required: true, fullWidth: true, error: bonusErrors().year }"
+                  [value]="newBonusYear()"
+                  (valueChange)="newBonusYear.set(toNumber($event))">
+                </daf-form-field>
+              </div>
+              <daf-form-field
+                [options]="{ label: 'PAYROLL.EMPLOYEE_CONFIG.BONUS_COMMENT' | translate, type: 'textarea', rows: 2, fullWidth: true }"
+                [value]="newBonusComment()"
+                (valueChange)="newBonusComment.set(($event ?? '') + '')">
+              </daf-form-field>
+            </div>
+
+            <div class="form-actions">
+              <daf-button
+                [label]="'PAYROLL.EMPLOYEE_CONFIG.CLEAR_FORM' | translate"
+                variant="secondary"
+                [options]="{ iconStart: 'backspace', disabled: addingBonus() || !bonusFormTouched() }"
+                (onClick)="resetBonusForm()">
+              </daf-button>
+              <daf-button
+                [label]="'PAYROLL.EMPLOYEE_CONFIG.ADD_BONUS' | translate"
+                variant="teal"
+                [options]="{ iconStart: 'add', loading: addingBonus(), disabled: addingBonus() }"
+                (onClick)="addBonus()">
+              </daf-button>
+            </div>
+          </div>
+        </daf-card>
+
+        <!-- Carte séparée : la liste n'appartient pas au formulaire d'ajout ; l'espacement
+             entre les deux cartes vient de `.page-body`. -->
+        <daf-card [options]="{ variant: 'default', padding: 'lg', radius: 'xl' }">
+          <div class="ec-form">
+            <!-- 2. Primes enregistrées — sous le formulaire, la liste se met à jour dès l'ajout. -->
+            <div class="ec-block">
+              <h3 class="ec-section-title">
+                {{ 'PAYROLL.EMPLOYEE_CONFIG.SECTION_SAVED_BONUSES' | translate }}{{ bonuses().length ? ' · ' + bonuses().length : '' }}
+              </h3>
+              <p class="ec-hint">{{ 'PAYROLL.EMPLOYEE_CONFIG.BONUSES_HINT' | translate }}</p>
+              <daf-data-table
+                [columns]="bonusColumns()"
+                [rows]="bonusRows()"
+                [config]="{ actions: bonusActions(), loading: bonusesLoading(), skeletonRows: 3, emptyMessage: ('PAYROLL.EMPLOYEE_CONFIG.NO_BONUSES' | translate) }">
+              </daf-data-table>
+            </div>
+          </div>
+        </daf-card>
         }
-        @if (error()) {
-          <span class="text-sm text-red-700">{{ error() }}</span>
         }
-      </div>
-    </div>
-  }
-</div>
+      }
+  </div>
+</daf-page>

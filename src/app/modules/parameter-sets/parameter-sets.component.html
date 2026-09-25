@@ -1,15 +1,35 @@
-<!-- `[kpis]` suit l'onglet : seul "Jeux existants" a un bandeau de 4 KPI — sur "Nouveau jeu"
-     le squelette en dessinait 4 qui disparaissaient au chargement. -->
-<daf-page [loading]="firstLoad()" [loadingLabel]="'PAYROLL.COMMON.LOADING' | translate" [kpis]="activeTab() === 'list' ? 4 : 0" [breadcrumbs]="true">
-  <daf-page-header
-    [title]="'PAYROLL.PARAMETER_SETS.TITLE' | translate"
-    [subtitle]="'PAYROLL.PARAMETER_SETS.SUBTITLE' | translate"
-    [breadcrumbs]="breadcrumbs()">
-  </daf-page-header>
+<daf-page [loading]="firstLoad()" [loadingLabel]="'PAYROLL.COMMON.LOADING' | translate" [kpis]="0" [breadcrumbs]="true">
+  <!-- Page détail d'un jeu (`?set=`) : même en-tête, mais titre = le jeu, fil d'Ariane
+       "Paie › Paramètres › v3 — 2026" (comme /rh/admin), et les actions du workflow à
+       droite (slot `pageActions`). -->
+  @if (activeTab() === 'list' && detailSet(); as ps) {
+    <daf-page-header
+      [title]="itemTitle(ps)"
+      [subtitle]="detailSubtitle(ps)"
+      [breadcrumbs]="breadcrumbs()">
+      <div pageActions class="ps-item-actions">
+        @if (ps.status === 'DRAFT') {
+          <daf-button [label]="'PAYROLL.PARAMETER_SETS.SUBMIT_BUTTON' | translate" variant="primary" (onClick)="submit(ps.id)" />
+        }
+        @if (ps.status === 'PENDING_FINANCE' && !ps.approvedByHr) {
+          <daf-button [label]="'PAYROLL.PARAMETER_SETS.APPROVE_HR_BUTTON' | translate" variant="secondary" (onClick)="approveHr(ps.id)" />
+        }
+        @if (ps.status === 'PENDING_FINANCE' && !ps.approvedByFinance) {
+          <daf-button [label]="'PAYROLL.PARAMETER_SETS.APPROVE_FINANCE_BUTTON' | translate" variant="secondary" (onClick)="approveFinance(ps.id)" />
+        }
+      </div>
+    </daf-page-header>
+  } @else {
+    <daf-page-header
+      [title]="'PAYROLL.PARAMETER_SETS.TITLE' | translate"
+      [subtitle]="'PAYROLL.PARAMETER_SETS.SUBTITLE' | translate"
+      [breadcrumbs]="breadcrumbs()">
+    </daf-page-header>
 
-  <div class="ps-tabs-wrap">
-    <daf-tabs [tabs]="tabs()" [(active)]="activeTab" [tabsLabel]="'PAYROLL.PARAMETER_SETS.TITLE' | translate" [idPrefix]="'parameter-sets-tabs'" />
-  </div>
+    <div class="ps-tabs-wrap">
+      <daf-tabs [tabs]="tabs()" [(active)]="activeTab" [tabsLabel]="'PAYROLL.PARAMETER_SETS.TITLE' | translate" [idPrefix]="'parameter-sets-tabs'" />
+    </div>
+  }
 
   @switch (activeTab()) {
 
@@ -56,27 +76,10 @@
             </daf-form-field>
           </div>
 
-          <div class="code-console">
-            <div class="code-console__bar">
-              <span class="code-console__filename">
-                <span class="material-symbols-outlined">data_object</span>
-                {{ 'PAYROLL.ADMIN.IRPP_FILENAME' | translate }}
-              </span>
-              <div class="code-console__actions">
-                <daf-badge
-                  [label]="(isJsonValid(newSetForm.get('irppBrackets')!.value) ? 'PAYROLL.ADMIN.JSON_VALID' : 'PAYROLL.ADMIN.JSON_INVALID') | translate"
-                  [options]="{ variant: isJsonValid(newSetForm.get('irppBrackets')!.value) ? 'success' : 'danger', size: 'sm', icon: isJsonValid(newSetForm.get('irppBrackets')!.value) ? 'check_circle' : 'error' }">
-                </daf-badge>
-                <daf-button
-                  [label]="'PAYROLL.ADMIN.REFORMAT' | translate"
-                  variant="ghost"
-                  [options]="{ size: 'sm', iconStart: 'code', disabled: !isJsonValid(newSetForm.get('irppBrackets')!.value) }"
-                  (onClick)="formatIrppJson()">
-                </daf-button>
-              </div>
-            </div>
+          <!-- Barème IRPP : un `daf-form-field` textarea tel quel (plus de console maison),
+               avec sous le champ le badge de validité et le bouton "Reformater". -->
+          <div class="ps-field-block">
             <daf-form-field
-              class="code-console__field"
               [options]="{
                 label: 'PAYROLL.ADMIN.IRPP_BRACKETS' | translate,
                 type: 'textarea',
@@ -87,6 +90,18 @@
               [value]="newSetForm.get('irppBrackets')!.value"
               (valueChange)="newSetForm.get('irppBrackets')!.setValue(($event ?? '').toString())">
             </daf-form-field>
+            <div class="ps-inline-actions">
+              <daf-badge
+                [label]="(isJsonValid(newSetForm.get('irppBrackets')!.value) ? 'PAYROLL.ADMIN.JSON_VALID' : 'PAYROLL.ADMIN.JSON_INVALID') | translate"
+                [options]="{ variant: isJsonValid(newSetForm.get('irppBrackets')!.value) ? 'success' : 'danger', size: 'sm', icon: isJsonValid(newSetForm.get('irppBrackets')!.value) ? 'check_circle' : 'error' }">
+              </daf-badge>
+              <daf-button
+                [label]="'PAYROLL.ADMIN.REFORMAT' | translate"
+                variant="ghost"
+                [options]="{ size: 'sm', iconStart: 'code', disabled: !isJsonValid(newSetForm.get('irppBrackets')!.value) }"
+                (onClick)="formatIrppJson()">
+              </daf-button>
+            </div>
           </div>
 
           <daf-form-field
@@ -95,9 +110,11 @@
             (valueChange)="newSetForm.get('changeRationale')!.setValue(($event ?? '').toString())">
           </daf-form-field>
 
-          <!-- Charges sociales -->
-          <div class="charges-section">
-            <div class="charges-header">
+          <!-- Charges sociales : titre + bouton sur une ligne simple (plus de bandeau coloré),
+               puis un `daf-data-table` dont les cellules portent les champs, suppression de
+               ligne par les actions de ligne du tableau, message vide du tableau. -->
+          <div class="ps-field-block">
+            <div class="ps-section-head">
               <daf-section-title [title]="'PAYROLL.ADMIN.CHARGES_TITLE' | translate: { count: newSetRates.length }" />
               <daf-button
                 [label]="'PAYROLL.ADMIN.ADD_CHARGE' | translate"
@@ -107,68 +124,68 @@
               </daf-button>
             </div>
 
-            @if (newSetRates.length === 0) {
-              <p class="charges-empty">{{ 'PAYROLL.ADMIN.CHARGES_EMPTY' | translate }}</p>
-            } @else {
-              <div class="rates-wrap">
-                <div class="rates-head">
-                  <span>{{ 'PAYROLL.ADMIN.COL_TYPE' | translate }}</span><span>{{ 'PAYROLL.ADMIN.COL_CODE' | translate }}</span><span>{{ 'PAYROLL.ADMIN.COL_LABEL' | translate }}</span>
-                  <span>{{ 'PAYROLL.ADMIN.COL_EMPLOYEE_RATE' | translate }}</span><span>{{ 'PAYROLL.ADMIN.COL_EMPLOYER_RATE' | translate }}</span><span>{{ 'PAYROLL.ADMIN.COL_BASE' | translate }}</span>
-                  <span>{{ 'PAYROLL.ADMIN.COL_CAP' | translate }}</span><span></span>
-                </div>
-                @for (ctrl of newSetRates.controls; track $index; let i = $index) {
-                  <div class="rates-row">
-                    <daf-select
-                      [options]="contractTypeOptions()"
-                      [selected]="[newSetRateGroup(i).get('contractType')!.value]"
-                      [config]="{ fullWidth: true }"
-                      (selectedChange)="newSetRateGroup(i).get('contractType')!.setValue($event[0])">
-                    </daf-select>
-                    <daf-form-field
-                      [options]="{ placeholder: 'CNSS' }"
-                      [value]="newSetRateGroup(i).get('chargeCode')!.value"
-                      (valueChange)="newSetRateGroup(i).get('chargeCode')!.setValue(($event ?? '').toString())">
-                    </daf-form-field>
-                    <daf-form-field
-                      [options]="{ placeholder: 'PAYROLL.ADMIN.CHARGE_LABEL_PLACEHOLDER' | translate }"
-                      [value]="newSetRateGroup(i).get('chargeLabel')!.value"
-                      (valueChange)="newSetRateGroup(i).get('chargeLabel')!.setValue(($event ?? '').toString())">
-                    </daf-form-field>
-                    <daf-form-field
-                      [options]="{ type: 'number', placeholder: '0.0918' }"
-                      [value]="newSetRateGroup(i).get('employeeRate')!.value"
-                      (valueChange)="newSetRateGroup(i).get('employeeRate')!.setValue(+($event ?? 0))">
-                    </daf-form-field>
-                    <daf-form-field
-                      [options]="{ type: 'number', placeholder: '0.1657' }"
-                      [value]="newSetRateGroup(i).get('employerRate')!.value"
-                      (valueChange)="newSetRateGroup(i).get('employerRate')!.setValue(+($event ?? 0))">
-                    </daf-form-field>
-                    <daf-select
-                      [options]="baseCalcOptions()"
-                      [selected]="[newSetRateGroup(i).get('baseCalculation')!.value]"
-                      [config]="{ fullWidth: true }"
-                      (selectedChange)="newSetRateGroup(i).get('baseCalculation')!.setValue($event[0])">
-                    </daf-select>
-                    <daf-form-field
-                      [options]="{ type: 'number', placeholder: '—' }"
-                      [value]="newSetRateGroup(i).get('capAmount')!.value"
-                      (valueChange)="newSetRateGroup(i).get('capAmount')!.setValue($event === '' || $event == null ? null : +$event)">
-                    </daf-form-field>
-                    <daf-button
-                      variant="ghost"
-                      [options]="{ size: 'sm', iconStart: 'close', title: 'PAYROLL.ADMIN.REMOVE' | translate }"
-                      (onClick)="removeNewSetRate(i)">
-                    </daf-button>
-                  </div>
-                }
-              </div>
-            }
+            <daf-data-table [columns]="newSetRateColumns()" [rows]="newSetRateRows()" [config]="newSetRateTableConfig()">
+              <ng-template dafCell="contractType" let-row let-i="index">
+                <daf-select
+                  [options]="contractTypeOptions()"
+                  [selected]="[newSetRateGroup(i).get('contractType')!.value]"
+                  [config]="{ fullWidth: true }"
+                  (selectedChange)="newSetRateGroup(i).get('contractType')!.setValue($event[0])">
+                </daf-select>
+              </ng-template>
+              <ng-template dafCell="chargeCode" let-row let-i="index">
+                <daf-form-field
+                  [options]="{ placeholder: 'CNSS' }"
+                  [value]="newSetRateGroup(i).get('chargeCode')!.value"
+                  (valueChange)="newSetRateGroup(i).get('chargeCode')!.setValue(($event ?? '').toString())">
+                </daf-form-field>
+              </ng-template>
+              <ng-template dafCell="chargeLabel" let-row let-i="index">
+                <daf-form-field
+                  [options]="{ placeholder: 'PAYROLL.ADMIN.CHARGE_LABEL_PLACEHOLDER' | translate }"
+                  [value]="newSetRateGroup(i).get('chargeLabel')!.value"
+                  (valueChange)="newSetRateGroup(i).get('chargeLabel')!.setValue(($event ?? '').toString())">
+                </daf-form-field>
+              </ng-template>
+              <ng-template dafCell="employeeRate" let-row let-i="index">
+                <daf-form-field
+                  [options]="{ type: 'number', placeholder: '0.0918' }"
+                  [value]="newSetRateGroup(i).get('employeeRate')!.value"
+                  (valueChange)="newSetRateGroup(i).get('employeeRate')!.setValue(+($event ?? 0))">
+                </daf-form-field>
+              </ng-template>
+              <ng-template dafCell="employerRate" let-row let-i="index">
+                <daf-form-field
+                  [options]="{ type: 'number', placeholder: '0.1657' }"
+                  [value]="newSetRateGroup(i).get('employerRate')!.value"
+                  (valueChange)="newSetRateGroup(i).get('employerRate')!.setValue(+($event ?? 0))">
+                </daf-form-field>
+              </ng-template>
+              <ng-template dafCell="baseCalculation" let-row let-i="index">
+                <daf-select
+                  [options]="baseCalcOptions()"
+                  [selected]="[newSetRateGroup(i).get('baseCalculation')!.value]"
+                  [config]="{ fullWidth: true }"
+                  (selectedChange)="newSetRateGroup(i).get('baseCalculation')!.setValue($event[0])">
+                </daf-select>
+              </ng-template>
+              <ng-template dafCell="capAmount" let-row let-i="index">
+                <daf-form-field
+                  [options]="{ type: 'number', placeholder: '—', suffixText: newSetDevise() }"
+                  [value]="newSetRateGroup(i).get('capAmount')!.value"
+                  (valueChange)="newSetRateGroup(i).get('capAmount')!.setValue($event === '' || $event == null ? null : +$event)">
+                </daf-form-field>
+              </ng-template>
+            </daf-data-table>
           </div>
 
-          <div class="info-box">
-            <strong>{{ 'PAYROLL.ADMIN.WORKFLOW_LABEL' | translate }}</strong> {{ 'PAYROLL.ADMIN.WORKFLOW_TEXT' | translate }}
-          </div>
+          <!-- Note sur le circuit de validation : une `daf-card` de la bibliothèque (icône +
+               titre + description) au lieu de l'encadré maison. -->
+          <daf-card [options]="{
+            variant: 'outlined', padding: 'md', radius: 'lg',
+            icon: 'info', title: ('PAYROLL.ADMIN.WORKFLOW_LABEL' | translate),
+            description: ('PAYROLL.ADMIN.WORKFLOW_TEXT' | translate)
+          }" />
 
           <div class="form-actions">
             <daf-button
@@ -186,34 +203,68 @@
     <!-- ══════════════════════════ Onglet "Jeux existants" ══════════════════════════ -->
     @case ('list') {
       <div class="ps-layout">
-        <!-- ── Bandeau exécutif : comme /payroll/candidate-simulation et
-             /payroll/engine-results — une section nue en grille, sans carte
-             englobante. TOUJOURS affiché : à 0 tant qu'aucun pays n'est choisi dans
-             le bouton filtre, mis à jour dès qu'il l'est. ─────────────────── -->
-        <section class="grid grid-cols-4 gap-2 sm:gap-6 kpi-section transition-opacity"
-                 [class.opacity-60]="loading()">
-            <daf-metric-card
-              [label]="'PAYROLL.PARAMETER_SETS.KPI_TOTAL_SETS' | translate"
-              [value]="paramSetKpis().total"
-              [options]="{ icon: 'list_alt' }">
-            </daf-metric-card>
-            <daf-metric-card
-              [label]="'PAYROLL.PARAMETER_SETS.KPI_DRAFT' | translate"
-              [value]="paramSetKpis().draft"
-              [options]="{ icon: 'edit_note' }">
-            </daf-metric-card>
-            <daf-metric-card
-              [label]="'PAYROLL.PARAMETER_SETS.KPI_PENDING' | translate"
-              [value]="paramSetKpis().pending"
-              [options]="{ icon: 'hourglass_top', iconColor: 'text-warning', iconBg: 'bg-warning/10' }">
-            </daf-metric-card>
-            <daf-metric-card
-              [label]="'PAYROLL.PARAMETER_SETS.KPI_ACTIVE' | translate"
-              [value]="paramSetKpis().active"
-              [options]="{ valueColor: 'text-success', icon: 'check_circle', iconColor: 'text-success', iconBg: 'bg-success/10' }">
-            </daf-metric-card>
-          </section>
+        @if (detailSet(); as ps) {
+          <!-- ══ Page détail d'un jeu ("Gérer") — onglets internes comme la barre d'onglets
+               de /finance/admin : une section à la fois, chacune avec son titre, son
+               bouton "Modifier" (mêmes pop-ups qu'avant) et son tableau en lecture seule. ══ -->
+          <daf-tabs [tabs]="detailTabs()" [(active)]="detailTab" [tabsLabel]="itemTitle(ps)" [idPrefix]="'parameter-set-detail-tabs'" />
 
+          <!-- Chiffres et tableau séparés, directement sur la page (plus de carte englobante) :
+               les tuiles `daf-metric-card` d'un côté, le `daf-data-table` — qui a déjà son
+               propre cadre — de l'autre, avec le bouton "Modifier" juste au-dessus du tableau.
+               Pas de titre de section : il répétait l'onglet juste au-dessus. -->
+          @switch (detailTab()) {
+            @case ('rubriques') {
+                <div class="ps-field-block">
+                  <div class="ps-section-toolbar">
+                    <daf-button
+                      [label]="'PAYROLL.PARAMETER_SETS.EDIT' | translate"
+                      variant="secondary"
+                      [options]="{ size: 'sm', iconStart: 'edit' }"
+                      (onClick)="openRubriquesEditor(ps)">
+                    </daf-button>
+                  </div>
+                  <daf-data-table [columns]="rubriquesColumns()" [rows]="rubriquesRows(ps)" [config]="readTableConfig('PAYROLL.PARAMETER_SETS.RUBRIQUES_EMPTY_READONLY')" />
+                </div>
+            }
+            @case ('benefits') {
+                <daf-data-table [columns]="benefitsColumns()" [rows]="benefitsRows(ps)" [config]="readTableConfig('PAYROLL.PARAMETER_SETS.BENEFITS_EMPTY_READONLY')" />
+            }
+            @default {
+              @if (ps.socialChargeRates.length) {
+                <!-- Tuiles neutres : icône seule, couleurs par défaut de la bibliothèque. -->
+                <div class="charges-kpi-row">
+                  <daf-metric-card
+                    [label]="'PAYROLL.PARAMETER_SETS.KPI_EMPLOYEE_TOTAL' | translate"
+                    [value]="(chargeTotals(ps).employeeTotal | number:'1.2-2') + ' %'"
+                    [options]="{ icon: 'person' }">
+                  </daf-metric-card>
+                  <daf-metric-card
+                    [label]="'PAYROLL.PARAMETER_SETS.KPI_EMPLOYER_TOTAL' | translate"
+                    [value]="(chargeTotals(ps).employerTotal | number:'1.2-2') + ' %'"
+                    [options]="{ icon: 'domain' }">
+                  </daf-metric-card>
+                  <daf-metric-card
+                    [label]="'PAYROLL.PARAMETER_SETS.KPI_TAX_WEDGE' | translate"
+                    [value]="(chargeTotals(ps).wedge | number:'1.2-2') + ' %'"
+                    [options]="{ icon: 'balance' }">
+                  </daf-metric-card>
+                </div>
+              }
+                <div class="ps-field-block">
+                  <div class="ps-section-toolbar">
+                    <daf-button
+                      [label]="'PAYROLL.PARAMETER_SETS.EDIT' | translate"
+                      variant="secondary"
+                      [options]="{ size: 'sm', iconStart: 'edit' }"
+                      (onClick)="openChargesEditor(ps)">
+                    </daf-button>
+                  </div>
+                  <daf-data-table [columns]="chargesColumns()" [rows]="chargesRows(ps)" [config]="readTableConfig('PAYROLL.PARAMETER_SETS.CHARGES_EMPTY_READONLY')" />
+                </div>
+            }
+          }
+        } @else {
           <!-- Recherche + bouton filtre (PAYS et statut) — toujours affichés, même vides :
                c'est ici que le pays se choisit. -->
           <daf-search-toolbar
@@ -226,97 +277,28 @@
             (filterApply)="applyFilters($event)">
           </daf-search-toolbar>
 
-          <!-- Accordéons de la bibliothèque tels quels, empilés sans carte englobante et sans
-               `state` : pas de liseré ni de pastille colorés, le statut reste dans le libellé. -->
-          <div class="ps-list">
-            <daf-section-title [title]="'PAYROLL.PARAMETER_SETS.PARAM_SETS_TITLE' | translate: { count: filteredParamSets().length }" />
-              @for (ps of filteredParamSets(); track ps.id) {
-                <daf-accordion-card
-                  [options]="{
-                    title: itemTitle(ps),
-                    subtitle: ('PAYROLL.PARAMETER_SETS.PS_META' | translate: { tolerance: ps.convergenceTolerance, threshold: ps.calibrationThresholdPct }),
-                    icon: 'tune',
-                    statusLabel: statusLabel(ps)
-                  }"
-                  [open]="selected()?.id === ps.id"
-                  (openChange)="onAccordionToggle(ps, $event)">
-
-                  <div headerAction class="ps-item-actions" (click)="$event.stopPropagation()">
-                    @if (ps.status === 'DRAFT') {
-                      <daf-button [label]="'PAYROLL.PARAMETER_SETS.SUBMIT_BUTTON' | translate" variant="primary" [options]="{ size: 'sm' }" (onClick)="submit(ps.id)" />
-                    }
-                    @if (ps.status === 'PENDING_FINANCE' && !ps.approvedByHr) {
-                      <daf-button [label]="'PAYROLL.PARAMETER_SETS.APPROVE_HR_BUTTON' | translate" variant="secondary" [options]="{ size: 'sm' }" (onClick)="approveHr(ps.id)" />
-                    }
-                    @if (ps.status === 'PENDING_FINANCE' && !ps.approvedByFinance) {
-                      <daf-button [label]="'PAYROLL.PARAMETER_SETS.APPROVE_FINANCE_BUTTON' | translate" variant="secondary" [options]="{ size: 'sm' }" (onClick)="approveFinance(ps.id)" />
-                    }
-                  </div>
-
-                    <!-- ── Charges sociales ─────────────────────────────────────── -->
-                    <div class="detail-section-header">
-                      <daf-section-title [title]="'PAYROLL.PARAMETER_SETS.CHARGES_TITLE' | translate: { count: ps.socialChargeRates.length }" />
-                      <daf-button
-                        [label]="'PAYROLL.PARAMETER_SETS.EDIT' | translate"
-                        variant="secondary"
-                        [options]="{ size: 'sm' }"
-                        (onClick)="openChargesEditor(ps)">
-                      </daf-button>
-                    </div>
-
-                    @if (ps.socialChargeRates.length) {
-                      <div class="charges-kpi-row">
-                        <daf-metric-card
-                          [label]="'PAYROLL.PARAMETER_SETS.KPI_EMPLOYEE_TOTAL' | translate"
-                          [value]="(chargeTotals(ps).employeeTotal | number:'1.2-2') + ' %'"
-                          [options]="{ icon: 'person', iconColor: 'text-primary', iconBg: 'bg-primary/10' }">
-                        </daf-metric-card>
-                        <daf-metric-card
-                          [label]="'PAYROLL.PARAMETER_SETS.KPI_EMPLOYER_TOTAL' | translate"
-                          [value]="(chargeTotals(ps).employerTotal | number:'1.2-2') + ' %'"
-                          [options]="{ icon: 'domain', iconColor: 'text-tertiary', iconBg: 'bg-tertiary/10' }">
-                        </daf-metric-card>
-                        <daf-metric-card
-                          [label]="'PAYROLL.PARAMETER_SETS.KPI_TAX_WEDGE' | translate"
-                          [value]="(chargeTotals(ps).wedge | number:'1.2-2') + ' %'"
-                          [options]="{ icon: 'balance', iconColor: 'text-on-surface', iconBg: 'bg-surface-container' }">
-                        </daf-metric-card>
-                      </div>
-                      <daf-data-table [columns]="chargesColumns()" [rows]="chargesRows(ps)" [config]="{ showHeader: false }" />
-                    } @else {
-                      <p class="detail-empty">{{ 'PAYROLL.PARAMETER_SETS.CHARGES_EMPTY_READONLY' | translate }}</p>
-                    }
-
-                    <!-- ── Avantages en nature (legacy) ────────────────────────── -->
-                    @if (ps.benefits.length) {
-                      <div class="detail-section-header" style="margin-top:20px">
-                        <daf-section-title [title]="'PAYROLL.PARAMETER_SETS.BENEFITS_TITLE' | translate: { count: ps.benefits.length }" />
-                      </div>
-                      <daf-data-table [columns]="benefitsColumns()" [rows]="benefitsRows(ps)" [config]="{ showHeader: false }" />
-                    }
-
-                    <!-- ── Rubriques de paie ────────────────────────────────────── -->
-                    <div class="detail-section-header" style="margin-top:20px">
-                      <daf-section-title [title]="'PAYROLL.PARAMETER_SETS.RUBRIQUES_TITLE' | translate: { count: ps.rubriques.length }" />
-                      <daf-button
-                        [label]="'PAYROLL.PARAMETER_SETS.EDIT' | translate"
-                        variant="secondary"
-                        [options]="{ size: 'sm' }"
-                        (onClick)="openRubriquesEditor(ps)">
-                      </daf-button>
-                    </div>
-
-                    @if (ps.rubriques.length) {
-                      <daf-data-table [columns]="rubriquesColumns()" [rows]="rubriquesRows(ps)" [config]="{ showHeader: false }" />
-                    } @else {
-                      <p class="detail-empty">{{ 'PAYROLL.PARAMETER_SETS.RUBRIQUES_EMPTY_READONLY' | translate }}</p>
-                    }
-
-                </daf-accordion-card>
-              } @empty {
-                <p class="detail-empty">{{ emptyMessage() }}</p>
-              }
+          <!-- Grille de cartes "Gérer", même recette que /finance/admin et /rh/admin : une
+               carte cliquable par jeu, ouvrant sa page détail (`?set=`). Une icône pleine
+               par statut (`cardIcon`), sans couleur par statut : couleurs par défaut de la
+               bibliothèque, identiques sur toutes les cartes. -->
+          <daf-section-title [title]="'PAYROLL.PARAMETER_SETS.PARAM_SETS_TITLE' | translate: { count: filteredParamSets().length }" />
+          <div class="ps-card-grid">
+            @for (ps of filteredParamSets(); track ps.id) {
+              <daf-card
+                [options]="{
+                  variant: 'glass', padding: 'lg', radius: 'xl',
+                  hoverable: true, clickable: true, fullHeight: true,
+                  icon: cardIcon(ps), iconFilled: true,
+                  title: itemTitle(ps),
+                  description: cardDescription(ps),
+                  action: { label: ('PAYROLL.PARAMETER_SETS.MANAGE' | translate) }
+                }"
+                (cardClick)="openSet(ps)" />
+            } @empty {
+              <daf-card class="ps-grid-empty" [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl', icon: 'info', description: emptyMessage() }" />
+            }
           </div>
+        }
       </div>
 
       <!-- ══════════════════════════════════════════════════════════════════════════
@@ -329,7 +311,7 @@
       <ng-template #chargesEditorTpl>
         <div class="charges-editor" [formGroup]="chargesForm">
           <div class="editor-toolbar">
-            <daf-button [label]="'PAYROLL.PARAMETER_SETS.ADD_CHARGE_LINE' | translate" variant="secondary" [options]="{ size: 'sm' }" (onClick)="addEditRate()" />
+            <daf-button [label]="'PAYROLL.PARAMETER_SETS.ADD_CHARGE_LINE' | translate" variant="secondary" [options]="{ size: 'sm', iconStart: 'add' }" (onClick)="addEditRate()" />
             <daf-button
               [label]="(savingCharges() ? 'PAYROLL.PARAMETER_SETS.SAVING' : 'PAYROLL.PARAMETER_SETS.SAVE') | translate"
               variant="primary"
@@ -337,119 +319,104 @@
               (onClick)="saveCharges(editingChargesId()!)">
             </daf-button>
           </div>
-          @if (editRates.length === 0) {
-            <p class="detail-empty">{{ 'PAYROLL.PARAMETER_SETS.CHARGES_EMPTY_EDITOR' | translate }}</p>
-          } @else {
-            <div class="rates-wrap">
-              <div class="rates-head">
-                <span>{{ 'PAYROLL.PARAMETER_SETS.COL_TYPE' | translate }}</span><span>{{ 'PAYROLL.PARAMETER_SETS.COL_CODE' | translate }}</span><span>{{ 'PAYROLL.PARAMETER_SETS.COL_LABEL' | translate }}</span>
-                <span>{{ 'PAYROLL.PARAMETER_SETS.COL_EMPLOYEE_SHARE' | translate }}</span><span>{{ 'PAYROLL.PARAMETER_SETS.COL_EMPLOYER_SHARE' | translate }}</span><span>{{ 'PAYROLL.PARAMETER_SETS.COL_BASE' | translate }}</span>
-                <span>{{ 'PAYROLL.PARAMETER_SETS.COL_CAP_OR_ORDER' | translate }}</span><span></span>
-              </div>
-              <ng-container formArrayName="rates">
-                @for (ctrl of editRates.controls; track $index; let i = $index) {
-                  <!-- Wrap row + formula expansion in one ng-container so both share formGroupName -->
-                  <ng-container [formGroupName]="i">
-                    <div class="rates-row" [class.rates-row--formula]="editRateGroup(i).get('baseCalculation')!.value === 'FORMULE'">
-                      <daf-select
-                        [options]="contractTypeOptions()"
-                        [selected]="[editRateGroup(i).get('contractType')!.value]"
-                        [config]="{ fullWidth: true }"
-                        (selectedChange)="editRateGroup(i).get('contractType')!.setValue($event[0])">
-                      </daf-select>
-                      <daf-form-field
-                        [options]="{ placeholder: 'CNSS' }"
-                        [value]="editRateGroup(i).get('chargeCode')!.value"
-                        (valueChange)="editRateGroup(i).get('chargeCode')!.setValue(($event ?? '').toString())">
-                      </daf-form-field>
-                      <daf-form-field
-                        [options]="{ placeholder: 'PAYROLL.PARAMETER_SETS.CHARGE_LABEL_PLACEHOLDER' | translate }"
-                        [value]="editRateGroup(i).get('chargeLabel')!.value"
-                        (valueChange)="editRateGroup(i).get('chargeLabel')!.setValue(($event ?? '').toString())">
-                      </daf-form-field>
-                      @if (editRateGroup(i).get('baseCalculation')!.value !== 'FORMULE') {
-                        <daf-form-field
-                          [options]="{ type: 'number', placeholder: '0.0918' }"
-                          [value]="editRateGroup(i).get('employeeRate')!.value"
-                          (valueChange)="editRateGroup(i).get('employeeRate')!.setValue(+($event ?? 0))">
-                        </daf-form-field>
-                        <daf-form-field
-                          [options]="{ type: 'number', placeholder: '0.1657' }"
-                          [value]="editRateGroup(i).get('employerRate')!.value"
-                          (valueChange)="editRateGroup(i).get('employerRate')!.setValue(+($event ?? 0))">
-                        </daf-form-field>
-                      } @else {
-                        <span class="ri ri--hint">{{ 'PAYROLL.PARAMETER_SETS.HINT_EE_DOWN' | translate }}</span>
-                        <span class="ri ri--hint">{{ 'PAYROLL.PARAMETER_SETS.HINT_ER_DOWN' | translate }}</span>
-                      }
-                      <daf-select
-                        [options]="baseCalcOptions()"
-                        [selected]="[editRateGroup(i).get('baseCalculation')!.value]"
-                        [config]="{ fullWidth: true }"
-                        (selectedChange)="editRateGroup(i).get('baseCalculation')!.setValue($event[0])">
-                      </daf-select>
-                      @if (editRateGroup(i).get('baseCalculation')!.value !== 'FORMULE') {
-                        <daf-form-field
-                          [options]="{ type: 'number', placeholder: '—' }"
-                          [value]="editRateGroup(i).get('capAmount')!.value"
-                          (valueChange)="editRateGroup(i).get('capAmount')!.setValue($event === '' || $event == null ? null : +$event)">
-                        </daf-form-field>
-                      } @else {
-                        <daf-form-field
-                          [options]="{ type: 'number', placeholder: '0', hint: 'PAYROLL.PARAMETER_SETS.EVAL_ORDER_TITLE' | translate }"
-                          [value]="editRateGroup(i).get('evalOrder')!.value"
-                          (valueChange)="editRateGroup(i).get('evalOrder')!.setValue(+($event ?? 0))">
-                        </daf-form-field>
-                      }
-                      <daf-button
-                        variant="ghost"
-                        [options]="{ size: 'sm', iconStart: 'close', title: 'PAYROLL.PARAMETER_SETS.REMOVE' | translate }"
-                        (onClick)="removeEditRate(i)">
-                      </daf-button>
-                    </div>
 
-                    <!-- Formula expansion — shown only when baseCalculation = FORMULE -->
-                    @if (editRateGroup(i).get('baseCalculation')!.value === 'FORMULE') {
-                      <div class="rate-formula-block">
-                        <div class="rate-formula-field">
-                          <daf-form-field
-                            [options]="{
-                              label: 'PAYROLL.PARAMETER_SETS.FORMULA_EE_LABEL' | translate,
-                              placeholder: 'PAYROLL.PARAMETER_SETS.FORMULA_EE_PLACEHOLDER' | translate
-                            }"
-                            [value]="editRateGroup(i).get('formulaEe')!.value"
-                            (valueChange)="editRateGroup(i).get('formulaEe')!.setValue(($event ?? '').toString())">
-                          </daf-form-field>
-                          <div class="formula-vars">
-                            @for (v of chargeVariableHints(i); track v.name) {
-                              <daf-button [label]="v.name" variant="ghost" [options]="{ size: 'sm', title: v.desc }" (onClick)="insertChargeFormulaVar(i, 'formulaEe', v.name)" />
-                            }
-                          </div>
-                        </div>
-                        <div class="rate-formula-field">
-                          <daf-form-field
-                            [options]="{
-                              label: 'PAYROLL.PARAMETER_SETS.FORMULA_ER_LABEL' | translate,
-                              placeholder: 'PAYROLL.PARAMETER_SETS.FORMULA_ER_PLACEHOLDER' | translate
-                            }"
-                            [value]="editRateGroup(i).get('formulaEr')!.value"
-                            (valueChange)="editRateGroup(i).get('formulaEr')!.setValue(($event ?? '').toString())">
-                          </daf-form-field>
-                          <div class="formula-vars">
-                            @for (v of chargeVariableHints(i); track v.name) {
-                              <daf-button [label]="v.name" variant="ghost" [options]="{ size: 'sm', title: v.desc }" (onClick)="insertChargeFormulaVar(i, 'formulaEr', v.name)" />
-                            }
-                          </div>
-                        </div>
-                        <p class="editor-hint" style="flex:1 1 100%;margin-top:6px">
-                          {{ 'PAYROLL.PARAMETER_SETS.FORMULA_ORDER_HINT' | translate }}
-                        </p>
-                      </div>
+          <!-- `daf-data-table` à cellules éditables (au lieu de la grille maison). En mode
+               FORMULE, les colonnes salarié / patronal portent directement le champ de
+               formule et ses variables, et la colonne "Plaf. / Ordre" l'ordre d'évaluation. -->
+          <daf-data-table [columns]="editRateColumns()" [rows]="editRateRows()" [config]="editRateTableConfig()">
+            <ng-template dafCell="contractType" let-row let-i="index">
+              <daf-select
+                [options]="contractTypeOptions()"
+                [selected]="[editRateGroup(i).get('contractType')!.value]"
+                [config]="{ fullWidth: true }"
+                (selectedChange)="editRateGroup(i).get('contractType')!.setValue($event[0])">
+              </daf-select>
+            </ng-template>
+            <ng-template dafCell="chargeCode" let-row let-i="index">
+              <daf-form-field
+                [options]="{ placeholder: 'CNSS' }"
+                [value]="editRateGroup(i).get('chargeCode')!.value"
+                (valueChange)="editRateGroup(i).get('chargeCode')!.setValue(($event ?? '').toString())">
+              </daf-form-field>
+            </ng-template>
+            <ng-template dafCell="chargeLabel" let-row let-i="index">
+              <daf-form-field
+                [options]="{ placeholder: 'PAYROLL.PARAMETER_SETS.CHARGE_LABEL_PLACEHOLDER' | translate }"
+                [value]="editRateGroup(i).get('chargeLabel')!.value"
+                (valueChange)="editRateGroup(i).get('chargeLabel')!.setValue(($event ?? '').toString())">
+              </daf-form-field>
+            </ng-template>
+            <ng-template dafCell="employeeRate" let-row let-i="index">
+              @if (editRateGroup(i).get('baseCalculation')!.value !== 'FORMULE') {
+                <daf-form-field
+                  [options]="{ type: 'number', placeholder: '0.0918' }"
+                  [value]="editRateGroup(i).get('employeeRate')!.value"
+                  (valueChange)="editRateGroup(i).get('employeeRate')!.setValue(+($event ?? 0))">
+                </daf-form-field>
+              } @else {
+                <div class="ps-formula-cell">
+                  <daf-form-field
+                    [options]="{ placeholder: 'PAYROLL.PARAMETER_SETS.FORMULA_EE_PLACEHOLDER' | translate, hint: 'PAYROLL.PARAMETER_SETS.FORMULA_EE_LABEL' | translate }"
+                    [value]="editRateGroup(i).get('formulaEe')!.value"
+                    (valueChange)="editRateGroup(i).get('formulaEe')!.setValue(($event ?? '').toString())">
+                  </daf-form-field>
+                  <div class="formula-vars">
+                    @for (v of chargeVariableHints(i); track v.name) {
+                      <daf-button [label]="v.name" variant="ghost" [options]="{ size: 'sm', title: v.desc }" (onClick)="insertChargeFormulaVar(i, 'formulaEe', v.name)" />
                     }
-                  </ng-container>
-                }
-              </ng-container>
-            </div>
+                  </div>
+                </div>
+              }
+            </ng-template>
+            <ng-template dafCell="employerRate" let-row let-i="index">
+              @if (editRateGroup(i).get('baseCalculation')!.value !== 'FORMULE') {
+                <daf-form-field
+                  [options]="{ type: 'number', placeholder: '0.1657' }"
+                  [value]="editRateGroup(i).get('employerRate')!.value"
+                  (valueChange)="editRateGroup(i).get('employerRate')!.setValue(+($event ?? 0))">
+                </daf-form-field>
+              } @else {
+                <div class="ps-formula-cell">
+                  <daf-form-field
+                    [options]="{ placeholder: 'PAYROLL.PARAMETER_SETS.FORMULA_ER_PLACEHOLDER' | translate, hint: 'PAYROLL.PARAMETER_SETS.FORMULA_ER_LABEL' | translate }"
+                    [value]="editRateGroup(i).get('formulaEr')!.value"
+                    (valueChange)="editRateGroup(i).get('formulaEr')!.setValue(($event ?? '').toString())">
+                  </daf-form-field>
+                  <div class="formula-vars">
+                    @for (v of chargeVariableHints(i); track v.name) {
+                      <daf-button [label]="v.name" variant="ghost" [options]="{ size: 'sm', title: v.desc }" (onClick)="insertChargeFormulaVar(i, 'formulaEr', v.name)" />
+                    }
+                  </div>
+                </div>
+              }
+            </ng-template>
+            <ng-template dafCell="baseCalculation" let-row let-i="index">
+              <daf-select
+                [options]="baseCalcOptions()"
+                [selected]="[editRateGroup(i).get('baseCalculation')!.value]"
+                [config]="{ fullWidth: true }"
+                (selectedChange)="editRateGroup(i).get('baseCalculation')!.setValue($event[0])">
+              </daf-select>
+            </ng-template>
+            <ng-template dafCell="capAmount" let-row let-i="index">
+              @if (editRateGroup(i).get('baseCalculation')!.value !== 'FORMULE') {
+                <daf-form-field
+                  [options]="{ type: 'number', placeholder: '—', suffixText: editorDevise() }"
+                  [value]="editRateGroup(i).get('capAmount')!.value"
+                  (valueChange)="editRateGroup(i).get('capAmount')!.setValue($event === '' || $event == null ? null : +$event)">
+                </daf-form-field>
+              } @else {
+                <daf-form-field
+                  [options]="{ type: 'number', placeholder: '0', hint: 'PAYROLL.PARAMETER_SETS.EVAL_ORDER_TITLE' | translate }"
+                  [value]="editRateGroup(i).get('evalOrder')!.value"
+                  (valueChange)="editRateGroup(i).get('evalOrder')!.setValue(+($event ?? 0))">
+                </daf-form-field>
+              }
+            </ng-template>
+          </daf-data-table>
+
+          @if (hasFormulaRate()) {
+            <p class="editor-hint">{{ 'PAYROLL.PARAMETER_SETS.FORMULA_ORDER_HINT' | translate }}</p>
           }
         </div>
       </ng-template>
@@ -457,7 +424,7 @@
       <ng-template #rubriquesEditorTpl>
         <div class="rubriques-editor" [formGroup]="rubriquesForm">
           <div class="editor-toolbar">
-            <daf-button [label]="'PAYROLL.PARAMETER_SETS.ADD_RUBRIQUE' | translate" variant="secondary" [options]="{ size: 'sm' }" (onClick)="addEditRubrique()" />
+            <daf-button [label]="'PAYROLL.PARAMETER_SETS.ADD_RUBRIQUE' | translate" variant="secondary" [options]="{ size: 'sm', iconStart: 'add' }" (onClick)="addEditRubrique()" />
             <daf-button
               [label]="(savingRubriques() ? 'PAYROLL.PARAMETER_SETS.SAVING' : 'PAYROLL.PARAMETER_SETS.SAVE_ALL') | translate"
               variant="primary"
@@ -467,27 +434,28 @@
           </div>
 
           @if (editRubriques.length === 0) {
-            <p class="detail-empty">{{ 'PAYROLL.PARAMETER_SETS.RUBRIQUES_EMPTY_EDITOR' | translate }}</p>
+            <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'lg', icon: 'info', description: ('PAYROLL.PARAMETER_SETS.RUBRIQUES_EMPTY_EDITOR' | translate) }" />
           } @else {
+            <!-- Brut de test : devise du pays du jeu (suffixe du champ), plus de "TND" en dur. -->
             <div class="preview-control">
               <daf-form-field
-                [options]="{ label: 'PAYROLL.PARAMETER_SETS.TEST_GROSS_LABEL' | translate, type: 'number' }"
+                [options]="{ label: 'PAYROLL.PARAMETER_SETS.TEST_GROSS_LABEL' | translate, type: 'number', suffixText: editorDevise() }"
                 [value]="testGross()"
                 (valueChange)="testGross.set(+($event ?? 0) || 3000)">
               </daf-form-field>
-              <span class="preview-gross-unit">TND / mois</span>
             </div>
 
             <ng-container formArrayName="items">
               @for (ctrl of editRubriques.controls; track $index; let i = $index) {
+                <!-- Carte dépliable sans `state` (pas de couleur par nature). Le montant
+                     d'aperçu passe dans le sous-titre au lieu d'un texte maison dans l'en-tête. -->
                 <daf-accordion-card
                   [formGroupName]="i"
                   [options]="{
                     title: (editRubriqueGroup(i).get('code')!.value || '…') + ' — ' + (editRubriqueGroup(i).get('labelFr')!.value || ('PAYROLL.PARAMETER_SETS.NEW_RUBRIQUE_PLACEHOLDER' | translate)),
-                    subtitle: calcModeLabel(editRubriqueGroup(i).get('calcMode')!.value),
+                    subtitle: calcModeLabel(editRubriqueGroup(i).get('calcMode')!.value) + ' · ' + previewAmount(i),
                     icon: rubriqueIcon(editRubriqueGroup(i).get('nature')!.value),
                     statusLabel: natureLabel(editRubriqueGroup(i).get('nature')!.value),
-                    state: rubriqueAccordionState(editRubriqueGroup(i).get('nature')!.value, editRubriqueGroup(i).get('isActive')!.value),
                     variant: 'outlined',
                     radius: 'lg'
                   }"
@@ -495,7 +463,6 @@
                   (openChange)="toggleRubriqueCard(i)">
 
                   <div headerAction class="rch-header-action" (click)="$event.stopPropagation()">
-                    <span class="rch-value">{{ previewAmount(i) }} TND</span>
                     <daf-button
                       variant="ghost"
                       [options]="{ size: 'sm', iconStart: 'close', title: 'PAYROLL.PARAMETER_SETS.REMOVE_RUBRIQUE' | translate }"
@@ -503,175 +470,181 @@
                     </daf-button>
                   </div>
 
-                      <div class="rg-section">
-                        <h4 class="rg-section-title">{{ 'PAYROLL.PARAMETER_SETS.SECTION_IDENTIFICATION' | translate }}</h4>
-                        <div class="rg-row">
-                          <div class="rg-field rg-field--sm">
-                            <daf-form-field
-                              [options]="{ label: 'PAYROLL.PARAMETER_SETS.CODE_LABEL' | translate, placeholder: 'CNSS_SAL' }"
-                              [value]="editRubriqueGroup(i).get('code')!.value"
-                              (valueChange)="editRubriqueGroup(i).get('code')!.setValue(($event ?? '').toString())">
-                            </daf-form-field>
-                          </div>
-                          <div class="rg-field rg-field--lg">
-                            <daf-form-field
-                              [options]="{ label: 'PAYROLL.PARAMETER_SETS.LABEL_FR_LABEL' | translate, placeholder: 'PAYROLL.PARAMETER_SETS.LABEL_FR_PLACEHOLDER' | translate }"
-                              [value]="editRubriqueGroup(i).get('labelFr')!.value"
-                              (valueChange)="editRubriqueGroup(i).get('labelFr')!.setValue(($event ?? '').toString())">
-                            </daf-form-field>
-                          </div>
-                          <div class="rg-field rg-field--lg">
-                            <daf-form-field
-                              [options]="{ label: 'PAYROLL.PARAMETER_SETS.LABEL_EN_LABEL' | translate, placeholder: 'PAYROLL.PARAMETER_SETS.LABEL_EN_PLACEHOLDER' | translate }"
-                              [value]="editRubriqueGroup(i).get('labelEn')!.value"
-                              (valueChange)="editRubriqueGroup(i).get('labelEn')!.setValue(($event ?? '').toString())">
-                            </daf-form-field>
-                          </div>
+                  <div class="rg-section">
+                    <daf-section-title [title]="'PAYROLL.PARAMETER_SETS.SECTION_IDENTIFICATION' | translate" />
+                    <div class="rg-row">
+                      <div class="rg-field rg-field--sm">
+                        <daf-form-field
+                          [options]="{ label: 'PAYROLL.PARAMETER_SETS.CODE_LABEL' | translate, placeholder: 'CNSS_SAL' }"
+                          [value]="editRubriqueGroup(i).get('code')!.value"
+                          (valueChange)="editRubriqueGroup(i).get('code')!.setValue(($event ?? '').toString())">
+                        </daf-form-field>
+                      </div>
+                      <div class="rg-field rg-field--lg">
+                        <daf-form-field
+                          [options]="{ label: 'PAYROLL.PARAMETER_SETS.LABEL_FR_LABEL' | translate, placeholder: 'PAYROLL.PARAMETER_SETS.LABEL_FR_PLACEHOLDER' | translate }"
+                          [value]="editRubriqueGroup(i).get('labelFr')!.value"
+                          (valueChange)="editRubriqueGroup(i).get('labelFr')!.setValue(($event ?? '').toString())">
+                        </daf-form-field>
+                      </div>
+                      <div class="rg-field rg-field--lg">
+                        <daf-form-field
+                          [options]="{ label: 'PAYROLL.PARAMETER_SETS.LABEL_EN_LABEL' | translate, placeholder: 'PAYROLL.PARAMETER_SETS.LABEL_EN_PLACEHOLDER' | translate }"
+                          [value]="editRubriqueGroup(i).get('labelEn')!.value"
+                          (valueChange)="editRubriqueGroup(i).get('labelEn')!.setValue(($event ?? '').toString())">
+                        </daf-form-field>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="rg-section">
+                    <daf-section-title [title]="'PAYROLL.PARAMETER_SETS.SECTION_NATURE' | translate" />
+                    <daf-radio-group
+                      [options]="natureRadioOptions()"
+                      [config]="{ layout: 'horizontal' }"
+                      [selected]="editRubriqueGroup(i).get('nature')!.value"
+                      (selectedChange)="editRubriqueGroup(i).get('nature')!.setValue($event)">
+                    </daf-radio-group>
+                    <p class="editor-hint">{{ 'PAYROLL.PARAMETER_SETS.NATURE_HINT' | translate }}</p>
+                  </div>
+
+                  <div class="rg-section">
+                    <daf-section-title [title]="'PAYROLL.PARAMETER_SETS.SECTION_CALC_MODE' | translate" />
+                    <daf-radio-group
+                      [options]="calcModeRadioOptions()"
+                      [config]="{ layout: 'horizontal' }"
+                      [selected]="editRubriqueGroup(i).get('calcMode')!.value"
+                      (selectedChange)="editRubriqueGroup(i).get('calcMode')!.setValue($event)">
+                    </daf-radio-group>
+
+                    @if (editRubriqueGroup(i).get('calcMode')!.value === 'FIXE_MENSUEL' ||
+                         editRubriqueGroup(i).get('calcMode')!.value === 'FIXE_JOURNALIER') {
+                      <div class="rg-row rg-row--mt">
+                        <div class="rg-field rg-field--md">
+                          <daf-form-field
+                            [options]="{
+                              label: 'PAYROLL.PARAMETER_SETS.AMOUNT_LABEL' | translate: { period: (editRubriqueGroup(i).get('calcMode')!.value === 'FIXE_JOURNALIER' ? ('PAYROLL.PARAMETER_SETS.PER_DAY' | translate) : ('PAYROLL.PARAMETER_SETS.PER_MONTH' | translate)) },
+                              type: 'number',
+                              placeholder: '0.00',
+                              suffixText: editorDevise()
+                            }"
+                            [value]="editRubriqueGroup(i).get('amount')!.value"
+                            (valueChange)="editRubriqueGroup(i).get('amount')!.setValue(+($event ?? 0))">
+                          </daf-form-field>
                         </div>
                       </div>
+                    }
 
-                      <div class="rg-section">
-                        <h4 class="rg-section-title">{{ 'PAYROLL.PARAMETER_SETS.SECTION_NATURE' | translate }}</h4>
-                        <daf-radio-group
-                          [options]="natureRadioOptions()"
-                          [config]="{ layout: 'horizontal' }"
-                          [selected]="editRubriqueGroup(i).get('nature')!.value"
-                          (selectedChange)="editRubriqueGroup(i).get('nature')!.setValue($event)">
-                        </daf-radio-group>
-                        <p class="editor-hint" style="margin-top:8px">{{ 'PAYROLL.PARAMETER_SETS.NATURE_HINT' | translate }}</p>
-                      </div>
-
-                      <div class="rg-section">
-                        <h4 class="rg-section-title">{{ 'PAYROLL.PARAMETER_SETS.SECTION_CALC_MODE' | translate }}</h4>
-                        <daf-radio-group
-                          [options]="calcModeRadioOptions()"
-                          [config]="{ layout: 'horizontal' }"
-                          [selected]="editRubriqueGroup(i).get('calcMode')!.value"
-                          (selectedChange)="editRubriqueGroup(i).get('calcMode')!.setValue($event)">
-                        </daf-radio-group>
-
-                        @if (editRubriqueGroup(i).get('calcMode')!.value === 'FIXE_MENSUEL' ||
-                             editRubriqueGroup(i).get('calcMode')!.value === 'FIXE_JOURNALIER') {
-                          <div class="rg-row rg-row--mt">
-                            <div class="rg-field rg-field--md">
-                              <daf-form-field
-                                [options]="{
-                                  label: 'PAYROLL.PARAMETER_SETS.AMOUNT_LABEL' | translate: { period: (editRubriqueGroup(i).get('calcMode')!.value === 'FIXE_JOURNALIER' ? ('PAYROLL.PARAMETER_SETS.PER_DAY' | translate) : ('PAYROLL.PARAMETER_SETS.PER_MONTH' | translate)) },
-                                  type: 'number',
-                                  placeholder: '0.00'
-                                }"
-                                [value]="editRubriqueGroup(i).get('amount')!.value"
-                                (valueChange)="editRubriqueGroup(i).get('amount')!.setValue(+($event ?? 0))">
-                              </daf-form-field>
-                            </div>
+                    @if (editRubriqueGroup(i).get('calcMode')!.value === 'POURCENTAGE_BRUT' ||
+                         editRubriqueGroup(i).get('calcMode')!.value === 'POURCENTAGE_CHARGES' ||
+                         editRubriqueGroup(i).get('calcMode')!.value === 'POURCENTAGE_PLAFONNE') {
+                      <div class="rg-row rg-row--mt">
+                        <div class="rg-field rg-field--sm">
+                          <daf-form-field
+                            [options]="{ label: 'PAYROLL.PARAMETER_SETS.RATE_LABEL' | translate, type: 'number', placeholder: '9.18', suffixText: '%' }"
+                            [value]="editRubriqueGroup(i).get('ratePercent')!.value"
+                            (valueChange)="editRubriqueGroup(i).get('ratePercent')!.setValue(+($event ?? 0))">
+                          </daf-form-field>
+                        </div>
+                        @if (editRubriqueGroup(i).get('calcMode')!.value === 'POURCENTAGE_PLAFONNE') {
+                          <div class="rg-field rg-field--md">
+                            <daf-form-field
+                              [options]="{ label: 'PAYROLL.PARAMETER_SETS.CAP_LABEL' | translate, type: 'number', placeholder: '3 500.00', suffixText: editorDevise() }"
+                              [value]="editRubriqueGroup(i).get('capAmount')!.value"
+                              (valueChange)="editRubriqueGroup(i).get('capAmount')!.setValue(+($event ?? 0))">
+                            </daf-form-field>
                           </div>
                         }
+                      </div>
+                    }
 
-                        @if (editRubriqueGroup(i).get('calcMode')!.value === 'POURCENTAGE_BRUT' ||
-                             editRubriqueGroup(i).get('calcMode')!.value === 'POURCENTAGE_CHARGES' ||
-                             editRubriqueGroup(i).get('calcMode')!.value === 'POURCENTAGE_PLAFONNE') {
-                          <div class="rg-row rg-row--mt">
-                            <div class="rg-field rg-field--sm">
-                              <daf-form-field
-                                [options]="{ label: 'PAYROLL.PARAMETER_SETS.RATE_LABEL' | translate, type: 'number', placeholder: '9.18' }"
-                                [value]="editRubriqueGroup(i).get('ratePercent')!.value"
-                                (valueChange)="editRubriqueGroup(i).get('ratePercent')!.setValue(+($event ?? 0))">
-                              </daf-form-field>
-                            </div>
-                            @if (editRubriqueGroup(i).get('calcMode')!.value === 'POURCENTAGE_PLAFONNE') {
-                              <div class="rg-field rg-field--md">
-                                <daf-form-field
-                                  [options]="{ label: 'PAYROLL.PARAMETER_SETS.CAP_LABEL' | translate, type: 'number', placeholder: '3 500.00' }"
-                                  [value]="editRubriqueGroup(i).get('capAmount')!.value"
-                                  (valueChange)="editRubriqueGroup(i).get('capAmount')!.setValue(+($event ?? 0))">
-                                </daf-form-field>
-                              </div>
+                    @if (editRubriqueGroup(i).get('calcMode')!.value === 'FORMULE') {
+                      <div class="rg-row rg-row--mt">
+                        <div class="rg-field rg-field--full">
+                          <daf-form-field
+                            [options]="{
+                              label: 'PAYROLL.PARAMETER_SETS.FORMULA_EXPR_LABEL' | translate,
+                              placeholder: 'PAYROLL.PARAMETER_SETS.FORMULA_EXPR_PLACEHOLDER' | translate,
+                              hint: 'PAYROLL.PARAMETER_SETS.FORMULA_OPERATORS_HINT' | translate
+                            }"
+                            [value]="editRubriqueGroup(i).get('formulaExpression')!.value"
+                            (valueChange)="editRubriqueGroup(i).get('formulaExpression')!.setValue(($event ?? '').toString())">
+                          </daf-form-field>
+                          <div class="formula-vars">
+                            @for (v of formulaVariableHints(); track v.name) {
+                              <daf-button [label]="v.name" variant="ghost" [options]="{ size: 'sm', title: v.desc }" (onClick)="insertFormulaVar(i, v.name)" />
+                            }
+                            @if (priorRubriqueVars(i).length > 0) {
+                              <span class="formula-vars-divider">{{ 'PAYROLL.PARAMETER_SETS.PRIOR_RUBRIQUES_LABEL' | translate }}</span>
+                              @for (v of priorRubriqueVars(i); track v.name) {
+                                <daf-button [label]="v.name" variant="ghost" [options]="{ size: 'sm', title: v.desc }" (onClick)="insertFormulaVar(i, v.name)" />
+                              }
                             }
                           </div>
-                        }
-
-                        @if (editRubriqueGroup(i).get('calcMode')!.value === 'FORMULE') {
-                          <div class="rg-row rg-row--mt">
-                            <div class="rg-field rg-field--full">
-                              <daf-form-field
-                                [options]="{
-                                  label: 'PAYROLL.PARAMETER_SETS.FORMULA_EXPR_LABEL' | translate,
-                                  placeholder: 'PAYROLL.PARAMETER_SETS.FORMULA_EXPR_PLACEHOLDER' | translate
-                                }"
-                                [value]="editRubriqueGroup(i).get('formulaExpression')!.value"
-                                (valueChange)="editRubriqueGroup(i).get('formulaExpression')!.setValue(($event ?? '').toString())">
-                              </daf-form-field>
-                              <p class="editor-hint formula-hint">
-                                {{ 'PAYROLL.PARAMETER_SETS.FORMULA_OPERATORS_HINT' | translate }}
-                              </p>
-                              <div class="formula-vars">
-                                @for (v of formulaVariableHints(); track v.name) {
-                                  <daf-button [label]="v.name" variant="ghost" [options]="{ size: 'sm', title: v.desc }" (onClick)="insertFormulaVar(i, v.name)" />
-                                }
-                                @if (priorRubriqueVars(i).length > 0) {
-                                  <span class="formula-vars-divider">{{ 'PAYROLL.PARAMETER_SETS.PRIOR_RUBRIQUES_LABEL' | translate }}</span>
-                                  @for (v of priorRubriqueVars(i); track v.name) {
-                                    <daf-button [label]="v.name" variant="ghost" [options]="{ size: 'sm', title: v.desc }" (onClick)="insertFormulaVar(i, v.name)" />
-                                  }
-                                }
-                              </div>
-                              <p class="editor-hint" style="margin-top:6px">
-                                {{ 'PAYROLL.PARAMETER_SETS.FORMULA_PREVIEW_HINT' | translate }}
-                              </p>
-                            </div>
-                          </div>
-                        }
-                      </div>
-
-                      <div class="rg-section">
-                        <h4 class="rg-section-title">{{ 'PAYROLL.PARAMETER_SETS.SECTION_TAX_CHARGES' | translate }}</h4>
-                        <div class="rg-checkbox-group">
-                          <daf-checkbox
-                            [options]="{ label: 'PAYROLL.PARAMETER_SETS.IRPP_CHECKBOX_TITLE' | translate, hint: 'PAYROLL.PARAMETER_SETS.IRPP_CHECKBOX_DESC' | translate }"
-                            [checked]="editRubriqueGroup(i).get('isSubjectToIrpp')!.value"
-                            (checkedChange)="editRubriqueGroup(i).get('isSubjectToIrpp')!.setValue($event)">
-                          </daf-checkbox>
-                          <daf-checkbox
-                            [options]="{ label: 'PAYROLL.PARAMETER_SETS.CHARGES_CHECKBOX_TITLE' | translate, hint: 'PAYROLL.PARAMETER_SETS.CHARGES_CHECKBOX_DESC' | translate }"
-                            [checked]="editRubriqueGroup(i).get('isSubjectToSocialCharges')!.value"
-                            (checkedChange)="editRubriqueGroup(i).get('isSubjectToSocialCharges')!.setValue($event)">
-                          </daf-checkbox>
+                          <p class="editor-hint">{{ 'PAYROLL.PARAMETER_SETS.FORMULA_PREVIEW_HINT' | translate }}</p>
                         </div>
                       </div>
+                    }
+                  </div>
 
-                      <div class="rg-section">
-                        <h4 class="rg-section-title">{{ 'PAYROLL.PARAMETER_SETS.SECTION_CONTRACT_TYPES' | translate }}</h4>
-                        <div class="rg-checkbox-group">
-                          <daf-checkbox
-                            [options]="{ label: 'PAYROLL.PARAMETER_SETS.CT_ALL_TITLE' | translate, hint: 'PAYROLL.PARAMETER_SETS.CT_ALL_DESC' | translate }"
-                            [checked]="editRubriqueGroup(i).get('ctAll')!.value"
-                            (checkedChange)="editRubriqueGroup(i).get('ctAll')!.setValue($event)">
-                          </daf-checkbox>
-                          @if (!editRubriqueGroup(i).get('ctAll')!.value) {
-                            <div class="rg-contract-types">
-                              @for (ct of contractTypes(); track ct.code) {
-                                <daf-checkbox [options]="{ label: ct.code }" [checked]="editRubriqueGroup(i).get('ctByCode')?.get(ct.code)?.value ?? false" (checkedChange)="editRubriqueGroup(i).get('ctByCode')?.get(ct.code)?.setValue($event)" />
-                              }
-                            </div>
+                  <div class="rg-section">
+                    <daf-section-title [title]="'PAYROLL.PARAMETER_SETS.SECTION_TAX_CHARGES' | translate" />
+                    <div class="rg-checkbox-group">
+                      <daf-checkbox
+                        [options]="{ label: 'PAYROLL.PARAMETER_SETS.IRPP_CHECKBOX_TITLE' | translate, hint: 'PAYROLL.PARAMETER_SETS.IRPP_CHECKBOX_DESC' | translate }"
+                        [checked]="editRubriqueGroup(i).get('isSubjectToIrpp')!.value"
+                        (checkedChange)="editRubriqueGroup(i).get('isSubjectToIrpp')!.setValue($event)">
+                      </daf-checkbox>
+                      <daf-checkbox
+                        [options]="{ label: 'PAYROLL.PARAMETER_SETS.CHARGES_CHECKBOX_TITLE' | translate, hint: 'PAYROLL.PARAMETER_SETS.CHARGES_CHECKBOX_DESC' | translate }"
+                        [checked]="editRubriqueGroup(i).get('isSubjectToSocialCharges')!.value"
+                        (checkedChange)="editRubriqueGroup(i).get('isSubjectToSocialCharges')!.setValue($event)">
+                      </daf-checkbox>
+                    </div>
+                  </div>
+
+                  <div class="rg-section">
+                    <daf-section-title [title]="'PAYROLL.PARAMETER_SETS.SECTION_CONTRACT_TYPES' | translate" />
+                    <div class="rg-checkbox-group">
+                      <daf-checkbox
+                        [options]="{ label: 'PAYROLL.PARAMETER_SETS.CT_ALL_TITLE' | translate, hint: 'PAYROLL.PARAMETER_SETS.CT_ALL_DESC' | translate }"
+                        [checked]="editRubriqueGroup(i).get('ctAll')!.value"
+                        (checkedChange)="editRubriqueGroup(i).get('ctAll')!.setValue($event)">
+                      </daf-checkbox>
+                      @if (!editRubriqueGroup(i).get('ctAll')!.value) {
+                        <div class="rg-contract-types">
+                          @for (ct of contractTypes(); track ct.code) {
+                            <daf-checkbox [options]="{ label: ct.code }" [checked]="editRubriqueGroup(i).get('ctByCode')?.get(ct.code)?.value ?? false" (checkedChange)="editRubriqueGroup(i).get('ctByCode')?.get(ct.code)?.setValue($event)" />
                           }
                         </div>
-                      </div>
+                      }
+                    </div>
+                  </div>
 
-                      <div class="rg-section">
-                        <h4 class="rg-section-title">{{ 'PAYROLL.PARAMETER_SETS.SECTION_STATUS' | translate }}</h4>
-                        <daf-checkbox
-                          [options]="{ label: 'PAYROLL.PARAMETER_SETS.ACTIVE_CHECKBOX_TITLE' | translate, hint: 'PAYROLL.PARAMETER_SETS.ACTIVE_CHECKBOX_DESC' | translate }"
-                          [checked]="editRubriqueGroup(i).get('isActive')!.value"
-                          (checkedChange)="editRubriqueGroup(i).get('isActive')!.setValue($event)">
-                        </daf-checkbox>
-                      </div>
+                  <div class="rg-section">
+                    <daf-section-title [title]="'PAYROLL.PARAMETER_SETS.SECTION_STATUS' | translate" />
+                    <daf-checkbox
+                      [options]="{ label: 'PAYROLL.PARAMETER_SETS.ACTIVE_CHECKBOX_TITLE' | translate, hint: 'PAYROLL.PARAMETER_SETS.ACTIVE_CHECKBOX_DESC' | translate }"
+                      [checked]="editRubriqueGroup(i).get('isActive')!.value"
+                      (checkedChange)="editRubriqueGroup(i).get('isActive')!.setValue($event)">
+                    </daf-checkbox>
+                  </div>
 
-                      <div class="rg-preview-section">
-                        <span class="rg-preview-label">
-                          {{ 'PAYROLL.PARAMETER_SETS.PREVIEW_LABEL' | translate: { gross: testGross().toLocaleString('fr-FR') } }}
-                        </span>
-                        <span class="rg-preview-amount">{{ previewAmount(i) }} TND</span>
-                      </div>
+                  <!-- Aperçu : `daf-amount-field` de la bibliothèque (montant formaté dans la
+                       devise du jeu) au lieu de l'encadré maison. -->
+                  <div class="rg-section">
+                    <daf-amount-field
+                      [options]="{
+                        value: previewValue(i),
+                        label: ('PAYROLL.PARAMETER_SETS.PREVIEW_LABEL' | translate: { gross: formatGross(), devise: editorDevise() }),
+                        currency: editorDevise(),
+                        currencyPosition: 'end',
+                        locale: numberLocaleCode(),
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                        placeholder: '—'
+                      }" />
+                  </div>
 
                 </daf-accordion-card>
               }

@@ -17,6 +17,7 @@
 
     "layout": {
       "NAV": {
+        "HOME": "Accueil",
         "SIMULATOR": "Simulateur manuel",
         "ADMIN": "Administration",
         "PAYSLIPS": "Fiches de paie",
@@ -31,6 +32,25 @@
         "BUDGET": "Budget prévisionnel"
       },
       "SECTION": "PAIE"
+    },
+
+    "HOME": {
+      "TITLE": "Accueil",
+      "GREETING": "Bonjour {{name}}, bienvenue dans le module Paie",
+      "GREETING_ANONYMOUS": "Bienvenue dans le module Paie",
+      "EMPTY": "Aucun écran de paie n'est accessible avec vos droits actuels.",
+      "DESC": {
+        "SIMULATOR": "Simuler un salaire net ↔ brut et son coût employeur.",
+        "PAYSLIPS": "Découper et classer les fiches de paie mensuelles.",
+        "EMPLOYEE_CONFIG": "Affecter la configuration de paie d'un employé.",
+        "COHORT": "Simuler la paie d'un groupe d'employés.",
+        "ENGINE_RUN": "Lancer le calcul de paie de la période.",
+        "ENGINE_RESULTS": "Consulter les résultats des calculs de paie.",
+        "CANDIDATE_SIMULATION": "Retrouver les simulations de candidats.",
+        "CALIBRATION": "Calibrer les paramètres sur les données réelles.",
+        "PARAMETER_SETS": "Gérer et approuver les jeux de paramètres.",
+        "BUDGET": "Suivre les lignes budgétaires et les prévisions."
+      }
     },
 
     "SIMULATOR": {
@@ -223,6 +243,49 @@
 
     "EMPLOYEE_CONFIG": {
       "TITLE": "Configuration employé",
+      "SUBTITLE": "Affecter la configuration de paie d'un employé : pays, contrat, avantages, salaire et primes.",
+      "BREADCRUMB": "Configuration employé",
+      "LIST_SUBTITLE": "Choisissez un collaborateur pour configurer sa paie : pays, contrat, avantages, salaire et primes.",
+      "EMPLOYEE_FALLBACK": "Collaborateur #{{id}}",
+      "OPEN_CONFIG": "Configurer",
+      "KPI_IN_POST": "Effectif en poste",
+      "KPI_IN_POST_HELP": "Collaborateurs actifs, en congé ou en mission, pour le pays filtré ou tous les pays.",
+      "KPI_ACTIVE": "Actifs",
+      "KPI_ACTIVE_HELP": "Collaborateurs au statut « Actif » dans le service RH.",
+      "KPI_AWAY": "En congé / en mission",
+      "KPI_AWAY_HELP": "Collaborateurs actuellement en congé ou en mission.",
+      "KPI_PAYS": "Pays paie",
+      "KPI_PAYS_HELP": "Nombre de pays configurés dans le module paie.",
+      "CONFIG_TITLE": "Configuration de paie",
+      "REASON_HINT": "Obligatoire pour enregistrer — conservé dans l'historique des modifications.",
+      "SECTION_ASSIGNMENT": "Affectation",
+      "SECTION_REASON": "Validation",
+      "SELECT_CONTRACT": "Sélectionner un contrat…",
+      "CONTRACT_NEEDS_COUNTRY": "Choisissez d'abord un pays",
+      "CALCULATE_NET_HINT": "Calcule le net à partir du brut, avec le jeu de paramètres actif du pays.",
+      "BENEFITS_NEED_COUNTRY": "Choisissez un pays pour afficher les avantages de son jeu de paramètres actif.",
+      "BENEFITS_EMPTY": "Aucun avantage en nature dans le jeu de paramètres actif de ce pays.",
+      "BENEFIT_PER_MONTH": "{{amount}} / mois",
+      "RESET": "Annuler les modifications",
+      "FIELD_REQUIRED": "Champ obligatoire.",
+      "FIELD_POSITIVE": "Le montant doit être supérieur à 0.",
+      "BONUS_PERIOD": "Période",
+      "BONUS_COMMENT_COL": "Commentaire",
+      "BONUS_SAVE_SUCCESS": "Prime ajoutée.",
+      "BONUS_DELETE_SUCCESS": "Prime supprimée.",
+      "DELETE_BONUS_TITLE": "Supprimer la prime ?",
+      "DELETE_BONUS_BODY": "La prime « {{label}} » de {{amount}} ({{period}}) sera définitivement supprimée.",
+      "CANCEL": "Annuler",
+      "DELETE": "Supprimer",
+      "SALARY_SECTION": "Salaire",
+      "REASON_PLACEHOLDER": "Ex. : revalorisation annuelle",
+      "SECTION_SAVED_BONUSES": "Primes enregistrées",
+      "SECTION_NEW_BONUS": "Nouvelle prime",
+      "BONUS_LABEL_PLACEHOLDER": "Ex. : prime de fin d'année",
+      "CLEAR_FORM": "Effacer",
+      "BONUSES_HINT": "Chaque prime est enregistrée immédiatement.",
+      "NO_BONUSES": "Aucune prime enregistrée pour cet employé.",
+      "DELETE_BONUS": "Supprimer la prime",
       "SELECT_EMPLOYEE": "Sélectionner un employé",
       "SELECT_COUNTRY": "Sélectionner un pays…",
       "COUNTRY": "Pays",
@@ -765,6 +828,12 @@
     },
 
     "PARAMETER_SETS": {
+      "BENEFITS_EMPTY_READONLY": "Aucun avantage en nature.",
+      "MANAGE": "Gérer",
+      "CARD_DESC": "{{status}} · {{charges}} charge(s) · {{rubriques}} rubrique(s)",
+      "TAB_CHARGES": "Charges sociales",
+      "TAB_RUBRIQUES": "Rubriques de paie",
+      "TAB_BENEFITS": "Avantages en nature",
       "TITLE": "Paramètres de paie",
       "BREADCRUMB": "Paramètres",
       "SUBTITLE": "Gestion des barèmes IRPP, charges sociales et rubriques de paie",
@@ -901,7 +970,7 @@
       "SECTION_STATUS": "Statut",
       "ACTIVE_CHECKBOX_TITLE": "Rubrique active",
       "ACTIVE_CHECKBOX_DESC": "Décocher pour désactiver sans supprimer",
-      "PREVIEW_LABEL": "Aperçu — pour un salaire brut de {{gross}} TND",
+      "PREVIEW_LABEL": "Aperçu — pour un salaire brut de {{gross}} {{devise}}",
       "ERROR_GENERIC": "Erreur",
       "ERROR_SAVE_CHARGES": "Erreur sauvegarde charges",
       "ERROR_SAVE_RUBRIQUES": "Erreur sauvegarde rubriques",

@@ -1,211 +1,98 @@
 /**
- * ── Palette "Corporate Fintech / Precision Paie" ─────────────────────────────
- * Variables locales au composant (jamais les tokens globaux de la bibliothèque) : un
- * accent bleu ardoise/pétrole + touches teal, réservé aux zones que ce composant possède
- * en propre (en-têtes de section, console JSON, cartes KPI, grille de cotisations). Les
- * composants `daf-*` gardent leurs propres tokens — on ne peut pas et on ne doit pas
- * restyler leur intérieur depuis ici (encapsulation Angular).
+ * Mise en page uniquement : cartes, tableaux, titres, boutons, champs et montants sont les
+ * composants `daf-*` de la bibliothèque, avec leurs propres couleurs. Plus de palette locale
+ * ni de bandeaux, consoles ou encadrés maison (retirés lors de l'alignement sur la
+ * bibliothèque) — et aucun `::ng-deep` sur l'intérieur d'un composant hors de la grille de
+ * cartes, qui reprend la même recette que /finance/admin.
  */
-:host {
-  --ps-petrol:        #0d5c75;
-  --ps-petrol-dark:   #094759;
-  --ps-petrol-tint:   color-mix(in srgb, #0d5c75 7%, transparent);
-  --ps-petrol-tint-strong: color-mix(in srgb, #0d5c75 14%, transparent);
-  --ps-teal:          #14b8a6;
-  --ps-shadow-1:      0 1px 2px rgba(13, 92, 117, 0.06), 0 2px 6px rgba(13, 92, 117, 0.06);
-}
 
 /* Pas de padding horizontal ici ni sur `.ps-layout` / `.ps-create-layout` : `.shell-content`
    pose déjà 2rem et `daf-page-header` n'en ajoute pas — 32px de plus décalaient onglets et
    contenu par rapport au titre. Même alignement que /payroll/simulator. */
 .ps-tabs-wrap { margin-bottom: 8px; }
 
-/* ── sélecteur pays (header) : même traitement que `.pays-trigger` /
-   `.employee-trigger` sur /payroll/candidate-simulation et /payroll/engine-results —
-   compact, pas de largeur forcée par un parent flex-1, rayon d'angle aligné sur les
-   daf-button "md" (rounded-lg). */
-
 .ps-layout { display: flex; flex-direction: column; gap: 24px; padding-bottom: 32px; }
-.ps-list { display: flex; flex-direction: column; gap: 12px; }
+
+/* ── Grille de cartes "Gérer" des jeux — même recette que `.list-type-grid` de
+   /finance/admin (et la grille de modules de /rh/admin). ───────────────────── */
+.ps-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+
+  ::ng-deep h4 { font-size: 15px; line-height: 1.3; }
+
+  // Le lien "Gérer" au même endroit en bas de chaque carte, quelle que soit la longueur
+  // de la description (`fullHeight` égalise déjà la hauteur des cartes d'une rangée).
+  ::ng-deep .glass-card { display: flex; flex-direction: column; }
+  ::ng-deep .glass-card > :last-child { margin-top: auto; }
+
+  > .ps-grid-empty { grid-column: 1 / -1; }
+}
 .ps-item-actions { display: flex; gap: 8px; }
 
-/* ── bandeau exécutif (KPIs) ──────────────────────────────────────────────
-   Même traitement que /payroll/candidate-simulation et /payroll/engine-results :
-   grille en classes Tailwind litérales (grid grid-cols-4 gap-2 sm:gap-6), tuiles
-   agrandies via `::ng-deep` scopé à `.kpi-section` (la lib n'a pas de variante
-   "grande taille" pour `daf-metric-card`). */
-.kpi-section ::ng-deep .glass-card        { padding: 1.5rem; min-height: 148px; }
-.kpi-section ::ng-deep .text-\[22px\]     { font-size: 1.75rem; }
-.kpi-section ::ng-deep .w-8.h-8.rounded-lg { width: 2.75rem; height: 2.75rem; }
-.kpi-section ::ng-deep .material-symbols-outlined.text-sm { font-size: 1.375rem; }
+/* ── Blocs communs ────────────────────────────────────────────────────────── */
+/* Titre de section + bouton sur une ligne (création) ; bouton seul aligné à droite
+   (détail, où l'onglet fait déjà office de titre). */
+.ps-section-head    { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.ps-section-toolbar { display: flex; justify-content: flex-end; }
+.ps-field-block     { display: flex; flex-direction: column; gap: 10px; }
+.ps-inline-actions  { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.editor-hint { font-size: 0.75rem; color: var(--color-on-surface-variant); margin: 0; }
 
 /* ── Onglet "Nouveau jeu" ─────────────────────────────────────────────────── */
 .ps-create-layout { display: flex; flex-direction: column; gap: 24px; padding-bottom: 32px; }
 /* Colonne du formulaire : `gap-5` (20px) entre blocs, comme le formulaire de démo de la lib. */
 .ps-form { display: flex; flex-direction: column; gap: 20px; }
 .field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 20px 24px; }
-.info-box { padding: 12px 16px; background: var(--ps-petrol-tint); border-left: 3px solid var(--ps-petrol); border-radius: var(--radius-md); font-size: 0.8125rem; color: var(--color-on-surface); }
-
-/* ── Console JSON du barème IRPP ──────────────────────────────────────────── */
-.code-console {
-  border: 1px solid var(--color-outline-variant);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  box-shadow: var(--ps-shadow-1);
-}
-.code-console__bar {
-  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--color-surface-container-low);
-  border-bottom: 1px solid var(--color-outline-variant);
-  color: var(--color-on-surface);
-}
-.code-console__filename {
-  display: flex; align-items: center; gap: 6px;
-  font-family: 'Cascadia Code', 'Consolas', 'Fira Code', monospace;
-  font-size: 0.75rem;
-  letter-spacing: 0.02em;
-  .material-symbols-outlined { font-size: 16px; }
-}
-.code-console__actions { display: flex; align-items: center; gap: 8px; }
-.code-console__field {
-  display: block;
-  ::ng-deep textarea {
-    font-family: 'Cascadia Code', 'Consolas', 'Fira Code', monospace !important;
-    font-size: 0.8125rem !important;
-    line-height: 1.6;
-  }
-}
 .form-actions { display: flex; justify-content: flex-end; gap: 12px; padding-top: 4px; }
-.charges-section { border: 1px solid var(--color-outline-variant); border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--ps-shadow-1); }
-.charges-header {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 10px 14px 10px 12px;
-  background: var(--ps-petrol-tint);
-  border-bottom: 1px solid var(--color-outline-variant);
-  border-left: 3px solid var(--ps-petrol);
-}
-.charges-empty { padding: 14px 16px; font-size: 0.8125rem; color: var(--color-on-surface-variant); text-align: center; }
 
-.detail-section-header {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 10px; padding: 8px 0 8px 12px;
-  border-left: 3px solid var(--ps-petrol);
-}
-
-/* ── Rangée KPI (charges salariales / patronales / coin fiscal) ─────────────── */
+/* ── Page détail : rangée des 3 chiffres des charges, posée seule sur la page (hors
+   carte), séparée du tableau par l'espacement de `.ps-layout`. ─────────────── */
 .charges-kpi-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(140px, 1fr));
   gap: 12px;
-  margin-bottom: 14px;
 }
 @media (max-width: 640px) {
   .charges-kpi-row { grid-template-columns: 1fr; }
 }
-.detail-empty { font-size: 0.8125rem; color: var(--color-on-surface-variant); margin: 0 0 8px; }
-.charges-editor { margin-top: 10px; }
-.editor-toolbar { display: flex; gap: 8px; margin-bottom: 10px; }
-.rates-wrap { overflow-x: auto; border-radius: var(--radius-md); box-shadow: var(--ps-shadow-1); }
-.rates-head {
-  display: grid; grid-template-columns: 80px 80px 1fr 68px 68px 110px 76px 32px; gap: 5px;
-  padding: 8px 10px; background: var(--ps-petrol-tint-strong);
-  font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
-  color: var(--ps-petrol-dark); min-width: 680px; border-radius: var(--radius-md) var(--radius-md) 0 0;
-}
-.rates-row {
-  display: grid; grid-template-columns: 80px 80px 1fr 68px 68px 110px 76px 32px; gap: 5px;
-  padding: 6px 10px; border: 1px solid var(--color-outline-variant); border-top: none;
-  align-items: center; min-width: 680px; background: var(--color-surface);
-  font-variant-numeric: tabular-nums;
-  &:last-child { border-radius: 0 0 var(--radius-md) var(--radius-md); }
-}
-.ri { height: 30px; padding: 0 7px; border: 1px solid var(--color-outline-variant); border-radius: var(--radius-md); background: var(--color-surface-container-low); color: var(--color-on-surface); font-size: 0.8125rem; width: 100%; box-sizing: border-box; font-variant-numeric: tabular-nums; &:focus { outline: none; border-color: var(--ps-petrol); } }
 
-/* ── Charge formula expansion ────────────────────────────────────────────── */
+/* ── Pop-ups d'édition ────────────────────────────────────────────────────── */
+.charges-editor,
+.rubriques-editor { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
+.editor-toolbar { display: flex; gap: 8px; }
 
-// rates-row modifier: round bottom corners only when NOT followed by a formula block
-.rates-row--formula {
-  border-radius: 0 !important;
-}
+/* Cellule "formule" du tableau des charges : champ + boutons de variables empilés. */
+.ps-formula-cell { display: flex; flex-direction: column; gap: 6px; min-width: 200px; }
 
-// Placeholder cells when rates are replaced by formula hint arrows
-.ri--hint {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.72rem;
-  color: var(--color-primary);
-  opacity: 0.7;
-  font-style: italic;
-}
-
-// Expansion block that appears directly below a FORMULE-mode rates-row — traité comme
-// une console de formule : fond légèrement assombri, bordure teal, contenu monospace.
-.rate-formula-block {
+.formula-vars {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 12px 14px 14px;
-  background: color-mix(in srgb, var(--ps-petrol) 6%, var(--color-surface-container-lowest, #fff));
-  border: 1px solid color-mix(in srgb, var(--ps-teal) 30%, transparent);
-  border-top: none;
-  border-radius: 0 0 var(--radius-md) var(--radius-md);
-  min-width: 680px;
-  font-family: 'Cascadia Code', 'Consolas', 'Fira Code', monospace;
-}
-
-.rate-formula-field {
-  flex: 1 1 240px;
-  display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 6px;
 }
-
-/* ── Rubriques de paie ─────────────────────────────────────────────────── */
-.rubriques-editor { margin-top: 10px; }
-.editor-hint { font-size: 0.75rem; color: var(--color-on-surface-variant); margin: 8px 0 0; }
-
-/* ── Test-gross preview control ─────────────────────────────────────────── */
-.preview-control {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
-  .preview-gross-unit { font-size: 0.8125rem; color: var(--color-on-surface-variant); }
-}
-
-/* ── Rubrique card header action (daf-accordion-card [headerAction]) ────── */
-.rch-header-action { display: flex; align-items: center; gap: 10px; }
-.rch-value {
-  font-size: 0.875rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--ps-petrol);
+.formula-vars-divider {
+  font-size: 0.75rem;
+  color: var(--color-on-surface-variant);
+  margin-left: 4px;
   white-space: nowrap;
 }
 
-/* ── Form sections ───────────────────────────────────────────────────────── */
-.rg-section {
-  margin-top: 20px;
-  &-title {
-    font-size: 0.8125rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--ps-petrol-dark);
-    margin: 0 0 12px;
-    padding-left: 8px;
-    border-left: 2px solid var(--ps-teal);
-  }
-}
+/* Brut de test (pop-up rubriques). */
+.preview-control { max-width: 280px; }
+
+/* En-tête de carte rubrique (slot `headerAction` de daf-accordion-card). */
+.rch-header-action { display: flex; align-items: center; gap: 10px; }
+
+/* ── Sections d'une rubrique ─────────────────────────────────────────────── */
+.rg-section { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
 
 .rg-row {
   display: flex;
   gap: 16px;
   flex-wrap: wrap;
-  &--mt { margin-top: 12px; }
+  &--mt { margin-top: 4px; }
 }
 
 .rg-field {
@@ -218,61 +105,11 @@
   &--full { flex: 1 1 100%; min-width: 280px; }
 }
 
-/* ── Checkbox groups ─────────────────────────────────────────────────────── */
-.rg-checkbox-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
+.rg-checkbox-group { display: flex; flex-direction: column; gap: 8px; }
 
 .rg-contract-types {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
   margin-left: 24px;
-  margin-top: 8px;
-}
-
-/* ── Formula expression input ────────────────────────────────────────────── */
-.formula-hint { margin-bottom: 8px !important; }
-
-.formula-vars {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.formula-vars-divider {
-  font-size: 0.75rem;
-  color: var(--color-on-surface-variant);
-  margin-left: 4px;
-  white-space: nowrap;
-}
-
-/* ── Live preview ────────────────────────────────────────────────────────── */
-.rg-preview-section {
-  margin-top: 20px;
-  padding: 14px 16px;
-  background: var(--ps-petrol-tint);
-  border: 1px solid color-mix(in srgb, var(--ps-teal) 35%, transparent);
-  border-radius: var(--radius-md);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.rg-preview-label {
-  font-size: 0.8125rem;
-  color: var(--color-on-surface-variant);
-}
-
-.rg-preview-amount {
-  font-size: 1.25rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--ps-petrol);
 }

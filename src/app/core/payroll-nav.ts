@@ -93,6 +93,21 @@ export const PAYROLL_BUDGET_PERMISSIONS = [
  * only its leaves count as modules here.)
  */
 export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
+  /**
+   * Accueil — first entry, like `accueil` in hr-shell and `home` in finance. No permission:
+   * it only lists the other entries the user can open. Being first, it is also where
+   * `payrollLandingGuard` sends `/payroll`.
+   */
+  {
+    id:          'accueil',
+    labelKey:    'PAYROLL.layout.NAV.HOME',
+    icon:        'home',
+    route:       'accueil',
+    permissions: [],
+  },
+  // ── Ordre du parcours métier, comme Finance et RH : simuler → calculer / consulter /
+  //    publier → piloter → paramétrer (en dernier, comme Administration / Admin).
+  //    Keep in sync with app.routes.ts ─────────────────────────────────────────────
   {
     id:          'simulator',
     labelKey:    'PAYROLL.layout.NAV.SIMULATOR',
@@ -100,22 +115,6 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
     route:       'simulator',
     permissions: PAYROLL_SIMULATOR_PERMISSIONS,
   },
-  {
-    id:          'payslips',
-    labelKey:    'PAYROLL.layout.NAV.PAYSLIPS',
-    icon:        'receipt_long',
-    route:       'payslips',
-    permissions: PAYROLL_PAYSLIPS_PERMISSIONS,
-  },
-  {
-    id:          'employee-config',
-    labelKey:    'PAYROLL.layout.NAV.EMPLOYEE_CONFIG',
-    icon:        'manage_accounts',
-    route:       'employee-config',
-    permissions: PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS,
-  },
-
-  // ── Keep in sync with app.routes.ts ─────────────────────────────────────────
   {
     id:          'cohort',
     labelKey:    'PAYROLL.layout.NAV.COHORT',
@@ -158,18 +157,11 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
     ],
   },
   {
-    id:          'calibration',
-    labelKey:    'PAYROLL.layout.NAV.CALIBRATION',
-    icon:        'tune',
-    route:       'calibration',
-    permissions: ['PAYROLL_RUN_CALIBRATION'],
-  },
-  {
-    id:          'parameter-sets',
-    labelKey:    'PAYROLL.layout.NAV.PARAMETER_SETS',
-    icon:        'settings_applications',
-    route:       'parameter-sets',
-    permissions: ['PAYROLL_VIEW_PARAMSET'],
+    id:          'payslips',
+    labelKey:    'PAYROLL.layout.NAV.PAYSLIPS',
+    icon:        'receipt_long',
+    route:       'payslips',
+    permissions: PAYROLL_PAYSLIPS_PERMISSIONS,
   },
   {
     id:          'budget',
@@ -177,6 +169,27 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
     icon:        'account_balance',
     route:       'budget',
     permissions: PAYROLL_BUDGET_PERMISSIONS,
+  },
+  {
+    id:          'calibration',
+    labelKey:    'PAYROLL.layout.NAV.CALIBRATION',
+    icon:        'tune',
+    route:       'calibration',
+    permissions: ['PAYROLL_RUN_CALIBRATION'],
+  },
+  {
+    id:          'employee-config',
+    labelKey:    'PAYROLL.layout.NAV.EMPLOYEE_CONFIG',
+    icon:        'manage_accounts',
+    route:       'employee-config',
+    permissions: PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS,
+  },
+  {
+    id:          'parameter-sets',
+    labelKey:    'PAYROLL.layout.NAV.PARAMETER_SETS',
+    icon:        'settings_applications',
+    route:       'parameter-sets',
+    permissions: ['PAYROLL_VIEW_PARAMSET'],
   },
 ];
 

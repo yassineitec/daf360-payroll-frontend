@@ -1,13 +1,17 @@
-import { ChangeDetectionStrategy, Component, OnInit, TemplateRef, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, TemplateRef, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   AccordionCardComponent,
+  AmountFieldComponent,
   ButtonComponent,
   CardComponent,
   CheckboxComponent,
   DataTableComponent,
+  DafCellDirective,
   FormFieldComponent,
   MetricCardComponent,
   PageComponent,
@@ -20,7 +24,6 @@ import {
   TabsComponent,
   tabParam,
   ModalService,
-  type AccordionState,
   type BadgeVariant,
   type BreadcrumbItem,
   type FilterField,
@@ -30,6 +33,7 @@ import {
   type SearchToolbarFilterConfig,
   type SelectOption,
   type TableColumn,
+  type TableConfig,
   type TableRow,
 } from '@khalilrebhiitec/daf360';
 import {
@@ -51,7 +55,7 @@ import { PAYROLL_CREATE_PARAMSET_PERMISSIONS } from '../../core/payroll-nav';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, ReactiveFormsModule, TranslatePipe,
-    AccordionCardComponent, ButtonComponent, CardComponent, CheckboxComponent, DataTableComponent,
+    AccordionCardComponent, AmountFieldComponent, ButtonComponent, CardComponent, CheckboxComponent, DataTableComponent, DafCellDirective,
     FormFieldComponent, MetricCardComponent, PageComponent, PageHeaderComponent, RadioGroupComponent,
     SearchToolbarComponent, SectionTitleComponent, SelectComponent, StatusBadgeComponent, TabsComponent,
   ],
@@ -66,6 +70,9 @@ export class ParameterSetsComponent implements OnInit {
   private readonly userStore    = inject(UserStore);
   private readonly notification = inject(NotificationService);
   private readonly modalService = inject(ModalService);
+  private readonly router       = inject(Router);
+  private readonly route        = inject(ActivatedRoute);
+  private readonly destroyRef   = inject(DestroyRef);
 
   // ── Éditeurs en pop-up (bibliothèque `ModalService` — pas de composant maison) :
   // les gabarits sont capturés une seule fois via `viewChild`, hors de la boucle
@@ -97,9 +104,87 @@ export class ParameterSetsComponent implements OnInit {
 
     // Aucun pays pré-sélectionné (pas même celui du profil), comme sur
     // `/payroll/candidate-simulation` : l'utilisateur choisit dans le bouton filtre, ce qui
-    // lance `load()`. Aucun `load()` ne part donc ici, et c'est lui seul qui éteint
-    // `firstLoad` : sans ceci la page restait sur le squelette de `daf-page`.
+    // lance `load()`. Seule exception : un lien qui porte déjà `?pays=` (lien partagé,
+    // rafraîchissement d'un jeu ouvert) recharge ce pays. `firstLoad` s'éteint ici dans
+    // tous les cas : sans ceci la page restait sur le squelette de `daf-page`.
     this.firstLoad.set(false);
+
+    // `?set=` = jeu ouvert en détail. Suivi en continu, pour que le bouton Précédent du
+    // navigateur ramène de la page détail à la grille de cartes.
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
+      const set = Number(params.get('set'));
+      this.openSetId.set(set > 0 ? set : null);
+    });
+    const urlPays = Number(this.route.snapshot.queryParamMap.get('pays'));
+    if (urlPays > 0) {
+      this.setListPays(urlPays);
+      this.load();
+    }
+  }
+
+  // ── Détail d'un jeu (page "Gérer") ──────────────────────────────────────────
+  // Même principe que /rh/admin et /finance/admin : une grille de cartes pour choisir,
+  // puis une page détail avec fil d'Ariane et onglets internes. Le jeu ouvert vit dans
+  // `?set=` (avec `?pays=`, sans lequel la liste ne serait pas chargée au rafraîchissement).
+  readonly openSetId = signal<number | null>(null);
+  readonly detailTab = signal<string>('charges');
+
+  readonly detailSet = computed(() => {
+    const id = this.openSetId();
+    return id ? this.paramSets().find(p => p.id === id) ?? null : null;
+  });
+
+  /** `selected` reste la référence des éditeurs en pop-up (variables de formule) : il suit
+   *  le jeu ouvert. Un `?set=` inconnu une fois la liste chargée ramène à la grille. */
+  private readonly syncSelected = effect(() => {
+    const ps = this.detailSet();
+    this.selected.set(ps);
+    if (!ps) { this.closeChargesEditor(); this.closeRubriquesEditor(); }
+    if (this.openSetId() && !ps && !this.loading()) this.closeSet();
+  });
+
+  readonly detailTabs = computed(() => {
+    const ps = this.detailSet();
+    if (!ps) return [];
+    return [
+      { id: 'charges',   label: this.t('PAYROLL.PARAMETER_SETS.TAB_CHARGES'),   icon: 'payments',     count: ps.socialChargeRates.length },
+      { id: 'rubriques', label: this.t('PAYROLL.PARAMETER_SETS.TAB_RUBRIQUES'), icon: 'receipt_long', count: ps.rubriques.length },
+      ...(ps.benefits.length
+        ? [{ id: 'benefits', label: this.t('PAYROLL.PARAMETER_SETS.TAB_BENEFITS'), icon: 'redeem', count: ps.benefits.length }]
+        : []),
+    ];
+  });
+
+  openSet(ps: ParameterSetDto): void {
+    this.detailTab.set('charges');
+    this.router.navigate([], { relativeTo: this.route, queryParams: { set: ps.id }, queryParamsHandling: 'merge' });
+  }
+
+  closeSet(): void {
+    this.router.navigate([], { relativeTo: this.route, queryParams: { set: null }, queryParamsHandling: 'merge' });
+  }
+
+  /** Sous-titre de la page détail : statut + tolérance / seuil (ancienne ligne maison). */
+  detailSubtitle(ps: ParameterSetDto): string {
+    return `${this.statusLabel(ps)} · ${this.t('PAYROLL.PARAMETER_SETS.PS_META', { tolerance: ps.convergenceTolerance, threshold: ps.calibrationThresholdPct })}`;
+  }
+
+  /** Icône de la carte d'un jeu, par statut. Pas de couleur par statut : la carte garde
+   *  les couleurs par défaut de la bibliothèque, seule l'icône distingue les statuts. */
+  cardIcon(ps: ParameterSetDto): string {
+    switch (ps.status) {
+      case 'ACTIVE':          return 'check_circle';
+      case 'PENDING_FINANCE': return 'hourglass_top';
+      case 'ARCHIVED':        return 'inventory_2';
+      default:                return 'edit_note'; // DRAFT
+    }
+  }
+
+  /** Description de la carte d'un jeu : statut, puis ce qu'il contient. */
+  cardDescription(ps: ParameterSetDto): string {
+    return this.t('PAYROLL.PARAMETER_SETS.CARD_DESC', {
+      status: this.statusLabel(ps), charges: ps.socialChargeRates.length, rubriques: ps.rubriques.length,
+    });
   }
 
   /** Un utilisateur sans droit de création arrivait sur l'onglet "Nouveau jeu" — désactivé
@@ -117,6 +202,11 @@ export class ParameterSetsComponent implements OnInit {
   private setListPays(paysId: number | null): void {
     this.listPaysId.set(paysId);
     this.filterForm.get('paysId')!.setValue(paysId);
+    // Pays reporté dans l'adresse (sans nouvelle entrée d'historique) pour qu'un `?set=`
+    // partagé ou rafraîchi retrouve la liste à laquelle il appartient.
+    this.router.navigate([], {
+      relativeTo: this.route, queryParams: { pays: paysId }, queryParamsHandling: 'merge', replaceUrl: true,
+    });
   }
 
   /** La création reste ouverte qu'aux rôles qui pouvaient déjà y accéder sur l'ancienne
@@ -125,10 +215,24 @@ export class ParameterSetsComponent implements OnInit {
   readonly canCreate = computed(() =>
     PAYROLL_CREATE_PARAMSET_PERMISSIONS.some(code => this.userStore.hasPermission(code)));
 
-  readonly breadcrumbs = computed((): BreadcrumbItem[] => [
-    { label: this.t('PAYROLL.COMMON.BREADCRUMB_ROOT'), link: '/payroll' },
-    { label: this.t('PAYROLL.PARAMETER_SETS.BREADCRUMB') },
-  ]);
+  readonly breadcrumbs = computed((): BreadcrumbItem[] => {
+    const ps = this.detailSet();
+    return [
+      { label: this.t('PAYROLL.COMMON.BREADCRUMB_ROOT'), link: '/payroll' },
+      // Page détail : "Paramètres" devient un lien qui ramène à la grille de cartes du
+      // même pays (même URL sans `?set=`).
+      ...(ps
+        ? [
+            {
+              label: this.t('PAYROLL.PARAMETER_SETS.BREADCRUMB'),
+              link: '/payroll/parameter-sets',
+              queryParams: { tab: 'list', pays: this.listPaysId() },
+            },
+            { label: this.itemTitle(ps) },
+          ]
+        : [{ label: this.t('PAYROLL.PARAMETER_SETS.BREADCRUMB') }]),
+    ];
+  });
 
   /** Même pattern que les autres pages payroll. */
   private t(key: string, params?: Record<string, unknown>): string {
@@ -145,18 +249,6 @@ export class ParameterSetsComponent implements OnInit {
   readonly firstLoad = signal(true);
   readonly paramSets = signal<ParameterSetDto[]>([]);
   readonly selected  = signal<ParameterSetDto | null>(null);
-
-  /** Bandeau exécutif — comme /payroll/candidate-simulation et /payroll/engine-results —
-   *  au-dessus de la liste, calculé sur tous les jeux chargés pour le pays (non filtré). */
-  readonly paramSetKpis = computed(() => {
-    const list = this.paramSets();
-    return {
-      total:   list.length,
-      draft:   list.filter(p => p.status === 'DRAFT').length,
-      pending: list.filter(p => p.status === 'PENDING_FINANCE').length,
-      active:  list.filter(p => p.status === 'ACTIVE').length,
-    };
-  });
 
   // ── Barre de recherche / filtre, comme `daf-search-toolbar` sur /finance/affaires et
   // les autres pages payroll — un seul chargement par pays (`listParameterSets`), la
@@ -371,9 +463,6 @@ export class ParameterSetsComponent implements OnInit {
         this.paramSets.set(ps);
         this.loading.set(false);
         this.firstLoad.set(false);
-        // Auto-select the first (usually only) parameter set so the detail
-        // panel — including Rubriques — is visible without an extra click.
-        if (ps.length > 0 && !this.selected()) this.selected.set(ps[0]);
       },
       error: err => {
         this.notification.error(err?.error?.message ?? this.t('PAYROLL.PARAMETER_SETS.ERROR_GENERIC'));
@@ -381,24 +470,6 @@ export class ParameterSetsComponent implements OnInit {
         this.firstLoad.set(false);
       },
     });
-  }
-
-  select(ps: ParameterSetDto): void {
-    const same = this.selected()?.id === ps.id;
-    this.selected.set(same ? null : ps);
-    if (same) { this.closeChargesEditor(); this.closeRubriquesEditor(); }
-  }
-
-  /** `daf-accordion-card` (openChange) for a parameter-set row — one open at a time,
-   *  same semantics as the old `select()` toggle. */
-  onAccordionToggle(ps: ParameterSetDto, open: boolean): void {
-    if (open) {
-      this.selected.set(ps);
-    } else {
-      this.selected.set(null);
-      this.closeChargesEditor();
-      this.closeRubriquesEditor();
-    }
   }
 
   itemTitle(ps: ParameterSetDto): string {
@@ -911,44 +982,119 @@ export class ParameterSetsComponent implements OnInit {
     }
   }
 
-  /** `daf-accordion-card` `state` for a rubrique card — mirrors `natureVariant()`'s
-   *  colour, dimmed to `locked` when the rubrique is inactive. */
-  rubriqueAccordionState(nature: string, isActive: boolean): AccordionState {
-    if (!isActive) return 'locked';
-    switch (nature) {
-      case 'PRIME':     return 'done';
-      case 'INDEMNITE': return 'active';
-      case 'RETENUE':   return 'blocked';
-      default:          return 'pending'; // AVANTAGE
-    }
-  }
-
   calcModeLabel(value: string): string {
     return this.calcModeOptions().find(o => o.value === value)?.label ?? value;
   }
 
-  previewAmount(i: number): string {
+  /** Montant d'aperçu d'une rubrique en cours d'édition, `null` en mode FORMULE (non
+   *  évaluable sans le contexte des charges — la simulation donne la vraie valeur). */
+  previewValue(i: number): number | null {
     const g = this.editRubriqueGroup(i).getRawValue();
     const gross = this.testGross();
-    let amount = 0;
     switch (g['calcMode']) {
       case 'FIXE_MENSUEL':
       case 'FIXE_JOURNALIER':
-        amount = g['amount'] ?? 0;
-        break;
+        return g['amount'] ?? 0;
       case 'POURCENTAGE_BRUT':
       case 'POURCENTAGE_CHARGES':
-        amount = gross * (g['ratePercent'] ?? 0) / 100;
-        break;
+        return gross * (g['ratePercent'] ?? 0) / 100;
       case 'POURCENTAGE_PLAFONNE': {
         const cap: number = g['capAmount'] ?? gross;
-        amount = Math.min(gross, cap) * (g['ratePercent'] ?? 0) / 100;
-        break;
+        return Math.min(gross, cap) * (g['ratePercent'] ?? 0) / 100;
       }
-      case 'FORMULE':
-        // Cannot evaluate formula without charge context — simulation shows the real value
-        return '—';
+      default:
+        return null;
     }
-    return amount.toLocaleString(this.numberLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  /** Même montant, formaté avec la devise du jeu édité — pour le sous-titre de la carte. */
+  previewAmount(i: number): string {
+    const v = this.previewValue(i);
+    if (v == null) return '—';
+    const amount = v.toLocaleString(this.numberLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `${amount} ${this.editorDevise()}`.trim();
+  }
+
+  // ── Devise ────────────────────────────────────────────────────────────────
+  // Plus de "TND" écrit en dur : la devise vient du pays (référentiel `listPays`), celui
+  // du formulaire de création ou celui du jeu ouvert dans une pop-up.
+  private deviseOf(paysId: number | null | undefined): string {
+    return this.paysList().find(p => p.id === paysId)?.devise ?? '';
+  }
+
+  /** Devise du pays choisi dans le formulaire "Nouveau jeu". */
+  newSetDevise(): string {
+    return this.deviseOf(this.newSetForm.get('paysId')?.value);
+  }
+
+  /** Devise du jeu en cours d'édition (pop-up charges ou rubriques). */
+  editorDevise(): string {
+    const id = this.editingRubriquesId() ?? this.editingChargesId();
+    return this.deviseOf(this.paramSets().find(p => p.id === id)?.paysId);
+  }
+
+  /** Locale des montants (`daf-amount-field`), la même que partout ailleurs sur la page. */
+  numberLocaleCode(): string { return this.numberLocale; }
+
+  /** Au moins une ligne en mode FORMULE : on affiche alors l'aide sur l'ordre d'évaluation. */
+  hasFormulaRate(): boolean {
+    return this.editRates.controls.some(c => c.get('baseCalculation')?.value === 'FORMULE');
+  }
+
+  formatGross(): string {
+    return this.testGross().toLocaleString(this.numberLocale);
+  }
+
+  // ── Tableaux de saisie des charges (daf-data-table + cellules `dafCell`) ─────
+  // Remplacent l'ancienne grille maison `.rates-head`/`.rates-row`. Une ligne du tableau =
+  // un FormGroup, retrouvé par son index (`let-i="index"` du gabarit de cellule) ; `id`
+  // stable par position pour que le tableau garde les champs (et le focus) d'une frappe
+  // à l'autre.
+  readonly newSetRateColumns = computed<TableColumn[]>(() => [
+    { key: 'contractType',    label: this.t('PAYROLL.ADMIN.COL_TYPE'),          width: '130px' },
+    { key: 'chargeCode',      label: this.t('PAYROLL.ADMIN.COL_CODE'),          width: '120px' },
+    { key: 'chargeLabel',     label: this.t('PAYROLL.ADMIN.COL_LABEL') },
+    { key: 'employeeRate',    label: this.t('PAYROLL.ADMIN.COL_EMPLOYEE_RATE'), width: '110px' },
+    { key: 'employerRate',    label: this.t('PAYROLL.ADMIN.COL_EMPLOYER_RATE'), width: '110px' },
+    { key: 'baseCalculation', label: this.t('PAYROLL.ADMIN.COL_BASE'),          width: '160px' },
+    { key: 'capAmount',       label: this.t('PAYROLL.ADMIN.COL_CAP'),           width: '130px' },
+  ]);
+
+  readonly editRateColumns = computed<TableColumn[]>(() => [
+    { key: 'contractType',    label: this.t('PAYROLL.PARAMETER_SETS.COL_TYPE'),           width: '130px' },
+    { key: 'chargeCode',      label: this.t('PAYROLL.PARAMETER_SETS.COL_CODE'),           width: '120px' },
+    { key: 'chargeLabel',     label: this.t('PAYROLL.PARAMETER_SETS.COL_LABEL') },
+    { key: 'employeeRate',    label: this.t('PAYROLL.PARAMETER_SETS.COL_EMPLOYEE_SHARE'), width: '180px' },
+    { key: 'employerRate',    label: this.t('PAYROLL.PARAMETER_SETS.COL_EMPLOYER_SHARE'), width: '180px' },
+    { key: 'baseCalculation', label: this.t('PAYROLL.PARAMETER_SETS.COL_BASE'),           width: '160px' },
+    { key: 'capAmount',       label: this.t('PAYROLL.PARAMETER_SETS.COL_CAP_OR_ORDER'),   width: '130px' },
+  ]);
+
+  private indexRows(count: number): TableRow[] {
+    return Array.from({ length: count }, (_, i) => ({ id: `line-${i}` }));
+  }
+  newSetRateRows(): TableRow[] { return this.indexRows(this.newSetRates.length); }
+  editRateRows(): TableRow[]   { return this.indexRows(this.editRates.length); }
+
+  private rowIndex(row: TableRow): number { return Number(String(row['id']).slice('line-'.length)); }
+
+  /** Suppression de ligne via les actions de ligne de `daf-data-table`, plus un bouton maison. */
+  readonly newSetRateTableConfig = computed<TableConfig>(() => ({
+    showHeader: false,
+    emptyMessage: this.t('PAYROLL.ADMIN.CHARGES_EMPTY'),
+    actions: [{ id: 'remove', icon: 'close', tooltip: this.t('PAYROLL.ADMIN.REMOVE'), variant: 'danger',
+                onClick: row => this.removeNewSetRate(this.rowIndex(row)) }],
+  }));
+
+  readonly editRateTableConfig = computed<TableConfig>(() => ({
+    showHeader: false,
+    emptyMessage: this.t('PAYROLL.PARAMETER_SETS.CHARGES_EMPTY_EDITOR'),
+    actions: [{ id: 'remove', icon: 'close', tooltip: this.t('PAYROLL.PARAMETER_SETS.REMOVE'), variant: 'danger',
+                onClick: row => this.removeEditRate(this.rowIndex(row)) }],
+  }));
+
+  /** Tableaux en lecture seule de la page détail : message vide de la bibliothèque. */
+  readTableConfig(emptyKey: string): TableConfig {
+    return { showHeader: false, emptyMessage: this.t(emptyKey) };
   }
 }

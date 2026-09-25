@@ -1,0 +1,20 @@
+.page-body     { display: flex; flex-direction: column; gap: 1.5rem; padding: 0 0 2rem; }
+.alert--error  { background: #fee2e2; color: #991b1b; padding: .75rem 1rem; border-radius: 6px; font-size: .875rem; }
+
+
+/* ── Onglet « Configuration » — mêmes mesures que le formulaire « Nouveau jeu » de
+   parameter-sets (`.ps-form` / `.field-row` / `.form-actions`). ───────────────── */
+.ec-tabs-wrap       { margin-bottom: -8px; }
+.ec-form            { display: flex; flex-direction: column; gap: 28px; }
+.ec-block           { display: flex; flex-direction: column; gap: 12px; }
+.field-row          { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px 24px; }
+.ec-inline-actions  { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ec-hint            { margin: 0; font-size: .75rem; color: var(--color-on-surface-variant, #44474c); }
+.ec-benefits        { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px 24px; }
+.form-actions       { display: flex; justify-content: flex-end; gap: 12px; padding-top: 20px;
+                      border-top: 1px solid var(--color-outline-variant, #c5c6cd); }
+
+/* Titre de bloc sans barre d'accent (remplace daf-section-title) — même typographie
+   majuscule que les libellés de section de la bibliothèque. */
+.ec-section-title   { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+                      color: var(--color-on-surface-variant, #44474c); }

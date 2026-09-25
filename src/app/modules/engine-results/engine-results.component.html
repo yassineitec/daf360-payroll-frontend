@@ -1,20 +1,26 @@
-<daf-page [breadcrumbs]="true">
-  <daf-page-header
-    [title]="'PAYROLL.ENGINE_RESULTS.TITLE' | translate"
-    [subtitle]="'PAYROLL.ENGINE_RESULTS.SUBTITLE' | translate"
-    [breadcrumbs]="breadcrumbs()">
-    <!-- Pas de bouton "Retour à la liste" : le fil d'Ariane (`Historique de paie`)
-         ramène déjà à `/payroll/engine-results`. -->
-  </daf-page-header>
+<!-- headerSize="md" doit concorder avec le size="md" du daf-page-header ci-dessous
+     (même réglage que /finance/affaires/:id). -->
+<daf-page [breadcrumbs]="true" headerSize="md">
 
-  <!-- Deux colonnes, comme /finance/affaires/:id : GAUCHE (30 %, sticky) la carte
-       « Détails » du collaborateur ; DROITE (70 %) les KPI, la liste des périodes et le
-       détail de la période ouverte. Flex + flex-wrap : sous ~1150 px la carte passe
-       pleine largeur au-dessus du reste (voir le .scss). -->
+  <!-- Deux colonnes, comme /finance/affaires/:id : GAUCHE (30 %, sticky) le titre de page
+       puis la carte « Détails » du collaborateur ; DROITE (70 %) les KPI — alignés sur le
+       titre —, la liste des périodes et le détail de la période ouverte. Flex +
+       flex-wrap : sous ~1150 px la colonne gauche passe pleine largeur au-dessus du
+       reste (voir le .scss). -->
   <div class="detail-split">
 
-    <!-- ══ COLONNE GAUCHE — carte « Détails » ══════════════════════════════════ -->
+    <!-- ══ COLONNE GAUCHE — titre + carte « Détails » ══════════════════════════ -->
     <div class="detail-aside">
+      <!-- size="md" : en-tête placé dans une colonne de split, comme la fiche affaire.
+           Pas de bouton "Retour à la liste" : le fil d'Ariane (`Historique de paie`)
+           ramène déjà à `/payroll/engine-results`. -->
+      <daf-page-header
+        size="md"
+        [title]="'PAYROLL.ENGINE_RESULTS.TITLE' | translate"
+        [titleWrap]="true"
+        [subtitle]="'PAYROLL.ENGINE_RESULTS.SUBTITLE' | translate"
+        [breadcrumbs]="breadcrumbs()" />
+
       <daf-section-card>
         <aside class="dp-card" [attr.aria-label]="'PAYROLL.ENGINE_RESULTS.DETAILS.PANEL_ARIA' | translate">
 
@@ -86,15 +92,13 @@
         <daf-metric-card
           [label]="'PAYROLL.ENGINE_RESULTS.KPI_TOTAL_NET' | translate"
           [value]="(employeeKpis().totalNet | number:'1.0-0') ?? ''"
-          [options]="{ icon: 'savings' }">
+          [options]="{ icon: 'wallet' }">
         </daf-metric-card>
-        <div class="kpi-grid__highlight">
-          <daf-metric-card
-            [label]="'PAYROLL.ENGINE_RESULTS.KPI_TOTAL_LOADED_COST' | translate"
-            [value]="(employeeKpis().totalLoadedCost | number:'1.0-0') ?? ''"
-            [options]="{ valueColor: 'text-primary', icon: 'account_balance' }">
-          </daf-metric-card>
-        </div>
+        <daf-metric-card
+          [label]="'PAYROLL.ENGINE_RESULTS.KPI_TOTAL_LOADED_COST' | translate"
+          [value]="(employeeKpis().totalLoadedCost | number:'1.0-0') ?? ''"
+          [options]="{ valueColor: 'text-primary', icon: 'account_balance' }">
+        </daf-metric-card>
         <daf-metric-card
           [label]="'PAYROLL.ENGINE_RESULTS.KPI_CONVERGENCE_RATE' | translate"
           [value]="employeeKpis().convergenceOkCount + '/' + employeeKpis().total"
@@ -147,13 +151,14 @@
           }
         </div>
       } @else {
-        <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
-          <daf-data-table
-            [columns]="resultColumns()"
-            [rows]="pagedResultRows()"
-            [config]="{ actions: resultActions(), emptyMessage: ('PAYROLL.ENGINE_RESULTS.EMPTY_FILTERED' | translate), showHeader: false }">
-          </daf-data-table>
-        </daf-card>
+        <!-- Tableau nu, comme l'exemple de la bibliothèque (demo-app) et
+             /payroll/candidate-simulation : pas de daf-card autour. -->
+        <daf-data-table
+          [columns]="resultColumns()"
+          [rows]="pagedResultRows()"
+          [config]="{ actions: resultActions(), emptyMessage: ('PAYROLL.ENGINE_RESULTS.EMPTY_FILTERED' | translate), hoverable: true }"
+          (rowClick)="toggleDetail($event['resultId'])">
+        </daf-data-table>
       }
 
       <!-- ── Pagination, comme /finance/affaires (`daf-pagination` de la bibliothèque) ── -->

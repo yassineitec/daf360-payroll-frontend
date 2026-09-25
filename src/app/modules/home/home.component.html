@@ -1,0 +1,26 @@
+<!-- Accueil paie — une carte par écran accessible, même source que la barre latérale
+     (`core/payroll-nav.ts`). Mise en page flex comme l'accueil finance. -->
+<daf-page>
+
+  <daf-page-header
+    [title]="'PAYROLL.HOME.TITLE' | translate"
+    [subtitle]="firstName()
+      ? ('PAYROLL.HOME.GREETING' | translate: { name: firstName() })
+      : ('PAYROLL.HOME.GREETING_ANONYMOUS' | translate)" />
+
+  @if (moduleCards().length) {
+    <section style="display:flex; flex-wrap:wrap; gap:1.5rem; align-items:stretch">
+      @for (m of moduleCards(); track m.id) {
+        <daf-card
+          style="flex:0 1 calc(25% - 18px); min-width:220px; height:auto; display:flex; flex-direction:column"
+          [options]="m.options"
+          (cardClick)="navigateTo(m.route)" />
+      }
+    </section>
+  } @else {
+    <p class="py-6 text-center text-body-md text-on-surface-variant">
+      {{ 'PAYROLL.HOME.EMPTY' | translate }}
+    </p>
+  }
+
+</daf-page>

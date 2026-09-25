@@ -17,6 +17,7 @@
 
     "layout": {
       "NAV": {
+        "HOME": "Home",
         "SIMULATOR": "Manual simulator",
         "ADMIN": "Administration",
         "PAYSLIPS": "Payslips",
@@ -31,6 +32,25 @@
         "BUDGET": "Forecast budget"
       },
       "SECTION": "PAYROLL"
+    },
+
+    "HOME": {
+      "TITLE": "Home",
+      "GREETING": "Hello {{name}}, welcome to the Payroll module",
+      "GREETING_ANONYMOUS": "Welcome to the Payroll module",
+      "EMPTY": "No payroll screen is available with your current permissions.",
+      "DESC": {
+        "SIMULATOR": "Simulate a net ↔ gross salary and its employer cost.",
+        "PAYSLIPS": "Split and file the monthly payslips.",
+        "EMPLOYEE_CONFIG": "Assign an employee's payroll configuration.",
+        "COHORT": "Simulate payroll for a group of employees.",
+        "ENGINE_RUN": "Run the payroll calculation for the period.",
+        "ENGINE_RESULTS": "Browse payroll calculation results.",
+        "CANDIDATE_SIMULATION": "Find candidate salary simulations.",
+        "CALIBRATION": "Calibrate parameters against actual data.",
+        "PARAMETER_SETS": "Manage and approve parameter sets.",
+        "BUDGET": "Track budget lines and forecasts."
+      }
     },
 
     "SIMULATOR": {
@@ -223,6 +243,49 @@
 
     "EMPLOYEE_CONFIG": {
       "TITLE": "Employee Configuration",
+      "SUBTITLE": "Assign an employee's payroll configuration: country, contract, benefits, salary and bonuses.",
+      "BREADCRUMB": "Employee configuration",
+      "LIST_SUBTITLE": "Pick an employee to configure their payroll: country, contract, benefits, salary and bonuses.",
+      "EMPLOYEE_FALLBACK": "Employee #{{id}}",
+      "OPEN_CONFIG": "Configure",
+      "KPI_IN_POST": "Headcount in post",
+      "KPI_IN_POST_HELP": "Employees active, on leave or on mission, for the filtered country or all countries.",
+      "KPI_ACTIVE": "Active",
+      "KPI_ACTIVE_HELP": "Employees with the \"Active\" status in the HR service.",
+      "KPI_AWAY": "On leave / on mission",
+      "KPI_AWAY_HELP": "Employees currently on leave or on mission.",
+      "KPI_PAYS": "Payroll countries",
+      "KPI_PAYS_HELP": "Number of countries configured in the payroll module.",
+      "CONFIG_TITLE": "Payroll configuration",
+      "REASON_HINT": "Required to save — kept in the change history.",
+      "SECTION_ASSIGNMENT": "Assignment",
+      "SECTION_REASON": "Confirmation",
+      "SELECT_CONTRACT": "Select a contract…",
+      "CONTRACT_NEEDS_COUNTRY": "Pick a country first",
+      "CALCULATE_NET_HINT": "Computes the net from the gross, using the country's active parameter set.",
+      "BENEFITS_NEED_COUNTRY": "Pick a country to show the benefits of its active parameter set.",
+      "BENEFITS_EMPTY": "No benefit in kind in this country's active parameter set.",
+      "BENEFIT_PER_MONTH": "{{amount}} / month",
+      "RESET": "Discard changes",
+      "FIELD_REQUIRED": "Required field.",
+      "FIELD_POSITIVE": "The amount must be greater than 0.",
+      "BONUS_PERIOD": "Period",
+      "BONUS_COMMENT_COL": "Comment",
+      "BONUS_SAVE_SUCCESS": "Bonus added.",
+      "BONUS_DELETE_SUCCESS": "Bonus deleted.",
+      "DELETE_BONUS_TITLE": "Delete this bonus?",
+      "DELETE_BONUS_BODY": "The bonus \"{{label}}\" of {{amount}} ({{period}}) will be permanently deleted.",
+      "CANCEL": "Cancel",
+      "DELETE": "Delete",
+      "SALARY_SECTION": "Salary",
+      "REASON_PLACEHOLDER": "e.g. annual salary review",
+      "SECTION_SAVED_BONUSES": "Saved bonuses",
+      "SECTION_NEW_BONUS": "New bonus",
+      "BONUS_LABEL_PLACEHOLDER": "e.g. year-end bonus",
+      "CLEAR_FORM": "Clear",
+      "BONUSES_HINT": "Each bonus is saved immediately.",
+      "NO_BONUSES": "No bonus recorded for this employee.",
+      "DELETE_BONUS": "Delete bonus",
       "SELECT_EMPLOYEE": "Select an employee",
       "SELECT_COUNTRY": "Select a country…",
       "COUNTRY": "Country",
@@ -765,6 +828,12 @@
     },
 
     "PARAMETER_SETS": {
+      "BENEFITS_EMPTY_READONLY": "No benefits in kind.",
+      "MANAGE": "Manage",
+      "CARD_DESC": "{{status}} · {{charges}} charge(s) · {{rubriques}} pay item(s)",
+      "TAB_CHARGES": "Social charges",
+      "TAB_RUBRIQUES": "Pay items",
+      "TAB_BENEFITS": "Benefits in kind",
       "TITLE": "Payroll parameters",
       "BREADCRUMB": "Parameters",
       "SUBTITLE": "Manage IRPP scales, social charges and payroll line items",
@@ -901,7 +970,7 @@
       "SECTION_STATUS": "Status",
       "ACTIVE_CHECKBOX_TITLE": "Active line item",
       "ACTIVE_CHECKBOX_DESC": "Uncheck to disable without deleting",
-      "PREVIEW_LABEL": "Preview — for a gross salary of {{gross}} TND",
+      "PREVIEW_LABEL": "Preview — for a gross salary of {{gross}} {{devise}}",
       "ERROR_GENERIC": "Error",
       "ERROR_SAVE_CHARGES": "Error saving charges",
       "ERROR_SAVE_RUBRIQUES": "Error saving line items",

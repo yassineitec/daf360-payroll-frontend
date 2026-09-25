@@ -64,6 +64,12 @@ export const routes: Routes = [
       // code lists the sidebar filters on (`core/payroll-nav.ts`). The module had no route
       // guards at all until now — nav-only gating, so a typed URL walked straight into a
       // page that then collected 403s from every call.
+      // Accueil — no permission guard, it only links to the screens the user can open.
+      {
+        path: 'accueil',
+        loadChildren: () =>
+          import('./modules/home/home.routes').then(m => m.HOME_ROUTES),
+      },
       {
         path: 'simulator',
         canActivate: [permissionGuard],
