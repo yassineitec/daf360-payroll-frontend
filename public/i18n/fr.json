@@ -22,6 +22,7 @@
         "ADMIN": "Administration",
         "PAYSLIPS": "Fiches de paie",
         "EMPLOYEE_CONFIG": "Configuration employé",
+        "SALARY_ADVANCES": "Avances sur salaire",
         "COHORT": "Simulation cohorte",
         "ENGINE_RUN": "Calcul de paie",
         "PAYROLL_HISTORY_GROUP": "Historique de paie",
@@ -50,6 +51,116 @@
         "CALIBRATION": "Calibrer les paramètres sur les données réelles.",
         "PARAMETER_SETS": "Gérer et approuver les jeux de paramètres.",
         "BUDGET": "Suivre les lignes budgétaires et les prévisions."
+      }
+    },
+
+    "SALARY_ADVANCES": {
+      "TITLE": "Avances sur salaire",
+      "SUBTITLE": "Versement des avances approuvées par la finance, retenues mensuelles et règles par pays",
+      "SEARCH": "Rechercher un collaborateur…",
+      "SEARCH_DEDUCTIONS": "Rechercher un collaborateur, un matricule…",
+      "ALL_STATUSES": "Tous les statuts",
+      "MONTH": "Mois de paie",
+      "EXPORT": "Exporter pour la paie (CSV)",
+      "MARK_ALL": "Tout marquer prélevé ({{count}})",
+      "DEDUCTIONS_HINT": "Exportez la liste pour le logiciel de paie, puis marquez chaque retenue une fois qu'elle figure sur le bulletin.",
+      "TERMS": "{{monthly}} × {{count}} dès {{month}}",
+      "LEFT": "reste {{amount}}",
+      "N_MONTHS": "{{count}} mois",
+      "MATRICULE": "Matricule {{value}}",
+      "NO_MATRICULE": "Matricule paie manquant",
+      "SKIP_HINT": "La retenue n'a pas été prélevée : elle est replanifiée un mois après la dernière, le montant dû ne change pas.",
+      "WAIVE_HINT": "Somme récupérée hors paie (solde de tout compte, espèces) ou abandonnée. Précisez comment.",
+      "REASON": "Motif",
+      "NOTES": "Commentaire",
+      "REASON_REQUIRED": "Le motif est obligatoire",
+      "CLOSE": "Fermer",
+      "CANCEL": "Annuler",
+      "CONFIRM": "Confirmer",
+      "ERROR": "Une erreur est survenue — veuillez réessayer",
+      "KPI": {
+        "TO_PAY": "À verser",
+        "REPAYING": "En remboursement",
+        "DUE": "Retenues du mois à traiter",
+        "OUTSTANDING": "Encours total"
+      },
+      "TAB": {
+        "PAYOUT": "À verser",
+        "DEDUCTIONS": "Retenues",
+        "FOLLOWUP": "Suivi",
+        "RULES": "Règles"
+      },
+      "COL": {
+        "EMPLOYEE": "Collaborateur",
+        "TERMS": "Remboursement",
+        "STATUS": "Statut",
+        "AMOUNT": "Montant",
+        "POSITION": "Mensualité",
+        "OUTSTANDING": "Reste dû"
+      },
+      "STATUS": {
+        "PENDING_FINANCE": "En attente de la finance",
+        "APPROVED": "Approuvée — à verser",
+        "REPAYING": "En remboursement",
+        "REPAID": "Remboursée",
+        "REJECTED": "Refusée par la finance",
+        "CANCELLED": "Retirée"
+      },
+      "INSTALLMENT": {
+        "PLANNED": "Prévue",
+        "DEDUCTED": "Prélevée",
+        "SKIPPED": "Reportée",
+        "WAIVED": "Soldée autrement"
+      },
+      "METHOD": {
+        "VIREMENT": "Virement",
+        "ESPECES": "Espèces",
+        "CARTE": "Carte",
+        "AUTRE": "Autre"
+      },
+      "ACTIONS": {
+        "VIEW": "Détail",
+        "PAY": "Verser",
+        "DEDUCTED": "Prélevée",
+        "SKIP": "Reporter",
+        "WAIVE": "Solder autrement"
+      },
+      "EMPTY": {
+        "PAYOUT": "Aucune avance à verser",
+        "DEDUCTIONS": "Aucune retenue prévue ce mois-ci",
+        "FOLLOWUP": "Aucune avance",
+        "RULES": "Aucune règle — aucun pays ne propose d'avance pour l'instant"
+      },
+      "PAYOUT": {
+        "HINT": "Les avances approuvées par la finance, en attente de versement.",
+        "TITLE": "Versement de l'avance",
+        "CONFIRM": "Enregistrer le versement",
+        "SCHEDULE_HINT": "Le versement crée l'échéancier : les retenues commencent au mois prévu, ou au mois en cours si celui-ci est passé.",
+        "METHOD": "Mode de versement",
+        "DATE": "Date du versement",
+        "REFERENCE": "Référence (virement, reçu…)",
+        "DATE_REQUIRED": "La date du versement est obligatoire"
+      },
+      "DETAIL": {
+        "DECIDED_BY": "Décision finance",
+        "PAID": "Versée"
+      },
+      "RULES": {
+        "HINT": "Un pays sans règle ouverte ne propose pas d'avance. Pas de plafond sur le montant : la finance en juge.",
+        "PAYS": "Pays",
+        "CURRENCY": "Devise",
+        "MAX_MONTHS": "Durée maximale (mois)",
+        "MAX_MONTHS_HINT": "Le collaborateur choisit de 1 à ce nombre de mois",
+        "SENIORITY": "Ancienneté minimale (mois)",
+        "SENIORITY_HINT": "0 = aucune condition",
+        "STATE": "État",
+        "OPEN": "Avances ouvertes",
+        "CLOSED": "Avances fermées",
+        "NONE": "Aucune",
+        "EDIT": "Modifier",
+        "ADD": "Ajouter un pays",
+        "SAVE": "Enregistrer",
+        "INVALID": "Vérifiez les valeurs (durée 1 à 24 mois, ancienneté ≥ 0)."
       }
     },
 
