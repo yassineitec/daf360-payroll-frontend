@@ -67,6 +67,13 @@ export const PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS = [
 ];
 
 /**
+ * `/payroll/salary-advances` — payroll owns the salary advances (V25): the payout of what
+ * finance approved, the monthly deductions, the follow-up and the per-country rules. Finance
+ * only approves or declines (its cost approval queue); the employee asks from self-service.
+ */
+export const PAYROLL_SALARY_ADVANCES_PERMISSIONS = ['PAYROLL_MANAGE_SALARY_ADVANCES'];
+
+/**
  * `/payroll/budget` — the budget lines + forecast outputs. Mirrors the backend exactly:
  * both calls the page makes (`GET /calibration/budget-lines`, `/calibration/forecast-outputs`)
  * accept any of these four codes. It used to be gated on `PAYROLL_VIEW_BUDGET_AGGREGATE`
@@ -113,6 +120,13 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
     icon:        'manage_accounts',
     route:       'employee-config',
     permissions: PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS,
+  },
+  {
+    id:          'salary-advances',
+    labelKey:    'PAYROLL.layout.NAV.SALARY_ADVANCES',
+    icon:        'payments',
+    route:       'salary-advances',
+    permissions: PAYROLL_SALARY_ADVANCES_PERMISSIONS,
   },
 
   // ── Keep in sync with app.routes.ts ─────────────────────────────────────────

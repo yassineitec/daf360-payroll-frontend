@@ -11,6 +11,7 @@ import {
   PAYROLL_BUDGET_PERMISSIONS,
   PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS,
   PAYROLL_PAYSLIPS_PERMISSIONS,
+  PAYROLL_SALARY_ADVANCES_PERMISSIONS,
   PAYROLL_SIMULATOR_PERMISSIONS,
 } from './core/payroll-nav';
 import { payrollLandingGuard } from './core/payroll-landing.guard';
@@ -84,6 +85,13 @@ export const routes: Routes = [
         data: { permissions: PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS },
         loadChildren: () =>
           import('./modules/employee-config/employee-config.routes').then(m => m.EMPLOYEE_CONFIG_ROUTES),
+      },
+      {
+        path: 'salary-advances',
+        canActivate: [permissionGuard],
+        data: { permissions: PAYROLL_SALARY_ADVANCES_PERMISSIONS },
+        loadChildren: () =>
+          import('./modules/salary-advances/salary-advances.routes').then(m => m.SALARY_ADVANCES_ROUTES),
       },
 
       // ── Keep in sync with core/payroll-nav.ts ─────────────────────────────────

@@ -1,0 +1,323 @@
+<!-- /payroll/salary-advances — payroll's desk for salary advances. Canonical page shape. -->
+<daf-page [loading]="firstLoad()" [kpis]="4">
+
+  <daf-page-header
+    [title]="'PAYROLL.SALARY_ADVANCES.TITLE' | translate"
+    [subtitle]="'PAYROLL.SALARY_ADVANCES.SUBTITLE' | translate" />
+
+  <section class="grid grid-cols-2 gap-2 sm:gap-6 lg:grid-cols-4">
+    <daf-metric-card [label]="'PAYROLL.SALARY_ADVANCES.KPI.TO_PAY' | translate" [value]="stats().toPay" [options]="kpiPayout" />
+    <daf-metric-card [label]="'PAYROLL.SALARY_ADVANCES.KPI.REPAYING' | translate" [value]="stats().repaying" [options]="kpiRepaying" />
+    <daf-metric-card [label]="'PAYROLL.SALARY_ADVANCES.KPI.DUE' | translate" [value]="stats().due" [options]="kpiDue" />
+    <daf-metric-card [label]="'PAYROLL.SALARY_ADVANCES.KPI.OUTSTANDING' | translate" [value]="stats().outstanding" [options]="kpiOutstanding" />
+  </section>
+
+  <daf-tabs #tabsRef
+    variant="underline"
+    style="--daf-tabs-fade: var(--color-background)"
+    [tabs]="tabs()"
+    [(active)]="activeTab"
+    idPrefix="salary-advances" />
+
+  <div role="tabpanel"
+       [id]="tabsRef.panelId(activeTab())"
+       [attr.aria-labelledby]="tabsRef.tabId(activeTab())"
+       class="flex flex-col gap-6">
+
+    @if (error()) {
+      <div class="flex items-center gap-2 rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">
+        <span class="material-symbols-outlined text-[18px]">error</span>
+        {{ error() }}
+      </div>
+    }
+
+    @switch (activeTab()) {
+
+      <!-- ── À verser ─────────────────────────────────────────────────────── -->
+      @case ('payout') {
+        <p class="text-body-sm text-on-surface-variant">{{ 'PAYROLL.SALARY_ADVANCES.PAYOUT.HINT' | translate }}</p>
+        <daf-search-toolbar
+          [placeholder]="'PAYROLL.SALARY_ADVANCES.SEARCH' | translate"
+          [value]="search()" [debounce]="200" (valueChange)="search.set($event ?? '')" />
+        <daf-data-table [columns]="payoutColumns()" [rows]="payoutRows()" [config]="payoutConfig()">
+          <ng-template dafCell="_actions" let-row>
+            <div class="flex items-center justify-end gap-2">
+              <daf-button
+                [options]="{ variant: 'ghost', size: 'sm', iconStart: 'visibility', label: ('PAYROLL.SALARY_ADVANCES.ACTIONS.VIEW' | translate) }"
+                (onClick)="openDetail(row['_source'])" />
+              <daf-button
+                [options]="{ variant: 'teal', size: 'sm', iconStart: 'account_balance', label: ('PAYROLL.SALARY_ADVANCES.ACTIONS.PAY' | translate) }"
+                (onClick)="openPayout(row['_source'])" />
+            </div>
+          </ng-template>
+        </daf-data-table>
+      }
+
+      <!-- ── Retenues du mois ─────────────────────────────────────────────── -->
+      @case ('deductions') {
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div class="w-full sm:max-w-xs">
+            <daf-select
+              [options]="monthOptions()"
+              [config]="{ label: ('PAYROLL.SALARY_ADVANCES.MONTH' | translate) }"
+              [selected]="[month()]"
+              (selectedChange)="month.set($event[0] || month())" />
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <daf-button
+              [options]="{
+                variant: 'secondary', iconStart: 'download',
+                label: ('PAYROLL.SALARY_ADVANCES.EXPORT' | translate),
+                loading: exporting(), disabled: exporting() || !planned().length
+              }"
+              (onClick)="exportCsv()" />
+            <daf-button
+              [options]="{
+                variant: 'teal', iconStart: 'task_alt',
+                label: ('PAYROLL.SALARY_ADVANCES.MARK_ALL' | translate:{ count: planned().length }),
+                loading: bulkBusy(), disabled: bulkBusy() || !planned().length
+              }"
+              (onClick)="markAllDeducted()" />
+          </div>
+        </div>
+        <p class="text-body-sm text-on-surface-variant">{{ 'PAYROLL.SALARY_ADVANCES.DEDUCTIONS_HINT' | translate }}</p>
+        <daf-search-toolbar
+          [placeholder]="'PAYROLL.SALARY_ADVANCES.SEARCH_DEDUCTIONS' | translate"
+          [value]="search()" [debounce]="200" (valueChange)="search.set($event ?? '')" />
+        <daf-data-table [columns]="deductionColumns()" [rows]="deductionRows()" [config]="deductionConfig()">
+          <ng-template dafCell="_actions" let-row>
+            @if (row['_source'].status === 'PLANNED') {
+              <div class="flex items-center justify-end gap-1">
+                <daf-button
+                  [options]="{ variant: 'ghost', size: 'sm', iconStart: 'task_alt', label: ('PAYROLL.SALARY_ADVANCES.ACTIONS.DEDUCTED' | translate) }"
+                  (onClick)="markDeducted([row['_source'].installmentId])" />
+                <daf-button
+                  [options]="{ variant: 'ghost', size: 'sm', iconStart: 'redo', label: ('PAYROLL.SALARY_ADVANCES.ACTIONS.SKIP' | translate) }"
+                  (onClick)="openNote(row['_source'], 'skip')" />
+                <daf-button
+                  [options]="{ variant: 'ghost', size: 'sm', iconStart: 'money_off', label: ('PAYROLL.SALARY_ADVANCES.ACTIONS.WAIVE' | translate) }"
+                  (onClick)="openNote(row['_source'], 'waive')" />
+              </div>
+            }
+          </ng-template>
+        </daf-data-table>
+      }
+
+      <!-- ── Suivi ─────────────────────────────────────────────────────────── -->
+      @case ('followup') {
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-end">
+          <div class="min-w-0 flex-1">
+            <daf-search-toolbar
+              [placeholder]="'PAYROLL.SALARY_ADVANCES.SEARCH' | translate"
+              [value]="search()" [debounce]="200" (valueChange)="search.set($event ?? '')" />
+          </div>
+          <div class="w-full sm:max-w-xs">
+            <daf-select
+              [options]="statusOptions()"
+              [config]="{ label: ('PAYROLL.SALARY_ADVANCES.COL.STATUS' | translate), placeholder: ('PAYROLL.SALARY_ADVANCES.ALL_STATUSES' | translate) }"
+              [selected]="statusFilter() ? [statusFilter()] : []"
+              (selectedChange)="onStatusFilter($event)" />
+          </div>
+        </div>
+        <daf-data-table [columns]="payoutColumns()" [rows]="followupRows()" [config]="followupConfig()">
+          <ng-template dafCell="_actions" let-row>
+            <div class="flex items-center justify-end">
+              <daf-button
+                [options]="{ variant: 'ghost', size: 'sm', iconStart: 'visibility', label: ('PAYROLL.SALARY_ADVANCES.ACTIONS.VIEW' | translate) }"
+                (onClick)="openDetail(row['_source'])" />
+            </div>
+          </ng-template>
+        </daf-data-table>
+      }
+
+      <!-- ── Règles ────────────────────────────────────────────────────────── -->
+      @case ('rules') {
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <p class="text-body-sm text-on-surface-variant">{{ 'PAYROLL.SALARY_ADVANCES.RULES.HINT' | translate }}</p>
+          @if (paysOptions().length) {
+            <daf-button
+              [options]="{ variant: 'secondary', iconStart: 'add', label: ('PAYROLL.SALARY_ADVANCES.RULES.ADD' | translate) }"
+              (onClick)="openPolicy(null)" />
+          }
+        </div>
+        <daf-data-table [columns]="ruleColumns()" [rows]="ruleRows()" [config]="ruleConfig()">
+          <ng-template dafCell="_actions" let-row>
+            <div class="flex items-center justify-end">
+              <daf-button
+                [options]="{ variant: 'ghost', size: 'sm', iconStart: 'edit', label: ('PAYROLL.SALARY_ADVANCES.RULES.EDIT' | translate) }"
+                (onClick)="openPolicy(row['_source'])" />
+            </div>
+          </ng-template>
+        </daf-data-table>
+      }
+    }
+  </div>
+
+</daf-page>
+
+<!-- ── Modal bodies, projected by ModalService. ── -->
+
+<ng-template #detailTpl>
+  @if (selected(); as a) {
+    <div class="flex flex-col gap-4 text-sm">
+      <div class="flex flex-col gap-1.5">
+        <div class="flex justify-between gap-4">
+          <span class="text-outline">{{ 'PAYROLL.SALARY_ADVANCES.COL.STATUS' | translate }}</span>
+          <span class="font-medium text-on-surface">{{ ('PAYROLL.SALARY_ADVANCES.STATUS.' + a.status) | translate }}</span>
+        </div>
+        <div class="flex justify-between gap-4">
+          <span class="text-outline">{{ 'PAYROLL.SALARY_ADVANCES.COL.TERMS' | translate }}</span>
+          <span class="text-right font-medium text-on-surface">
+            {{ 'PAYROLL.SALARY_ADVANCES.TERMS' | translate:{ monthly: money(a.monthlyAmount, a.currency), count: a.installments, month: monthName(a.firstDeductionMonth) } }}
+          </span>
+        </div>
+        @if (a.financeDecidedByName) {
+          <div class="flex justify-between gap-4">
+            <span class="text-outline">{{ 'PAYROLL.SALARY_ADVANCES.DETAIL.DECIDED_BY' | translate }}</span>
+            <span class="font-medium text-on-surface">{{ a.financeDecidedByName }}</span>
+          </div>
+        }
+        @if (a.disbursedOn) {
+          <div class="flex justify-between gap-4">
+            <span class="text-outline">{{ 'PAYROLL.SALARY_ADVANCES.DETAIL.PAID' | translate }}</span>
+            <span class="text-right font-medium text-on-surface">
+              {{ a.disbursedOn }} · {{ ('PAYROLL.SALARY_ADVANCES.METHOD.' + a.disbursementMethod) | translate }}
+              @if (a.disbursementReference) { · {{ a.disbursementReference }} }
+            </span>
+          </div>
+        }
+        @if (a.outstandingAmount !== null) {
+          <div class="flex justify-between gap-4">
+            <span class="text-outline">{{ 'PAYROLL.SALARY_ADVANCES.COL.OUTSTANDING' | translate }}</span>
+            <span class="font-semibold text-on-surface">{{ money(a.outstandingAmount, a.currency) }}</span>
+          </div>
+        }
+      </div>
+      @if (a.reason) {
+        <p class="whitespace-pre-line rounded-lg bg-surface-container-low px-3 py-2 text-on-surface">{{ a.reason }}</p>
+      }
+      @if (a.schedule.length) {
+        <ul class="flex flex-col gap-1 rounded-lg bg-surface-container-low px-3 py-2 text-xs">
+          @for (line of a.schedule; track line.id) {
+            <li class="flex justify-between gap-3">
+              <span class="text-on-surface">{{ monthName(line.dueMonth) }}</span>
+              <span class="text-on-surface-variant">
+                {{ money(line.amount, a.currency) }} · {{ ('PAYROLL.SALARY_ADVANCES.INSTALLMENT.' + line.status) | translate }}
+              </span>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  }
+</ng-template>
+
+<ng-template #payoutTpl>
+  <div class="flex flex-col gap-5">
+    @if (selected(); as a) {
+      <div class="flex flex-col gap-1 rounded-xl bg-surface-container-low px-4 py-3">
+        <span class="text-label-caps text-outline">{{ a.employeeName }} · AVS-{{ a.id }}</span>
+        <span class="text-[22px] font-black leading-tight text-on-surface">{{ money(a.amount, a.currency) }}</span>
+        <span class="text-body-sm text-on-surface-variant">{{ 'PAYROLL.SALARY_ADVANCES.PAYOUT.SCHEDULE_HINT' | translate }}</span>
+      </div>
+    }
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <daf-select
+        [options]="methodOptions()"
+        [config]="{ label: ('PAYROLL.SALARY_ADVANCES.PAYOUT.METHOD' | translate), required: true }"
+        [selected]="[method()]"
+        (selectedChange)="onMethodChange($event)" />
+      <daf-form-field
+        [value]="paidOn()"
+        (valueChange)="paidOn.set($any($event) || '')"
+        [options]="{ type: 'date', fullWidth: true, required: true, label: ('PAYROLL.SALARY_ADVANCES.PAYOUT.DATE' | translate) }" />
+    </div>
+    <daf-form-field
+      [value]="reference()"
+      (valueChange)="reference.set($any($event) || '')"
+      [options]="{ fullWidth: true, maxLength: 100, label: ('PAYROLL.SALARY_ADVANCES.PAYOUT.REFERENCE' | translate) }" />
+    <daf-form-field
+      [value]="note()"
+      (valueChange)="note.set($any($event) || '')"
+      [options]="{ type: 'textarea', rows: 2, fullWidth: true, maxLength: 1000, label: ('PAYROLL.SALARY_ADVANCES.NOTES' | translate) }" />
+    @if (modalError()) {
+      <div class="flex items-center gap-2 rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">
+        <span class="material-symbols-outlined text-[18px]">error</span>
+        {{ modalError() }}
+      </div>
+    }
+  </div>
+</ng-template>
+
+<ng-template #noteTpl>
+  <div class="flex flex-col gap-5">
+    @if (noteRow(); as r) {
+      <div class="flex flex-col gap-1 rounded-xl bg-surface-container-low px-4 py-3">
+        <span class="text-label-caps text-outline">{{ r.employeeName }} · AVS-{{ r.salaryAdvanceId }}</span>
+        <span class="text-[22px] font-black leading-tight text-on-surface">{{ money(r.amount, r.currency) }}</span>
+        <span class="text-body-sm text-on-surface-variant">
+          {{ (noteKind() === 'skip' ? 'PAYROLL.SALARY_ADVANCES.SKIP_HINT' : 'PAYROLL.SALARY_ADVANCES.WAIVE_HINT') | translate }}
+        </span>
+      </div>
+    }
+    <daf-form-field
+      [value]="note()"
+      (valueChange)="note.set($any($event) || '')"
+      [options]="{ type: 'textarea', rows: 3, fullWidth: true, maxLength: 500, required: true, label: ('PAYROLL.SALARY_ADVANCES.REASON' | translate) }" />
+    @if (modalError()) {
+      <div class="flex items-center gap-2 rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">
+        <span class="material-symbols-outlined text-[18px]">error</span>
+        {{ modalError() }}
+      </div>
+    }
+  </div>
+</ng-template>
+
+<ng-template #policyTpl>
+  <div class="flex flex-col gap-5">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      @if (policyIsNew()) {
+        <daf-select
+          [options]="paysOptions()"
+          [config]="{ label: ('PAYROLL.SALARY_ADVANCES.RULES.PAYS' | translate), required: true }"
+          [selected]="policyForm().paysId ? ['' + policyForm().paysId] : []"
+          (selectedChange)="patchPolicy({ paysId: toNumber($event[0]) })" />
+      }
+      <daf-select
+        [options]="currencyOptions"
+        [config]="{ label: ('PAYROLL.SALARY_ADVANCES.RULES.CURRENCY' | translate), required: true }"
+        [selected]="[policyForm().currency]"
+        (selectedChange)="patchPolicy({ currency: $event[0] || policyForm().currency })" />
+      <daf-form-field
+        [value]="policyForm().maxInstallments"
+        (valueChange)="patchPolicy({ maxInstallments: toNumber($event) })"
+        [options]="{
+          type: 'number', fullWidth: true, align: 'end', required: true,
+          label: ('PAYROLL.SALARY_ADVANCES.RULES.MAX_MONTHS' | translate),
+          hint: ('PAYROLL.SALARY_ADVANCES.RULES.MAX_MONTHS_HINT' | translate)
+        }" />
+      <daf-form-field
+        [value]="policyForm().minSeniorityMonths"
+        (valueChange)="patchPolicy({ minSeniorityMonths: toNumber($event) })"
+        [options]="{
+          type: 'number', fullWidth: true, align: 'end', required: true,
+          label: ('PAYROLL.SALARY_ADVANCES.RULES.SENIORITY' | translate),
+          hint: ('PAYROLL.SALARY_ADVANCES.RULES.SENIORITY_HINT' | translate)
+        }" />
+      <daf-select
+        [options]="[
+          { value: 'yes', label: ('PAYROLL.SALARY_ADVANCES.RULES.OPEN' | translate) },
+          { value: 'no', label: ('PAYROLL.SALARY_ADVANCES.RULES.CLOSED' | translate) }
+        ]"
+        [config]="{ label: ('PAYROLL.SALARY_ADVANCES.RULES.STATE' | translate), required: true }"
+        [selected]="[policyForm().isActive ? 'yes' : 'no']"
+        (selectedChange)="patchPolicy({ isActive: $event[0] === 'yes' })" />
+    </div>
+    @if (modalError()) {
+      <div class="flex items-center gap-2 rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">
+        <span class="material-symbols-outlined text-[18px]">error</span>
+        {{ modalError() }}
+      </div>
+    }
+  </div>
+</ng-template>

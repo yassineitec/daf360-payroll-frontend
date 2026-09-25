@@ -21,6 +21,7 @@
         "ADMIN": "Administration",
         "PAYSLIPS": "Payslips",
         "EMPLOYEE_CONFIG": "Employee configuration",
+        "SALARY_ADVANCES": "Salary advances",
         "COHORT": "Cohort simulation",
         "ENGINE_RUN": "Payroll run",
         "PAYROLL_HISTORY_GROUP": "Payroll history",
@@ -31,6 +32,116 @@
         "BUDGET": "Forecast budget"
       },
       "SECTION": "PAYROLL"
+    },
+
+    "SALARY_ADVANCES": {
+      "TITLE": "Salary advances",
+      "SUBTITLE": "Payout of the advances finance approved, monthly deductions and per-country rules",
+      "SEARCH": "Search an employee…",
+      "SEARCH_DEDUCTIONS": "Search an employee, a payroll ID…",
+      "ALL_STATUSES": "All statuses",
+      "MONTH": "Payroll month",
+      "EXPORT": "Export for payroll (CSV)",
+      "MARK_ALL": "Mark all deducted ({{count}})",
+      "DEDUCTIONS_HINT": "Export the list for the payroll software, then mark each deduction once it appears on the payslip.",
+      "TERMS": "{{monthly}} × {{count}} from {{month}}",
+      "LEFT": "{{amount}} left",
+      "N_MONTHS": "{{count}} month(s)",
+      "MATRICULE": "Payroll ID {{value}}",
+      "NO_MATRICULE": "Payroll ID missing",
+      "SKIP_HINT": "The deduction was not taken: it is re-planned one month after the last one, the amount owed does not change.",
+      "WAIVE_HINT": "Recovered outside payroll (final settlement, cash) or written off. Say how.",
+      "REASON": "Reason",
+      "NOTES": "Comment",
+      "REASON_REQUIRED": "A reason is required",
+      "CLOSE": "Close",
+      "CANCEL": "Cancel",
+      "CONFIRM": "Confirm",
+      "ERROR": "Something went wrong — please try again",
+      "KPI": {
+        "TO_PAY": "To pay out",
+        "REPAYING": "Being repaid",
+        "DUE": "This month's deductions to process",
+        "OUTSTANDING": "Total outstanding"
+      },
+      "TAB": {
+        "PAYOUT": "To pay out",
+        "DEDUCTIONS": "Deductions",
+        "FOLLOWUP": "Follow-up",
+        "RULES": "Rules"
+      },
+      "COL": {
+        "EMPLOYEE": "Employee",
+        "TERMS": "Repayment",
+        "STATUS": "Status",
+        "AMOUNT": "Amount",
+        "POSITION": "Installment",
+        "OUTSTANDING": "Outstanding"
+      },
+      "STATUS": {
+        "PENDING_FINANCE": "Awaiting finance",
+        "APPROVED": "Approved — to pay out",
+        "REPAYING": "Being repaid",
+        "REPAID": "Repaid",
+        "REJECTED": "Rejected by finance",
+        "CANCELLED": "Withdrawn"
+      },
+      "INSTALLMENT": {
+        "PLANNED": "Planned",
+        "DEDUCTED": "Deducted",
+        "SKIPPED": "Postponed",
+        "WAIVED": "Settled otherwise"
+      },
+      "METHOD": {
+        "VIREMENT": "Bank transfer",
+        "ESPECES": "Cash",
+        "CARTE": "Card",
+        "AUTRE": "Other"
+      },
+      "ACTIONS": {
+        "VIEW": "Details",
+        "PAY": "Pay out",
+        "DEDUCTED": "Deducted",
+        "SKIP": "Postpone",
+        "WAIVE": "Settle otherwise"
+      },
+      "EMPTY": {
+        "PAYOUT": "No advance to pay out",
+        "DEDUCTIONS": "No deduction planned this month",
+        "FOLLOWUP": "No advance",
+        "RULES": "No rule — no country offers advances yet"
+      },
+      "PAYOUT": {
+        "HINT": "Advances approved by finance, waiting to be paid out.",
+        "TITLE": "Advance payout",
+        "CONFIRM": "Record the payout",
+        "SCHEDULE_HINT": "Recording the payout creates the schedule: deductions start in the planned month, or the current month if that one has passed.",
+        "METHOD": "Payment method",
+        "DATE": "Payout date",
+        "REFERENCE": "Reference (transfer, receipt…)",
+        "DATE_REQUIRED": "The payout date is required"
+      },
+      "DETAIL": {
+        "DECIDED_BY": "Finance decision",
+        "PAID": "Paid out"
+      },
+      "RULES": {
+        "HINT": "A country without an open rule offers no advance. No ceiling on the amount: finance judges it.",
+        "PAYS": "Country",
+        "CURRENCY": "Currency",
+        "MAX_MONTHS": "Maximum period (months)",
+        "MAX_MONTHS_HINT": "The employee picks from 1 to this many months",
+        "SENIORITY": "Minimum seniority (months)",
+        "SENIORITY_HINT": "0 = no condition",
+        "STATE": "State",
+        "OPEN": "Advances open",
+        "CLOSED": "Advances closed",
+        "NONE": "None",
+        "EDIT": "Edit",
+        "ADD": "Add a country",
+        "SAVE": "Save",
+        "INVALID": "Check the values (period 1 to 24 months, seniority ≥ 0)."
+      }
     },
 
     "SIMULATOR": {
