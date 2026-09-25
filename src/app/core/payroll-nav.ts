@@ -67,6 +67,21 @@ export const PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS = [
 ];
 
 /**
+ * `/payroll/budget` — the budget lines + forecast outputs. Mirrors the backend exactly:
+ * both calls the page makes (`GET /calibration/budget-lines`, `/calibration/forecast-outputs`)
+ * accept any of these four codes. It used to be gated on `PAYROLL_VIEW_BUDGET_AGGREGATE`
+ * alone — a code rh-service's catalog doesn't list, so role administration can't grant it —
+ * which hid the page from admins the backend would have served. Granting that code instead
+ * would also cost cookie bytes on roles already at the 4096 B ceiling.
+ */
+export const PAYROLL_BUDGET_PERMISSIONS = [
+  'PAYROLL_VIEW_BUDGET_AGGREGATE',
+  'PAYROLL_VIEW_AGGREGATE',
+  'PAYROLL_EXPORT_BUDGET',
+  'PAYROLL_RUN_CALIBRATION',
+];
+
+/**
  * The live payroll screens.
  *
  * Nine modules are enabled — `admin` was folded into `parameter-sets` (see
@@ -161,7 +176,7 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
     labelKey:    'PAYROLL.layout.NAV.BUDGET',
     icon:        'account_balance',
     route:       'budget',
-    permissions: ['PAYROLL_VIEW_BUDGET_AGGREGATE'],
+    permissions: PAYROLL_BUDGET_PERMISSIONS,
   },
 ];
 

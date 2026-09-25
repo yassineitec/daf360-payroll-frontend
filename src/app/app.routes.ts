@@ -8,6 +8,7 @@ import { InlineTranslateLoader, PAYROLL_TRANSLATIONS } from './core/inline-trans
 import { PayrollShellComponent } from './layout/payroll-shell.component';
 import { provideDafAccess, permissionGuard } from '@khalilrebhiitec/daf360';
 import {
+  PAYROLL_BUDGET_PERMISSIONS,
   PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS,
   PAYROLL_PAYSLIPS_PERMISSIONS,
   PAYROLL_SIMULATOR_PERMISSIONS,
@@ -110,7 +111,7 @@ export const routes: Routes = [
       {
         path: 'budget',
         canActivate: [permissionGuard],
-        data: { permissions: ['PAYROLL_VIEW_BUDGET_AGGREGATE'] },
+        data: { permissions: PAYROLL_BUDGET_PERMISSIONS },
         loadChildren: () =>
           import('./modules/budget/budget.routes').then(m => m.BUDGET_ROUTES),
       },
