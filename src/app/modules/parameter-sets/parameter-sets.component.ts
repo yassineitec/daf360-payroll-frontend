@@ -40,6 +40,7 @@ import {
   SavePayrollRubriqueRequest,
   PayrollRubriqueDto,
 } from '../../core/payroll-api.service';
+import { HrProfileService, HrContractType } from '../../core/hr-profile.service';
 import { NotificationService } from '../../core/notification.service';
 import { UserStore } from '../../core/user.store';
 import { PAYROLL_CREATE_PARAMSET_PERMISSIONS } from '../../core/payroll-nav';
@@ -59,6 +60,7 @@ import { PAYROLL_CREATE_PARAMSET_PERMISSIONS } from '../../core/payroll-nav';
 })
 export class ParameterSetsComponent implements OnInit {
   private readonly api          = inject(PayrollApiService);
+  private readonly hr           = inject(HrProfileService);
   private readonly fb           = inject(FormBuilder);
   private readonly translate    = inject(TranslateService);
   private readonly userStore    = inject(UserStore);
@@ -236,7 +238,7 @@ export class ParameterSetsComponent implements OnInit {
   readonly editingChargesId = signal<number | null>(null);
   readonly savingCharges    = signal(false);
 
-  readonly contractTypes   = ['CDI', 'CDD', 'STAGE', 'CIVP'];
+  readonly contractTypes   = signal<HrContractType[]>([]);
   readonly baseCalcOptions = computed(() => [
     { value: 'GROSS',        label: this.t('PAYROLL.PARAMETER_SETS.BASE_GROSS') },
     { value: 'CAPPED_GROSS', label: this.t('PAYROLL.PARAMETER_SETS.BASE_CAPPED_GROSS') },
@@ -361,6 +363,9 @@ export class ParameterSetsComponent implements OnInit {
       return;
     }
     this.loading.set(true);
+    this.hr.getContractTypes(paysId).subscribe(types => {
+      this.contractTypes.set(types);
+    });
     this.api.listParameterSets(paysId).subscribe({
       next: ps => {
         this.paramSets.set(ps);
@@ -489,6 +494,11 @@ export class ParameterSetsComponent implements OnInit {
   }
 
   private makeRubriqueGroup(r: Partial<PayrollRubriqueDto>): FormGroup {
+    const selectedCodes = new Set(
+      (r.contractTypes ?? '').split(',').map(s => s.trim()).filter(Boolean)
+    );
+    const ctByCodeControls: Record<string, [boolean]> = {};
+    this.contractTypes().forEach(ct => { ctByCodeControls[ct.code] = [selectedCodes.has(ct.code)]; });
     return this.fb.group({
       code:                     [r.code     ?? '',           Validators.required],
       labelFr:                  [r.labelFr  ?? '',           Validators.required],
@@ -504,10 +514,7 @@ export class ParameterSetsComponent implements OnInit {
       isSubjectToSocialCharges: [r.isSubjectToSocialCharges ?? false],
       isSubjectToIrpp:          [r.isSubjectToIrpp   ?? true],
       ctAll:                    [!r.contractTypes],
-      ctCDI:                    [r.contractTypes?.includes('CDI')   ?? false],
-      ctCDD:                    [r.contractTypes?.includes('CDD')   ?? false],
-      ctSTAGE:                  [r.contractTypes?.includes('STAGE') ?? false],
-      ctCIVP:                   [r.contractTypes?.includes('CIVP')  ?? false],
+      ctByCode:                 this.fb.group(ctByCodeControls),
       isActive:                 [r.isActive  ?? true],
     });
   }
@@ -558,8 +565,9 @@ export class ParameterSetsComponent implements OnInit {
       isSubjectToIrpp:          r.isSubjectToIrpp,
       direction:                r.nature === 'RETENUE' ? 'DEBIT' : 'CREDIT',
       contractTypes:            r.ctAll ? null :
-        (['CDI', 'CDD', 'STAGE', 'CIVP'] as const)
-          .filter((t: string) => r['ct' + t] === true)
+        Object.entries(r.ctByCode ?? {})
+          .filter(([, checked]) => checked === true)
+          .map(([code]) => code)
           .join(',') || null,
       isActive:                 r.isActive,
     }));
@@ -668,7 +676,7 @@ export class ParameterSetsComponent implements OnInit {
   }
 
   readonly contractTypeOptions = computed<SelectOption[]>(() =>
-    this.contractTypes.map(ct => ({ value: ct, label: ct })));
+    this.contractTypes().map(ct => ({ value: ct.code, label: ct.code })));
 
   readonly natureRadioOptions = computed<RadioOption[]>(() =>
     this.natureOptions().map(o => ({ value: o.value, label: o.label, hint: o.description })));

@@ -1,0 +1,213 @@
+<div class="flex flex-col gap-6 p-6 max-w-2xl">
+  <h1 class="text-xl font-bold">{{ 'PAYROLL.EMPLOYEE_CONFIG.TITLE' | translate }}</h1>
+
+  <div class="flex flex-col gap-1.5">
+    <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+      {{ 'PAYROLL.EMPLOYEE_CONFIG.SELECT_EMPLOYEE' | translate }}
+    </label>
+    <app-employee-select
+      [ngModel]="selectedUserId()"
+      (ngModelChange)="onEmployeeSelected($event)" />
+  </div>
+
+  <div class="flex flex-col gap-1.5">
+    <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+      {{ 'PAYROLL.EMPLOYEE_CONFIG.EMPLOYEE_LIST' | translate }}
+    </label>
+    @if (employeeListLoading()) {
+      <p class="text-sm text-gray-500">…</p>
+    } @else if (employeePage(); as page) {
+      <div class="max-h-64 overflow-y-auto rounded-lg border border-gray-200">
+        @for (e of page.content; track e.userId) {
+          <button type="button"
+            class="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50"
+            [class.bg-teal-50]="e.userId === selectedUserId()"
+            (click)="onEmployeeSelected(e.userId)">
+            <span>{{ e.fullName }}</span>
+            @if (e.employeeId) {
+              <span class="text-xs text-gray-400">{{ e.employeeId }}</span>
+            }
+          </button>
+        }
+      </div>
+    }
+    @if (employeeListError()) {
+      <span class="text-sm text-red-700">{{ employeeListError() }}</span>
+    }
+  </div>
+
+  @if (loading()) {
+    <p class="text-sm text-gray-500">…</p>
+  }
+
+  @if (config(); as cfg) {
+    <div class="flex flex-col gap-4 rounded-xl border border-gray-200 p-5">
+      <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+          {{ 'PAYROLL.EMPLOYEE_CONFIG.COUNTRY' | translate }}
+        </label>
+        <select class="rounded-lg border border-gray-300 px-3 py-2"
+          [ngModel]="cfg.paysId" (ngModelChange)="onPaysChange(+$event)">
+          @if (cfg.paysId == null) {
+            <option [value]="null" disabled selected>{{ 'PAYROLL.EMPLOYEE_CONFIG.SELECT_COUNTRY' | translate }}</option>
+          }
+          @for (p of paysList(); track p.id) {
+            <option [value]="p.id">{{ p.frenchLabel }} ({{ p.isoCode }})</option>
+          }
+        </select>
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+          {{ 'PAYROLL.EMPLOYEE_CONFIG.CONTRACT_TYPE' | translate }}
+        </label>
+        <select class="rounded-lg border border-gray-300 px-3 py-2"
+          [ngModel]="cfg.contractType" (ngModelChange)="onContractTypeChange($event)">
+          @for (ct of contractTypes(); track ct.code) {
+            <option [value]="ct.code">{{ ct.code }}</option>
+          }
+        </select>
+      </div>
+
+      @if (benefits().length) {
+        <div class="flex flex-col gap-1.5">
+          <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+            {{ 'PAYROLL.EMPLOYEE_CONFIG.BENEFITS' | translate }}
+          </label>
+          <div class="flex flex-col gap-2">
+            @for (b of benefits(); track b.benefitCode) {
+              <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox"
+                  [checked]="isBenefitSelected(b.benefitCode)"
+                  (change)="toggleBenefit(b.benefitCode)" />
+                {{ b.benefitLabelFr }}
+              </label>
+            }
+          </div>
+        </div>
+      }
+
+      <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+          {{ 'PAYROLL.EMPLOYEE_CONFIG.GROSS_SALARY' | translate }}
+        </label>
+        <div class="flex items-center gap-2">
+          <input type="number" class="flex-1 rounded-lg border border-gray-300 px-3 py-2"
+            [ngModel]="cfg.currentGrossSalary"
+            (ngModelChange)="onGrossSalaryChange($any($event))" />
+          <button type="button"
+            class="shrink-0 rounded-lg bg-gray-200 px-3 py-2 text-sm disabled:opacity-50"
+            [disabled]="calculatingNet() || cfg.currentGrossSalary == null"
+            (click)="calculateNet()">
+            {{ 'PAYROLL.EMPLOYEE_CONFIG.CALCULATE_NET' | translate }}
+          </button>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+          {{ 'PAYROLL.EMPLOYEE_CONFIG.CURRENT_SALARY' | translate }}
+        </label>
+        <input type="number" class="rounded-lg border border-gray-300 px-3 py-2"
+          [ngModel]="cfg.currentNetSalary"
+          (ngModelChange)="onSalaryChange($any($event))" />
+      </div>
+
+      <div class="flex flex-col gap-2 rounded-xl border border-gray-200 p-4">
+        <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+          {{ 'PAYROLL.EMPLOYEE_CONFIG.BONUSES' | translate }}
+        </label>
+        @for (b of bonuses(); track b.id) {
+          <div class="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm">
+            <span>{{ b.periodMonth }}/{{ b.periodYear }} — {{ b.label }} ({{ b.amount }} {{ b.currency }})</span>
+            <button type="button" class="text-red-600" (click)="deleteBonus(b.id)">✕</button>
+          </div>
+        }
+        <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              {{ 'PAYROLL.EMPLOYEE_CONFIG.BONUS_AMOUNT' | translate }}
+            </label>
+            <input type="number" [placeholder]="'PAYROLL.EMPLOYEE_CONFIG.BONUS_AMOUNT' | translate"
+              class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              [ngModel]="newBonusAmount()" (ngModelChange)="newBonusAmount.set($any($event))" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              {{ 'PAYROLL.EMPLOYEE_CONFIG.CURRENCY' | translate }}
+            </label>
+            <select class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              [ngModel]="newBonusCurrency()" (ngModelChange)="newBonusCurrency.set($event)">
+              @for (c of bonusCurrencies; track c) {
+                <option [value]="c">{{ c }}</option>
+              }
+            </select>
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              {{ 'PAYROLL.EMPLOYEE_CONFIG.BONUS_MONTH' | translate }}
+            </label>
+            <input type="number" [placeholder]="'PAYROLL.EMPLOYEE_CONFIG.BONUS_MONTH' | translate" min="1" max="12"
+              class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              [ngModel]="newBonusMonth()" (ngModelChange)="newBonusMonth.set($any($event))" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              {{ 'PAYROLL.EMPLOYEE_CONFIG.BONUS_YEAR' | translate }}
+            </label>
+            <input type="number" [placeholder]="'PAYROLL.EMPLOYEE_CONFIG.BONUS_YEAR' | translate"
+              class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              [ngModel]="newBonusYear()" (ngModelChange)="newBonusYear.set($any($event))" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              {{ 'PAYROLL.EMPLOYEE_CONFIG.BONUS_LABEL' | translate }}
+            </label>
+            <input type="text" [placeholder]="'PAYROLL.EMPLOYEE_CONFIG.BONUS_LABEL' | translate"
+              class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+              [ngModel]="newBonusLabel()" (ngModelChange)="newBonusLabel.set($event)" />
+          </div>
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+            {{ 'PAYROLL.EMPLOYEE_CONFIG.BONUS_COMMENT' | translate }}
+          </label>
+          <input type="text" [placeholder]="'PAYROLL.EMPLOYEE_CONFIG.BONUS_COMMENT' | translate"
+            class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+            [ngModel]="newBonusComment()" (ngModelChange)="newBonusComment.set($event)" />
+        </div>
+        <button type="button" class="self-start rounded-lg bg-teal-700 px-3 py-1.5 text-sm text-white"
+          (click)="addBonus()">
+          {{ 'PAYROLL.EMPLOYEE_CONFIG.ADD_BONUS' | translate }}
+        </button>
+        @if (bonusError()) {
+          <span class="text-sm text-red-700">{{ bonusError() }}</span>
+        }
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+          {{ 'PAYROLL.EMPLOYEE_CONFIG.REASON' | translate }}
+        </label>
+        <input type="text" class="rounded-lg border border-gray-300 px-3 py-2"
+          [ngModel]="reason()" (ngModelChange)="reason.set($event)" />
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button type="button"
+          class="rounded-lg bg-teal-700 px-4 py-2 text-white disabled:opacity-50"
+          [disabled]="saving() || reason().trim() === '' || cfg.paysId == null"
+          (click)="save()">
+          {{ 'PAYROLL.EMPLOYEE_CONFIG.SAVE' | translate }}
+        </button>
+
+        @if (success()) {
+          <span class="text-sm text-teal-700">{{ success() }}</span>
+        }
+        @if (error()) {
+          <span class="text-sm text-red-700">{{ error() }}</span>
+        }
+      </div>
+    </div>
+  }
+</div>

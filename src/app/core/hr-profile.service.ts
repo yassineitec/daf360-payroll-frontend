@@ -1,7 +1,14 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
+
+export interface HrContractType {
+  code: string;
+  labelFr: string;
+  labelEn: string;
+}
 
 export interface EmployeeListItem {
   userId: number;
@@ -50,6 +57,13 @@ export class HrProfileService {
     // (ACTIVE / ON_LEAVE / ON_MISSION, ou sans fiche) ; avec, uniquement ce statut.
     if (opts.status) params = params.set('status', opts.status);
     return this.http.get<EmployeePage>(`${this.base}/api/hr/profiles/employees`, { params });
+  }
+
+  getContractTypes(paysId?: number | null): Observable<HrContractType[]> {
+    let params = new HttpParams();
+    if (paysId != null) params = params.set('paysId', paysId);
+    return this.http.get<HrContractType[]>(`${this.base}/api/hr/ref/contract-types`, { params })
+      .pipe(catchError(() => of([])));
   }
 
   /** Fiche complète (`GET /api/hr/profiles/{id}`, par `profileId`) — carte « Détails » de

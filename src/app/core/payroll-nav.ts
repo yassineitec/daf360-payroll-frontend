@@ -58,6 +58,29 @@ export const PAYROLL_CREATE_PARAMSET_PERMISSIONS = [
  */
 export const PAYROLL_PAYSLIPS_PERMISSIONS = ['RH_MANAGE_PAYSLIPS'];
 
+/** `/payroll/employee-config` — assigning a payroll configuration (country, contract type,
+ *  benefits, current net salary) to a specific employee. Viewing needs either code;
+ *  the backend's own PUT enforces MANAGE specifically. */
+export const PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS = [
+  'PAYROLL_VIEW_EMPLOYEE_CONFIG',
+  'PAYROLL_MANAGE_EMPLOYEE_CONFIG',
+];
+
+/**
+ * `/payroll/budget` — the budget lines + forecast outputs. Mirrors the backend exactly:
+ * both calls the page makes (`GET /calibration/budget-lines`, `/calibration/forecast-outputs`)
+ * accept any of these four codes. It used to be gated on `PAYROLL_VIEW_BUDGET_AGGREGATE`
+ * alone — a code rh-service's catalog doesn't list, so role administration can't grant it —
+ * which hid the page from admins the backend would have served. Granting that code instead
+ * would also cost cookie bytes on roles already at the 4096 B ceiling.
+ */
+export const PAYROLL_BUDGET_PERMISSIONS = [
+  'PAYROLL_VIEW_BUDGET_AGGREGATE',
+  'PAYROLL_VIEW_AGGREGATE',
+  'PAYROLL_EXPORT_BUDGET',
+  'PAYROLL_RUN_CALIBRATION',
+];
+
 /**
  * The live payroll screens.
  *
@@ -83,6 +106,13 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
     icon:        'receipt_long',
     route:       'payslips',
     permissions: PAYROLL_PAYSLIPS_PERMISSIONS,
+  },
+  {
+    id:          'employee-config',
+    labelKey:    'PAYROLL.layout.NAV.EMPLOYEE_CONFIG',
+    icon:        'manage_accounts',
+    route:       'employee-config',
+    permissions: PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS,
   },
 
   // ── Keep in sync with app.routes.ts ─────────────────────────────────────────
@@ -146,7 +176,7 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
     labelKey:    'PAYROLL.layout.NAV.BUDGET',
     icon:        'account_balance',
     route:       'budget',
-    permissions: ['PAYROLL_VIEW_BUDGET_AGGREGATE'],
+    permissions: PAYROLL_BUDGET_PERMISSIONS,
   },
 ];
 
