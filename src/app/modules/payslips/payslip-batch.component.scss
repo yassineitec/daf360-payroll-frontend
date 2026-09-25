@@ -17,10 +17,17 @@ $success: var(--color-success, #0f7b5f);
 .import__fields  { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; }
 @media (max-width: 900px) { .import__fields { grid-template-columns: 1fr; } }
 
-.import__footer  { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-.import__note    { display: flex; align-items: center; gap: .5rem; margin: 0; font-size: .875rem; color: $muted; }
-.import__note .material-symbols-outlined { font-size: 1.25rem; color: var(--color-teal, #0f766e); }
-.import__actions { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+/* Note à gauche, boutons à droite en bas de la carte, sur UNE seule ligne : la note se
+   rétrécit (et passe sur deux lignes si besoin) au lieu de faire tomber les boutons sous
+   elle. Empilés seulement sur petit écran, boutons toujours calés à droite. */
+.import__footer  { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: nowrap; }
+.import__note    { display: flex; align-items: center; gap: .5rem; margin: 0;
+                   flex: 1 1 auto; min-width: 0; font-size: .875rem; color: $muted; }
+.import__note .material-symbols-outlined { font-size: 1.25rem; color: var(--color-teal, #0f766e); flex-shrink: 0; }
+.import__actions { display: flex; align-items: center; justify-content: flex-end; gap: .75rem; flex-shrink: 0; margin-left: auto; }
+@media (max-width: 640px) {
+  .import__footer { flex-wrap: wrap; }
+}
 
 .hidden-input    { display: none; }
 
@@ -62,3 +69,9 @@ $success: var(--color-success, #0f7b5f);
 .history-file    { display: inline-flex; align-items: center; gap: .5rem; max-width: 18rem; }
 .history-file .material-symbols-outlined { font-size: 1.125rem; color: var(--color-danger, #dc2626); }
 .history-file__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Pop-up d'attente du traitement ─────────────────────────────────── */
+.processing-modal { display: flex; flex-direction: column; align-items: center; gap: .75rem; padding: .5rem 0 1rem; text-align: center; }
+/* `daf-loading` réserve 50vh hors plein écran — trop haut pour un petit pop-up. */
+.processing-modal ::ng-deep daf-loading > div { min-height: 10rem; }
+.processing-modal__hint { margin: 0; font-size: .8125rem; color: $muted; }

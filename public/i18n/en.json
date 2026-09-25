@@ -269,7 +269,7 @@
       "EMPTY_RESULT_HINT": "Fill in the parameters on the left, then process the file to see results here.",
       "FORM": {
         "TITLE": "Import a payslip batch",
-        "SUBTITLE": "Set the period and attach the multi-employee payroll file",
+        "SUBTITLE": "Pick the country and the period, then attach the multi-employee payroll file",
         "PAYS": "Country",
         "YEAR": "Year",
         "MONTH": "Month",
@@ -278,7 +278,7 @@
         "SUBMIT": "Process and distribute",
         "PROCESSING": "Processing…",
         "SUBMIT_COUNT": "Process and distribute ({{count}} payslips)",
-        "SHAREPOINT_NOTE": "Each payslip is filed to the employee's HR SharePoint folder"
+        "SHAREPOINT_NOTE": "Each payslip matched by its matricule is filed to the employee's HR SharePoint folder"
       },
       "MONTHS": {
         "JANUARY": "January",
@@ -293,6 +293,13 @@
         "OCTOBER": "October",
         "NOVEMBER": "November",
         "DECEMBER": "December"
+      },
+      "PROCESSING_MODAL": {
+        "TITLE": "Processing the batch",
+        "BRAND": "Payslips",
+        "MESSAGE": "Splitting the payslips and filing them to SharePoint…",
+        "MESSAGE_COUNT": "Splitting the {{count}} payslips and filing them to SharePoint…",
+        "HINT": "This can take a few minutes. Please do not close this page."
       },
       "SUMMARY": {
         "TITLE": "Processing summary",
@@ -355,10 +362,10 @@
         "PERIOD": "Period",
         "FILE": "File name",
         "COUNT": "Payslips",
-        "STATUS": "SharePoint status",
+        "STATUS": "Processing status",
         "COUNT_VALUE": "{{count}} payslips",
-        "STATUS_SUCCESS": "Success ({{success}}/{{total}} synced)",
-        "STATUS_PARTIAL": "Partial ({{success}}/{{total}} synced)",
+        "STATUS_SUCCESS": "Success ({{success}}/{{total}} matched)",
+        "STATUS_PARTIAL": "Partial ({{success}}/{{total}} matched)",
         "EMPTY": "No imports yet",
         "VIEW": "View details"
       }
@@ -641,6 +648,36 @@
         "OFFBOARDING": "Offboarding",
         "TERMINATED": "Terminated",
         "ARCHIVED": "Archived"
+      },
+      "DETAILS": {
+        "PANEL_ARIA": "Employee details",
+        "PARTIAL": "Full HR record unavailable — open the employee from the list to show every detail.",
+        "SECTION_CONTRACT": "Contract",
+        "SECTION_POSITION": "Position",
+        "SECTION_PAYROLL": "Payroll",
+        "CONTRACT_TYPE": "Contract type",
+        "HIRE_DATE": "Hire date",
+        "SENIORITY": "Seniority",
+        "CONTRACT_END": "Contract end",
+        "PROBATION_END": "Probation end",
+        "REGIME": "Work regime",
+        "DEPARTMENT": "Department",
+        "GRADE": "Grade",
+        "DISCIPLINE": "Discipline",
+        "NOG_LEVEL": "NOG level",
+        "PAYS": "Country",
+        "MARITAL_STATUS": "Marital status",
+        "CHILDREN": "Dependent children",
+        "CNSS": "CNSS no.",
+        "CNSS_DATE": "CNSS affiliation",
+        "YEARS": "{{count}} yr(s)",
+        "MONTHS": "{{count}} mo",
+        "MARITAL": {
+          "SINGLE": "Single",
+          "MARRIED": "Married",
+          "DIVORCED": "Divorced",
+          "WIDOWED": "Widowed"
+        }
       }
     },
 

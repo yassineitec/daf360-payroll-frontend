@@ -51,4 +51,48 @@ export class HrProfileService {
     if (opts.status) params = params.set('status', opts.status);
     return this.http.get<EmployeePage>(`${this.base}/api/hr/profiles/employees`, { params });
   }
+
+  /** Fiche complète (`GET /api/hr/profiles/{id}`, par `profileId`) — carte « Détails » de
+   *  `/payroll/engine-results/:employeeId`. */
+  getProfile(profileId: number): Observable<EmployeeProfileDetail> {
+    return this.http.get<EmployeeProfileDetail>(`${this.base}/api/hr/profiles/${profileId}`);
+  }
+
+  /** `photoUrl` est stocké relatif (`/api/hr/profiles/{id}/photo`, servi sans jeton) —
+   *  préfixé ici par l'URL du service RH ; `null` quand le profil n'a pas de photo. */
+  photoSrc(photoUrl: string | null | undefined): string | null {
+    return photoUrl ? `${this.base}${photoUrl}` : null;
+  }
+}
+
+/**
+ * Sous-ensemble de `EmployeeProfileResponseDto` (daf360-rh-service) lu par la paie. Les champs
+ * sensibles (banque, CIN, passeport, n° SS, matricule fiscal) sont masqués par le service RH
+ * pour les appelants sans droit RH — ils ne sont volontairement pas déclarés ici.
+ */
+export interface EmployeeProfileDetail {
+  id: number;
+  userId: number;
+  fullName: string | null;
+  matricule: string | null;
+  paysLabel: string | null;
+  lifecycleStatus: string | null;
+  photoUrl: string | null;
+  // Contrat
+  hireDate: string | null;          // ISO yyyy-MM-dd
+  contractType: string | null;
+  contractEndDate: string | null;
+  probationEndDate: string | null;
+  isOnProbation: boolean | null;
+  regimeLabelFr: string | null;
+  // Poste
+  department: string | null;
+  grade: string | null;
+  discipline: string | null;
+  nogLevel: string | null;
+  // Paie
+  maritalStatus: string | null;
+  numberOfChildren: number | null;
+  cnssNumber: string | null;
+  cnssAffiliationDate: string | null;
 }

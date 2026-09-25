@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, TemplateRef, computed, inject, signal, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { catchError, of } from 'rxjs';
@@ -10,7 +10,9 @@ import {
   DataTableComponent,
   FileUploadComponent,
   FilterComponent,
+  LoadingComponent,
   MetricCardComponent,
+  ModalService,
   PageComponent,
   PageHeaderComponent,
   SelectComponent,
@@ -19,6 +21,7 @@ import {
   type BreadcrumbItem,
   type FilterField,
   type FilterResult,
+  type ModalRef,
   type SelectOption,
   type TableColumn,
   type TableRow,
@@ -78,7 +81,7 @@ type HistoryStatusFilter = 'ALL' | 'SUCCESS' | 'PARTIAL';
     CommonModule, TranslatePipe,
     ButtonComponent, CardComponent, DafCellDirective, DataTableComponent, FileUploadComponent,
     MetricCardComponent, PageComponent, PageHeaderComponent,
-    FilterComponent, SelectComponent, StatusBadgeComponent,
+    FilterComponent, LoadingComponent, SelectComponent, StatusBadgeComponent,
   ],
   templateUrl: './payslip-batch.component.html',
   styleUrl: './payslip-batch.component.scss',
@@ -87,7 +90,23 @@ export class PayslipBatchComponent implements OnInit {
   private readonly svc          = inject(PayslipBatchService);
   private readonly payrollApi   = inject(PayrollApiService);
   private readonly notification = inject(NotificationService);
+  private readonly modalService = inject(ModalService);
   protected readonly translate  = inject(TranslateService);
+
+  /** Pop-up d'attente pendant le traitement — `ModalService` de la lib, corps =
+   *  `#processingTpl` (un `daf-loading`). Le backend traite tout le lot en UNE requête
+   *  et ne renvoie aucun avancement : c'est donc un indicateur d'attente, pas une barre
+   *  de progression en %. Fermé dès que la réponse (ou l'erreur) arrive. */
+  private readonly processingTpl = viewChild<TemplateRef<unknown>>('processingTpl');
+  private processingModalRef: ModalRef | null = null;
+  /** Nombre de fiches du lot en cours, figé à l'envoi (le fichier est retiré ensuite). */
+  readonly processingPages = signal<number | null>(null);
+
+  constructor() {
+    // Le pop-up vit sous la racine de l'appli, hors de cette vue : on le ferme si
+    // l'utilisateur quitte la page pendant le traitement.
+    inject(DestroyRef).onDestroy(() => this.closeProcessingModal());
+  }
 
   /** Même pattern que les autres pages : traduction synchrone pour ce qui ne passe pas
    *  par le pipe `| translate` du template. */
@@ -215,7 +234,7 @@ export class PayslipBatchComponent implements OnInit {
 
   readonly needsAttention = computed(() => {
     const r = this.result();
-    return !!r && (r.errorCount > 0 || r.unidentifiedCount > 0);
+    return !!r && (r.errorCount > 0 || r.unidentifiedCount > 0 || r.duplicateCount > 0);
   });
 
   submit(): void {
@@ -227,6 +246,7 @@ export class PayslipBatchComponent implements OnInit {
 
     this.processing.set(true);
     this.result.set(null);
+    this.openProcessingModal();
 
     this.svc.processBatch(file, paysId, year, month).pipe(
       catchError(err => {
@@ -235,6 +255,7 @@ export class PayslipBatchComponent implements OnInit {
       }),
     ).subscribe(result => {
       this.processing.set(false);
+      this.closeProcessingModal();
       if (!result) return;
       this.result.set(result);
       this.resultFileName.set(file.name);
@@ -244,6 +265,26 @@ export class PayslipBatchComponent implements OnInit {
         success: result.successCount, total: result.totalPages,
       }));
     });
+  }
+
+  private openProcessingModal(): void {
+    const tpl = this.processingTpl();
+    if (!tpl) return;
+    this.processingPages.set(this.detectedPages());
+    this.processingModalRef = this.modalService.open({
+      title:           this.t('PAYROLL.PAYSLIPS.PROCESSING_MODAL.TITLE'),
+      icon:            'cloud_upload',
+      size:            'sm',
+      body:            tpl,
+      // Rien à annuler côté serveur : un clic à côté ne doit pas faire croire que le
+      // traitement s'est arrêté.
+      closeOnBackdrop: false,
+    });
+  }
+
+  private closeProcessingModal(): void {
+    this.processingModalRef?.close();
+    this.processingModalRef = null;
   }
 
   // ── Rapport du lot ───────────────────────────────────────────────────────

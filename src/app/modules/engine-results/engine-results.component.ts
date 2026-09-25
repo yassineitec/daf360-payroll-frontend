@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { PayrollEngineService, RunPayrollResponse } from '../../core/payroll-engine.service';
+import { EmployeeProfileDetail, HrProfileService } from '../../core/hr-profile.service';
 import { recallEmployee } from './engine-results-employee';
 import {
   AvatarComponent,
@@ -15,6 +16,7 @@ import {
   PageHeaderComponent,
   PaginationComponent,
   SearchToolbarComponent,
+  SectionCardComponent,
   SectionTitleComponent,
   StatusBadgeComponent,
   TabsComponent,
@@ -30,6 +32,19 @@ import {
 } from '@khalilrebhiitec/daf360';
 
 type RubriqueCategory = 'GAIN' | 'RETENUE' | 'AVANTAGE';
+
+/** Une ligne libellé / valeur de la carte « Détails ». */
+interface DetailRow { label: string; value: string; }
+interface DetailSection { id: string; title: string; rows: DetailRow[]; }
+
+/** Codes de la liste RH `MARITAL_STATUS` (configurable en base) → clé de traduction ;
+ *  un code inconnu s'affiche tel quel. */
+const MARITAL_KEYS: Record<string, string> = {
+  SINGLE: 'SINGLE', CELIBATAIRE: 'SINGLE',
+  MARRIED: 'MARRIED', MARIE: 'MARRIED',
+  DIVORCED: 'DIVORCED', DIVORCE: 'DIVORCED',
+  WIDOWED: 'WIDOWED', VEUF: 'WIDOWED',
+};
 
 const RUBRIQUE_TABS: { id: RubriqueCategory; label: string }[] = [
   { id: 'GAIN',     label: 'Rémunération de base & forfait' },
@@ -61,7 +76,7 @@ const RUBRIQUE_TABS: { id: RubriqueCategory; label: string }[] = [
     CommonModule, TranslatePipe,
     AvatarComponent, ButtonComponent, CardComponent, DataTableComponent, EntityCardComponent,
     MetricCardComponent, PageComponent, PageHeaderComponent, PaginationComponent,
-    SearchToolbarComponent, SectionTitleComponent, StatusBadgeComponent, TabsComponent,
+    SearchToolbarComponent, SectionCardComponent, SectionTitleComponent, StatusBadgeComponent, TabsComponent,
   ],
   templateUrl: './engine-results.component.html',
   styleUrl: './engine-results.component.scss',
@@ -91,8 +106,108 @@ export class EngineResultsComponent {
   ]);
 
   constructor() {
-    if (Number.isFinite(this.employeeId) && this.employeeId > 0) this.loadEmployeeResults();
-    else this.backToList();
+    if (Number.isFinite(this.employeeId) && this.employeeId > 0) {
+      this.loadEmployeeResults();
+      this.loadProfile();
+    } else {
+      this.backToList();
+    }
+  }
+
+  // ── Carte « Détails » (colonne gauche, comme /finance/affaires/:id) ──────
+  // Fiche RH complète, lue par `profileId`. Celui-ci vient de la liste (sessionStorage) :
+  // une page ouverte directement par lien n'en a pas, la carte se limite alors au nom.
+  private readonly hrApi = inject(HrProfileService);
+  readonly profile = signal<EmployeeProfileDetail | null>(null);
+  readonly profileLoading = signal(false);
+
+  private loadProfile(): void {
+    const profileId = this.employee()?.profileId;
+    if (!profileId) return;
+    this.profileLoading.set(true);
+    this.hrApi.getProfile(profileId).subscribe({
+      next: p  => { this.profile.set(p); this.profileLoading.set(false); },
+      // Carte en mode dégradé (données de la liste) — l'historique de paie reste utilisable.
+      error: () => this.profileLoading.set(false),
+    });
+  }
+
+  readonly photoSrc = computed(() => this.hrApi.photoSrc(this.profile()?.photoUrl));
+  readonly matricule = computed(() => this.profile()?.matricule ?? this.employee()?.employeeId ?? null);
+
+  readonly lifecycle = computed(() => {
+    const s = this.profile()?.lifecycleStatus ?? this.employee()?.lifecycleStatus;
+    if (!s) return null;
+    const key = `PAYROLL.ENGINE_RESULTS.LIFECYCLE.${s}`;
+    const label = this.t(key);
+    const variant: BadgeVariant = s === 'ACTIVE' ? 'success'
+      : (s === 'TERMINATED' || s === 'ARCHIVED') ? 'neutral' : 'warning';
+    return { label: label === key ? s : label, variant };
+  });
+
+  readonly detailSections = computed<DetailSection[]>(() => {
+    const p = this.profile();
+    const e = this.employee();
+    const row = (key: string, value: string | number | null | undefined): DetailRow | null =>
+      value == null || value === '' ? null : { label: this.t(`PAYROLL.ENGINE_RESULTS.DETAILS.${key}`), value: String(value) };
+    const section = (id: string, rows: (DetailRow | null)[]): DetailSection => ({
+      id, title: this.t(`PAYROLL.ENGINE_RESULTS.DETAILS.SECTION_${id}`), rows: rows.filter((r): r is DetailRow => !!r),
+    });
+
+    return [
+      section('CONTRACT', [
+        row('CONTRACT_TYPE', p?.contractType ?? e?.contractType),
+        row('HIRE_DATE', this.formatDate(p?.hireDate)),
+        row('SENIORITY', this.seniority(p?.hireDate)),
+        row('CONTRACT_END', this.formatDate(p?.contractEndDate)),
+        row('PROBATION_END', p?.isOnProbation ? this.formatDate(p?.probationEndDate) : null),
+        row('REGIME', p?.regimeLabelFr),
+      ]),
+      section('POSITION', [
+        row('DEPARTMENT', p?.department ?? e?.department),
+        row('GRADE', p?.grade),
+        row('DISCIPLINE', p?.discipline),
+        row('NOG_LEVEL', p?.nogLevel),
+        row('PAYS', p?.paysLabel ?? e?.paysLabel),
+      ]),
+      section('PAYROLL', [
+        row('MARITAL_STATUS', this.maritalLabel(p?.maritalStatus)),
+        row('CHILDREN', p?.numberOfChildren),
+        row('CNSS', p?.cnssNumber),
+        row('CNSS_DATE', this.formatDate(p?.cnssAffiliationDate)),
+      ]),
+    ].filter(s => s.rows.length > 0);
+  });
+
+  private formatDate(iso: string | null | undefined): string | null {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleDateString(this.translate.currentLang() === 'en' ? 'en-GB' : 'fr-FR',
+      { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  /** « 3 ans 4 mois » depuis la date d'embauche. */
+  private seniority(iso: string | null | undefined): string | null {
+    if (!iso) return null;
+    const start = new Date(iso);
+    if (Number.isNaN(start.getTime())) return null;
+    const now = new Date();
+    let months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+    if (now.getDate() < start.getDate()) months--;
+    if (months < 0) return null;
+    const years = Math.floor(months / 12);
+    const rest = months % 12;
+    const parts: string[] = [];
+    if (years) parts.push(this.t('PAYROLL.ENGINE_RESULTS.DETAILS.YEARS', { count: years }));
+    if (rest || !years) parts.push(this.t('PAYROLL.ENGINE_RESULTS.DETAILS.MONTHS', { count: rest }));
+    return parts.join(' ');
+  }
+
+  private maritalLabel(code: string | null | undefined): string | null {
+    if (!code) return null;
+    const key = MARITAL_KEYS[code.toUpperCase()];
+    return key ? this.t(`PAYROLL.ENGINE_RESULTS.DETAILS.MARITAL.${key}`) : code;
   }
 
   backToList(): void {

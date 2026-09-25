@@ -269,7 +269,7 @@
       "EMPTY_RESULT_HINT": "Renseignez les paramètres à gauche puis traitez le fichier pour voir les résultats ici.",
       "FORM": {
         "TITLE": "Importer un lot de fiches de paie",
-        "SUBTITLE": "Configurez la période et associez le fichier de paie multi-collaborateurs",
+        "SUBTITLE": "Choisissez le pays et la période, puis associez le fichier de paie multi-collaborateurs",
         "PAYS": "Pays",
         "YEAR": "Année",
         "MONTH": "Mois",
@@ -278,7 +278,7 @@
         "SUBMIT": "Traiter et distribuer",
         "PROCESSING": "Traitement en cours…",
         "SUBMIT_COUNT": "Traiter et distribuer ({{count}} fiches)",
-        "SHAREPOINT_NOTE": "Chaque fiche est déposée dans le dossier SharePoint RH du collaborateur"
+        "SHAREPOINT_NOTE": "Chaque fiche identifiée par son matricule est déposée dans le dossier SharePoint RH du collaborateur"
       },
       "MONTHS": {
         "JANUARY": "Janvier",
@@ -293,6 +293,13 @@
         "OCTOBER": "Octobre",
         "NOVEMBER": "Novembre",
         "DECEMBER": "Décembre"
+      },
+      "PROCESSING_MODAL": {
+        "TITLE": "Traitement du lot en cours",
+        "BRAND": "Fiches de paie",
+        "MESSAGE": "Découpage des fiches et dépôt sur SharePoint…",
+        "MESSAGE_COUNT": "Découpage des {{count}} fiches et dépôt sur SharePoint…",
+        "HINT": "Cela peut prendre quelques minutes. Merci de ne pas fermer cette page."
       },
       "SUMMARY": {
         "TITLE": "Résumé du traitement",
@@ -355,10 +362,10 @@
         "PERIOD": "Période",
         "FILE": "Nom du fichier",
         "COUNT": "Nombre de fiches",
-        "STATUS": "Statut SharePoint",
+        "STATUS": "Statut du traitement",
         "COUNT_VALUE": "{{count}} fiches",
-        "STATUS_SUCCESS": "Succès ({{success}}/{{total}} synchronisées)",
-        "STATUS_PARTIAL": "Partiel ({{success}}/{{total}} synchronisées)",
+        "STATUS_SUCCESS": "Succès ({{success}}/{{total}} identifiées)",
+        "STATUS_PARTIAL": "Partiel ({{success}}/{{total}} identifiées)",
         "EMPTY": "Aucune importation pour le moment",
         "VIEW": "Voir le détail"
       }
@@ -641,6 +648,36 @@
         "OFFBOARDING": "Départ en cours",
         "TERMINATED": "Sorti",
         "ARCHIVED": "Archivé"
+      },
+      "DETAILS": {
+        "PANEL_ARIA": "Détails du collaborateur",
+        "PARTIAL": "Fiche RH complète indisponible — ouvrez le collaborateur depuis la liste pour afficher tous les détails.",
+        "SECTION_CONTRACT": "Contrat",
+        "SECTION_POSITION": "Poste",
+        "SECTION_PAYROLL": "Paie",
+        "CONTRACT_TYPE": "Type de contrat",
+        "HIRE_DATE": "Date d'embauche",
+        "SENIORITY": "Ancienneté",
+        "CONTRACT_END": "Fin de contrat",
+        "PROBATION_END": "Fin de période d'essai",
+        "REGIME": "Régime",
+        "DEPARTMENT": "Département",
+        "GRADE": "Grade",
+        "DISCIPLINE": "Discipline",
+        "NOG_LEVEL": "Niveau NOG",
+        "PAYS": "Pays",
+        "MARITAL_STATUS": "Situation familiale",
+        "CHILDREN": "Enfants à charge",
+        "CNSS": "N° CNSS",
+        "CNSS_DATE": "Affiliation CNSS",
+        "YEARS": "{{count}} an(s)",
+        "MONTHS": "{{count}} mois",
+        "MARITAL": {
+          "SINGLE": "Célibataire",
+          "MARRIED": "Marié(e)",
+          "DIVORCED": "Divorcé(e)",
+          "WIDOWED": "Veuf / veuve"
+        }
       }
     },
 

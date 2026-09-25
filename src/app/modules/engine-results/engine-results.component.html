@@ -3,38 +3,69 @@
     [title]="'PAYROLL.ENGINE_RESULTS.TITLE' | translate"
     [subtitle]="'PAYROLL.ENGINE_RESULTS.SUBTITLE' | translate"
     [breadcrumbs]="breadcrumbs()">
-    <!-- ── Retour à l'annuaire (`/payroll/engine-results`) — remplace l'ancien sélecteur
-         employé du header : on arrive ici en cliquant un collaborateur de la liste. ── -->
-    <div pageActions>
-      <daf-button
-        [label]="'PAYROLL.ENGINE_RESULTS.BACK_TO_LIST' | translate"
-        variant="ghost"
-        [options]="{ iconStart: 'arrow_back' }"
-        (onClick)="backToList()">
-      </daf-button>
-    </div>
+    <!-- Pas de bouton "Retour à la liste" : le fil d'Ariane (`Historique de paie`)
+         ramène déjà à `/payroll/engine-results`. -->
   </daf-page-header>
 
-  <div class="page-body">
-    <!-- ── Bandeau d'identité du collaborateur ouvert ──────────────────────── -->
-    <daf-card [options]="{ variant: 'flat', padding: 'lg', radius: 'xl' }">
-      <div class="emp-header">
-        <daf-avatar [data]="{ name: employeeName() }" size="lg" />
-        <div class="emp-header__body">
-          <h2 class="emp-header__name">{{ employeeName() }}</h2>
-          @if (employee(); as e) {
-            <p class="emp-header__meta">
-              @if (e.employeeId) {
-                <span class="emp-chip">{{ 'PAYROLL.ENGINE_RESULTS.COL_MATRICULE' | translate }} {{ e.employeeId }}</span>
-              }
-              @for (part of [e.department, e.contractType, e.paysLabel]; track $index) {
-                @if (part) { <span>{{ part }}</span> }
-              }
-            </p>
+  <!-- Deux colonnes, comme /finance/affaires/:id : GAUCHE (30 %, sticky) la carte
+       « Détails » du collaborateur ; DROITE (70 %) les KPI, la liste des périodes et le
+       détail de la période ouverte. Flex + flex-wrap : sous ~1150 px la carte passe
+       pleine largeur au-dessus du reste (voir le .scss). -->
+  <div class="detail-split">
+
+    <!-- ══ COLONNE GAUCHE — carte « Détails » ══════════════════════════════════ -->
+    <div class="detail-aside">
+      <daf-section-card>
+        <aside class="dp-card" [attr.aria-label]="'PAYROLL.ENGINE_RESULTS.DETAILS.PANEL_ARIA' | translate">
+
+          <!-- 1. Identité -->
+          <section class="dp-block dp-identity">
+            <daf-avatar [data]="{ name: employeeName(), avatarUrl: photoSrc() }" size="lg" />
+            <div class="dp-identity__body">
+              <h2 class="dp-identity__name" [title]="employeeName()">{{ employeeName() }}</h2>
+              <div class="dp-identity__meta">
+                @if (matricule(); as m) {
+                  <span class="dp-chip">{{ 'PAYROLL.ENGINE_RESULTS.COL_MATRICULE' | translate }} {{ m }}</span>
+                }
+                @if (lifecycle(); as l) {
+                  <daf-badge [label]="l.label" [options]="{ variant: l.variant, size: 'sm' }" />
+                }
+              </div>
+            </div>
+          </section>
+
+          <!-- 2..4. Contrat / Poste / Paie — une section par bloc, lignes libellé → valeur.
+               Une ligne sans valeur n'est pas affichée ; une section vide non plus. -->
+          @for (s of detailSections(); track s.id) {
+            <!-- Filet uniquement ENTRE sections (Contrat | Poste | Paie) — aucun sous
+                 l'identité ni entre les lignes d'une section. -->
+            @if (!$first) {
+              <div class="dp-rule dp-rule--major"></div>
+            }
+            <section class="dp-block" [attr.aria-labelledby]="'dp-h-' + s.id">
+              <h3 class="dp-label" [id]="'dp-h-' + s.id">{{ s.title }}</h3>
+              <dl class="dp-rows">
+                @for (r of s.rows; track r.label; let last = $last) {
+                  <div class="dp-row" [class.dp-row--last]="last">
+                    <dt class="dp-row__key">{{ r.label }}</dt>
+                    <dd class="dp-row__val">{{ r.value }}</dd>
+                  </div>
+                }
+              </dl>
+            </section>
           }
-        </div>
-      </div>
-    </daf-card>
+
+          @if (profileLoading()) {
+            <p class="dp-hint">{{ 'PAYROLL.COMMON.LOADING' | translate }}</p>
+          } @else if (!profile()) {
+            <p class="dp-hint">{{ 'PAYROLL.ENGINE_RESULTS.DETAILS.PARTIAL' | translate }}</p>
+          }
+        </aside>
+      </daf-section-card>
+    </div>
+
+    <!-- ══ COLONNE DROITE — KPI, liste des périodes, détail ═════════════════ -->
+    <div class="detail-main">
 
     @if (empLoading()) {
       <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
@@ -213,5 +244,6 @@
         <p class="empty-state">{{ 'PAYROLL.ENGINE_RESULTS.EMPTY_EMPLOYEE_RESULTS' | translate }}</p>
       </daf-card>
     }
+    </div>
   </div>
 </daf-page>

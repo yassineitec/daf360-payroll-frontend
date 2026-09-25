@@ -109,6 +109,7 @@
         </daf-file-upload>
       }
 
+      <!-- Note SharePoint à gauche, boutons à droite en bas de la carte (`space-between`). -->
       <div class="import__footer">
         <p class="import__note">
           <span class="material-symbols-outlined" aria-hidden="true">lock</span>
@@ -233,3 +234,17 @@
     </daf-card>
   </section>
 </daf-page>
+
+<!-- Corps du pop-up d'attente (`ModalService`, voir `openProcessingModal()`) : le
+     `daf-loading` de la lib, ramené à une hauteur de pop-up (il réserve 50vh hors
+     plein écran). Pas de % : le serveur ne renvoie aucun avancement. -->
+<ng-template #processingTpl>
+  <div class="processing-modal">
+    <daf-loading
+      [brand]="'PAYROLL.PAYSLIPS.PROCESSING_MODAL.BRAND' | translate"
+      [message]="(processingPages()
+        ? ('PAYROLL.PAYSLIPS.PROCESSING_MODAL.MESSAGE_COUNT' | translate: { count: processingPages() })
+        : ('PAYROLL.PAYSLIPS.PROCESSING_MODAL.MESSAGE' | translate))" />
+    <p class="processing-modal__hint">{{ 'PAYROLL.PAYSLIPS.PROCESSING_MODAL.HINT' | translate }}</p>
+  </div>
+</ng-template>
