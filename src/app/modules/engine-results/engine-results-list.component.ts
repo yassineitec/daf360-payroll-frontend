@@ -4,7 +4,9 @@ import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { catchError, forkJoin, map, of } from 'rxjs';
-import { HrProfileService, type EmployeeListItem } from '../../core/hr-profile.service';
+import {
+  HrProfileService, LIFECYCLE_STATUSES, type EmployeeFilterOptions, type EmployeeListItem,
+} from '../../core/hr-profile.service';
 import { PayrollEngineService, type PayrollResultsSummaryDto } from '../../core/payroll-engine.service';
 import { CURRENCY_GLYPHS, CurrencyService, SUPPORTED_CURRENCIES } from '../../core/currency.service';
 import {
@@ -83,12 +85,16 @@ export class EngineResultsListComponent implements OnInit {
 
   readonly searchText = signal('');
   readonly paysFilter = signal<number | null>(null);
+  readonly statusFilter     = signal<string | null>(null);
+  readonly departmentFilter = signal<string | null>(null);
+  readonly contractFilter   = signal<string | null>(null);
   readonly viewMode   = signal<'grid' | 'list'>('grid');
   /** 0-indexé, comme `daf-pagination`. */
   readonly page     = signal(0);
   readonly pageSize = signal(20);
 
   private readonly paysList = signal<PaysItem[]>([]);
+  private readonly filterOptions = signal<EmployeeFilterOptions | null>(null);
 
   ngOnInit(): void {
     this.http.get<PaysItem[]>(`${environment.hrApiUrl}/api/hr/config/hs/pays-list`)
@@ -96,6 +102,7 @@ export class EngineResultsListComponent implements OnInit {
       .subscribe(list => this.paysList.set(list));
     // Aucun filtre pays par défaut : la liste affiche tout le personnel et le bandeau KPI
     // les totaux de tous les pays ; choisir un pays recharge ces mêmes tuiles pour lui.
+    this.hrService.getFilterOptions().subscribe(o => this.filterOptions.set(o));
     this.load();
     this.loadKpis();
   }
@@ -297,6 +304,9 @@ export class EngineResultsListComponent implements OnInit {
     this.hrService.listEmployees({
       search: this.searchText(),
       paysId: this.paysFilter(),
+      status: this.statusFilter() ?? undefined,
+      department: this.departmentFilter(),
+      contract: this.contractFilter(),
       page: this.page(),
       size: this.pageSize(),
     }).subscribe({
@@ -340,6 +350,26 @@ export class EngineResultsListComponent implements OnInit {
     searchable: true,
     placeholder: this.t('PAYROLL.ENGINE_RESULTS.FILTER_ALL'),
     options: this.paysList().map(p => ({ value: String(p.id), label: `${p.french_label} (${p.iso_code})` })),
+  }, {
+    name: 'status',
+    label: this.t('PAYROLL.ENGINE_RESULTS.FILTER_STATUS'),
+    type: 'select',
+    // Sans statut, le service RH ne renvoie que les collaborateurs en poste.
+    placeholder: this.t('PAYROLL.ENGINE_RESULTS.FILTER_IN_POST'),
+    options: LIFECYCLE_STATUSES.map(s => ({ value: s, label: this.lifecycleLabel(s) })),
+  }, {
+    name: 'department',
+    label: this.t('PAYROLL.ENGINE_RESULTS.FILTER_DEPARTMENT'),
+    type: 'select',
+    searchable: true,
+    placeholder: this.t('PAYROLL.ENGINE_RESULTS.FILTER_ALL'),
+    options: this.filterOptions()?.departments ?? [],
+  }, {
+    name: 'contract',
+    label: this.t('PAYROLL.ENGINE_RESULTS.FILTER_CONTRACT'),
+    type: 'select',
+    placeholder: this.t('PAYROLL.ENGINE_RESULTS.FILTER_ALL'),
+    options: (this.filterOptions()?.contractTypes ?? []).map(c => ({ value: c, label: c })),
   }]);
 
   readonly filterConfig = computed<SearchToolbarFilterConfig>(() => ({
@@ -349,12 +379,20 @@ export class EngineResultsListComponent implements OnInit {
     resetLabel: this.t('PAYROLL.ENGINE_RESULTS.FILTER_RESET'),
     triggerLabel: this.t('PAYROLL.ENGINE_RESULTS.FILTER_TRIGGER'),
     // `daf-filter` seeds `initialValues` in its own shape — a `select` is a `string[]`.
-    initialValues: { pays: this.paysFilter() != null ? [String(this.paysFilter())] : [] },
+    initialValues: {
+      pays:       this.paysFilter() != null ? [String(this.paysFilter())] : [],
+      status:     this.statusFilter() ? [this.statusFilter()!] : [],
+      department: this.departmentFilter() ? [this.departmentFilter()!] : [],
+      contract:   this.contractFilter() ? [this.contractFilter()!] : [],
+    },
   }));
 
   applyFilters(result: FilterResult): void {
     const raw = result['pays'] as string | null;
     this.paysFilter.set(raw ? Number(raw) : null);
+    this.statusFilter.set((result['status'] as string | null) || null);
+    this.departmentFilter.set((result['department'] as string | null) || null);
+    this.contractFilter.set((result['contract'] as string | null) || null);
     this.page.set(0);
     this.load();
     this.loadKpis();

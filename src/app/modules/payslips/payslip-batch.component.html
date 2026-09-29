@@ -206,7 +206,7 @@
              panneau aligné à droite puisque le bouton est en bout d'en-tête. -->
         <daf-filter
           [fields]="historyFilterFields()"
-          [initialValues]="{ status: historyFilter() === 'ALL' ? [] : [historyFilter()] }"
+          [initialValues]="historyFilterSeed()"
           [title]="'PAYROLL.PAYSLIPS.HISTORY.FILTER_TITLE' | translate"
           [triggerLabel]="'PAYROLL.PAYSLIPS.HISTORY.FILTER_TRIGGER' | translate"
           [applyLabel]="'PAYROLL.PAYSLIPS.HISTORY.FILTER_APPLY' | translate"

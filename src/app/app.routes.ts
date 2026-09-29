@@ -58,8 +58,8 @@ export const routes: Routes = [
     children: [
       // Nine modules are enabled; each route here must have a matching sidebar entry in
       // `core/payroll-nav.ts`. If a screen has to be switched off, comment out BOTH.
-      // `admin` was folded into `parameter-sets` (the "+ Nouveau jeu" panel) and no longer
-      // has its own route.
+      // `admin` is the parameter-sets module, grown into the administration home;
+      // `parameter-sets` only redirects there.
       //
       // Every live route carries `permissionGuard` + `data.permissions`, using the same
       // code lists the sidebar filters on (`core/payroll-nav.ts`). The module had no route
@@ -115,13 +115,19 @@ export const routes: Routes = [
         loadChildren: () =>
           import('./modules/calibration/calibration.routes').then(m => m.CALIBRATION_ROUTES),
       },
+      // Administration de la paie — accueil en cartes (jeux de paramètres, pays, rubriques,
+      // avantages, règles des avances, journal…), comme /rh/admin. Le module garde son
+      // dossier `parameter-sets`, dont il est issu.
       {
-        path: 'parameter-sets',
+        path: 'admin',
         canActivate: [permissionGuard],
         data: { permissions: ['PAYROLL_VIEW_PARAMSET'] },
         loadChildren: () =>
           import('./modules/parameter-sets/parameter-sets.routes').then(m => m.PARAMETER_SETS_ROUTES),
       },
+      // Ancienne adresse : favoris et liens partagés. La redirection garde `?tab=`, `?pays=`
+      // et `?set=`.
+      { path: 'parameter-sets', redirectTo: 'admin', pathMatch: 'full' },
       {
         path: 'budget',
         canActivate: [permissionGuard],

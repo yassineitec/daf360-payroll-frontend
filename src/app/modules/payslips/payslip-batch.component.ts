@@ -30,6 +30,7 @@ import {
 import { NotificationService } from '../../core/notification.service';
 import { PayrollApiService, PaysDto } from '../../core/payroll-api.service';
 import { PayslipBatchResult, PayslipBatchService, PayslipPageStatus } from '../../core/payslip-batch.service';
+import { dayRange, distinctSorted, inDayRange, pickValue, rangeSeed } from '../../shared/filter-utils';
 
 const MONTH_KEYS = [
   'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
@@ -55,6 +56,11 @@ interface PayslipHistoryEntry {
 }
 
 type HistoryStatusFilter = 'ALL' | 'SUCCESS' | 'PARTIAL';
+
+/** Clé de période triable `YYYY-MM` — valeur du filtre « Période » de l'historique. */
+function periodKey(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, '0')}`;
+}
 
 /**
  * `/payroll/payslips` — upload the monthly multi-page payslip PDF (one employee per page,
@@ -321,21 +327,68 @@ export class PayslipBatchComponent implements OnInit {
   // ── Historique des importations ──────────────────────────────────────────
   readonly history = signal<PayslipHistoryEntry[]>([]);
   readonly historyFilter = signal<HistoryStatusFilter>('ALL');
+  readonly historyPaysFilter   = signal<number | null>(null);
+  /** Période au format `YYYY-MM`. */
+  readonly historyPeriodFilter = signal<string | null>(null);
+  /** Plage « Date de traitement » telle qu'émise par le panneau (`Date[]`). */
+  readonly historyProcessedFilter = signal<Date[] | null>(null);
 
-  // `daf-filter` : champ vide = tous les statuts ('ALL').
-  readonly historyFilterFields = computed<FilterField[]>(() => [{
-    name: 'status',
-    label: this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_STATUS'),
-    type: 'select',
-    placeholder: this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_ALL'),
-    options: [
-      { value: 'SUCCESS', label: this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_SUCCESS') },
-      { value: 'PARTIAL', label: this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_PARTIAL') },
-    ],
-  }]);
+  // `daf-filter` : champ vide = tous les statuts ('ALL'). Pays et période proposent les
+  // valeurs présentes dans l'historique.
+  readonly historyFilterFields = computed<FilterField[]>(() => {
+    const history = this.history();
+    const pays = new Map(history.map(h => [h.paysId, h.paysLabel || h.paysIso]));
+    const periods = distinctSorted(history.map(h => periodKey(h.periodYear, h.periodMonth))).reverse();
+    return [{
+      name: 'status',
+      label: this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_STATUS'),
+      type: 'select',
+      placeholder: this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_ALL'),
+      options: [
+        { value: 'SUCCESS', label: this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_SUCCESS') },
+        { value: 'PARTIAL', label: this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_PARTIAL') },
+      ],
+    }, {
+      name: 'pays',
+      label: this.t('PAYROLL.PAYSLIPS.HISTORY.PAYS'),
+      type: 'select',
+      searchable: true,
+      placeholder: this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_ALL_PAYS'),
+      options: [...pays.entries()]
+        .sort((a, b) => a[1].localeCompare(b[1]))
+        .map(([id, label]) => ({ value: String(id), label })),
+    }, {
+      name: 'period',
+      label: this.t('PAYROLL.PAYSLIPS.HISTORY.PERIOD'),
+      type: 'select',
+      placeholder: this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_ALL_PERIODS'),
+      options: periods.map(p => ({ value: p, label: this.periodLabel(p) })),
+    }, {
+      name: 'processedAt',
+      label: this.t('PAYROLL.PAYSLIPS.HISTORY.DATE'),
+      type: 'daterange',
+    }];
+  });
+
+  /** Amorçage du panneau — forme interne de `daf-filter` (un `select` est un `string[]`). */
+  readonly historyFilterSeed = computed<FilterResult>(() => ({
+    status:      this.historyFilter() === 'ALL' ? [] : [this.historyFilter()],
+    pays:        this.historyPaysFilter() != null ? [String(this.historyPaysFilter())] : [],
+    period:      this.historyPeriodFilter() ? [this.historyPeriodFilter()!] : [],
+    processedAt: this.historyProcessedFilter(),
+  }));
 
   applyHistoryFilter(result: FilterResult): void {
     this.historyFilter.set(((result['status'] as string | null) || 'ALL') as HistoryStatusFilter);
+    const pays = pickValue(result, 'pays');
+    this.historyPaysFilter.set(pays ? Number(pays) : null);
+    this.historyPeriodFilter.set(pickValue(result, 'period'));
+    this.historyProcessedFilter.set(rangeSeed(result['processedAt']));
+  }
+
+  private periodLabel(key: string): string {
+    const [year, month] = key.split('-').map(Number);
+    return `${this.t(`PAYROLL.PAYSLIPS.MONTHS.${MONTH_KEYS[month - 1]}`)} ${year}`;
   }
 
   private isFullSuccess(r: PayslipBatchResult): boolean {
@@ -354,8 +407,14 @@ export class PayslipBatchComponent implements OnInit {
 
   readonly historyRows = computed<TableRow[]>(() => {
     const filter = this.historyFilter();
+    const pays = this.historyPaysFilter();
+    const period = this.historyPeriodFilter();
+    const processed = dayRange(this.historyProcessedFilter());
     return this.history()
-      .filter(h => filter === 'ALL' || (filter === 'SUCCESS') === this.isFullSuccess(h.result))
+      .filter(h => (filter === 'ALL' || (filter === 'SUCCESS') === this.isFullSuccess(h.result))
+        && (pays == null || h.paysId === pays)
+        && (!period || periodKey(h.periodYear, h.periodMonth) === period)
+        && inDayRange(h.processedAt, processed))
       .map(h => {
         const ok = this.isFullSuccess(h.result);
         return {

@@ -1,5 +1,19 @@
-.page-body     { display: flex; flex-direction: column; gap: 1.5rem; padding: 0 0 2rem; }
-.alert--error  { background: #fee2e2; color: #991b1b; padding: .75rem 1rem; border-radius: 6px; font-size: .875rem; }
+/* Mise en page de /payroll/admin (et /rh/admin) : annule le padding de `.shell-content`
+   puis repose 24px à l'intérieur. */
+:host { display: block; margin: -2rem; }
+@media (max-width: 1024px) { :host { margin: -1.5rem; } }
+@media (max-width: 768px)  { :host { margin: 0; } }
+.ec-content { min-width: 0; overflow-x: hidden; padding: 20px 24px 24px; }
+@media (max-width: 640px) { .ec-content { padding: 12px 16px 16px; } }
+
+/* Fil d'Ariane seul : le nom du collaborateur est repris par l'en-tête de section. */
+.ec-breadcrumb-header { display: block; }
+.ec-breadcrumb-header ::ng-deep h1 { display: none; }
+.ec-breadcrumb-header ::ng-deep nav { font-size: 15px; line-height: 1.4; }
+
+.page-body     { display: flex; flex-direction: column; gap: 16px; }
+.alert--error  { padding: 8px 12px; border-radius: 8px; font-size: 12px;
+                 background: var(--color-error-container); color: var(--color-on-error-container); }
 
 
 /* ── Onglet « Configuration » — mêmes mesures que le formulaire « Nouveau jeu » de

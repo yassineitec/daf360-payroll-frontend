@@ -1,13 +1,15 @@
+<!-- Mise en page d'une section de /payroll/admin : fil d'Ariane seul (Administration ›
+     Salaires des collaborateurs › collaborateur), puis l'en-tête de section du collaborateur. -->
+<div class="ec-content">
 <daf-page [breadcrumbs]="true">
-  <!-- Pas de bouton "Retour à la liste" : le fil d'Ariane (`Configuration employé`)
-       ramène déjà à `/payroll/employee-config`. Titre = le collaborateur ouvert. -->
   <daf-page-header
+    class="ec-breadcrumb-header"
     [title]="employeeName()"
-    [subtitle]="employeeSubtitle()"
     [breadcrumbs]="breadcrumbs()">
   </daf-page-header>
 
   <div class="page-body">
+      <app-admin-section-header [title]="employeeName()" [subtitle]="employeeSubtitle()" />
 
       @if (loading()) {
         <daf-card [options]="{ variant: 'default', padding: 'lg', radius: 'xl' }">
@@ -134,6 +136,10 @@
               </daf-form-field>
             </div>
 
+            <!-- Refus du serveur : bandeau, comme les pop-ups de l'administration. -->
+            @if (saveError()) {
+              <div class="alert alert--error" role="alert">{{ saveError() }}</div>
+            }
             <div class="form-actions">
               <daf-button
                 [label]="'PAYROLL.EMPLOYEE_CONFIG.RESET' | translate"
@@ -240,3 +246,4 @@
       }
   </div>
 </daf-page>
+</div>

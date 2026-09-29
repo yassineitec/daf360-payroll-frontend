@@ -1,78 +1,118 @@
+<!-- Même structure que /rh/admin (admin.component) : sans `?tab=`, un accueil — titre,
+     entité, puis une carte par section ; une carte ouvre sa section dans `daf-page`, sous le
+     seul fil d'Ariane "Administration › <section>", qui ramène à l'accueil. -->
+@if (activeTab() === null) {
+  <div class="ps-home-header">
+    <h2 class="ps-home-title">{{ 'PAYROLL.ADMIN_HOME.TITLE' | translate }}</h2>
+    <p class="ps-home-sub">{{ 'PAYROLL.ADMIN_HOME.ENTITY' | translate: { pays: currentPays() } }}</p>
+  </div>
+
+  <!-- Même recette de cartes de module que /rh/admin : `daf-card` glass cliquables, icône
+       pleine colorée par ton, titre seul. -->
+  <!-- Aide au survol : `daf-help-popover` de la bibliothèque, révélé par toute la carte
+       (souris ou focus clavier, Échap pour fermer) comme `daf-metric-card` — pas de glyphe,
+       la tuile est petite et entièrement cliquable. Titre + description + exemple. -->
+  <section class="ps-home-cards">
+    @for (card of cards(); track card.key) {
+      <div
+        #cardAnchor
+        class="ps-home-card"
+        [attr.aria-describedby]="'admin-help-' + card.key"
+        (mouseenter)="helpOpen.set(card.key)"
+        (mouseleave)="helpOpen.set(null)"
+        (focusin)="helpOpen.set(card.key)"
+        (focusout)="helpOpen.set(null)"
+        (keydown.escape)="helpOpen.set(null)">
+        <daf-card
+          [options]="{
+            variant: 'glass', padding: 'lg', radius: 'xl', hoverable: true, clickable: true, fullHeight: true,
+            icon: card.icon, iconFilled: true,
+            iconBg: toneIcon(card.tone).iconBg, iconColor: toneIcon(card.tone).iconColor,
+            title: (card.labelKey | translate)
+          }"
+          (cardClick)="openCard(card)" />
+        <daf-help-popover
+          [attr.id]="'admin-help-' + card.key"
+          [anchor]="cardAnchor"
+          [open]="helpOpen() === card.key"
+          [heading]="card.labelKey | translate"
+          [text]="('PAYROLL.ADMIN_HOME.HELP.' + card.helpKey) | translate"
+          placement="bottom"
+          align="start" />
+      </div>
+    }
+  </section>
+} @else {
+<div class="ps-tab-content">
 <daf-page [loading]="firstLoad()" [loadingLabel]="'PAYROLL.COMMON.LOADING' | translate" [kpis]="0" [breadcrumbs]="true">
-  <!-- Page détail d'un jeu (`?set=`) : même en-tête, mais titre = le jeu, fil d'Ariane
-       "Paie › Paramètres › v3 — 2026" (comme /rh/admin), et les actions du workflow à
-       droite (slot `pageActions`). -->
+  <!-- Fil d'Ariane seul, comme /rh/admin : le titre de `daf-page-header`, qui répéterait le
+       dernier maillon, est masqué ; chaque section porte ensuite son propre petit en-tête
+       (titre, aide, commandes). Sur la page détail d'un jeu (`?set=`) : un maillon de plus,
+       le statut en sous-titre et les actions du workflow à droite. -->
   @if (activeTab() === 'list' && detailSet(); as ps) {
     <daf-page-header
+      class="ps-breadcrumb-header"
       [title]="itemTitle(ps)"
-      [subtitle]="detailSubtitle(ps)"
-      [breadcrumbs]="breadcrumbs()">
-      <div pageActions class="ps-item-actions">
-        @if (ps.status === 'DRAFT') {
-          <daf-button [label]="'PAYROLL.PARAMETER_SETS.SUBMIT_BUTTON' | translate" variant="primary" (onClick)="submit(ps.id)" />
-        }
-        @if (ps.status === 'PENDING_FINANCE' && !ps.approvedByHr) {
-          <daf-button [label]="'PAYROLL.PARAMETER_SETS.APPROVE_HR_BUTTON' | translate" variant="secondary" (onClick)="approveHr(ps.id)" />
-        }
-        @if (ps.status === 'PENDING_FINANCE' && !ps.approvedByFinance) {
-          <daf-button [label]="'PAYROLL.PARAMETER_SETS.APPROVE_FINANCE_BUTTON' | translate" variant="secondary" (onClick)="approveFinance(ps.id)" />
-        }
-      </div>
-    </daf-page-header>
+      [breadcrumbs]="breadcrumbs()"
+      (breadcrumbNavigate)="onBreadcrumb($event)" />
   } @else {
     <daf-page-header
-      [title]="'PAYROLL.PARAMETER_SETS.TITLE' | translate"
-      [subtitle]="'PAYROLL.PARAMETER_SETS.SUBTITLE' | translate"
-      [breadcrumbs]="breadcrumbs()">
-    </daf-page-header>
-
-    <div class="ps-tabs-wrap">
-      <daf-tabs [tabs]="tabs()" [(active)]="activeTab" [tabsLabel]="'PAYROLL.PARAMETER_SETS.TITLE' | translate" [idPrefix]="'parameter-sets-tabs'" />
-    </div>
+      class="ps-breadcrumb-header"
+      [title]="currentSectionLabelKey() | translate"
+      [breadcrumbs]="breadcrumbs()"
+      (breadcrumbNavigate)="onBreadcrumb($event)" />
   }
 
   @switch (activeTab()) {
 
+    <!-- ══════════ Sections d'administration (composants autonomes, dossier admin/) ══════════ -->
+    @case ('countries')     { <app-payroll-countries-admin /> }
+    @case ('engine-params') { <app-engine-params-admin /> }
+    @case ('rubriques')     { <app-engine-rubriques-admin /> }
+    @case ('benefits')      { <app-benefits-catalogue-admin /> }
+    @case ('advance-rules') { <app-advance-rules-admin /> }
+    @case ('audit')         { <app-payroll-audit-admin /> }
+
     <!-- ══════════════════════════ Onglet "Nouveau jeu" ══════════════════════════ -->
     @case ('create') {
       <div class="ps-create-layout">
-        <!-- Même structure que le formulaire de référence de la bibliothèque (demo-app,
-             section "Formulaires") : daf-card `default`, titre de section, puis une colonne
-             de blocs espacés uniformément (`.ps-form`) au lieu de marges au cas par cas. -->
+        <!-- En-tête de section comme /rh/admin (titre + aide) ; puis le formulaire : daf-card
+             `default` et une colonne de blocs espacés uniformément (`.ps-form`). -->
+        <app-admin-section-header
+          [title]="'PAYROLL.ADMIN_HOME.CARDS.CREATE' | translate"
+          [subtitle]="'PAYROLL.ADMIN.SUBTITLE' | translate" />
         <daf-card [options]="{ variant: 'default', padding: 'lg', radius: 'xl' }" [formGroup]="newSetForm">
          <div class="ps-form">
-
-          <daf-section-title [title]="'PAYROLL.ADMIN.CARD_TITLE' | translate" />
 
           <div class="field-row">
             <daf-select
               [options]="paysOptions()"
               [selected]="newSetForm.get('paysId')!.value ? ['' + newSetForm.get('paysId')!.value] : []"
-              [config]="{ label: 'PAYROLL.ADMIN.PAYS' | translate, placeholder: 'PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate, searchable: true, fullWidth: true, required: true }"
-              (selectedChange)="newSetForm.get('paysId')!.setValue($event[0] ? +$event[0] : null)">
+              [config]="{ label: 'PAYROLL.ADMIN.PAYS' | translate, placeholder: 'PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate, searchable: true, fullWidth: true, required: true, error: newSetFieldError('paysId') }"
+              (selectedChange)="setNewSetValue('paysId', $event[0] ? +$event[0] : null)">
             </daf-select>
             <daf-form-field
-              [options]="{ label: 'PAYROLL.ADMIN.FISCAL_YEAR' | translate, type: 'number' }"
+              [options]="{ label: 'PAYROLL.ADMIN.FISCAL_YEAR' | translate, type: 'number', required: true, error: newSetFieldError('fiscalYear') }"
               [value]="newSetForm.get('fiscalYear')!.value"
-              (valueChange)="newSetForm.get('fiscalYear')!.setValue(+($event ?? 0))">
+              (valueChange)="setNewSetValue('fiscalYear', num($event))">
             </daf-form-field>
           </div>
 
           <div class="field-row">
             <daf-form-field
-              [options]="{ label: 'PAYROLL.ADMIN.TOLERANCE' | translate, type: 'number' }"
+              [options]="{ label: 'PAYROLL.ADMIN.TOLERANCE' | translate, type: 'number', required: true, error: newSetFieldError('convergenceTolerance') }"
               [value]="newSetForm.get('convergenceTolerance')!.value"
-              (valueChange)="newSetForm.get('convergenceTolerance')!.setValue(+($event ?? 0))">
+              (valueChange)="setNewSetValue('convergenceTolerance', num($event))">
             </daf-form-field>
             <daf-form-field
-              [options]="{ label: 'PAYROLL.ADMIN.MAX_ITERATIONS' | translate, type: 'number' }"
+              [options]="{ label: 'PAYROLL.ADMIN.MAX_ITERATIONS' | translate, type: 'number', required: true, error: newSetFieldError('maxConvergenceIterations') }"
               [value]="newSetForm.get('maxConvergenceIterations')!.value"
-              (valueChange)="newSetForm.get('maxConvergenceIterations')!.setValue(+($event ?? 0))">
+              (valueChange)="setNewSetValue('maxConvergenceIterations', num($event))">
             </daf-form-field>
             <daf-form-field
-              [options]="{ label: 'PAYROLL.ADMIN.CALIBRATION_THRESHOLD' | translate, type: 'number' }"
+              [options]="{ label: 'PAYROLL.ADMIN.CALIBRATION_THRESHOLD' | translate, type: 'number', required: true, error: newSetFieldError('calibrationThresholdPct') }"
               [value]="newSetForm.get('calibrationThresholdPct')!.value"
-              (valueChange)="newSetForm.get('calibrationThresholdPct')!.setValue(+($event ?? 0))">
+              (valueChange)="setNewSetValue('calibrationThresholdPct', num($event))">
             </daf-form-field>
           </div>
 
@@ -84,16 +124,18 @@
                 label: 'PAYROLL.ADMIN.IRPP_BRACKETS' | translate,
                 type: 'textarea',
                 rows: 6,
+                required: true,
                 hint: 'PAYROLL.ADMIN.IRPP_HINT' | translate,
-                placeholder: '[{\'lower\':0,\'upper\':5000,\'rate\':0.00},{\'lower\':5000,\'upper\':20000,\'rate\':0.26}]'
+                placeholder: irppPlaceholder,
+                error: newSetFieldError('irppBrackets')
               }"
               [value]="newSetForm.get('irppBrackets')!.value"
-              (valueChange)="newSetForm.get('irppBrackets')!.setValue(($event ?? '').toString())">
+              (valueChange)="setNewSetValue('irppBrackets', ($event ?? '').toString())">
             </daf-form-field>
             <div class="ps-inline-actions">
               <daf-badge
-                [label]="(isJsonValid(newSetForm.get('irppBrackets')!.value) ? 'PAYROLL.ADMIN.JSON_VALID' : 'PAYROLL.ADMIN.JSON_INVALID') | translate"
-                [options]="{ variant: isJsonValid(newSetForm.get('irppBrackets')!.value) ? 'success' : 'danger', size: 'sm', icon: isJsonValid(newSetForm.get('irppBrackets')!.value) ? 'check_circle' : 'error' }">
+                [label]="(newSetForm.get('irppBrackets')!.valid ? 'PAYROLL.ADMIN.JSON_VALID' : 'PAYROLL.ADMIN.JSON_INVALID') | translate"
+                [options]="{ variant: newSetForm.get('irppBrackets')!.valid ? 'success' : 'danger', size: 'sm', icon: newSetForm.get('irppBrackets')!.valid ? 'check_circle' : 'error' }">
               </daf-badge>
               <daf-button
                 [label]="'PAYROLL.ADMIN.REFORMAT' | translate"
@@ -107,7 +149,7 @@
           <daf-form-field
             [options]="{ label: 'PAYROLL.ADMIN.RATIONALE' | translate, placeholder: 'PAYROLL.ADMIN.RATIONALE_PLACEHOLDER' | translate }"
             [value]="newSetForm.get('changeRationale')!.value"
-            (valueChange)="newSetForm.get('changeRationale')!.setValue(($event ?? '').toString())">
+            (valueChange)="setNewSetValue('changeRationale', ($event ?? '').toString())">
           </daf-form-field>
 
           <!-- Charges sociales : titre + bouton sur une ligne simple (plus de bandeau coloré),
@@ -127,38 +169,38 @@
             <daf-data-table [columns]="newSetRateColumns()" [rows]="newSetRateRows()" [config]="newSetRateTableConfig()">
               <ng-template dafCell="contractType" let-row let-i="index">
                 <daf-select
-                  [options]="contractTypeOptions()"
+                  [options]="newSetContractTypeOptions()"
                   [selected]="[newSetRateGroup(i).get('contractType')!.value]"
-                  [config]="{ fullWidth: true }"
-                  (selectedChange)="newSetRateGroup(i).get('contractType')!.setValue($event[0])">
+                  [config]="{ fullWidth: true, placeholder: ('PAYROLL.ADMIN.CONTRACT_PLACEHOLDER' | translate), error: newSetRateError(i, 'contractType') }"
+                  (selectedChange)="setNewSetRateValue(i, 'contractType', $event[0])">
                 </daf-select>
               </ng-template>
               <ng-template dafCell="chargeCode" let-row let-i="index">
                 <daf-form-field
-                  [options]="{ placeholder: 'CNSS' }"
+                  [options]="{ placeholder: 'CNSS', error: newSetRateError(i, 'chargeCode') }"
                   [value]="newSetRateGroup(i).get('chargeCode')!.value"
-                  (valueChange)="newSetRateGroup(i).get('chargeCode')!.setValue(($event ?? '').toString())">
+                  (valueChange)="setNewSetRateValue(i, 'chargeCode', ($event ?? '').toString())">
                 </daf-form-field>
               </ng-template>
               <ng-template dafCell="chargeLabel" let-row let-i="index">
                 <daf-form-field
-                  [options]="{ placeholder: 'PAYROLL.ADMIN.CHARGE_LABEL_PLACEHOLDER' | translate }"
+                  [options]="{ placeholder: 'PAYROLL.ADMIN.CHARGE_LABEL_PLACEHOLDER' | translate, error: newSetRateError(i, 'chargeLabel') }"
                   [value]="newSetRateGroup(i).get('chargeLabel')!.value"
-                  (valueChange)="newSetRateGroup(i).get('chargeLabel')!.setValue(($event ?? '').toString())">
+                  (valueChange)="setNewSetRateValue(i, 'chargeLabel', ($event ?? '').toString())">
                 </daf-form-field>
               </ng-template>
               <ng-template dafCell="employeeRate" let-row let-i="index">
                 <daf-form-field
-                  [options]="{ type: 'number', placeholder: '0.0918' }"
+                  [options]="{ type: 'number', placeholder: '0.0918', error: newSetRateError(i, 'employeeRate') }"
                   [value]="newSetRateGroup(i).get('employeeRate')!.value"
-                  (valueChange)="newSetRateGroup(i).get('employeeRate')!.setValue(+($event ?? 0))">
+                  (valueChange)="setNewSetRateValue(i, 'employeeRate', num($event))">
                 </daf-form-field>
               </ng-template>
               <ng-template dafCell="employerRate" let-row let-i="index">
                 <daf-form-field
-                  [options]="{ type: 'number', placeholder: '0.1657' }"
+                  [options]="{ type: 'number', placeholder: '0.1657', error: newSetRateError(i, 'employerRate') }"
                   [value]="newSetRateGroup(i).get('employerRate')!.value"
-                  (valueChange)="newSetRateGroup(i).get('employerRate')!.setValue(+($event ?? 0))">
+                  (valueChange)="setNewSetRateValue(i, 'employerRate', num($event))">
                 </daf-form-field>
               </ng-template>
               <ng-template dafCell="baseCalculation" let-row let-i="index">
@@ -166,14 +208,14 @@
                   [options]="baseCalcOptions()"
                   [selected]="[newSetRateGroup(i).get('baseCalculation')!.value]"
                   [config]="{ fullWidth: true }"
-                  (selectedChange)="newSetRateGroup(i).get('baseCalculation')!.setValue($event[0])">
+                  (selectedChange)="setNewSetRateValue(i, 'baseCalculation', $event[0])">
                 </daf-select>
               </ng-template>
               <ng-template dafCell="capAmount" let-row let-i="index">
                 <daf-form-field
-                  [options]="{ type: 'number', placeholder: '—', suffixText: newSetDevise() }"
+                  [options]="{ type: 'number', placeholder: '—', suffixText: newSetDevise(), error: newSetRateError(i, 'capAmount') }"
                   [value]="newSetRateGroup(i).get('capAmount')!.value"
-                  (valueChange)="newSetRateGroup(i).get('capAmount')!.setValue($event === '' || $event == null ? null : +$event)">
+                  (valueChange)="setNewSetRateValue(i, 'capAmount', num($event))">
                 </daf-form-field>
               </ng-template>
             </daf-data-table>
@@ -187,11 +229,16 @@
             description: ('PAYROLL.ADMIN.WORKFLOW_TEXT' | translate)
           }" />
 
+          <!-- Erreur de création (formulaire incomplet ou refus du serveur) : bandeau, comme
+               l'.error-banner des sections RH ; le bouton reste actif pour révéler les erreurs. -->
+          @if (newSetError()) {
+            <div class="admin-error-banner" role="alert">{{ newSetError() }}</div>
+          }
           <div class="form-actions">
             <daf-button
               [label]="(savingNewSet() ? 'PAYROLL.ADMIN.SUBMITTING' : 'PAYROLL.ADMIN.SUBMIT') | translate"
               variant="teal"
-              [options]="{ loading: savingNewSet(), disabled: newSetForm.invalid || savingNewSet() }"
+              [options]="{ loading: savingNewSet(), disabled: savingNewSet() }"
               (onClick)="submitNewSet()">
             </daf-button>
           </div>
@@ -207,7 +254,46 @@
           <!-- ══ Page détail d'un jeu ("Gérer") — onglets internes comme la barre d'onglets
                de /finance/admin : une section à la fois, chacune avec son titre, son
                bouton "Modifier" (mêmes pop-ups qu'avant) et son tableau en lecture seule. ══ -->
-          <daf-tabs [tabs]="detailTabs()" [(active)]="detailTab" [tabsLabel]="itemTitle(ps)" [idPrefix]="'parameter-set-detail-tabs'" />
+          <!-- En-tête de section comme les autres sections : version, statut, approbations
+               (Directeur Pays / DAF) et, à droite, l'étape suivante du circuit de validation
+               (bouton vert, confirmation avant envoi). -->
+          <app-admin-section-header [title]="itemTitle(ps)" [subtitle]="approvalLine(ps)">
+            <daf-badge
+              [label]="statusLabel(ps)"
+              [options]="{ variant: setStatusVariant(ps), size: 'sm', dot: true }" />
+            @for (step of workflowSteps(ps); track step) {
+              <daf-button
+                [label]="workflowLabel(step) | translate"
+                variant="teal"
+                [options]="{ iconStart: step === 'submit' ? 'send' : 'verified' }"
+                (onClick)="askWorkflow(step, ps)" />
+            }
+          </app-admin-section-header>
+
+          <!-- Onglets + action de l'onglet à droite (le « Ajouter » des sections RH) ; seul un
+               brouillon se modifie — sinon une mention « lecture seule ». -->
+          <div class="ps-detail-tabs">
+            <div class="ps-detail-tabs__tabs">
+              <daf-tabs [tabs]="detailTabs()" [(active)]="detailTab" [tabsLabel]="itemTitle(ps)" [idPrefix]="'parameter-set-detail-tabs'" />
+            </div>
+            @if (ps.status !== 'DRAFT') {
+              <p class="editor-hint ps-readonly">
+                <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+                {{ 'PAYROLL.PARAMETER_SETS.READONLY_HINT' | translate: { status: statusLabel(ps) } }}
+              </p>
+            } @else if (detailTab() !== 'benefits') {
+              <daf-button class="admin-desktop-only"
+                [label]="'PAYROLL.PARAMETER_SETS.EDIT' | translate"
+                variant="teal"
+                [options]="{ iconStart: 'edit' }"
+                (onClick)="detailTab() === 'rubriques' ? openRubriquesEditor(ps) : openChargesEditor(ps)" />
+              <daf-button class="admin-mobile-only"
+                [title]="'PAYROLL.PARAMETER_SETS.EDIT' | translate"
+                variant="teal"
+                [options]="{ iconStart: 'edit', size: 'sm' }"
+                (onClick)="detailTab() === 'rubriques' ? openRubriquesEditor(ps) : openChargesEditor(ps)" />
+            }
+          </div>
 
           <!-- Chiffres et tableau séparés, directement sur la page (plus de carte englobante) :
                les tuiles `daf-metric-card` d'un côté, le `daf-data-table` — qui a déjà son
@@ -216,14 +302,6 @@
           @switch (detailTab()) {
             @case ('rubriques') {
                 <div class="ps-field-block">
-                  <div class="ps-section-toolbar">
-                    <daf-button
-                      [label]="'PAYROLL.PARAMETER_SETS.EDIT' | translate"
-                      variant="secondary"
-                      [options]="{ size: 'sm', iconStart: 'edit' }"
-                      (onClick)="openRubriquesEditor(ps)">
-                    </daf-button>
-                  </div>
                   <daf-data-table [columns]="rubriquesColumns()" [rows]="rubriquesRows(ps)" [config]="readTableConfig('PAYROLL.PARAMETER_SETS.RUBRIQUES_EMPTY_READONLY')" />
                 </div>
             }
@@ -252,52 +330,46 @@
                 </div>
               }
                 <div class="ps-field-block">
-                  <div class="ps-section-toolbar">
-                    <daf-button
-                      [label]="'PAYROLL.PARAMETER_SETS.EDIT' | translate"
-                      variant="secondary"
-                      [options]="{ size: 'sm', iconStart: 'edit' }"
-                      (onClick)="openChargesEditor(ps)">
-                    </daf-button>
-                  </div>
                   <daf-data-table [columns]="chargesColumns()" [rows]="chargesRows(ps)" [config]="readTableConfig('PAYROLL.PARAMETER_SETS.CHARGES_EMPTY_READONLY')" />
                 </div>
             }
           }
         } @else {
-          <!-- Recherche + bouton filtre (PAYS et statut) — toujours affichés, même vides :
-               c'est ici que le pays se choisit. -->
-          <daf-search-toolbar
-            [placeholder]="'PAYROLL.PARAMETER_SETS.SEARCH_PLACEHOLDER' | translate"
-            [value]="searchText()"
-            (valueChange)="onSearchTextChange($event)"
-            [debounce]="300"
-            [filterFields]="filterFields()"
-            [filterConfig]="filterConfig()"
-            (filterApply)="applyFilters($event)">
-          </daf-search-toolbar>
+          <!-- En-tête de section comme /rh/admin : titre (avec le nombre de jeux), aide, et à
+               droite la recherche + le bouton filtre (PAYS et statut) — toujours affichés, même
+               vides : c'est ici que le pays se choisit. -->
+          <app-admin-section-header
+            [title]="'PAYROLL.ADMIN_HOME.CARDS.LIST_COUNT' | translate: { count: filteredParamSets().length }"
+            [subtitle]="'PAYROLL.PARAMETER_SETS.SUBTITLE' | translate">
+            <div class="ps-search">
+              <daf-search-toolbar
+                [card]="false"
+                [placeholder]="'PAYROLL.PARAMETER_SETS.SEARCH_PLACEHOLDER' | translate"
+                [value]="searchText()"
+                (valueChange)="onSearchTextChange($event)"
+                [debounce]="300"
+                [filterFields]="filterFields()"
+                [filterConfig]="filterConfig()"
+                (filterApply)="applyFilters($event)">
+              </daf-search-toolbar>
+            </div>
+          </app-admin-section-header>
 
-          <!-- Grille de cartes "Gérer", même recette que /finance/admin et /rh/admin : une
-               carte cliquable par jeu, ouvrant sa page détail (`?set=`). Une icône pleine
-               par statut (`cardIcon`), sans couleur par statut : couleurs par défaut de la
-               bibliothèque, identiques sur toutes les cartes. -->
-          <daf-section-title [title]="'PAYROLL.PARAMETER_SETS.PARAM_SETS_TITLE' | translate: { count: filteredParamSets().length }" />
-          <div class="ps-card-grid">
-            @for (ps of filteredParamSets(); track ps.id) {
-              <daf-card
-                [options]="{
-                  variant: 'glass', padding: 'lg', radius: 'xl',
-                  hoverable: true, clickable: true, fullHeight: true,
-                  icon: cardIcon(ps), iconFilled: true,
-                  title: itemTitle(ps),
-                  description: cardDescription(ps),
-                  action: { label: ('PAYROLL.PARAMETER_SETS.MANAGE' | translate) }
-                }"
-                (cardClick)="openSet(ps)" />
-            } @empty {
-              <daf-card class="ps-grid-empty" [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl', icon: 'info', description: emptyMessage() }" />
-            }
-          </div>
+          <!-- Tableau paginé comme les sections de /rh/admin : chargement, message centré si
+               vide, 5 lignes par page ; l'action « Gérer » ouvre la page détail (`?set=`). -->
+          @if (loading()) {
+            <app-admin-spinner />
+          } @else if (!setRows().length) {
+            <div class="admin-empty"><p>{{ emptyMessage() }}</p></div>
+          } @else {
+            <div class="admin-table-scroll">
+              <daf-data-table [columns]="setColumns()" [rows]="setPager.rows()" [config]="setTableConfig()" />
+            </div>
+            <app-admin-table-footer
+              [total]="setPager.total()" [page]="setPager.current()" [totalPages]="setPager.totalPages()"
+              [unit]="'PAYROLL.ADMIN_HOME.COUNT.SETS' | translate"
+              (pageChange)="setPager.go($event)" />
+          }
         }
       </div>
 
@@ -312,12 +384,6 @@
         <div class="charges-editor" [formGroup]="chargesForm">
           <div class="editor-toolbar">
             <daf-button [label]="'PAYROLL.PARAMETER_SETS.ADD_CHARGE_LINE' | translate" variant="secondary" [options]="{ size: 'sm', iconStart: 'add' }" (onClick)="addEditRate()" />
-            <daf-button
-              [label]="(savingCharges() ? 'PAYROLL.PARAMETER_SETS.SAVING' : 'PAYROLL.PARAMETER_SETS.SAVE') | translate"
-              variant="primary"
-              [options]="{ size: 'sm', loading: savingCharges(), disabled: savingCharges() }"
-              (onClick)="saveCharges(editingChargesId()!)">
-            </daf-button>
           </div>
 
           <!-- `daf-data-table` à cellules éditables (au lieu de la grille maison). En mode
@@ -418,6 +484,36 @@
           @if (hasFormulaRate()) {
             <p class="editor-hint">{{ 'PAYROLL.PARAMETER_SETS.FORMULA_ORDER_HINT' | translate }}</p>
           }
+
+          @if (chargesError()) {
+            <div class="admin-error-banner" role="alert">{{ chargesError() }}</div>
+          }
+          <app-admin-modal-footer
+            [saveLabel]="'PAYROLL.PARAMETER_SETS.SAVE' | translate"
+            [cancelLabel]="'PAYROLL.ADMIN_HOME.CANCEL' | translate"
+            [saving]="savingCharges()"
+            (save)="saveCharges(editingChargesId()!)"
+            (cancel)="closeChargesEditor()" />
+        </div>
+      </ng-template>
+
+      <ng-template #workflowConfirmTpl>
+        <div class="workflow-confirm">
+          @if (pendingWorkflow(); as w) {
+            <p>{{ workflowMessage(w.step) | translate: { version: itemTitle(w.ps) } }}</p>
+            @if (w.step !== 'submit') {
+              <p class="editor-hint">{{ 'PAYROLL.PARAMETER_SETS.CONFIRM_ACTIVATION_HINT' | translate }}</p>
+            }
+            @if (workflowError()) {
+              <div class="admin-error-banner" role="alert">{{ workflowError() }}</div>
+            }
+            <app-admin-modal-footer
+              [saveLabel]="workflowLabel(w.step) | translate"
+              [cancelLabel]="'PAYROLL.ADMIN_HOME.CANCEL' | translate"
+              [saving]="workflowSaving()"
+              (save)="confirmWorkflow()"
+              (cancel)="closeWorkflow()" />
+          }
         </div>
       </ng-template>
 
@@ -425,12 +521,6 @@
         <div class="rubriques-editor" [formGroup]="rubriquesForm">
           <div class="editor-toolbar">
             <daf-button [label]="'PAYROLL.PARAMETER_SETS.ADD_RUBRIQUE' | translate" variant="secondary" [options]="{ size: 'sm', iconStart: 'add' }" (onClick)="addEditRubrique()" />
-            <daf-button
-              [label]="(savingRubriques() ? 'PAYROLL.PARAMETER_SETS.SAVING' : 'PAYROLL.PARAMETER_SETS.SAVE_ALL') | translate"
-              variant="primary"
-              [options]="{ size: 'sm', loading: savingRubriques(), disabled: savingRubriques() }"
-              (onClick)="saveRubriques(editingRubriquesId()!)">
-            </daf-button>
           </div>
 
           @if (editRubriques.length === 0) {
@@ -650,8 +740,20 @@
               }
             </ng-container>
           }
+
+          @if (rubriquesError()) {
+            <div class="admin-error-banner" role="alert">{{ rubriquesError() }}</div>
+          }
+          <app-admin-modal-footer
+            [saveLabel]="'PAYROLL.PARAMETER_SETS.SAVE_ALL' | translate"
+            [cancelLabel]="'PAYROLL.ADMIN_HOME.CANCEL' | translate"
+            [saving]="savingRubriques()"
+            (save)="saveRubriques(editingRubriquesId()!)"
+            (cancel)="closeRubriquesEditor()" />
         </div>
       </ng-template>
     }
   }
 </daf-page>
+</div>
+}

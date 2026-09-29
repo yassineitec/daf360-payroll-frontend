@@ -24,6 +24,7 @@ import {
 } from '@khalilrebhiitec/daf360';
 import { PayrollApiService, BenefitCatalogueDto, PaysDto } from '../../core/payroll-api.service';
 import { HrProfileService, HrContractType } from '../../core/hr-profile.service';
+import { AdminSectionHeaderComponent } from '../parameter-sets/admin/admin-section-header.component';
 import { NotificationService } from '../../core/notification.service';
 import {
   EmployeeConfigService, EmployeePayrollConfigDto, EmployeePayrollBonusDto,
@@ -51,7 +52,7 @@ const BONUS_CURRENCIES = ['TND', 'EUR', 'USD', 'EGP', 'SAR', 'AED'];
   imports: [
     TranslatePipe,
     ButtonComponent, CardComponent, CheckboxComponent, DataTableComponent, FormFieldComponent,
-    PageComponent, PageHeaderComponent, SectionCardComponent,
+    AdminSectionHeaderComponent, PageComponent, PageHeaderComponent, SectionCardComponent,
     SelectComponent, SkeletonComponent, TabsComponent,
   ],
   templateUrl: './employee-config.component.html',
@@ -89,7 +90,7 @@ export class EmployeeConfigComponent implements OnInit {
     this.employee()?.fullName ?? this.t('PAYROLL.EMPLOYEE_CONFIG.EMPLOYEE_FALLBACK', { id: this.userId }));
 
   readonly breadcrumbs = computed((): BreadcrumbItem[] => [
-    { label: this.t('PAYROLL.COMMON.BREADCRUMB_ROOT'), link: '/payroll' },
+    { label: this.t('PAYROLL.ADMIN_HOME.TITLE'), link: '/payroll/admin' },
     { label: this.t('PAYROLL.EMPLOYEE_CONFIG.BREADCRUMB'), link: '/payroll/employee-config' },
     { label: this.employeeName() },
   ]);
@@ -181,6 +182,8 @@ export class EmployeeConfigComponent implements OnInit {
   readonly saving = signal(false);
   readonly calculatingNet = signal(false);
   readonly loadError = signal<string | null>(null);
+  /** Refus d'enregistrement (motif du serveur), en bandeau au-dessus des boutons. */
+  readonly saveError = signal<string | null>(null);
 
   readonly bonuses = signal<EmployeePayrollBonusDto[]>([]);
   readonly bonusesLoading = signal(false);
@@ -218,8 +221,22 @@ export class EmployeeConfigComponent implements OnInit {
     { key: 'period',  label: this.t('PAYROLL.EMPLOYEE_CONFIG.BONUS_PERIOD') },
     { key: 'label',   label: this.t('PAYROLL.EMPLOYEE_CONFIG.BONUS_LABEL') },
     { key: 'comment', label: this.t('PAYROLL.EMPLOYEE_CONFIG.BONUS_COMMENT_COL') },
-    { key: 'amount',  label: this.t('PAYROLL.EMPLOYEE_CONFIG.BONUS_AMOUNT'), align: 'right' },
+    // Montant brut formaté par la colonne ; une devise commune passe dans le format, sinon
+    // chaque ligne affiche la sienne dans une colonne dédiée.
+    {
+      key: 'amount', label: this.t('PAYROLL.EMPLOYEE_CONFIG.BONUS_AMOUNT'), type: 'currency',
+      format: { currency: this.bonusCurrency() ?? undefined, minimumFractionDigits: 2, maximumFractionDigits: 2 },
+    },
+    ...(this.bonusCurrency() == null && this.bonuses().length
+      ? [{ key: 'currency', label: this.t('PAYROLL.EMPLOYEE_CONFIG.CURRENCY') }]
+      : []),
   ]);
+
+  /** Devise unique des primes enregistrées, ou `null` si elles en mélangent plusieurs. */
+  private readonly bonusCurrency = computed(() => {
+    const set = new Set(this.bonuses().map(b => b.currency).filter(Boolean));
+    return set.size === 1 ? [...set][0] : null;
+  });
 
   readonly bonusRows = computed<TableRow[]>(() =>
     this.bonuses().map(b => ({
@@ -227,7 +244,8 @@ export class EmployeeConfigComponent implements OnInit {
       period:  `${this.monthLabel(b.periodMonth)} ${b.periodYear}`,
       label:   b.label,
       comment: b.comment || '—',
-      amount:  this.money(b.amount, b.currency) ?? '—',
+      amount:  b.amount,
+      currency: b.currency || '—',
     })),
   );
 
@@ -369,7 +387,12 @@ export class EmployeeConfigComponent implements OnInit {
     const cfg = this.config();
     // cfg.paysId == null is also checked here, not just on the save button's disabled
     // option: this narrows it to `number` for the request below.
-    if (cfg === null || cfg.paysId == null || this.reason().trim() === '') return;
+    if (cfg === null || cfg.paysId == null || this.reason().trim() === '' || this.saving()) return;
+    if ((cfg.currentGrossSalary ?? 0) < 0 || (cfg.currentNetSalary ?? 0) < 0) {
+      this.saveError.set(this.t('PAYROLL.EMPLOYEE_CONFIG.NEGATIVE_SALARY'));
+      return;
+    }
+    this.saveError.set(null);
     this.saving.set(true);
     this.svc.upsert(this.userId, {
       paysId: cfg.paysId,
@@ -386,9 +409,10 @@ export class EmployeeConfigComponent implements OnInit {
         this.reason.set('');
         this.notify.success(this.t('PAYROLL.EMPLOYEE_CONFIG.SAVE_SUCCESS'));
       },
-      error: () => {
+      error: err => {
+        const body = (err as { error?: { detail?: string; message?: string } } | null)?.error;
         this.saving.set(false);
-        this.notify.error(this.t('PAYROLL.EMPLOYEE_CONFIG.SAVE_ERROR'));
+        this.saveError.set(body?.detail ?? body?.message ?? this.t('PAYROLL.EMPLOYEE_CONFIG.SAVE_ERROR'));
       },
     });
   }

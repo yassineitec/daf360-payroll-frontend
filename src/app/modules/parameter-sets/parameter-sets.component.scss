@@ -6,30 +6,88 @@
  * cartes, qui reprend la même recette que /finance/admin.
  */
 
-/* Pas de padding horizontal ici ni sur `.ps-layout` / `.ps-create-layout` : `.shell-content`
-   pose déjà 2rem et `daf-page-header` n'en ajoute pas — 32px de plus décalaient onglets et
-   contenu par rapport au titre. Même alignement que /payroll/simulator. */
-.ps-tabs-wrap { margin-bottom: 8px; }
+/* ── Mise en page de /rh/admin (admin.component) ──────────────────────────────
+   Annule le padding de `.shell-content` (mêmes valeurs que le shell RH : 2rem, 1.5rem
+   sous 1024px) pour occuper toute la zone de contenu, puis repose 24px à l'intérieur.
+   Sous 768px le shell paie décale le contenu à gauche pour le bouton du menu : on garde
+   alors son padding tel quel. Pas de conteneur défilant — `.shell-content` porte la seule
+   barre de défilement. */
+:host { display: block; margin: -2rem; }
+@media (max-width: 1024px) { :host { margin: -1.5rem; } }
+@media (max-width: 768px)  { :host { margin: 0; } }
 
-.ps-layout { display: flex; flex-direction: column; gap: 24px; padding-bottom: 32px; }
-
-/* ── Grille de cartes "Gérer" des jeux — même recette que `.list-type-grid` de
-   /finance/admin (et la grille de modules de /rh/admin). ───────────────────── */
-.ps-card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 14px;
-
-  ::ng-deep h4 { font-size: 15px; line-height: 1.3; }
-
-  // Le lien "Gérer" au même endroit en bas de chaque carte, quelle que soit la longueur
-  // de la description (`fullHeight` égalise déjà la hauteur des cartes d'une rangée).
-  ::ng-deep .glass-card { display: flex; flex-direction: column; }
-  ::ng-deep .glass-card > :last-child { margin-top: auto; }
-
-  > .ps-grid-empty { grid-column: 1 / -1; }
+/* Accueil : titre + entité (`.page-header` / `.page-title` / `.page-sub` de /rh/admin). */
+.ps-home-header { padding: 24px 24px 0; }
+.ps-home-title {
+  font-family: var(--font-sans);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+  margin: 0;
 }
+@media (min-width: 640px) { .ps-home-title { font-size: 32px; } }
+.ps-home-sub { font-size: var(--text-body-sm); color: var(--color-on-surface-variant); margin: 3px 0 0; }
+
+/* Grille flex-wrap de /rh/admin : quatre cartes par rangée sur grand écran, repli
+   naturel ensuite, sans point de rupture. Accueil et grille des jeux. */
+.ps-home-cards { display: flex; flex-wrap: wrap; gap: 1.5rem; padding: 20px 24px; }
+.ps-home-card  { flex: 0 1 calc(25% - 18px); min-width: 220px; display: flex; }
+/* Conteneur de l'aide au survol : la carte y prend toute la hauteur (`fullHeight`). */
+.ps-home-card > daf-card { flex: 1 1 auto; min-width: 0; }
+
+/* Titre de carte en 15px (défaut `daf-card` : 20px, trop grand pour une tuile de 220px),
+   comme /rh/admin. Icône agrandie à la demande : carré 64px / pictogramme 36px (valeurs
+   du préréglage `xl` de `daf-card`) au lieu de 48 / 24. */
+.ps-home-card ::ng-deep h4 { font-size: 15px; line-height: 1.3; }
+.ps-home-card ::ng-deep div:has(> .material-symbols-outlined) { width: 64px; height: 64px; }
+.ps-home-card ::ng-deep .material-symbols-outlined { font-size: 36px; }
+
+/* Section ouverte : `.tab-content` de /rh/admin. */
+.ps-tab-content { min-width: 0; overflow-x: hidden; padding: 20px 24px 24px; }
+
+/* Fil d'Ariane seul (`.tab-breadcrumb-header` de /rh/admin) : le titre répète le dernier
+   maillon, il est masqué ; le fil porte le retour à l'accueil, en 15px au lieu de 12px. */
+.ps-breadcrumb-header { display: block; }
+.ps-breadcrumb-header ::ng-deep h1 { display: none; }
+.ps-breadcrumb-header ::ng-deep nav { font-size: 15px; line-height: 1.4; }
+
+@media (max-width: 640px) {
+  .ps-home-header { padding: 16px 16px 0; }
+  .ps-home-cards  { padding: 12px 16px; gap: 12px; }
+  .ps-tab-content { padding: 12px 16px 16px; }
+}
+
+/* Recherche dans l'en-tête de section : même largeur que la recherche des sections RH. */
+.ps-search { width: 360px; max-width: 100%; }
+@media (max-width: 640px) { .ps-search { width: 100%; } }
+
+/* Sections : en-tête puis contenu, 16px d'écart (`margin-bottom` de l'en-tête RH). */
+.ps-layout { display: flex; flex-direction: column; gap: 16px; }
+
+/* Liste des jeux : état vide et défilement du tableau, comme les sections admin (ADMIN_SECTION_STYLES). */
+.admin-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  padding: 36px; text-align: center; color: var(--color-on-surface-variant);
+}
+.admin-empty p { margin: 0; font-size: 13px; }
+.admin-table-scroll { overflow-x: auto; }
 .ps-item-actions { display: flex; gap: 8px; }
+
+/* Page détail : onglets à gauche, action de l'onglet (ou mention « lecture seule ») à droite. */
+.ps-detail-tabs { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.ps-detail-tabs__tabs { flex: 1 1 auto; min-width: 0; }
+.ps-readonly { display: inline-flex; align-items: center; gap: 6px; }
+.ps-readonly .material-symbols-outlined { font-size: 16px; }
+.admin-mobile-only { display: none; }
+@media (max-width: 640px) {
+  .admin-desktop-only { display: none; }
+  .admin-mobile-only  { display: inline-flex; }
+}
+
+/* Pop-up de confirmation du circuit de validation. */
+.workflow-confirm { display: flex; flex-direction: column; gap: 10px; }
+.workflow-confirm p { margin: 0; font-size: 13px; }
 
 /* ── Blocs communs ────────────────────────────────────────────────────────── */
 /* Titre de section + bouton sur une ligne (création) ; bouton seul aligné à droite
@@ -41,7 +99,12 @@
 .editor-hint { font-size: 0.75rem; color: var(--color-on-surface-variant); margin: 0; }
 
 /* ── Onglet "Nouveau jeu" ─────────────────────────────────────────────────── */
-.ps-create-layout { display: flex; flex-direction: column; gap: 24px; padding-bottom: 32px; }
+.ps-create-layout { display: flex; flex-direction: column; gap: 16px; }
+/* Erreur de création : bandeau (l'.error-banner des sections RH). */
+.admin-error-banner {
+  padding: 8px 12px; border-radius: 8px; font-size: 12px;
+  background: var(--color-error-container); color: var(--color-on-error-container);
+}
 /* Colonne du formulaire : `gap-5` (20px) entre blocs, comme le formulaire de démo de la lib. */
 .ps-form { display: flex; flex-direction: column; gap: 20px; }
 .field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 20px 24px; }
@@ -52,7 +115,7 @@
 .charges-kpi-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(140px, 1fr));
-  gap: 12px;
+  gap: 24px;   /* grille de KPI de `daf-page` (`gap-6`) */
 }
 @media (max-width: 640px) {
   .charges-kpi-row { grid-template-columns: 1fr; }
@@ -113,3 +176,29 @@
   flex-wrap: wrap;
   margin-left: 24px;
 }
+
+/* ── Vue d'arbitrage DAF (page détail) ─────────────────────────────────────── */
+/* 4 tuiles au lieu de 3 : surcoût, patronal, salarial, coût employeur. */
+.charges-kpi-row--4 { grid-template-columns: repeat(4, minmax(150px, 1fr)); }
+@media (max-width: 1024px) {
+  .charges-kpi-row--4 { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+}
+/* La règle 640px de `.charges-kpi-row` est moins spécifique que le modificateur : on la
+   répète pour qu'elle s'applique aussi aux 4 tuiles. */
+@media (max-width: 640px) {
+  .charges-kpi-row--4 { grid-template-columns: 1fr; }
+}
+
+/* Deux cartes côte à côte (famille de risque | checklist), empilées en dessous de 960px. */
+.ps-arbitrage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+@media (max-width: 960px) {
+  .ps-arbitrage-grid { grid-template-columns: 1fr; }
+}
+
+/* Filtre rapide et bouton "Modifier" sur une ligne, repliés sur mobile. */
+.ps-section-head { flex-wrap: wrap; }

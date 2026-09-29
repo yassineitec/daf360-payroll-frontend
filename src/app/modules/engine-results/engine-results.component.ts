@@ -30,6 +30,7 @@ import {
   type TableRow,
   type ToolbarToggleOption,
 } from '@khalilrebhiitec/daf360';
+import { dayRange, distinctSorted, inDayRange, monthName, pickValue, rangeSeed } from '../../shared/filter-utils';
 
 type RubriqueCategory = 'GAIN' | 'RETENUE' | 'AVANTAGE';
 
@@ -59,8 +60,8 @@ const RUBRIQUE_TABS: { id: RubriqueCategory; label: string }[] = [
  * (`EngineResultsListComponent`), qui a remplacé l'ancien sélecteur employé du header.
  * Jusqu'au 2026-09-23 cette page portait aussi un second onglet "Simulations candidats",
  * déplacé vers `/payroll/candidate-simulation` : les deux volets sont désormais deux pages
- * distinctes reliées dans le sous-menu "Historique de paie" de la sidebar plutôt que deux
- * onglets d'un même écran.
+ * distinctes de la sidebar plutôt que deux onglets d'un même écran (celle-ci en entrée
+ * directe « Résultats de paie », l'autre dans le groupe « Simulation »).
  *
  * Présentation du détail : carte "hero" (net à payer + convergence, même traitement que
  * `engine-run`) et décomposition par nature de rubrique en onglets, affichée en pleine
@@ -245,6 +246,10 @@ export class EngineResultsComponent {
   // reste du bandeau.
   readonly searchText = signal('');
   readonly convergenceFilter = signal<'' | 'ok' | 'failed'>('');
+  readonly yearFilter  = signal<number | null>(null);
+  readonly monthFilter = signal<number | null>(null);
+  /** Plage « Date de calcul » telle qu'émise par le panneau (`Date[]`), pour le ré-amorcer. */
+  readonly calculatedFilter = signal<Date[] | null>(null);
   readonly viewMode = signal<'grid' | 'list'>('list');
 
   /** Pagination façon `daf-pagination` de la bibliothèque (`/finance/affaires`) —
@@ -269,11 +274,17 @@ export class EngineResultsComponent {
   readonly filteredResults = computed(() => {
     const query = this.searchText().trim().toLowerCase();
     const status = this.convergenceFilter();
+    const year = this.yearFilter();
+    const month = this.monthFilter();
+    const calculated = dayRange(this.calculatedFilter());
     return this.results().filter(r => {
       const period = `${r.periodMonth}/${r.periodYear}`;
       const matchesQuery = !query || period.includes(query) || String(r.resultId).includes(query);
       const matchesStatus = !status || (status === 'ok' ? r.convergenceOk : !r.convergenceOk);
-      return matchesQuery && matchesStatus;
+      return matchesQuery && matchesStatus
+        && (year == null || r.periodYear === year)
+        && (month == null || r.periodMonth === month)
+        && inDayRange(r.calculatedAt, calculated);
     });
   });
 
@@ -286,6 +297,24 @@ export class EngineResultsComponent {
       { value: 'ok',     label: this.t('PAYROLL.ENGINE_RESULTS.CONVERGENCE_OK') },
       { value: 'failed', label: this.t('PAYROLL.ENGINE_RESULTS.CONVERGENCE_FAILED') },
     ],
+  }, {
+    name: 'year',
+    label: this.t('PAYROLL.ENGINE_RESULTS.FILTER_YEAR'),
+    type: 'select',
+    placeholder: this.t('PAYROLL.ENGINE_RESULTS.FILTER_ALL'),
+    options: distinctSorted(this.results().map(r => r.periodYear)).reverse()
+      .map(y => ({ value: String(y), label: String(y) })),
+  }, {
+    name: 'month',
+    label: this.t('PAYROLL.ENGINE_RESULTS.FILTER_MONTH'),
+    type: 'select',
+    placeholder: this.t('PAYROLL.ENGINE_RESULTS.FILTER_ALL'),
+    options: distinctSorted(this.results().map(r => r.periodMonth))
+      .map(m => ({ value: String(m), label: monthName(m, this.translate.getCurrentLang() ?? 'fr') })),
+  }, {
+    name: 'calculatedAt',
+    label: this.t('PAYROLL.ENGINE_RESULTS.COL_CALCULATED_AT'),
+    type: 'daterange',
   }]);
 
   readonly filterConfig = computed<SearchToolbarFilterConfig>(() => ({
@@ -296,11 +325,21 @@ export class EngineResultsComponent {
     triggerLabel: this.t('PAYROLL.ENGINE_RESULTS.FILTER_TRIGGER'),
     // `daf-filter` seeds `initialValues` once, in its own internal shape — a `select`
     // field is a `string[]` there (normalizes to a scalar only on `apply`).
-    initialValues: { convergence: this.convergenceFilter() ? [this.convergenceFilter()] : [] },
+    initialValues: {
+      convergence:  this.convergenceFilter() ? [this.convergenceFilter()] : [],
+      year:         this.yearFilter() != null ? [String(this.yearFilter())] : [],
+      month:        this.monthFilter() != null ? [String(this.monthFilter())] : [],
+      calculatedAt: this.calculatedFilter(),
+    },
   }));
 
   applyFilters(result: FilterResult): void {
     this.convergenceFilter.set((result['convergence'] as 'ok' | 'failed' | null) ?? '');
+    const year = pickValue(result, 'year');
+    const month = pickValue(result, 'month');
+    this.yearFilter.set(year ? Number(year) : null);
+    this.monthFilter.set(month ? Number(month) : null);
+    this.calculatedFilter.set(rangeSeed(result['calculatedAt']));
     this.page.set(0);
   }
 

@@ -44,6 +44,14 @@ export interface EngineRubriqueDefDto {
   active: boolean;
 }
 
+/** Corps de création / modification d'une rubrique du moteur (`code` ignoré à la modification). */
+export type SaveEngineRubriqueRequest = Omit<EngineRubriqueDefDto, 'id' | 'countryId'>;
+
+/** Modes de calcul connus du moteur (un calculateur chacun côté serveur). */
+export const ENGINE_CALC_MODES = [
+  'TAUX_PCT', 'MONTANT_FIXE', 'BAREME_PROGRESSIF', 'ANNUALISE_BAREME', 'FORMULE', 'NEWTON_RAPHSON',
+] as const;
+
 export interface RunPayrollRequest {
   employeeId: number;
   paysId: number;
@@ -170,6 +178,36 @@ export class PayrollEngineService {
   listRubriques(paysId: number): Observable<EngineRubriqueDefDto[]> {
     return this.http.get<EngineRubriqueDefDto[]>(`${this.base}/rubriques`,
       { params: new HttpParams().set('paysId', paysId) });
+  }
+
+  // ── Administration (écritures) — `/admin/engine` ──────────────────────────
+  private readonly adminBase = environment.payrollApiUrl + '/api/payroll/admin/engine';
+
+  /** Nouvelle version en brouillon (copie de l'active) — 409 si un brouillon existe déjà. */
+  createParamSetDraft(paysId: number): Observable<EngineParamSetDto> {
+    return this.http.post<EngineParamSetDto>(`${this.adminBase}/param-sets`, null,
+      { params: new HttpParams().set('paysId', paysId) });
+  }
+
+  /** Paramètres (JSON objet) et date d'effet d'une version en brouillon. */
+  updateParamSetDraft(id: number, parameters: string, effectiveDate?: string | null): Observable<EngineParamSetDto> {
+    return this.http.put<EngineParamSetDto>(`${this.adminBase}/param-sets/${id}`, { parameters, effectiveDate: effectiveDate ?? null });
+  }
+
+  /** Toutes les rubriques du pays, actives ET inactives (l'administration réactive). */
+  listAllRubriques(paysId: number): Observable<EngineRubriqueDefDto[]> {
+    return this.http.get<EngineRubriqueDefDto[]>(`${this.adminBase}/rubriques`,
+      { params: new HttpParams().set('paysId', paysId) });
+  }
+
+  createRubrique(paysId: number, req: SaveEngineRubriqueRequest): Observable<EngineRubriqueDefDto> {
+    return this.http.post<EngineRubriqueDefDto>(`${this.adminBase}/rubriques`, req,
+      { params: new HttpParams().set('paysId', paysId) });
+  }
+
+  /** Modifie une rubrique (son code ne change pas). */
+  updateRubrique(id: number, req: SaveEngineRubriqueRequest): Observable<EngineRubriqueDefDto> {
+    return this.http.put<EngineRubriqueDefDto>(`${this.adminBase}/rubriques/${id}`, req);
   }
 
   // ── Engine run ────────────────────────────────────────────────────────────

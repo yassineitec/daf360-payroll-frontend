@@ -259,6 +259,47 @@ export interface PaysDto {
   devise: string;
 }
 
+/** `payroll_countries` — la configuration du moteur par pays (`GET /admin/countries`). */
+export interface PayrollCountryDto {
+  id: number;
+  paysId: number;
+  paysLabel: string | null;
+  isoCode: string | null;
+  currencyCode: string;
+  fiscalYearStartMonth: number;
+  /** JSON brut (sources de taux de change), ou null. */
+  forexApiSources: string | null;
+  active: boolean;
+  createdAt: string;
+}
+
+/** Corps de `POST /admin/countries` et `PUT /admin/countries/{id}` (`paysId` ignoré au PUT). */
+export interface SavePayrollCountryRequest {
+  paysId: number | null;
+  currencyCode: string;
+  fiscalYearStartMonth: number;
+  forexApiSources: string | null;
+  active: boolean;
+}
+
+/** Une ligne du journal des modifications de la paie (`GET /admin/audit`). */
+export interface AuditEntryDto {
+  source: 'EMPLOYEE_CONFIG' | 'SALARY_ADVANCE';
+  id: number;
+  at: string;
+  paysId: number;
+  actorId: number | null;
+  actorName: string | null;
+  /** Collaborateur (configuration) ou n° d'avance (avance). */
+  subjectId: number | null;
+  subjectName: string | null;
+  /** Configuration : le motif ; avance : le statut atteint. */
+  action: string;
+  /** Avance : le statut quitté (null à la création). */
+  fromStatus: string | null;
+  detail: string | null;
+}
+
 export interface CalibrationCycleDto {
   id: number;
   paysId: number;
@@ -284,6 +325,35 @@ export class PayrollApiService {
 
   listPays(): Observable<PaysDto[]> {
     return this.http.get<PaysDto[]>(`${this.base}/ref/pays`);
+  }
+
+  // ── Administration ───────────────────────────────────────────────────────
+
+  /** Pays configurés dans le moteur de paie, dans le périmètre de l'appelant. */
+  listPayrollCountries(): Observable<PayrollCountryDto[]> {
+    return this.http.get<PayrollCountryDto[]>(`${this.base}/admin/countries`);
+  }
+
+  /** Configure un nouveau pays dans le moteur (409 s'il l'est déjà). */
+  createPayrollCountry(req: SavePayrollCountryRequest): Observable<PayrollCountryDto> {
+    return this.http.post<PayrollCountryDto>(`${this.base}/admin/countries`, req);
+  }
+
+  /** Modifie devise, début d'exercice, sources de change et état d'un pays de paie. */
+  updatePayrollCountry(id: number, req: SavePayrollCountryRequest): Observable<PayrollCountryDto> {
+    return this.http.put<PayrollCountryDto>(`${this.base}/admin/countries/${id}`, req);
+  }
+
+  /** Remplace les avantages d'un jeu — jeu en brouillon uniquement (409 sinon). */
+  updateBenefits(parameterSetId: number, benefits: BenefitCatalogueDto[]): Observable<ParameterSetDto> {
+    return this.http.put<ParameterSetDto>(`${this.base}/parameter-sets/${parameterSetId}/benefits`, benefits);
+  }
+
+  /** Journal des modifications d'un pays, du plus récent au plus ancien. Le serveur ne
+   *  renvoie que les sources que l'appelant a le droit de lire. */
+  getAudit(paysId: number, limit = 200): Observable<AuditEntryDto[]> {
+    const params = new HttpParams().set('paysId', paysId).set('limit', limit);
+    return this.http.get<AuditEntryDto[]>(`${this.base}/admin/audit`, { params });
   }
 
   // ── Parameter Sets ────────────────────────────────────────────────────────

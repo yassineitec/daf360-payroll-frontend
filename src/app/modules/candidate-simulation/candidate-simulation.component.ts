@@ -28,6 +28,8 @@ import {
   type ToolbarToggleOption,
 } from '@khalilrebhiitec/daf360';
 import { environment } from '../../../environments/environment';
+import { UserStore } from '../../core/user.store';
+import { dayRange, distinctSorted, inDayRange, pickValue, rangeSeed } from '../../shared/filter-utils';
 
 interface PaysItem { id: number; iso_code: string; french_label: string; }
 
@@ -36,7 +38,7 @@ interface PaysItem { id: number; iso_code: string; french_label: string; }
  * pour des candidats (recherche par pays, liste, puis historique de négociation par
  * candidat), extrait de `engine-results` où il vivait comme second onglet ("Simulations
  * candidats") jusqu'au 2026-09-23 : les deux volets sont désormais deux pages distinctes,
- * regroupées dans le sous-menu "Historique de paie" de la sidebar. Mêmes données/API
+ * celle-ci rangée dans le groupe « Simulation » de la sidebar. Mêmes données/API
  * réelles qu'avant, seul le point d'entrée change.
  */
 @Component({
@@ -56,6 +58,7 @@ export class CandidateSimulationComponent implements OnInit {
   private readonly candSvc   = inject(CandidateSimulationService);
   private readonly http      = inject(HttpClient);
   private readonly translate = inject(TranslateService);
+  private readonly userStore = inject(UserStore);
 
   private t(key: string, params?: Record<string, unknown>): string {
     this.translate.currentLang();
@@ -76,7 +79,7 @@ export class CandidateSimulationComponent implements OnInit {
   readonly histLoading       = signal(false);
   readonly history           = signal<CandidateCostApprovalDto[]>([]);
   private readonly paysList  = signal<PaysItem[]>([]);
-  /** TOUS les pays du référentiel RH, sans filtre par rôle ni par pays du profil. */
+  /** TOUS les pays du référentiel RH ; celui du profil est pré-sélectionné (`ngOnInit`). */
   readonly paysOptions = computed<SelectOption[]>(() =>
     this.paysList().map(p => ({ value: String(p.id), label: `${p.french_label} (${p.iso_code})` })),
   );
@@ -100,6 +103,10 @@ export class CandidateSimulationComponent implements OnInit {
   // les KPI restent calculés sur la liste complète, non filtrée.
   readonly searchText = signal('');
   readonly statusFilter = signal('');
+  readonly positionFilter = signal<string | null>(null);
+  readonly locationFilter = signal<string | null>(null);
+  /** Plage « Dernière soumission » telle qu'émise par le panneau (`Date[]`). */
+  readonly submittedFilter = signal<Date[] | null>(null);
   readonly viewMode = signal<'grid' | 'list'>('list');
 
   /** Pagination façon `daf-pagination` de la bibliothèque (`/finance/affaires`) —
@@ -125,17 +132,24 @@ export class CandidateSimulationComponent implements OnInit {
   readonly filteredCandidates = computed(() => {
     const query = this.searchText().trim().toLowerCase();
     const status = this.statusFilter();
+    const position = this.positionFilter();
+    const location = this.locationFilter();
+    const submitted = dayRange(this.submittedFilter());
     return this.candidateList().filter(c => {
       const matchesQuery = !query
         || `${c.firstName} ${c.lastName}`.toLowerCase().includes(query)
         || (c.appliedPosition ?? '').toLowerCase().includes(query);
       const matchesStatus = !status || c.latestStatus === status;
-      return matchesQuery && matchesStatus;
+      return matchesQuery && matchesStatus
+        && (!position || c.appliedPosition === position)
+        && (!location || c.candidateLocation === location)
+        && inDayRange(c.latestSubmittedAt, submitted);
     });
   });
 
-  /** Pays + statut dans le même bouton filtre. Le pays est chargé côté serveur (un
-   *  changement relance `loadCandidates()`), le statut filtre la liste déjà en mémoire. */
+  /** Pays + statut + poste/localisation/date dans le même bouton filtre. Le pays est chargé
+   *  côté serveur (un changement relance `loadCandidates()`), le reste filtre la liste déjà
+   *  en mémoire — poste et localisation proposent les valeurs présentes dans cette liste. */
   readonly filterFields = computed<FilterField[]>(() => [{
     name: 'pays',
     label: this.t('PAYROLL.CANDIDATE_SIMULATION.PAYS_SELECT_LABEL'),
@@ -149,6 +163,24 @@ export class CandidateSimulationComponent implements OnInit {
     type: 'select',
     placeholder: this.t('PAYROLL.CANDIDATE_SIMULATION.FILTER_ALL'),
     options: (['PENDING', 'APPROVED', 'REJECTED'] as const).map(s => ({ value: s, label: this.statusLabel(s) })),
+  }, {
+    name: 'position',
+    label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_POSITION'),
+    type: 'select',
+    searchable: true,
+    placeholder: this.t('PAYROLL.CANDIDATE_SIMULATION.FILTER_ALL'),
+    options: distinctSorted(this.candidateList().map(c => c.appliedPosition)).map(p => ({ value: p, label: p })),
+  }, {
+    name: 'location',
+    label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_ENTITY'),
+    type: 'select',
+    searchable: true,
+    placeholder: this.t('PAYROLL.CANDIDATE_SIMULATION.FILTER_ALL'),
+    options: distinctSorted(this.candidateList().map(c => c.candidateLocation)).map(l => ({ value: l, label: l })),
+  }, {
+    name: 'submitted',
+    label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_LATEST'),
+    type: 'daterange',
   }]);
 
   readonly filterConfig = computed<SearchToolbarFilterConfig>(() => ({
@@ -162,11 +194,17 @@ export class CandidateSimulationComponent implements OnInit {
     initialValues: {
       pays:   this.candidatePaysId() ? [String(this.candidatePaysId())] : [],
       status: this.statusFilter() ? [this.statusFilter()] : [],
+      position:  this.positionFilter() ? [this.positionFilter()!] : [],
+      location:  this.locationFilter() ? [this.locationFilter()!] : [],
+      submitted: this.submittedFilter(),
     },
   }));
 
   applyFilters(result: FilterResult): void {
     this.statusFilter.set((result['status'] as string | null) ?? '');
+    this.positionFilter.set(pickValue(result, 'position'));
+    this.locationFilter.set(pickValue(result, 'location'));
+    this.submittedFilter.set(rangeSeed(result['submitted']));
     this.page.set(0);
     const raw = result['pays'] as string | null;
     const paysId = raw ? Number(raw) : null;
@@ -224,8 +262,14 @@ export class CandidateSimulationComponent implements OnInit {
       .pipe(catchError(() => of([] as PaysItem[])))
       .subscribe(list => this.paysList.set(list));
 
-    // Aucun pays pré-sélectionné (pas même celui du profil) : l'utilisateur choisit dans
-    // le bouton filtre, et ce choix lance la recherche (`applyFilters`).
+    // Pays pré-sélectionné = celui du profil de l'utilisateur connecté (ex. admin Tunisie →
+    // Tunisie) et la recherche part aussitôt ; il reste modifiable dans le bouton filtre
+    // (`applyFilters`). Sans pays sur le profil, la page reste à l'état vide.
+    const userPaysId = this.userStore.currentUser()?.paysId;
+    if (userPaysId) {
+      this.candidatePaysId.set(userPaysId);
+      this.loadCandidates();
+    }
   }
 
   loadCandidates(): void {

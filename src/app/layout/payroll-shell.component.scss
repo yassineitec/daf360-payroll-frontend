@@ -17,3 +17,19 @@
   @media (max-width: 768px)  { margin-left: 0; padding: 0.5rem 0.5rem 0.5rem 3.25rem; }
   @media (max-width: 480px)  { padding: 0.5rem 0.375rem 0.5rem 3.25rem; }
 }
+
+/* A group title ("Simulation", "Administration") keeps the colour of the other entries, even while one of its
+   children is the active page. daf-side-nav paints such a parent teal with a filled icon
+   (`text-teal`, `hasActiveChild` in `itemClasses` / `iconVariation`); only the child itself
+   should carry the active accent here. `[aria-expanded]` is rendered on group buttons only,
+   so plain entries — including the active one — are untouched. The icon needs `!important`
+   because the lib sets its fill as an inline style. */
+:host ::ng-deep daf-side-nav button[aria-expanded].text-teal {
+  color: var(--color-on-surface-variant);
+
+  &:hover { color: var(--color-on-surface); }
+
+  &:not(:hover) > .material-symbols-outlined:first-child {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24 !important;
+  }
+}

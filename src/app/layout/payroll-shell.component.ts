@@ -62,6 +62,7 @@ export class PayrollShellComponent implements OnInit {
 
   private mapNavDefs(defs: PayrollNavDef[]): NavItem[] {
     return defs
+      .filter(def => !def.hiddenInSidebar)
       .filter(def =>
         !def.permissions.length ||
         def.permissions.some(code => this.userStore.hasPermission(code)),

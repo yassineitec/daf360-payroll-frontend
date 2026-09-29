@@ -22,7 +22,7 @@ export const payrollLandingGuard: CanActivateFn = (
   const perms  = inject(PermissionService);
   const router = inject(Router);
 
-  // A `children` group (e.g. "Historique de paie") carries no `route` of its own and an
+  // A `children` group (e.g. "Simulation") carries no `route` of its own and an
   // empty `permissions` — flatten to its leaves first, in place, so `.find()` below never
   // lands on the group itself and tries to build `/payroll/undefined`.
   const routable = PAYROLL_NAV_DEFS.flatMap(def => def.children ?? [def]);

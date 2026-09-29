@@ -1,85 +1,50 @@
-<daf-page [breadcrumbs]="true">
-  <daf-page-header
-    [title]="'PAYROLL.EMPLOYEE_CONFIG.TITLE' | translate"
-    [subtitle]="'PAYROLL.EMPLOYEE_CONFIG.LIST_SUBTITLE' | translate"
-    [breadcrumbs]="breadcrumbs()">
-  </daf-page-header>
+<!-- Même mise en page qu'une section de /payroll/admin (et de /rh/admin) : fil d'Ariane seul,
+     en-tête de section (titre + nombre, aide, recherche et filtre à droite), puis le tableau,
+     « N collaborateurs » et la pagination. Recherche, filtres et pages côté serveur (`load()`). -->
+<div class="ec-content">
+  <daf-page [breadcrumbs]="true">
+    <daf-page-header
+      class="ec-breadcrumb-header"
+      [title]="'PAYROLL.EMPLOYEE_CONFIG.TITLE' | translate"
+      [breadcrumbs]="breadcrumbs()">
+    </daf-page-header>
 
-  <div class="page-body">
-    <!-- ── Bandeau KPI : effectifs RH du pays filtré (ou de tous les pays) — voir
-         `loadKpis()`. Chaque tuile explique ce qu'elle mesure au survol. ─────── -->
-    <section
-      class="grid grid-cols-4 gap-2 sm:gap-6 kpi-section transition-opacity"
-      [class.opacity-60]="kpiLoading()"
-      [attr.aria-busy]="kpiLoading()">
-      @for (tile of kpiTiles(); track tile.label) {
-        <daf-metric-card [label]="tile.label" [value]="tile.value" [options]="tile.options" />
+    <div class="admin-section">
+      <app-admin-section-header
+        [title]="('PAYROLL.EMPLOYEE_CONFIG.TITLE' | translate) + ' (' + totalElements() + ')'"
+        [subtitle]="'PAYROLL.EMPLOYEE_CONFIG.LIST_SUBTITLE' | translate">
+        <div class="admin-search">
+          <daf-search-toolbar
+            [card]="false"
+            [placeholder]="'PAYROLL.ENGINE_RESULTS.SEARCH_EMPLOYEE_PLACEHOLDER' | translate"
+            [value]="searchText()"
+            (valueChange)="onSearchTextChange($event)"
+            [debounce]="300"
+            [filterFields]="filterFields()"
+            [filterConfig]="filterConfig()"
+            (filterApply)="applyFilters($event)">
+          </daf-search-toolbar>
+        </div>
+      </app-admin-section-header>
+
+      @if (error()) {
+        <div class="admin-error-banner" role="alert">{{ error() }}</div>
+      } @else if (loading() && employees().length === 0) {
+        <app-admin-spinner />
+      } @else if (employees().length === 0) {
+        <div class="admin-empty">
+          <p>{{ 'PAYROLL.ENGINE_RESULTS.EMPTY_EMPLOYEES' | translate }}</p>
+        </div>
+      } @else {
+        <!-- Page suivante / nouvelle recherche en vol : le tableau reste affiché, estompé. -->
+        <div class="admin-table-scroll" [class.is-loading]="loading()">
+          <daf-data-table [columns]="employeeColumns()" [rows]="employeeRows()" [config]="tableConfig()" />
+        </div>
+        <app-admin-table-footer
+          [total]="totalElements()" [page]="page()" [totalPages]="totalPages()"
+          [unit]="'PAYROLL.ADMIN_HOME.COUNT.EMPLOYEES' | translate"
+          (pageChange)="onPageChange($event)" />
       }
-    </section>
-
-    <!-- ── Recherche (nom / matricule), filtre pays et bascule carte-tableau — tout
-         côté serveur, voir `load()`. ─────────────────────────────────────────── -->
-    <daf-search-toolbar
-      [placeholder]="'PAYROLL.ENGINE_RESULTS.SEARCH_EMPLOYEE_PLACEHOLDER' | translate"
-      [value]="searchText()"
-      (valueChange)="onSearchTextChange($event)"
-      [debounce]="300"
-      [filterFields]="filterFields()"
-      [filterConfig]="filterConfig()"
-      (filterApply)="applyFilters($event)"
-      [views]="viewOptions()"
-      [(view)]="viewMode">
-    </daf-search-toolbar>
-
-    @if (error()) {
-      <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
-        <div class="alert alert--error">{{ error() }}</div>
-      </daf-card>
-    } @else if (loading() && employees().length === 0) {
-      <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
-        <p class="empty-state">{{ 'PAYROLL.COMMON.LOADING' | translate }}</p>
-      </daf-card>
-    } @else {
-      <div [class.is-loading]="loading()">
-        @if (viewMode() === 'grid') {
-          <div class="grid grid-cols-3 gap-5">
-            @for (card of employeeCards(); track card.id) {
-              <daf-entity-card
-                [options]="card.options"
-                (cardClick)="open(card.id)"
-                (viewClick)="open(card.id)">
-              </daf-entity-card>
-            } @empty {
-              <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }" class="col-span-full">
-                <p class="empty-state">{{ 'PAYROLL.ENGINE_RESULTS.EMPTY_EMPLOYEES' | translate }}</p>
-              </daf-card>
-            }
-          </div>
-        } @else {
-          <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
-            <daf-data-table
-              [columns]="employeeColumns()"
-              [rows]="employeeRows()"
-              [config]="{ actions: employeeActions(), emptyMessage: ('PAYROLL.ENGINE_RESULTS.EMPTY_EMPLOYEES' | translate), showHeader: false }">
-            </daf-data-table>
-          </daf-card>
-        }
-      </div>
-
-      <daf-pagination
-        [currentPage]="page()"
-        [totalPages]="totalPages()"
-        [totalElements]="totalElements()"
-        [pageSize]="pageSize()"
-        [pageSizeOptions]="[10, 20, 50, 100]"
-        [perPageLabel]="'PAYROLL.COMMON.PAGINATION.PER_PAGE' | translate"
-        [summaryLabel]="'PAYROLL.COMMON.PAGINATION.SUMMARY' | translate"
-        [firstPageLabel]="'PAYROLL.COMMON.PAGINATION.FIRST' | translate"
-        [lastPageLabel]="'PAYROLL.COMMON.PAGINATION.LAST' | translate"
-        [config]="{ showFirstLast: true }"
-        (pageChange)="onPageChange($event)"
-        (pageSizeChange)="onPageSizeChange($event)">
-      </daf-pagination>
-    }
-  </div>
-</daf-page>
+    </div>
+  </daf-page>
+</div>

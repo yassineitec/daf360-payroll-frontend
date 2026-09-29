@@ -28,13 +28,14 @@ const TONE_ICON: Record<Tone, { iconColor: string; iconBg: string }> = {
 const MODULE_TONE: Record<string, Tone> = {
   'simulator':            'primary',
   'payslips':             'teal',
+  'salary-advances':      'secondary',
   'employee-config':      'secondary',
   'cohort':               'tertiary',
   'engine-run':           'warning',
   'engine-results':       'teal',
   'candidate-simulation': 'tertiary',
   'calibration':          'secondary',
-  'parameter-sets':       'danger',
+  'admin':                'danger',
   'budget':               'warning',
 };
 
@@ -42,7 +43,7 @@ const MODULE_TONE: Record<string, Tone> = {
  * Accueil paie — same shape as the finance home: daf-page + daf-page-header, then one card
  * per screen. Cards come from `PAYROLL_NAV_DEFS`, the same list as the sidebar, filtered on
  * the same permission codes, so the page never offers a card the route guard would bounce.
- * Groups ("Historique de paie") are flattened: the home lists screens, not menu folders.
+ * Groups ("Simulation", "Administration") are flattened: the home lists screens, not menu folders.
  */
 @Component({
   selector: 'app-payroll-home',

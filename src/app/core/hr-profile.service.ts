@@ -25,6 +25,19 @@ export interface EmployeeListItem {
   lifecycleStatus: string | null;
 }
 
+/** `FilterOptionsDto` de daf360-rh-service. */
+export interface EmployeeFilterOptions {
+  departments:   { value: string; label: string }[];
+  grades:        { value: string; label: string }[];
+  pays:          { value: string; label: string }[];
+  contractTypes: string[];
+}
+
+/** Statuts de cycle de vie (`LifecycleStatus` du service RH), dans l'ordre du parcours. */
+export const LIFECYCLE_STATUSES = [
+  'PRE_ONBOARDING', 'ACTIVE', 'ON_LEAVE', 'ON_MISSION', 'OFFBOARDING', 'TERMINATED', 'ARCHIVED',
+] as const;
+
 export interface EmployeePage {
   content: EmployeeListItem[];
   totalElements: number;
@@ -48,7 +61,8 @@ export class HrProfileService {
   /** Paginated variant for the `/payroll/engine-results` directory — same endpoint, but
    *  the caller drives `page` (0-indexed) instead of always reading the first page. */
   listEmployees(opts: {
-    search?: string; paysId?: number | null; status?: string; page: number; size: number;
+    search?: string; paysId?: number | null; status?: string;
+    department?: string | null; contract?: string | null; page: number; size: number;
   }): Observable<EmployeePage> {
     let params = new HttpParams().set('size', opts.size).set('page', opts.page);
     if (opts.search?.trim()) params = params.set('search', opts.search.trim());
@@ -56,7 +70,18 @@ export class HrProfileService {
     // Sans `status`, le service RH ne renvoie que les collaborateurs en poste
     // (ACTIVE / ON_LEAVE / ON_MISSION, ou sans fiche) ; avec, uniquement ce statut.
     if (opts.status) params = params.set('status', opts.status);
+    // `department` = libellé FR du département, `contract` = code brut de
+    // employee_profiles.contract_type — les valeurs de `getFilterOptions()`.
+    if (opts.department) params = params.set('department', opts.department);
+    if (opts.contract) params = params.set('contract', opts.contract);
     return this.http.get<EmployeePage>(`${this.base}/api/hr/profiles/employees`, { params });
+  }
+
+  /** Valeurs des listes déroulantes du filtre collaborateurs (`/api/hr/profiles/filter-options`).
+   *  Listes vides si le service RH est indisponible — le filtre reste utilisable. */
+  getFilterOptions(): Observable<EmployeeFilterOptions> {
+    return this.http.get<EmployeeFilterOptions>(`${this.base}/api/hr/profiles/filter-options`)
+      .pipe(catchError(() => of({ departments: [], grades: [], pays: [], contractTypes: [] })));
   }
 
   getContractTypes(paysId?: number | null): Observable<HrContractType[]> {

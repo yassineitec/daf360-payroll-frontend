@@ -23,6 +23,15 @@ export interface PayrollNavDef {
   permissions: string[];
   /** Sub-entries rendered as an expandable group. One level only, like `NavItem.children`. */
   children?: PayrollNavDef[];
+  /**
+   * Kept out of the sidebar, but still a module: the payroll home card and the landing
+   * guard keep offering it. Set when the screen is reached from somewhere else — its
+   * sidebar entry would only duplicate that way in.
+   */
+  hiddenInSidebar?: boolean;
+  /** Sidebar entry lit while this screen is open, for a `hiddenInSidebar` one — the entry
+   *  it is reached from. Omitted ⇒ its own `route`. */
+  highlightRoute?: string;
 }
 
 /** `/payroll/simulator` — running a simulation. Reference reads (pays, active parameter
@@ -31,10 +40,10 @@ export interface PayrollNavDef {
 export const PAYROLL_SIMULATOR_PERMISSIONS = ['PAYROLL_RUN_SIMULATION'];
 
 /**
- * Creating a parameter set — the "+ Nouveau jeu de paramètres" panel folded into
- * `/payroll/parameter-sets` (was its own `/payroll/admin` page until the two were merged:
- * creating and then managing/approving a parameter set were split across two menu entries
- * for what is really one workflow on one entity).
+ * Creating a parameter set — the « Nouveau paramétrage » section of the administration home
+ * (`/payroll/admin`, formerly `/payroll/parameter-sets`). It was once a separate admin page,
+ * merged in because creating and then managing/approving a parameter set is one workflow
+ * on one entity.
  *
  * It used to be gated on `PAYROLL_SUPER_ADMIN` alone, but the only call the panel makes,
  * `POST /parameter-sets`, is annotated `hasAuthority('PAYROLL_APPROVE_PARAMSET')` — so a
@@ -65,13 +74,54 @@ export const PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS = [
   'PAYROLL_VIEW_EMPLOYEE_CONFIG',
   'PAYROLL_MANAGE_EMPLOYEE_CONFIG',
 ];
-
+ 
 /**
  * `/payroll/salary-advances` — payroll owns the salary advances (V25): the payout of what
  * finance approved, the monthly deductions, the follow-up and the per-country rules. Finance
  * only approves or declines (its cost approval queue); the employee asks from self-service.
  */
 export const PAYROLL_SALARY_ADVANCES_PERMISSIONS = ['PAYROLL_MANAGE_SALARY_ADVANCES'];
+
+/** Carte « Pays de paie » de l'administration — mêmes codes que `GET /admin/countries`. */
+export const PAYROLL_COUNTRIES_PERMISSIONS = [
+  'PAYROLL_VIEW_PARAMSET',
+  'PAYROLL_MANAGE_COUNTRIES',
+  'PAYROLL_SUPER_ADMIN',
+];
+
+/** Carte « Rubriques du moteur » — mêmes codes que `GET /engine/rubriques`. */
+export const PAYROLL_ENGINE_RUBRIQUES_PERMISSIONS = ['PAYROLL_MANAGE_RUBRIQUES', 'PAYROLL_VIEW_PARAMSET'];
+
+/** Carte « Catalogue des avantages » — mêmes codes que `GET /parameter-sets`, qui les porte. */
+export const PAYROLL_BENEFITS_PERMISSIONS = ['PAYROLL_VIEW_PARAMSET', 'PAYROLL_APPROVE_PARAMSET'];
+
+/** Modifier les avantages d'un jeu en brouillon — mêmes codes que `PUT …/benefits` (et que
+ *  les charges et rubriques d'un jeu). */
+export const PAYROLL_EDIT_PARAMSET_PERMISSIONS = ['PAYROLL_APPROVE_PARAMSET', 'PAYROLL_APPROVE_PARAMSET_FAST_TRACK'];
+
+/** Carte « Paramètres du moteur » — mêmes codes que `GET /engine/param-sets`. */
+export const PAYROLL_ENGINE_PARAMS_PERMISSIONS = ['PAYROLL_VIEW_PARAMSET'];
+
+/** Circuit des paramètres du moteur — mêmes codes que le serveur, étape par étape :
+ *  créer / modifier un brouillon, soumettre et approuver (RH) ; approuver (Finance) et activer. */
+export const PAYROLL_ENGINE_EDIT_PERMISSIONS    = ['PAYROLL_APPROVE_PARAMSET', 'PAYROLL_SUPER_ADMIN'];
+export const PAYROLL_ENGINE_SUBMIT_PERMISSIONS  = ['PAYROLL_APPROVE_PARAMSET'];
+export const PAYROLL_ENGINE_FINANCE_PERMISSIONS = ['PAYROLL_APPROVE_PARAMSET_FAST_TRACK'];
+
+/** Créer / modifier une rubrique du moteur — mêmes codes que `POST`/`PUT /admin/engine/rubriques`. */
+export const PAYROLL_MANAGE_RUBRIQUES_PERMISSIONS = ['PAYROLL_MANAGE_RUBRIQUES', 'PAYROLL_SUPER_ADMIN'];
+
+/** Créer / modifier un pays de paie — mêmes codes que `POST`/`PUT /admin/countries`. */
+export const PAYROLL_MANAGE_COUNTRIES_PERMISSIONS = ['PAYROLL_MANAGE_COUNTRIES', 'PAYROLL_SUPER_ADMIN'];
+
+/** Carte « Journal des modifications » — mêmes codes que `GET /admin/audit` (le serveur ne
+ *  renvoie ensuite que les historiques que chacun de ces codes permet de lire). */
+export const PAYROLL_AUDIT_PERMISSIONS = [
+  'PAYROLL_VIEW_EMPLOYEE_CONFIG',
+  'PAYROLL_MANAGE_EMPLOYEE_CONFIG',
+  'PAYROLL_MANAGE_SALARY_ADVANCES',
+  'PAYROLL_SUPER_ADMIN',
+];
 
 /**
  * `/payroll/budget` — the budget lines + forecast outputs. Mirrors the backend exactly:
@@ -91,8 +141,8 @@ export const PAYROLL_BUDGET_PERMISSIONS = [
 /**
  * The live payroll screens.
  *
- * Nine modules are enabled — `admin` was folded into `parameter-sets` (see
- * `PAYROLL_CREATE_PARAMSET_PERMISSIONS`), so it no longer has its own entry or route.
+ * `admin` is the administration home (the former `parameter-sets` page, whose old URL now
+ * redirects to it); `employee-config` is a module without a sidebar entry (`hiddenInSidebar`).
  * Every entry here MUST have a matching route in `app.routes.ts` and vice-versa: an entry
  * with no route navigates into the `**` redirect, and a route with no entry is only
  * reachable by typing the URL. If a screen ever has to be switched off again, comment it
@@ -112,22 +162,52 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
     route:       'accueil',
     permissions: [],
   },
-  // ── Ordre du parcours métier, comme Finance et RH : simuler → calculer / consulter /
-  //    publier → piloter → paramétrer (en dernier, comme Administration / Admin).
-  //    Keep in sync with app.routes.ts ─────────────────────────────────────────────
+  // ── Ordre du parcours métier : simuler → paie du mois (avances → calcul → résultats →
+  //    fiches) → piloter → paramétrer (en dernier, comme Administration / Admin).
+  //    Groups first and last for the occasional screens, the monthly ones one click away
+  //    in the middle. Keep the leaves in sync with app.routes.ts ──────────────────────
+  /**
+   * Expandable group — every simulation: one employee (manual), a group (cohort), and the
+   * saved candidate simulations. The last one lived under a "Historique" group next to the
+   * payroll results until 2026-09-28; it is simulated pay, not real payroll, so it sits here.
+   */
   {
-    id:          'simulator',
-    labelKey:    'PAYROLL.layout.NAV.SIMULATOR',
-    icon:        'calculate',
-    route:       'simulator',
-    permissions: PAYROLL_SIMULATOR_PERMISSIONS,
+    id:          'simulation',
+    labelKey:    'PAYROLL.layout.NAV.SIMULATION_GROUP',
+    icon:        'science',
+    permissions: [],
+    children: [
+      {
+        id:          'simulator',
+        labelKey:    'PAYROLL.layout.NAV.SIMULATOR',
+        icon:        'calculate',
+        route:       'simulator',
+        permissions: PAYROLL_SIMULATOR_PERMISSIONS,
+      },
+      {
+        id:          'cohort',
+        labelKey:    'PAYROLL.layout.NAV.COHORT',
+        icon:        'groups',
+        route:       'cohort',
+        permissions: ['PAYROLL_RUN_SIMULATION'],
+      },
+      {
+        id:          'candidate-simulation',
+        labelKey:    'PAYROLL.layout.NAV.CANDIDATE_SIMULATION',
+        icon:        'person_search',
+        route:       'candidate-simulation',
+        permissions: ['PAYROLL_VIEW_RESULTS'],
+      },
+    ],
   },
+  // Monthly payroll, in the order the month is worked: the advance deductions are settled
+  // before the run, the results checked after it, the payslips published last.
   {
-    id:          'cohort',
-    labelKey:    'PAYROLL.layout.NAV.COHORT',
-    icon:        'groups',
-    route:       'cohort',
-    permissions: ['PAYROLL_RUN_SIMULATION'],
+    id:          'salary-advances',
+    labelKey:    'PAYROLL.layout.NAV.SALARY_ADVANCES',
+    icon:        'account_balance_wallet',
+    route:       'salary-advances',
+    permissions: PAYROLL_SALARY_ADVANCES_PERMISSIONS,
   },
   {
     id:          'engine-run',
@@ -136,32 +216,12 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
     route:       'engine-run',
     permissions: ['PAYROLL_RUN_ENGINE'],
   },
-  /**
-   * Expandable group — was a single `engine-results` entry with 2 internal tabs
-   * (employee results / candidate simulations), split 2026-09-23 into 2 real pages so
-   * each is directly linkable and no longer hides half its content behind a tab click.
-   */
   {
-    id:          'payroll-history',
-    labelKey:    'PAYROLL.layout.NAV.PAYROLL_HISTORY_GROUP',
+    id:          'engine-results',
+    labelKey:    'PAYROLL.layout.NAV.ENGINE_RESULTS',
     icon:        'history',
-    permissions: [],
-    children: [
-      {
-        id:          'engine-results',
-        labelKey:    'PAYROLL.layout.NAV.ENGINE_RESULTS',
-        icon:        'payments',
-        route:       'engine-results',
-        permissions: ['PAYROLL_VIEW_RESULTS'],
-      },
-      {
-        id:          'candidate-simulation',
-        labelKey:    'PAYROLL.layout.NAV.CANDIDATE_SIMULATION',
-        icon:        'groups',
-        route:       'candidate-simulation',
-        permissions: ['PAYROLL_VIEW_RESULTS'],
-      },
-    ],
+    route:       'engine-results',
+    permissions: ['PAYROLL_VIEW_RESULTS'],
   },
   {
     id:          'payslips',
@@ -169,13 +229,6 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
     icon:        'receipt_long',
     route:       'payslips',
     permissions: PAYROLL_PAYSLIPS_PERMISSIONS,
-  },
-  {
-    id:          'salary-advances',
-    labelKey:    'PAYROLL.layout.NAV.SALARY_ADVANCES',
-    icon:        'payments',
-    route:       'salary-advances',
-    permissions: PAYROLL_SALARY_ADVANCES_PERMISSIONS,
   },
   {
     id:          'budget',
@@ -191,18 +244,30 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
     route:       'calibration',
     permissions: ['PAYROLL_RUN_CALIBRATION'],
   },
+  /**
+   * The per-employee payroll configuration — no sidebar entry: it opens from its card on
+   * the administration home. Still a module, so the payroll home card and the landing guard
+   * keep offering it (a holder of these codes alone cannot open the administration).
+   */
   {
     id:          'employee-config',
     labelKey:    'PAYROLL.layout.NAV.EMPLOYEE_CONFIG',
     icon:        'manage_accounts',
     route:       'employee-config',
     permissions: PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS,
+    hiddenInSidebar: true,
+    highlightRoute:  'admin',
   },
+  /**
+   * Administration — one entry, like Administration / Admin in RH and Finance, kept last. It
+   * opens /payroll/admin, whose home is the card grid of every set-up section (parameter
+   * sets, countries, line items, benefits, advance rules, log…).
+   */
   {
-    id:          'parameter-sets',
-    labelKey:    'PAYROLL.layout.NAV.PARAMETER_SETS',
-    icon:        'settings_applications',
-    route:       'parameter-sets',
+    id:          'admin',
+    labelKey:    'PAYROLL.layout.NAV.SETTINGS_GROUP',
+    icon:        'admin_panel_settings',
+    route:       'admin',
     permissions: ['PAYROLL_VIEW_PARAMSET'],
   },
 ];
@@ -226,5 +291,5 @@ export function activeNavRoute(url: string, defs: PayrollNavDef[] = PAYROLL_NAV_
   const match = [...routable]
     .sort((a, b) => b.route!.length - a.route!.length)
     .find(def => new RegExp(`(^|/)${def.route}(/|$)`).test(path));
-  return match ? match.route! : '';
+  return match ? (match.highlightRoute ?? match.route!) : '';
 }

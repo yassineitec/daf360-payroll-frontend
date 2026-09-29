@@ -1,14 +1,16 @@
 import {
   ChangeDetectionStrategy, Component, OnInit, TemplateRef, ViewChild, computed, effect, inject, signal, untracked,
 } from '@angular/core';
-import { catchError, of } from 'rxjs';
+import { Subscription, catchError, of } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   BadgeCell, DafCellDirective, DataTableComponent, FormFieldComponent, MetricCardComponent, MetricCardOptions,
   ModalRef, ModalService, PageComponent, PageHeaderComponent, SearchToolbarComponent, SelectComponent,
-  TabItem, TabsComponent, TableColumn, TableConfig, TableRow, tabParam, ButtonComponent,
+  TabItem, TabsComponent, TableColumn, TableConfig, TableRow, tabParam, ButtonComponent, AccordionCardComponent, StatusBadgeComponent,
 } from '@khalilrebhiitec/daf360';
-import type { BadgeVariant, SelectOption } from '@khalilrebhiitec/daf360';
+import type {
+  BadgeVariant, FilterField, FilterResult, SearchToolbarFilterConfig, SelectOption,
+} from '@khalilrebhiitec/daf360';
 
 import { PayrollApiService, PaysDto } from '../../core/payroll-api.service';
 import {
@@ -26,6 +28,10 @@ const INSTALLMENT_VARIANT: Record<InstallmentStatus, BadgeVariant> = {
   PLANNED: 'warning', DEDUCTED: 'success', SKIPPED: 'neutral', WAIVED: 'info',
 };
 const CURRENCIES = ['TND', 'EGP', 'EUR', 'USD'];
+const INSTALLMENT_STATUSES: InstallmentStatus[] = ['PLANNED', 'DEDUCTED', 'SKIPPED', 'WAIVED'];
+
+/** Schedules reach a few months out; past that there is nothing to deduct yet. */
+const MAX_MONTHS_AHEAD = 3;
 
 /**
  * `/payroll/salary-advances` — payroll owns the salary advances: they exist to be deducted
@@ -45,7 +51,9 @@ const CURRENCIES = ['TND', 'EGP', 'EUR', 'USD'];
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     PageComponent, PageHeaderComponent, MetricCardComponent, TabsComponent, SearchToolbarComponent,
-    SelectComponent, DataTableComponent, DafCellDirective, FormFieldComponent, ButtonComponent, TranslatePipe,
+    SelectComponent, DataTableComponent, DafCellDirective, FormFieldComponent, ButtonComponent, AccordionCardComponent,
+    StatusBadgeComponent,
+    TranslatePipe,
   ],
   templateUrl: './salary-advances.component.html',
 })
@@ -60,6 +68,7 @@ export class SalaryAdvancesComponent implements OnInit {
   @ViewChild('policyTpl') private policyTpl!: TemplateRef<unknown>;
   @ViewChild('detailTpl') private detailTpl!: TemplateRef<unknown>;
   private modalRef: ModalRef | null = null;
+  private deductionsSub?: Subscription;
 
   // ── Data ─────────────────────────────────────────────────────────────────
   readonly toPay      = signal<SalaryAdvance[]>([]);
@@ -76,7 +85,6 @@ export class SalaryAdvancesComponent implements OnInit {
   // ── View state ───────────────────────────────────────────────────────────
   readonly activeTab    = tabParam<TabKey>(['payout', 'deductions', 'followup', 'rules'], 'payout');
   readonly search       = signal('');
-  readonly statusFilter = signal<AdvanceStatus | ''>('');
   readonly month        = signal(currentYearMonth());
   readonly exporting    = signal(false);
   readonly bulkBusy     = signal(false);
@@ -97,6 +105,11 @@ export class SalaryAdvancesComponent implements OnInit {
   readonly kpiRepaying: MetricCardOptions    = { icon: 'autorenew', iconColor: 'text-primary', iconBg: 'bg-primary/10' };
   readonly kpiDue: MetricCardOptions         = { icon: 'receipt_long', iconColor: 'text-tertiary', iconBg: 'bg-tertiary/10' };
   readonly kpiOutstanding: MetricCardOptions = { icon: 'account_balance_wallet', iconColor: 'text-teal', iconBg: 'bg-teal/10' };
+
+  // Payroll month card (Retenues tab).
+  readonly kpiMonthLines: MetricCardOptions    = { icon: 'receipt_long', iconColor: 'text-tertiary', iconBg: 'bg-tertiary/10' };
+  readonly kpiMonthToDeduct: MetricCardOptions = { icon: 'pending_actions', iconColor: 'text-warning', iconBg: 'bg-warning/10' };
+  readonly kpiMonthDeducted: MetricCardOptions = { icon: 'task_alt', iconColor: 'text-success', iconBg: 'bg-success/10' };
 
   private readonly locale = computed(() => (this.translate.currentLang() === 'en' ? 'en-GB' : 'fr-FR'));
 
@@ -123,9 +136,11 @@ export class SalaryAdvancesComponent implements OnInit {
     this.svc.policies().pipe(catchError(() => of([] as AdvancePolicy[]))).subscribe(list => this.policies.set(list));
   }
 
+  /** Only the latest month's response may land: switching months fast must not show an older one. */
   private loadDeductions(month: string): void {
+    this.deductionsSub?.unsubscribe();
     this.deductionsLoading.set(true);
-    this.svc.deductions(month).subscribe({
+    this.deductionsSub = this.svc.deductions(month).subscribe({
       next: rows => { this.deductions.set(rows); this.deductionsLoading.set(false); },
       error: err => { this.deductions.set([]); this.deductionsLoading.set(false); this.error.set(this.message(err)); },
     });
@@ -133,6 +148,16 @@ export class SalaryAdvancesComponent implements OnInit {
 
   // ── Projections ──────────────────────────────────────────────────────────
   readonly planned = computed(() => this.deductions().filter(r => r.status === 'PLANNED'));
+
+  /** Payroll month card: every line of the month, what is left to deduct, what already was. */
+  readonly monthSummary = computed(() => {
+    const rows = this.deductions();
+    return {
+      lines: rows.length,
+      toDeduct: sumByCurrency(this.planned().map(r => ({ amount: r.amount, currency: r.currency })), this.locale()),
+      deducted: rows.filter(r => r.status === 'DEDUCTED').length,
+    };
+  });
 
   readonly stats = computed(() => {
     const repaying = this.all().filter(a => a.status === 'REPAYING');
@@ -155,16 +180,168 @@ export class SalaryAdvancesComponent implements OnInit {
     ];
   });
 
-  readonly monthOptions = computed<SelectOption[]>(() => {
-    const loc = this.locale();
-    const now = currentYearMonth();
-    return Array.from({ length: 10 }, (_, i) => addMonths(now, 3 - i)).map(m => ({ value: m, label: monthLabel(m, loc) }));
+  /** Payroll month navigator: any past month, up to {@link MAX_MONTHS_AHEAD} ahead. */
+  readonly currentMonth = currentYearMonth();
+  readonly isCurrentMonth = computed(() => this.month() === this.currentMonth);
+  readonly canGoNext = computed(() => this.month() < addMonths(this.currentMonth, MAX_MONTHS_AHEAD));
+
+  /** Payroll month accordion: folded on arrival, the month as its title, the summary under it. */
+  readonly monthCardOpen = signal(false);
+  readonly monthTitle = computed(() => {
+    const name = this.monthName(this.month());
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  });
+  readonly monthSubtitle = computed(() => {
+    const t = (k: string, p?: object) => this.translate.instant(k, p);
+    this.translate.currentLang();
+    if (this.deductionsLoading()) return t('PAYROLL.SALARY_ADVANCES.MONTH');
+    const s = this.monthSummary();
+    return t('PAYROLL.SALARY_ADVANCES.MONTH_SUMMARY.LINE', { lines: s.lines, amount: s.toDeduct });
   });
 
-  readonly statusOptions = computed<SelectOption[]>(() => {
+  shiftMonth(delta: number): void {
+    const next = addMonths(this.month(), delta);
+    if (delta > 0 && !this.canGoNext()) return;
+    this.month.set(next);
+  }
+
+  // ── Filters ──────────────────────────────────────────────────────────────
+  /**
+   * One filter panel per tab, in the search toolbar. Choice lists are built from the rows the
+   * tab holds, so no choice ever leads to an empty table.
+   */
+  readonly filterFields = computed<Record<TabKey, FilterField[]>>(() => {
     this.translate.currentLang();
-    return ADVANCE_STATUSES.map(s => ({ value: s, label: this.translate.instant(`PAYROLL.SALARY_ADVANCES.STATUS.${s}`) }));
+    const t = (k: string) => this.translate.instant(k);
+    const all = t('PAYROLL.SALARY_ADVANCES.FILTER.ALL');
+    const pays = (ids: number[]): FilterField => ({
+      name: 'pays', label: t('PAYROLL.SALARY_ADVANCES.FILTER.PAYS'), type: 'select', searchable: true, placeholder: all,
+      options: distinct(ids).map(id => ({ value: String(id), label: this.paysName(id) })),
+    });
+    const currency = (codes: string[]): FilterField => ({
+      name: 'currency', label: t('PAYROLL.SALARY_ADVANCES.FILTER.CURRENCY'), type: 'select', placeholder: all,
+      options: distinct(codes).map(c => ({ value: c, label: c })),
+    });
+    const status = (values: string[], prefix: string): FilterField => ({
+      name: 'status', label: t('PAYROLL.SALARY_ADVANCES.COL.STATUS'), type: 'select',
+      placeholder: t('PAYROLL.SALARY_ADVANCES.ALL_STATUSES'),
+      options: values.map(s => ({ value: s, label: t(`PAYROLL.SALARY_ADVANCES.${prefix}.${s}`) })),
+    });
+    const months = (name: string, label: string, values: number[]): FilterField => ({
+      name, label: t(label), type: 'select', placeholder: all,
+      options: distinct(values).sort((a, b) => a - b)
+        .map(n => ({
+          value: String(n),
+          label: n ? this.translate.instant('PAYROLL.SALARY_ADVANCES.N_MONTHS', { count: n }) : t('PAYROLL.SALARY_ADVANCES.RULES.NONE'),
+        })),
+    });
+    const names = (name: string, label: string, values: (string | null)[]): FilterField => ({
+      name, label: t(label), type: 'select', searchable: true, placeholder: all,
+      options: distinct(values.filter((v): v is string => !!v)).sort((a, b) => a.localeCompare(b))
+        .map(v => ({ value: v, label: v })),
+    });
+
+    const toPay = this.toPay();
+    const advances = this.all();
+    const deductions = this.deductions();
+    const policies = this.policies();
+    return {
+      payout: [
+        pays(toPay.map(a => a.paysId)),
+        currency(toPay.map(a => a.currency)),
+        {
+          name: 'firstMonth', label: t('PAYROLL.SALARY_ADVANCES.FILTER.FIRST_MONTH'), type: 'select', placeholder: all,
+          options: distinct(toPay.map(a => a.firstDeductionMonth.slice(0, 7))).map(m => ({ value: m, label: this.monthName(m) })),
+        },
+        { name: 'approved', label: t('PAYROLL.SALARY_ADVANCES.FILTER.APPROVED'), type: 'daterange' },
+        months('installments', 'PAYROLL.SALARY_ADVANCES.FILTER.INSTALLMENTS', toPay.map(a => a.installments)),
+        names('decidedBy', 'PAYROLL.SALARY_ADVANCES.FILTER.DECIDED_BY', toPay.map(a => a.financeDecidedByName)),
+        { name: 'requested', label: t('PAYROLL.SALARY_ADVANCES.FILTER.REQUESTED'), type: 'daterange' },
+      ],
+      deductions: [
+        status(INSTALLMENT_STATUSES, 'INSTALLMENT'),
+        pays(deductions.map(r => r.paysId)),
+        currency(deductions.map(r => r.currency)),
+        { name: 'noMatricule', label: t('PAYROLL.SALARY_ADVANCES.FILTER.NO_MATRICULE'), type: 'checkbox' },
+        names('employee', 'PAYROLL.SALARY_ADVANCES.COL.EMPLOYEE', deductions.map(r => r.employeeName)),
+        { name: 'firstInstallment', label: t('PAYROLL.SALARY_ADVANCES.FILTER.FIRST_INSTALLMENT'), type: 'checkbox' },
+        { name: 'lastInstallment', label: t('PAYROLL.SALARY_ADVANCES.FILTER.LAST_INSTALLMENT'), type: 'checkbox' },
+      ],
+      followup: [
+        status(ADVANCE_STATUSES, 'STATUS'),
+        pays(advances.map(a => a.paysId)),
+        currency(advances.map(a => a.currency)),
+        { name: 'disbursed', label: t('PAYROLL.SALARY_ADVANCES.FILTER.DISBURSED'), type: 'daterange' },
+        {
+          name: 'method', label: t('PAYROLL.SALARY_ADVANCES.PAYOUT.METHOD'), type: 'select', placeholder: all,
+          options: distinct(advances.map(a => a.disbursementMethod).filter((m): m is string => !!m))
+            .map(m => ({ value: m, label: this.methodLabel(m) })),
+        },
+        { name: 'requested', label: t('PAYROLL.SALARY_ADVANCES.FILTER.REQUESTED'), type: 'daterange' },
+        { name: 'outstanding', label: t('PAYROLL.SALARY_ADVANCES.FILTER.OUTSTANDING_ONLY'), type: 'checkbox' },
+      ],
+      rules: [
+        {
+          name: 'state', label: t('PAYROLL.SALARY_ADVANCES.RULES.STATE'), type: 'select', placeholder: all,
+          options: [
+            { value: 'open', label: t('PAYROLL.SALARY_ADVANCES.RULES.OPEN') },
+            { value: 'closed', label: t('PAYROLL.SALARY_ADVANCES.RULES.CLOSED') },
+          ],
+        },
+        currency(policies.map(p => p.currency)),
+        pays(policies.map(p => p.paysId)),
+        months('maxMonths', 'PAYROLL.SALARY_ADVANCES.RULES.MAX_MONTHS', policies.map(p => p.maxInstallments)),
+        months('seniority', 'PAYROLL.SALARY_ADVANCES.RULES.SENIORITY', policies.map(p => p.minSeniorityMonths)),
+      ],
+    };
   });
+
+  private methodLabel(method: string): string {
+    const key = `PAYROLL.SALARY_ADVANCES.METHOD.${method}`;
+    const label = this.translate.instant(key);
+    return label === key ? method : label;
+  }
+
+  /** Applied filter per tab, as the panel emitted it. */
+  readonly filters = signal<Record<TabKey, FilterResult>>({ payout: {}, deductions: {}, followup: {}, rules: {} });
+
+  onFilter(tab: TabKey, result: FilterResult): void {
+    this.filters.update(f => ({ ...f, [tab]: result }));
+  }
+
+  /**
+   * The panel is rebuilt each time its tab is shown and seeds itself from `initialValues`, once.
+   * Feeding it the applied filter back keeps what the panel shows in step with the table.
+   */
+  readonly filterConfigs = computed<Record<TabKey, SearchToolbarFilterConfig>>(() => {
+    this.translate.currentLang();
+    const t = (k: string) => this.translate.instant(k);
+    const fields = this.filterFields();
+    const applied = this.filters();
+    const config = (tab: TabKey): SearchToolbarFilterConfig => ({
+      title: t('PAYROLL.SALARY_ADVANCES.FILTER.TITLE'),
+      triggerLabel: t('PAYROLL.SALARY_ADVANCES.FILTER.TRIGGER'),
+      applyLabel: t('PAYROLL.SALARY_ADVANCES.FILTER.APPLY'),
+      cancelLabel: t('PAYROLL.SALARY_ADVANCES.FILTER.CANCEL'),
+      resetLabel: t('PAYROLL.SALARY_ADVANCES.FILTER.RESET'),
+      align: 'right',
+      initialValues: toSeed(fields[tab], applied[tab]),
+    });
+    return { payout: config('payout'), deductions: config('deductions'), followup: config('followup'), rules: config('rules') };
+  });
+
+  /** A select's applied value, or null when unset. */
+  private pick(tab: TabKey, name: string): string | null {
+    const v = this.filters()[tab][name];
+    return ((Array.isArray(v) ? v[0] : v) as string | null | undefined) || null;
+  }
+
+  /** A date range's applied bounds as `YYYY-MM-DD`, both inclusive. */
+  private range(tab: TabKey, name: string): [string | null, string | null] {
+    const v = this.filters()[tab][name];
+    const days = (Array.isArray(v) ? v : [v]).filter((d): d is Date => d instanceof Date).map(isoDay).sort();
+    return [days[0] ?? null, days[days.length - 1] ?? null];
+  }
 
   readonly methodOptions = computed<SelectOption[]>(() => {
     this.translate.currentLang();
@@ -219,13 +396,44 @@ export class SalaryAdvancesComponent implements OnInit {
   readonly payoutColumns = computed<TableColumn[]>(() => { this.translate.currentLang(); return this.advanceColumns(); });
   readonly payoutRows = computed<TableRow[]>(() => {
     this.translate.currentLang();
-    return this.toPay().filter(a => this.matches(a.employeeName)).map(a => this.advanceRow(a));
+    const pays = this.pick('payout', 'pays');
+    const currency = this.pick('payout', 'currency');
+    const firstMonth = this.pick('payout', 'firstMonth');
+    const [from, to] = this.range('payout', 'approved');
+    const installments = this.pick('payout', 'installments');
+    const decidedBy = this.pick('payout', 'decidedBy');
+    const [reqFrom, reqTo] = this.range('payout', 'requested');
+    return this.toPay()
+      .filter(a => this.matches(a.employeeName)
+        && (!pays || String(a.paysId) === pays)
+        && (!currency || a.currency === currency)
+        && (!firstMonth || a.firstDeductionMonth.startsWith(firstMonth))
+        && inRange(a.financeDecidedAt, from, to)
+        && (!installments || String(a.installments) === installments)
+        && (!decidedBy || a.financeDecidedByName === decidedBy)
+        && inRange(a.createdAt, reqFrom, reqTo))
+      .map(a => this.advanceRow(a));
   });
 
   readonly followupRows = computed<TableRow[]>(() => {
     this.translate.currentLang();
-    const s = this.statusFilter();
-    return this.all().filter(a => this.matches(a.employeeName) && (!s || a.status === s)).map(a => this.advanceRow(a));
+    const status = this.pick('followup', 'status');
+    const pays = this.pick('followup', 'pays');
+    const currency = this.pick('followup', 'currency');
+    const [from, to] = this.range('followup', 'disbursed');
+    const method = this.pick('followup', 'method');
+    const [reqFrom, reqTo] = this.range('followup', 'requested');
+    const outstandingOnly = this.filters().followup['outstanding'] === true;
+    return this.all()
+      .filter(a => this.matches(a.employeeName)
+        && (!status || a.status === status)
+        && (!pays || String(a.paysId) === pays)
+        && (!currency || a.currency === currency)
+        && inRange(a.disbursedOn, from, to)
+        && (!method || a.disbursementMethod === method)
+        && inRange(a.createdAt, reqFrom, reqTo)
+        && (!outstandingOnly || (a.outstandingAmount ?? 0) > 0))
+      .map(a => this.advanceRow(a));
   });
 
   readonly deductionColumns = computed<TableColumn[]>(() => {
@@ -245,8 +453,22 @@ export class SalaryAdvancesComponent implements OnInit {
     this.translate.currentLang();
     const t = (k: string, p?: object) => this.translate.instant(k, p);
     const q = this.search().trim().toLowerCase();
+    const status = this.pick('deductions', 'status');
+    const pays = this.pick('deductions', 'pays');
+    const currency = this.pick('deductions', 'currency');
+    const noMatricule = this.filters().deductions['noMatricule'] === true;
+    const employee = this.pick('deductions', 'employee');
+    const firstOnly = this.filters().deductions['firstInstallment'] === true;
+    const lastOnly = this.filters().deductions['lastInstallment'] === true;
     return this.deductions()
-      .filter(r => !q || (r.employeeName ?? '').toLowerCase().includes(q) || (r.payrollMatricule ?? '').toLowerCase().includes(q))
+      .filter(r => (!q || (r.employeeName ?? '').toLowerCase().includes(q) || (r.payrollMatricule ?? '').toLowerCase().includes(q))
+        && (!status || r.status === status)
+        && (!pays || String(r.paysId) === pays)
+        && (!currency || r.currency === currency)
+        && (!noMatricule || !r.payrollMatricule)
+        && (!employee || r.employeeName === employee)
+        && (!firstOnly || r.seq === 1)
+        && (!lastOnly || r.seq === r.installmentsTotal))
       .map(r => ({
         employee: {
           name: r.employeeName ?? '—', initials: initials(r.employeeName),
@@ -281,7 +503,19 @@ export class SalaryAdvancesComponent implements OnInit {
   readonly ruleRows = computed<TableRow[]>(() => {
     this.translate.currentLang();
     const t = (k: string, p?: object) => this.translate.instant(k, p);
-    return this.policies().map(p => ({
+    const state = this.pick('rules', 'state');
+    const currency = this.pick('rules', 'currency');
+    const pays = this.pick('rules', 'pays');
+    const maxMonths = this.pick('rules', 'maxMonths');
+    const seniority = this.pick('rules', 'seniority');
+    return this.policies()
+      .filter(p => this.matches(this.paysName(p.paysId))
+        && (!state || p.isActive === (state === 'open'))
+        && (!currency || p.currency === currency)
+        && (!pays || String(p.paysId) === pays)
+        && (!maxMonths || String(p.maxInstallments) === maxMonths)
+        && (!seniority || String(p.minSeniorityMonths) === seniority))
+      .map(p => ({
       pays: `${this.paysName(p.paysId)} · ${p.currency}`,
       months: t('PAYROLL.SALARY_ADVANCES.N_MONTHS', { count: p.maxInstallments }),
       seniority: p.minSeniorityMonths ? t('PAYROLL.SALARY_ADVANCES.N_MONTHS', { count: p.minSeniorityMonths }) : t('PAYROLL.SALARY_ADVANCES.RULES.NONE'),
@@ -456,10 +690,6 @@ export class SalaryAdvancesComponent implements OnInit {
     });
   }
 
-  onStatusFilter(values: string[]): void {
-    this.statusFilter.set((values[0] as AdvanceStatus) ?? '');
-  }
-
   // ── Display ──────────────────────────────────────────────────────────────
   money(value: number | null | undefined, currency: string | null): string {
     if (value === null || value === undefined) return '—';
@@ -503,8 +733,37 @@ function monthLabel(ym: string | null, locale: string): string {
 }
 
 function todayIso(): string {
-  const d = new Date();
+  return isoDay(new Date());
+}
+
+function distinct<T>(values: T[]): T[] {
+  return [...new Set(values)].sort();
+}
+
+/**
+ * An applied filter back in the panel's own shape: a select holds a `string[]` (it emits a
+ * scalar), anything else is stored as emitted.
+ */
+function toSeed(fields: FilterField[], applied: FilterResult): FilterResult {
+  const seed: FilterResult = {};
+  for (const f of fields) {
+    const v = applied[f.name];
+    if (v === undefined) continue;
+    seed[f.name] = (f.type ?? 'select') === 'select' ? (v ? [String(Array.isArray(v) ? v[0] : v)] : []) : v;
+  }
+  return seed;
+}
+
+function isoDay(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Whether an ISO timestamp's day falls in [from, to]. No bound → no constraint; no date → out once bounded. */
+function inRange(iso: string | null, from: string | null, to: string | null): boolean {
+  if (!from && !to) return true;
+  if (!iso) return false;
+  const day = iso.slice(0, 10);
+  return (!from || day >= from) && (!to || day <= to);
 }
 
 function initials(name: string | null): string {
