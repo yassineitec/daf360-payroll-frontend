@@ -1,5 +1,5 @@
 <!-- Même mise en page qu'une section de /payroll/admin (et de /rh/admin) : fil d'Ariane seul,
-     en-tête de section (titre + nombre, aide, recherche et filtre à droite), puis le tableau,
+     en-tête de section (titre + nombre, aide), bandeau blanc pleine largeur (recherche + filtre), puis le tableau,
      « N collaborateurs » et la pagination. Recherche, filtres et pages côté serveur (`load()`). -->
 <div class="ec-content">
   <daf-page [breadcrumbs]="true">
@@ -12,20 +12,21 @@
     <div class="admin-section">
       <app-admin-section-header
         [title]="('PAYROLL.EMPLOYEE_CONFIG.TITLE' | translate) + ' (' + totalElements() + ')'"
-        [subtitle]="'PAYROLL.EMPLOYEE_CONFIG.LIST_SUBTITLE' | translate">
-        <div class="admin-search">
-          <daf-search-toolbar
-            [card]="false"
-            [placeholder]="'PAYROLL.ENGINE_RESULTS.SEARCH_EMPLOYEE_PLACEHOLDER' | translate"
-            [value]="searchText()"
-            (valueChange)="onSearchTextChange($event)"
-            [debounce]="300"
-            [filterFields]="filterFields()"
-            [filterConfig]="filterConfig()"
-            (filterApply)="applyFilters($event)">
-          </daf-search-toolbar>
-        </div>
-      </app-admin-section-header>
+        [subtitle]="'PAYROLL.EMPLOYEE_CONFIG.LIST_SUBTITLE' | translate" />
+
+      <!-- Recherche + filtre sur toute la largeur, dans un bandeau blanc. -->
+      <div class="admin-toolbar">
+        <daf-search-toolbar
+          [card]="false"
+          [placeholder]="'PAYROLL.ENGINE_RESULTS.SEARCH_EMPLOYEE_PLACEHOLDER' | translate"
+          [value]="searchText()"
+          (valueChange)="onSearchTextChange($event)"
+          [debounce]="300"
+          [filterFields]="filterFields()"
+          [filterConfig]="filterConfig()"
+          (filterApply)="applyFilters($event)">
+        </daf-search-toolbar>
+      </div>
 
       @if (error()) {
         <div class="admin-error-banner" role="alert">{{ error() }}</div>

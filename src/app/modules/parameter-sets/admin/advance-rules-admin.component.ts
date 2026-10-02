@@ -33,22 +33,14 @@ const CURRENCIES = ['TND', 'EGP', 'EUR', 'USD'];
     AdminTableFooterComponent, ButtonComponent, DataTableComponent, FormFieldComponent, SearchToolbarComponent,
     SelectComponent,
   ],
-  // Comme une section de /rh/admin : en-tête (titre, aide, recherche + bouton vert
-  // « Ajouter » à droite), puis le tableau — modifier une règle : action de ligne.
+  // Comme une section de /rh/admin : en-tête (titre, aide, bouton vert « Ajouter » à
+  // droite), bandeau blanc recherche + filtre pleine largeur, puis le tableau — modifier
+  // une règle : action de ligne.
   template: `
     <div class="admin-section">
       <app-admin-section-header
         [title]="'PAYROLL.ADMIN_HOME.CARDS.ADVANCE_RULES' | translate"
         [subtitle]="'PAYROLL.SALARY_ADVANCES.RULES.HINT' | translate">
-        <div class="admin-search">
-          <daf-search-toolbar
-            [card]="false"
-            [placeholder]="'PAYROLL.SALARY_ADVANCES.SEARCH_RULES' | translate"
-            [value]="search()" [debounce]="200" (valueChange)="search.set($event ?? '')"
-            [filterFields]="filterFields()"
-            [filterConfig]="filterConfig()"
-            (filterApply)="filters.set($event)" />
-        </div>
         @if (freePaysOptions().length) {
           <daf-button class="admin-desktop-only"
             [label]="'PAYROLL.SALARY_ADVANCES.RULES.ADD' | translate"
@@ -62,6 +54,17 @@ const CURRENCIES = ['TND', 'EGP', 'EUR', 'USD'];
             (onClick)="openPolicy(null)" />
         }
       </app-admin-section-header>
+
+      <!-- Recherche + filtre sur toute la largeur, dans un bandeau blanc. -->
+      <div class="admin-toolbar">
+        <daf-search-toolbar
+          [card]="false"
+          [placeholder]="'PAYROLL.SALARY_ADVANCES.SEARCH_RULES' | translate"
+          [value]="search()" [debounce]="200" (valueChange)="search.set($event ?? '')"
+          [filterFields]="filterFields()"
+          [filterConfig]="filterConfig()"
+          (filterApply)="filters.set($event)" />
+      </div>
 
       <!-- Comme les sections RH : indicateur pendant le chargement, message centré si vide,
            sinon le tableau (5 lignes par page) + « N éléments » et la pagination. -->

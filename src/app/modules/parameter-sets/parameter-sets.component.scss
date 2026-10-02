@@ -58,9 +58,12 @@
   .ps-tab-content { padding: 12px 16px 16px; }
 }
 
-/* Recherche dans l'en-tête de section : même largeur que la recherche des sections RH. */
-.ps-search { width: 360px; max-width: 100%; }
-@media (max-width: 640px) { .ps-search { width: 100%; } }
+/* Bandeau recherche + filtre sous l'en-tête : toute la largeur, fond blanc (comme .admin-toolbar). */
+.ps-toolbar {
+  background: var(--color-surface-container-lowest, #fff);
+  border: 1px solid color-mix(in srgb, var(--color-outline-variant) 40%, transparent);
+  border-radius: 12px;
+}
 
 /* Sections : en-tête puis contenu, 16px d'écart (`margin-bottom` de l'en-tête RH). */
 .ps-layout { display: flex; flex-direction: column; gap: 16px; }
@@ -115,6 +118,47 @@
 .ps-form { display: flex; flex-direction: column; gap: 20px; }
 .field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 20px 24px; }
 .form-actions { display: flex; justify-content: flex-end; gap: 12px; padding-top: 4px; }
+
+/* Charges sociales de « Nouveau jeu » : une carte par charge, champs à libellés en deux
+   lignes de grille (identité, puis taux / base / plafond), aperçu en montant dessous. */
+.ps-charges-heading { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ps-charges-empty {
+  margin: 0; padding: 28px 16px; text-align: center; font-size: 13px;
+  color: var(--color-on-surface-variant);
+  border: 1px dashed color-mix(in srgb, var(--color-outline-variant) 80%, transparent);
+  border-radius: 12px;
+}
+.ps-charge-list { display: flex; flex-direction: column; gap: 12px; }
+.ps-charge-item {
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 14px 16px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-outline-variant) 60%, transparent);
+  border-radius: 12px;
+  background: var(--color-surface-container-low, transparent);
+}
+.ps-charge-item__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ps-charge-item__title { font-size: 13px; font-weight: 700; color: var(--color-on-surface); }
+.ps-charge-item__code  { font-weight: 600; color: var(--color-primary); }
+/* Ligne 1 : contrat, code, libellé (le plus long). Ligne 2 : 4 cases fixes, pour que les
+   colonnes restent alignées d'une charge à l'autre même sans plafond. */
+.ps-charge-grid-id    { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 12px 16px; }
+.ps-charge-grid-rates { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 16px; }
+.ps-charge-preview {
+  display: flex; align-items: center; gap: 6px; margin: 0;
+  padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--color-outline-variant) 40%, transparent);
+  font-size: 12px; color: var(--color-on-surface-variant);
+}
+.ps-charge-preview .material-symbols-outlined { font-size: 16px; color: var(--color-secondary); }
+.ps-charges-total { margin: 0; text-align: right; font-size: 12px; font-weight: 600; color: var(--color-on-surface-variant); }
+
+@media (max-width: 900px) {
+  .ps-charge-grid-id    { grid-template-columns: 1fr 1fr; }
+  .ps-charge-grid-id > :last-child { grid-column: 1 / -1; }
+  .ps-charge-grid-rates { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 560px) {
+  .ps-charge-grid-id, .ps-charge-grid-rates { grid-template-columns: 1fr; }
+}
 
 /* ── Pop-ups d'édition ────────────────────────────────────────────────────── */
 .charges-editor,

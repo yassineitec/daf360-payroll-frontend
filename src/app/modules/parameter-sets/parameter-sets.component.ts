@@ -686,17 +686,19 @@ export class ParameterSetsComponent implements OnInit {
   }
 
   newSetRateError(i: number, name: string): string | undefined {
-    return this.controlError(this.newSetRateGroup(i).get(name));
+    // Taux saisis en % : bornes du message en % aussi (max 1 → 100).
+    const scale = name === 'employeeRate' || name === 'employerRate' ? 100 : 1;
+    return this.controlError(this.newSetRateGroup(i).get(name), scale);
   }
 
-  private controlError(ctrl: AbstractControl | null): string | undefined {
+  private controlError(ctrl: AbstractControl | null, scale = 1): string | undefined {
     if (!ctrl || ctrl.valid || !(ctrl.dirty || this.newSetSubmitted())) return undefined;
     const e = ctrl.errors ?? {};
     if (e['required'])  return this.t('PAYROLL.ADMIN.ERR.REQUIRED');
     if (e['integer'])   return this.t('PAYROLL.ADMIN.ERR.INTEGER');
     if (e['positive'])  return this.t('PAYROLL.ADMIN.ERR.POSITIVE');
-    if (e['min'])       return this.t('PAYROLL.ADMIN.ERR.MIN', { min: e['min'].min });
-    if (e['max'])       return this.t('PAYROLL.ADMIN.ERR.MAX', { max: e['max'].max });
+    if (e['min'])       return this.t('PAYROLL.ADMIN.ERR.MIN', { min: e['min'].min * scale });
+    if (e['max'])       return this.t('PAYROLL.ADMIN.ERR.MAX', { max: e['max'].max * scale });
     if (e['irpp'])      return this.t(`PAYROLL.ADMIN.ERR.IRPP.${e['irpp']}`);
     return this.t('PAYROLL.ADMIN.ERR.INVALID');
   }
@@ -1428,16 +1430,6 @@ export class ParameterSetsComponent implements OnInit {
   // un FormGroup, retrouvé par son index (`let-i="index"` du gabarit de cellule) ; `id`
   // stable par position pour que le tableau garde les champs (et le focus) d'une frappe
   // à l'autre.
-  readonly newSetRateColumns = computed<TableColumn[]>(() => [
-    { key: 'contractType',    label: this.t('PAYROLL.ADMIN.COL_TYPE'),          width: '130px' },
-    { key: 'chargeCode',      label: this.t('PAYROLL.ADMIN.COL_CODE'),          width: '120px' },
-    { key: 'chargeLabel',     label: this.t('PAYROLL.ADMIN.COL_LABEL') },
-    { key: 'employeeRate',    label: this.t('PAYROLL.ADMIN.COL_EMPLOYEE_RATE'), width: '110px' },
-    { key: 'employerRate',    label: this.t('PAYROLL.ADMIN.COL_EMPLOYER_RATE'), width: '110px' },
-    { key: 'baseCalculation', label: this.t('PAYROLL.ADMIN.COL_BASE'),          width: '160px' },
-    { key: 'capAmount',       label: this.t('PAYROLL.ADMIN.COL_CAP'),           width: '130px' },
-  ]);
-
   readonly editRateColumns = computed<TableColumn[]>(() => [
     { key: 'contractType',    label: this.t('PAYROLL.PARAMETER_SETS.COL_TYPE'),           width: '130px' },
     { key: 'chargeCode',      label: this.t('PAYROLL.PARAMETER_SETS.COL_CODE'),           width: '120px' },
@@ -1451,27 +1443,71 @@ export class ParameterSetsComponent implements OnInit {
   private indexRows(count: number): TableRow[] {
     return Array.from({ length: count }, (_, i) => ({ id: `line-${i}` }));
   }
-  newSetRateRows(): TableRow[] { return this.indexRows(this.newSetRates.length); }
   editRateRows(): TableRow[]   { return this.indexRows(this.editRates.length); }
 
   private rowIndex(row: TableRow): number { return Number(String(row['id']).slice('line-'.length)); }
 
-  /** Suppression de ligne via les actions de ligne de `daf-data-table`, plus un bouton maison. */
-  readonly newSetRateTableConfig = computed<TableConfig>(() => ({
-    showHeader: false,
-    emptyMessage: this.t('PAYROLL.ADMIN.CHARGES_EMPTY'),
-    // Outils de mise en page seulement, PAS de tri : chaque cellule est un champ lié à sa
-    // ligne de formulaire par sa position d'affichage (`let-i="index"`). Trier relierait
-    // les champs aux mauvais taux.
-    ...tableTools(this.translate),
-    actions: [{ id: 'remove', icon: 'close', tooltip: this.t('PAYROLL.ADMIN.REMOVE'), variant: 'danger',
-                onClick: row => this.removeNewSetRate(this.rowIndex(row)) }],
-  }));
+  // ── Charges de « Nouveau jeu » : une carte par charge (plus de tableau de champs) ──
+  // Le tableau de 7 colonnes de champs débordait de la carte et n'avait pas d'en-têtes ;
+  // chaque charge est maintenant une carte à libellés, en 2 lignes de grille. Les taux se
+  // saisissent en % (9,18) et restent stockés en décimal (0.0918) dans le formulaire, donc
+  // envoyés au serveur tels qu'avant.
+
+  /** Taux d'une charge en %, pour l'affichage (0.0918 → 9.18), arrondi pour masquer le bruit flottant. */
+  newSetRatePct(i: number, name: 'employeeRate' | 'employerRate'): number | null {
+    const v = this.newSetRateGroup(i).get(name)!.value as number | null;
+    return v == null ? null : Number((v * 100).toFixed(4));
+  }
+
+  /** Saisie en % → décimal dans le formulaire (9.18 → 0.0918). */
+  setNewSetRatePct(i: number, name: 'employeeRate' | 'employerRate', value: unknown): void {
+    const n = this.num(value);
+    this.setNewSetRateValue(i, name, n == null ? null : Number((n / 100).toFixed(6)));
+  }
+
+  /** Base de calcul : le plafond n'a de sens qu'en `CAPPED_GROSS` — vidé en repassant à `GROSS`
+   *  pour ne pas envoyer un plafond invisible. */
+  setNewSetRateBase(i: number, value: string): void {
+    this.setNewSetRateValue(i, 'baseCalculation', value);
+    if (value !== 'CAPPED_GROSS') this.newSetRateGroup(i).get('capAmount')!.setValue(null);
+  }
+
+  isNewSetRateCapped(i: number): boolean {
+    return this.newSetRateGroup(i).get('baseCalculation')!.value === 'CAPPED_GROSS';
+  }
+
+  /** Aperçu d'une charge pour le brut d'exemple (`testGross`, le même que les pop-ups) :
+   *  base = brut, ou min(brut, plafond) en `CAPPED_GROSS` — même règle que le moteur. */
+  newSetRatePreview(i: number): string {
+    const g = this.newSetRateGroup(i).getRawValue();
+    const gross = this.testGross();
+    const base = g['baseCalculation'] === 'CAPPED_GROSS' ? Math.min(gross, g['capAmount'] ?? gross) : gross;
+    return this.t('PAYROLL.ADMIN.CHARGE_PREVIEW', {
+      gross: this.money(gross),
+      ee: this.money(base * (g['employeeRate'] ?? 0)),
+      er: this.money(base * (g['employerRate'] ?? 0)),
+    });
+  }
+
+  /** Somme des taux saisis, en %, sous la liste des charges. */
+  newSetRatesTotal(): string {
+    const sum = (name: string) => this.newSetRates.controls
+      .reduce((s, c) => s + (Number(c.get(name)!.value) || 0), 0) * 100;
+    const pct = (v: number) => v.toLocaleString(this.numberLocale, { maximumFractionDigits: 4 });
+    return this.t('PAYROLL.ADMIN.CHARGES_TOTAL', { ee: pct(sum('employeeRate')), er: pct(sum('employerRate')) });
+  }
+
+  private money(v: number): string {
+    const amount = v.toLocaleString(this.numberLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `${amount} ${this.newSetDevise()}`.trim();
+  }
 
   readonly editRateTableConfig = computed<TableConfig>(() => ({
     showHeader: false,
     emptyMessage: this.t('PAYROLL.PARAMETER_SETS.CHARGES_EMPTY_EDITOR'),
-    // Outils de mise en page seulement, PAS de tri (voir `newSetRateTableConfig`).
+    // Outils de mise en page seulement, PAS de tri : chaque cellule est un champ lié à sa
+    // ligne de formulaire par sa position d'affichage (`let-i="index"`). Trier relierait
+    // les champs aux mauvais taux.
     ...tableTools(this.translate),
     actions: [{ id: 'remove', icon: 'close', tooltip: this.t('PAYROLL.PARAMETER_SETS.REMOVE'), variant: 'danger',
                 onClick: row => this.removeEditRate(this.rowIndex(row)) }],

@@ -11,6 +11,13 @@ export const ADMIN_SECTION_STYLES = `
   .admin-pays    { width: 240px; max-width: 100%; }
   @media (max-width: 640px) { .admin-search, .admin-pays { width: 100%; } }
 
+  /* Bandeau recherche + filtre sous l'en-tête : toute la largeur, fond blanc. */
+  .admin-toolbar {
+    background: var(--color-surface-container-lowest, #fff);
+    border: 1px solid color-mix(in srgb, var(--color-outline-variant) 40%, transparent);
+    border-radius: 12px;
+  }
+
   /* Liste vide : message centré (+ action), comme l'.empty-state des sections RH. */
   .admin-empty {
     display: flex; flex-direction: column; align-items: center; gap: 12px;
