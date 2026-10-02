@@ -91,7 +91,9 @@
         <daf-data-table
           [columns]="candidateColumns()"
           [rows]="pagedCandidateRows()"
-          [config]="{ actions: candidateActions(), emptyMessage: emptyMessage(), hoverable: true }"
+          [config]="candidateTableConfig()"
+          (sortChange)="onCandidateSort($event)"
+          (resetClick)="onCandidateSort(null)"
           (rowClick)="openCandidateById($event['candidateId'])">
         </daf-data-table>
       }

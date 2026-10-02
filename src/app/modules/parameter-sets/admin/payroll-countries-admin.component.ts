@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, TemplateRef, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, TemplateRef, computed, inject, signal, viewChild, untracked } from '@angular/core';
 import { catchError, of } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
@@ -13,10 +13,12 @@ import {
 import { PAYROLL_MANAGE_COUNTRIES_PERMISSIONS } from '../../../core/payroll-nav';
 import { UserStore } from '../../../core/user.store';
 import { monthName, pickValue } from '../../../shared/filter-utils';
+import { delegatedSort, tableTools } from '../../../shared/table-tools';
 import { ADMIN_SECTION_STYLES, AdminSectionHeaderComponent } from './admin-section-header.component';
 import {
   AdminModalFooterComponent, AdminPager, AdminSpinnerComponent, AdminTableFooterComponent,
 } from './admin-section-kit';
+import { PaysNamesService } from '../../../core/pays-names.service';
 
 /**
  * Section « Pays de paie » de l'administration paie : la configuration du moteur par pays
@@ -78,7 +80,8 @@ import {
         </div>
       } @else {
         <div class="admin-table-scroll">
-          <daf-data-table [columns]="columns()" [rows]="pager.rows()" [config]="tableConfig()" />
+          <daf-data-table [columns]="columns()" [rows]="pager.rows()" [config]="tableConfig()"
+            (sortChange)="pager.onSort($event)" (resetClick)="pager.onSort(null)" />
         </div>
         <app-admin-table-footer
           [total]="pager.total()" [page]="pager.current()" [totalPages]="pager.totalPages()"
@@ -146,6 +149,7 @@ import {
 export class PayrollCountriesAdminComponent implements OnInit {
   private readonly api       = inject(PayrollApiService);
   private readonly translate = inject(TranslateService);
+  private readonly paysNames = inject(PaysNamesService);
   private readonly userStore = inject(UserStore);
   private readonly modal     = inject(ModalService);
 
@@ -189,7 +193,7 @@ export class PayrollCountriesAdminComponent implements OnInit {
   readonly freePaysOptions = computed<SelectOption[]>(() => {
     const taken = new Set(this.countries().map(c => c.paysId));
     return this.pays().filter(p => !taken.has(p.id))
-      .map(p => ({ value: String(p.id), label: `${p.frenchLabel} (${p.isoCode})` }));
+      .map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})` }));
   });
 
   readonly monthOptions = computed<SelectOption[]>(() => {
@@ -227,12 +231,15 @@ export class PayrollCountriesAdminComponent implements OnInit {
   }));
 
   readonly columns = computed<TableColumn[]>(() => [
-    { key: 'pays',     label: this.t('PAYROLL.ADMIN_HOME.COUNTRIES.COL_PAYS') },
-    { key: 'currency', label: this.t('PAYROLL.ADMIN_HOME.COUNTRIES.COL_CURRENCY') },
-    { key: 'fiscal',   label: this.t('PAYROLL.ADMIN_HOME.COUNTRIES.COL_FISCAL_START') },
-    { key: 'forex',    label: this.t('PAYROLL.ADMIN_HOME.COUNTRIES.COL_FOREX') },
-    { key: 'state',    label: this.t('PAYROLL.ADMIN_HOME.COUNTRIES.COL_STATE'), type: 'badge' },
-    { key: 'created',  label: this.t('PAYROLL.ADMIN_HOME.COUNTRIES.COL_CREATED'), type: 'date', format: { dateStyle: 'short' } },
+    { key: 'pays',     label: this.t('PAYROLL.ADMIN_HOME.COUNTRIES.COL_PAYS'), sortable: true },
+    { key: 'currency', label: this.t('PAYROLL.ADMIN_HOME.COUNTRIES.COL_CURRENCY'), sortable: true },
+    // Mois écrit en toutes lettres et nombre de sources en texte : triés sur leur valeur.
+    { key: 'fiscal',   label: this.t('PAYROLL.ADMIN_HOME.COUNTRIES.COL_FISCAL_START'), sortable: true,
+      sortAccessor: row => (row['_source'] as PayrollCountryDto).fiscalYearStartMonth },
+    { key: 'forex',    label: this.t('PAYROLL.ADMIN_HOME.COUNTRIES.COL_FOREX'), sortable: true,
+      sortAccessor: row => forexCount((row['_source'] as PayrollCountryDto).forexApiSources) },
+    { key: 'state',    label: this.t('PAYROLL.ADMIN_HOME.COUNTRIES.COL_STATE'), type: 'badge', sortable: true },
+    { key: 'created',  label: this.t('PAYROLL.ADMIN_HOME.COUNTRIES.COL_CREATED'), type: 'date', format: { dateStyle: 'short' }, sortable: true },
   ]);
 
   readonly rows = computed<TableRow[]>(() => {
@@ -250,7 +257,7 @@ export class PayrollCountriesAdminComponent implements OnInit {
         const sources = forexCount(c.forexApiSources);
         return {
           id: c.id,
-          pays: c.paysLabel ? `${c.paysLabel}${c.isoCode ? ` (${c.isoCode})` : ''}` : `#${c.paysId}`,
+          pays: `${this.paysNames.name(c.paysId, c.paysLabel ?? `#${c.paysId}`)}${c.paysLabel && c.isoCode ? ` (${c.isoCode})` : ''}`,
           currency: c.currencyCode,
           fiscal: monthName(c.fiscalYearStartMonth, lang),
           forex: sources
@@ -267,10 +274,12 @@ export class PayrollCountriesAdminComponent implements OnInit {
   });
 
   /** Pages de 5 lignes, comme les sections de /rh/admin. */
-  readonly pager = new AdminPager(() => this.rows());
+  readonly pager = new AdminPager(() => this.rows(), () => this.columns());
 
   readonly tableConfig = computed<TableConfig>(() => ({
-    showHeader: true, hoverable: true,
+    showHeader: false, hoverable: true,
+    ...tableTools(this.translate),
+    ...delegatedSort(untracked(this.pager.sort)),
     rowId: row => row['id'],
     emptyMessage: this.t(this.failed() ? 'PAYROLL.ADMIN_HOME.LOAD_ERROR' : 'PAYROLL.ADMIN_HOME.COUNTRIES.EMPTY'),
     actions: this.canManage()

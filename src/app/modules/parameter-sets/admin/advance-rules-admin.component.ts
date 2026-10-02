@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, TemplateRef, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, TemplateRef, computed, inject, signal, viewChild, untracked } from '@angular/core';
 import { catchError, of } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
@@ -9,10 +9,12 @@ import {
 import { PayrollApiService, type PaysDto } from '../../../core/payroll-api.service';
 import { SalaryAdvancesService, type AdvancePolicy } from '../../salary-advances/salary-advances.service';
 import { pickValue } from '../../../shared/filter-utils';
+import { delegatedSort, tableTools } from '../../../shared/table-tools';
 import { ADMIN_SECTION_STYLES, AdminSectionHeaderComponent } from './admin-section-header.component';
 import {
   AdminModalFooterComponent, AdminPager, AdminSpinnerComponent, AdminTableFooterComponent,
 } from './admin-section-kit';
+import { PaysNamesService } from '../../../core/pays-names.service';
 
 const CURRENCIES = ['TND', 'EGP', 'EUR', 'USD'];
 
@@ -76,7 +78,8 @@ const CURRENCIES = ['TND', 'EGP', 'EUR', 'USD'];
         </div>
       } @else {
         <div class="admin-table-scroll">
-          <daf-data-table [columns]="columns()" [rows]="pager.rows()" [config]="tableConfig()" />
+          <daf-data-table [columns]="columns()" [rows]="pager.rows()" [config]="tableConfig()"
+            (sortChange)="pager.onSort($event)" (resetClick)="pager.onSort(null)" />
         </div>
         <app-admin-table-footer
           [total]="pager.total()" [page]="pager.current()" [totalPages]="pager.totalPages()"
@@ -146,6 +149,7 @@ export class AdvanceRulesAdminComponent implements OnInit {
   private readonly payrollApi = inject(PayrollApiService);
   private readonly modal      = inject(ModalService);
   private readonly translate  = inject(TranslateService);
+  private readonly paysNames = inject(PaysNamesService);
 
   private readonly policyTpl = viewChild.required<TemplateRef<unknown>>('policyTpl');
   modalRef: ModalRef | null = null;
@@ -184,13 +188,13 @@ export class AdvanceRulesAdminComponent implements OnInit {
   }
 
   private paysName(id: number): string {
-    return this.pays().find(p => p.id === id)?.frenchLabel ?? `#${id}`;
+    return this.paysNames.name(id, this.pays().find(p => p.id === id)?.frenchLabel ?? `#${id}`);
   }
 
   /** Pays sans règle encore — les seuls proposés à l'ajout. */
   readonly freePaysOptions = computed<SelectOption[]>(() => {
     const taken = new Set(this.policies().map(p => p.paysId));
-    return this.pays().filter(p => !taken.has(p.id)).map(p => ({ value: String(p.id), label: p.frenchLabel }));
+    return this.pays().filter(p => !taken.has(p.id)).map(p => ({ value: String(p.id), label: this.paysNames.name(p.id, p.frenchLabel) }));
   });
 
   readonly stateOptions = computed<SelectOption[]>(() => [
@@ -219,10 +223,13 @@ export class AdvanceRulesAdminComponent implements OnInit {
   }));
 
   readonly columns = computed<TableColumn[]>(() => [
-    { key: 'pays',      label: this.t('PAYROLL.SALARY_ADVANCES.RULES.PAYS') },
-    { key: 'months',    label: this.t('PAYROLL.SALARY_ADVANCES.RULES.MAX_MONTHS') },
-    { key: 'seniority', label: this.t('PAYROLL.SALARY_ADVANCES.RULES.SENIORITY') },
-    { key: 'state',     label: this.t('PAYROLL.SALARY_ADVANCES.RULES.STATE'), type: 'badge' },
+    // Valeurs brutes : les durées sont écrites en toutes lettres (« 6 mois »).
+    { key: 'pays',      label: this.t('PAYROLL.SALARY_ADVANCES.RULES.PAYS'), sortable: true },
+    { key: 'months',    label: this.t('PAYROLL.SALARY_ADVANCES.RULES.MAX_MONTHS'), sortable: true,
+      sortAccessor: row => (row['_source'] as AdvancePolicy).maxInstallments },
+    { key: 'seniority', label: this.t('PAYROLL.SALARY_ADVANCES.RULES.SENIORITY'), sortable: true,
+      sortAccessor: row => (row['_source'] as AdvancePolicy).minSeniorityMonths },
+    { key: 'state',     label: this.t('PAYROLL.SALARY_ADVANCES.RULES.STATE'), type: 'badge', sortable: true },
   ]);
 
   readonly rows = computed<TableRow[]>(() => {
@@ -248,10 +255,12 @@ export class AdvanceRulesAdminComponent implements OnInit {
   });
 
   /** Pages de 5 lignes, comme les sections de /rh/admin. */
-  readonly pager = new AdminPager(() => this.rows());
+  readonly pager = new AdminPager(() => this.rows(), () => this.columns());
 
   readonly tableConfig = computed<TableConfig>(() => ({
-    showHeader: true, hoverable: true,
+    showHeader: false, hoverable: true,
+    ...tableTools(this.translate),
+    ...delegatedSort(untracked(this.pager.sort)),
     rowId: row => (row['_source'] as AdvancePolicy).paysId,
     emptyMessage: this.t('PAYROLL.SALARY_ADVANCES.EMPTY.RULES'),
     actions: [

@@ -26,8 +26,28 @@ export interface EmployeeListItem {
 }
 
 /** `FilterOptionsDto` de daf360-rh-service. */
+/** Department choices in the UI language (`lang` = `translate.currentLang()`); `value` unchanged. */
+export function departmentFilterOptions(
+  opts: EmployeeFilterOptions | null, lang: string | null | undefined,
+): { value: string; label: string }[] {
+  const isEn = (lang ?? '').startsWith('en');
+  return (opts?.departments ?? []).map(d => ({ value: d.value, label: (isEn && d.labelEn) || d.label }));
+}
+
+/**
+ * Contract-type code (employee_profiles.contract_type, a free varchar holding CDI/CDD/… and
+ * PERMANENT/FIXED_TERM/…) → its label via PAYROLL.COMMON.CONTRACT_TYPE_CODE.*; an unknown
+ * code shows as itself rather than as a raw translation key.
+ */
+export function contractTypeLabel(code: string, translate: { instant(key: string): string }): string {
+  const key = 'PAYROLL.COMMON.CONTRACT_TYPE_CODE.' + code;
+  const label = translate.instant(key);
+  return label === key ? code : label;
+}
+
 export interface EmployeeFilterOptions {
-  departments:   { value: string; label: string }[];
+  /** `label` = FR, `labelEn` = EN (admin RH) — `value` reste le libellé FR envoyé au filtre. */
+  departments:   { value: string; label: string; labelEn?: string | null }[];
   grades:        { value: string; label: string }[];
   pays:          { value: string; label: string }[];
   contractTypes: string[];
@@ -63,6 +83,8 @@ export class HrProfileService {
   listEmployees(opts: {
     search?: string; paysId?: number | null; status?: string;
     department?: string | null; contract?: string | null; page: number; size: number;
+    /** `colonne,asc|desc` — colonnes admises par le service RH (EmployeeProfileService.EMPLOYEE_SORT_COLUMNS). */
+    sort?: string | null;
   }): Observable<EmployeePage> {
     let params = new HttpParams().set('size', opts.size).set('page', opts.page);
     if (opts.search?.trim()) params = params.set('search', opts.search.trim());
@@ -74,6 +96,7 @@ export class HrProfileService {
     // employee_profiles.contract_type — les valeurs de `getFilterOptions()`.
     if (opts.department) params = params.set('department', opts.department);
     if (opts.contract) params = params.set('contract', opts.contract);
+    if (opts.sort) params = params.set('sort', opts.sort);
     return this.http.get<EmployeePage>(`${this.base}/api/hr/profiles/employees`, { params });
   }
 

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, TemplateRef, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, TemplateRef, computed, inject, signal, viewChild, untracked } from '@angular/core';
 import { catchError, of, type Observable } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
@@ -20,6 +20,7 @@ import { ADMIN_SECTION_STYLES, AdminSectionHeaderComponent } from './admin-secti
 import {
   AdminModalFooterComponent, AdminPager, AdminSpinnerComponent, AdminTableFooterComponent,
 } from './admin-section-kit';
+import { delegatedSort, tableTools } from '../../../shared/table-tools';
 
 type ParamKind = 'number' | 'text' | 'boolean' | 'bareme';
 
@@ -91,7 +92,8 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
         </div>
       } @else {
         <div class="admin-table-scroll">
-          <daf-data-table [columns]="versionColumns()" [rows]="versionPager.rows()" [config]="versionConfig()" />
+          <daf-data-table [columns]="versionColumns()" [rows]="versionPager.rows()" [config]="versionConfig()"
+            (sortChange)="versionPager.onSort($event)" (resetClick)="versionPager.onSort(null)" />
         </div>
         <app-admin-table-footer
           [total]="versionPager.total()" [page]="versionPager.current()" [totalPages]="versionPager.totalPages()"
@@ -146,7 +148,8 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
           </div>
         } @else {
           <div class="admin-table-scroll">
-            <daf-data-table [columns]="paramColumns()" [rows]="paramPager.rows()" [config]="paramConfig()" />
+            <daf-data-table [columns]="paramColumns()" [rows]="paramPager.rows()" [config]="paramConfig()"
+              (sortChange)="paramPager.onSort($event)" (resetClick)="paramPager.onSort(null)" />
           </div>
           <app-admin-table-footer
             [total]="paramPager.total()" [page]="paramPager.current()" [totalPages]="paramPager.totalPages()"
@@ -348,12 +351,14 @@ export class EngineParamsAdminComponent implements OnInit {
 
   // ── Tableau des versions ──────────────────────────────────────────────────
   readonly versionColumns = computed<TableColumn[]>(() => [
-    { key: 'version',   label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_VERSION') },
-    { key: 'status',    label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_STATUS'), type: 'badge' },
-    { key: 'effective', label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.EFFECTIVE_DATE'), type: 'date', format: { dateStyle: 'short' } },
-    { key: 'count',     label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_COUNT'), type: 'number' },
-    { key: 'createdBy', label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_CREATED_BY') },
-    { key: 'activated', label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_ACTIVATED'), type: 'date', format: { dateStyle: 'short' } },
+    // « v12 » se trierait mal en texte (v10 avant v9) : trié sur le numéro.
+    { key: 'version',   label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_VERSION'), sortable: true,
+      sortAccessor: row => (row['_source'] as EngineParamSetDto).versionNumber },
+    { key: 'status',    label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_STATUS'), type: 'badge', sortable: true },
+    { key: 'effective', label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.EFFECTIVE_DATE'), type: 'date', format: { dateStyle: 'short' }, sortable: true },
+    { key: 'count',     label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_COUNT'), type: 'number', sortable: true },
+    { key: 'createdBy', label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_CREATED_BY'), sortable: true },
+    { key: 'activated', label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_ACTIVATED'), type: 'date', format: { dateStyle: 'short' }, sortable: true },
   ]);
 
   readonly versionRows = computed<TableRow[]>(() =>
@@ -372,13 +377,15 @@ export class EngineParamsAdminComponent implements OnInit {
     })));
 
   /** Pages de 5 lignes, comme les sections de /rh/admin. */
-  readonly versionPager = new AdminPager(() => this.versionRows());
-  readonly paramPager   = new AdminPager(() => this.paramRows());
+  readonly versionPager = new AdminPager(() => this.versionRows(), () => this.versionColumns());
+  readonly paramPager   = new AdminPager(() => this.paramRows(), () => this.paramColumns());
 
   readonly versionConfig = computed<TableConfig>(() => {
     const status = (row: TableRow) => (row['_source'] as EngineParamSetDto).status;
     return {
-      showHeader: true, hoverable: true,
+      showHeader: false, hoverable: true,
+      ...tableTools(this.translate),
+      ...delegatedSort(untracked(this.versionPager.sort)),
       rowId: row => row['id'],
       emptyMessage: this.t(
         !this.paysId() ? 'PAYROLL.ADMIN_HOME.NO_PAYS'
@@ -405,10 +412,10 @@ export class EngineParamsAdminComponent implements OnInit {
 
   // ── Tableau des paramètres ────────────────────────────────────────────────
   readonly paramColumns = computed<TableColumn[]>(() => [
-    { key: 'key',    label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_KEY') },
-    { key: 'kind',   label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_TYPE'), type: 'badge' },
-    { key: 'value',  label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_VALUE') },
-    { key: 'usedBy', label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_USED_BY') },
+    { key: 'key',    label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_KEY'), sortable: true },
+    { key: 'kind',   label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_TYPE'), type: 'badge', sortable: true },
+    { key: 'value',  label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_VALUE'), sortable: true },
+    { key: 'usedBy', label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_USED_BY'), sortable: true },
   ]);
 
   readonly paramRows = computed<TableRow[]>(() => {
@@ -426,7 +433,9 @@ export class EngineParamsAdminComponent implements OnInit {
   });
 
   readonly paramConfig = computed<TableConfig>(() => ({
-    showHeader: true, hoverable: true,
+    showHeader: false, hoverable: true,
+    ...tableTools(this.translate),
+    ...delegatedSort(untracked(this.paramPager.sort)),
     rowId: row => row['id'],
     emptyMessage: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.NO_PARAMS'),
     actions: this.isEditable()

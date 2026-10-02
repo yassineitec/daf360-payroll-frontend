@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, TemplateRef, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, TemplateRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormArray, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
@@ -14,7 +14,6 @@ import {
   DataTableComponent,
   DafCellDirective,
   FormFieldComponent,
-  MetricCardComponent,
   PageComponent,
   PageHeaderComponent,
   RadioGroupComponent,
@@ -58,6 +57,7 @@ import { AdminSectionHeaderComponent } from './admin/admin-section-header.compon
 import {
   AdminModalFooterComponent, AdminPager, AdminSpinnerComponent, AdminTableFooterComponent,
 } from './admin/admin-section-kit';
+import { delegatedSort, tableTools } from '../../shared/table-tools';
 import { AdvanceRulesAdminComponent } from './admin/advance-rules-admin.component';
 import { BenefitsCatalogueAdminComponent } from './admin/benefits-catalogue-admin.component';
 import { EngineParamsAdminComponent } from './admin/engine-params-admin.component';
@@ -65,6 +65,7 @@ import { EngineRubriquesAdminComponent } from './admin/engine-rubriques-admin.co
 import { PayrollAuditAdminComponent } from './admin/payroll-audit-admin.component';
 import { PayrollCountriesAdminComponent } from './admin/payroll-countries-admin.component';
 import { dayRange, distinctSorted, inDayRange, pickValue, rangeSeed } from '../../shared/filter-utils';
+import { PaysNamesService } from '../../core/pays-names.service';
 
 /** Pastille de statut d'un jeu dans le tableau. */
 const SET_STATUS_VARIANT: Record<string, BadgeVariant> = {
@@ -157,7 +158,7 @@ function sectionParam(ids: () => readonly ParamSetsSection[]) {
   imports: [
     CommonModule, ReactiveFormsModule, TranslatePipe,
     AccordionCardComponent, AmountFieldComponent, ButtonComponent, CardComponent, HelpPopoverComponent, CheckboxComponent, DataTableComponent, DafCellDirective,
-    FormFieldComponent, MetricCardComponent, PageComponent, PageHeaderComponent, RadioGroupComponent,
+    FormFieldComponent, PageComponent, PageHeaderComponent, RadioGroupComponent,
     SearchToolbarComponent, SectionTitleComponent, SelectComponent, StatusBadgeComponent, TabsComponent,
     AdminModalFooterComponent, AdminSectionHeaderComponent, AdminSpinnerComponent, AdminTableFooterComponent,
     AdvanceRulesAdminComponent, BenefitsCatalogueAdminComponent, EngineParamsAdminComponent, EngineRubriquesAdminComponent,
@@ -171,6 +172,7 @@ export class ParameterSetsComponent implements OnInit {
   private readonly hr           = inject(HrProfileService);
   private readonly fb           = inject(FormBuilder);
   private readonly translate    = inject(TranslateService);
+  private readonly paysNames = inject(PaysNamesService);
   private readonly userStore    = inject(UserStore);
   private readonly notification = inject(NotificationService);
   private readonly modalService = inject(ModalService);
@@ -210,7 +212,7 @@ export class ParameterSetsComponent implements OnInit {
   readonly currentPays = computed(() => {
     const user = this.userStore.currentUser();
     const pays = this.paysList().find(p => p.id === user?.paysId);
-    return pays?.frenchLabel ?? user?.isoCode ?? '—';
+    return pays ? this.paysNames.name(pays.id, pays.frenchLabel) : (user?.isoCode ?? '—');
   });
 
   readonly currentSectionLabelKey = computed(() =>
@@ -231,7 +233,7 @@ export class ParameterSetsComponent implements OnInit {
   //    engine-run/engine-results — liste chargée une fois.
   private readonly paysList = signal<PaysDto[]>([]);
   readonly paysOptions = computed<SelectOption[]>(() =>
-    this.paysList().map(p => ({ value: String(p.id), label: `${p.frenchLabel} (${p.isoCode})` })),
+    this.paysList().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})` })),
   );
 
   ngOnInit(): void {
@@ -502,13 +504,13 @@ export class ParameterSetsComponent implements OnInit {
 
   // ── Liste des jeux : tableau paginé, comme les sections de /rh/admin ─────────
   readonly setColumns = computed<TableColumn[]>(() => [
-    { key: 'version',   label: this.t('PAYROLL.ADMIN_HOME.LIST.COL_VERSION') },
-    { key: 'status',    label: this.t('PAYROLL.ADMIN_HOME.LIST.COL_STATUS'), type: 'badge' },
-    { key: 'charges',   label: this.t('PAYROLL.ADMIN_HOME.LIST.COL_CHARGES'), type: 'number' },
-    { key: 'rubriques', label: this.t('PAYROLL.ADMIN_HOME.LIST.COL_RUBRIQUES'), type: 'number' },
-    { key: 'benefits',  label: this.t('PAYROLL.ADMIN_HOME.LIST.COL_BENEFITS'), type: 'number' },
-    { key: 'approval',  label: this.t('PAYROLL.ADMIN_HOME.LIST.COL_APPROVAL') },
-    { key: 'created',   label: this.t('PAYROLL.ADMIN_HOME.LIST.COL_CREATED'), type: 'date', format: { dateStyle: 'short' } },
+    { key: 'version',   label: this.t('PAYROLL.ADMIN_HOME.LIST.COL_VERSION'), sortable: true },
+    { key: 'status',    label: this.t('PAYROLL.ADMIN_HOME.LIST.COL_STATUS'), type: 'badge', sortable: true },
+    { key: 'charges',   label: this.t('PAYROLL.ADMIN_HOME.LIST.COL_CHARGES'), type: 'number', sortable: true },
+    { key: 'rubriques', label: this.t('PAYROLL.ADMIN_HOME.LIST.COL_RUBRIQUES'), type: 'number', sortable: true },
+    { key: 'benefits',  label: this.t('PAYROLL.ADMIN_HOME.LIST.COL_BENEFITS'), type: 'number', sortable: true },
+    { key: 'approval',  label: this.t('PAYROLL.ADMIN_HOME.LIST.COL_APPROVAL'), sortable: true },
+    { key: 'created',   label: this.t('PAYROLL.ADMIN_HOME.LIST.COL_CREATED'), type: 'date', format: { dateStyle: 'short' }, sortable: true },
   ]);
 
   /** Approbations obtenues : Directeur Pays, DAF, les deux, ou aucune. */
@@ -536,10 +538,12 @@ export class ParameterSetsComponent implements OnInit {
     })));
 
   /** Pages de 5 lignes, comme les sections de /rh/admin. */
-  readonly setPager = new AdminPager(() => this.setRows());
+  readonly setPager = new AdminPager(() => this.setRows(), () => this.setColumns());
 
   readonly setTableConfig = computed<TableConfig>(() => ({
-    showHeader: true, hoverable: true,
+    showHeader: false, hoverable: true,
+    ...tableTools(this.translate),
+    ...delegatedSort(untracked(this.setPager.sort)),
     rowId: row => row['id'],
     actions: [{
       id: 'manage', icon: 'settings', tooltip: this.t('PAYROLL.PARAMETER_SETS.MANAGE'),
@@ -1142,12 +1146,12 @@ export class ParameterSetsComponent implements OnInit {
 
   // ── daf-data-table columns/rows — charges (read-only) ───────────────────────
   readonly chargesColumns = computed<TableColumn[]>(() => [
-    { key: 'contractType', label: this.t('PAYROLL.PARAMETER_SETS.COL_TYPE'), type: 'badge' },
-    { key: 'chargeCode',   label: this.t('PAYROLL.PARAMETER_SETS.COL_CODE') },
-    { key: 'chargeLabel',  label: this.t('PAYROLL.PARAMETER_SETS.COL_LABEL') },
-    { key: 'employeeShare', label: this.t('PAYROLL.PARAMETER_SETS.COL_EMPLOYEE_SHARE'), type: 'percent', format: { maximumFractionDigits: 2 } },
-    { key: 'employerShare', label: this.t('PAYROLL.PARAMETER_SETS.COL_EMPLOYER_SHARE'), type: 'percent', format: { maximumFractionDigits: 2 } },
-    { key: 'baseCalculation', label: this.t('PAYROLL.PARAMETER_SETS.COL_BASE') },
+    { key: 'contractType', label: this.t('PAYROLL.PARAMETER_SETS.COL_TYPE'), type: 'badge', sortable: true },
+    { key: 'chargeCode',   label: this.t('PAYROLL.PARAMETER_SETS.COL_CODE'), sortable: true },
+    { key: 'chargeLabel',  label: this.t('PAYROLL.PARAMETER_SETS.COL_LABEL'), sortable: true },
+    { key: 'employeeShare', label: this.t('PAYROLL.PARAMETER_SETS.COL_EMPLOYEE_SHARE'), type: 'percent', format: { maximumFractionDigits: 2 }, sortable: true },
+    { key: 'employerShare', label: this.t('PAYROLL.PARAMETER_SETS.COL_EMPLOYER_SHARE'), type: 'percent', format: { maximumFractionDigits: 2 }, sortable: true },
+    { key: 'baseCalculation', label: this.t('PAYROLL.PARAMETER_SETS.COL_BASE'), sortable: true },
   ]);
 
   chargesRows(ps: ParameterSetDto): TableRow[] {
@@ -1162,19 +1166,6 @@ export class ParameterSetsComponent implements OnInit {
       employerShare:   r.baseCalculation === 'FORMULE' ? (r.formulaEr || '—') : round2(r.employerRate * 100),
       baseCalculation: r.baseCalculation,
     }));
-  }
-
-  /**
-   * KPI de synthèse affichées au-dessus du tableau des cotisations : somme des taux
-   * salariaux/patronaux (hors lignes FORMULE, dont le taux n'est pas un nombre fixe) et
-   * coin fiscal global = les deux additionnés. Purement une lecture visuelle des mêmes
-   * données déjà dans le tableau — aucun champ ni logique métier ajoutée.
-   */
-  chargeTotals(ps: ParameterSetDto): { employeeTotal: number; employerTotal: number; wedge: number } {
-    const rates = (ps.socialChargeRates ?? []).filter(r => r.baseCalculation !== 'FORMULE');
-    const employeeTotal = rates.reduce((sum, r) => sum + (r.employeeRate ?? 0), 0) * 100;
-    const employerTotal = rates.reduce((sum, r) => sum + (r.employerRate ?? 0), 0) * 100;
-    return { employeeTotal, employerTotal, wedge: employeeTotal + employerTotal };
   }
 
   // ── Éditeur JSON du barème IRPP (onglet "Nouveau jeu") ──────────────────────
@@ -1197,10 +1188,10 @@ export class ParameterSetsComponent implements OnInit {
 
   // ── daf-data-table columns/rows — benefits (read-only, legacy) ──────────────
   readonly benefitsColumns = computed<TableColumn[]>(() => [
-    { key: 'benefitCode',   label: this.t('PAYROLL.PARAMETER_SETS.COL_CODE') },
-    { key: 'benefitLabelFr', label: this.t('PAYROLL.PARAMETER_SETS.COL_LABEL') },
-    { key: 'monthlyValue',  label: this.t('PAYROLL.PARAMETER_SETS.COL_MONTHLY_VALUE'), type: 'number', format: { minimumFractionDigits: 0, maximumFractionDigits: 0 } },
-    { key: 'taxable',       label: this.t('PAYROLL.PARAMETER_SETS.COL_TAXABLE'), type: 'badge' },
+    { key: 'benefitCode',   label: this.t('PAYROLL.PARAMETER_SETS.COL_CODE'), sortable: true },
+    { key: 'benefitLabelFr', label: this.t('PAYROLL.PARAMETER_SETS.COL_LABEL'), sortable: true },
+    { key: 'monthlyValue',  label: this.t('PAYROLL.PARAMETER_SETS.COL_MONTHLY_VALUE'), type: 'number', format: { minimumFractionDigits: 0, maximumFractionDigits: 0 }, sortable: true },
+    { key: 'taxable',       label: this.t('PAYROLL.PARAMETER_SETS.COL_TAXABLE'), type: 'badge', sortable: true },
   ]);
 
   benefitsRows(ps: ParameterSetDto): TableRow[] {
@@ -1215,16 +1206,16 @@ export class ParameterSetsComponent implements OnInit {
 
   // ── daf-data-table columns/rows — rubriques (read-only) ─────────────────────
   readonly rubriquesColumns = computed<TableColumn[]>(() => [
-    { key: 'code',          label: this.t('PAYROLL.PARAMETER_SETS.COL_CODE') },
-    { key: 'labelFr',       label: this.t('PAYROLL.PARAMETER_SETS.COL_LABEL') },
-    { key: 'nature',        label: this.t('PAYROLL.PARAMETER_SETS.COL_NATURE'), type: 'badge' },
-    { key: 'calcMode',      label: this.t('PAYROLL.PARAMETER_SETS.COL_CALC_MODE') },
-    { key: 'valueRate',     label: this.t('PAYROLL.PARAMETER_SETS.COL_VALUE_RATE') },
-    { key: 'direction',     label: this.t('PAYROLL.PARAMETER_SETS.COL_DIRECTION'), type: 'badge' },
-    { key: 'irpp',          label: this.t('PAYROLL.PARAMETER_SETS.COL_IRPP'), type: 'badge' },
-    { key: 'charges',       label: this.t('PAYROLL.PARAMETER_SETS.COL_CHARGES'), type: 'badge' },
-    { key: 'contractTypes', label: this.t('PAYROLL.PARAMETER_SETS.COL_CONTRACTS') },
-    { key: 'active',        label: this.t('PAYROLL.PARAMETER_SETS.COL_ACTIVE'), type: 'badge' },
+    { key: 'code',          label: this.t('PAYROLL.PARAMETER_SETS.COL_CODE'), sortable: true },
+    { key: 'labelFr',       label: this.t('PAYROLL.PARAMETER_SETS.COL_LABEL'), sortable: true },
+    { key: 'nature',        label: this.t('PAYROLL.PARAMETER_SETS.COL_NATURE'), type: 'badge', sortable: true },
+    { key: 'calcMode',      label: this.t('PAYROLL.PARAMETER_SETS.COL_CALC_MODE'), sortable: true },
+    { key: 'valueRate',     label: this.t('PAYROLL.PARAMETER_SETS.COL_VALUE_RATE'), sortable: true },
+    { key: 'direction',     label: this.t('PAYROLL.PARAMETER_SETS.COL_DIRECTION'), type: 'badge', sortable: true },
+    { key: 'irpp',          label: this.t('PAYROLL.PARAMETER_SETS.COL_IRPP'), type: 'badge', sortable: true },
+    { key: 'charges',       label: this.t('PAYROLL.PARAMETER_SETS.COL_CHARGES'), type: 'badge', sortable: true },
+    { key: 'contractTypes', label: this.t('PAYROLL.PARAMETER_SETS.COL_CONTRACTS'), sortable: true },
+    { key: 'active',        label: this.t('PAYROLL.PARAMETER_SETS.COL_ACTIVE'), type: 'badge', sortable: true },
   ]);
 
   rubriquesRows(ps: ParameterSetDto): TableRow[] {
@@ -1467,23 +1458,29 @@ export class ParameterSetsComponent implements OnInit {
 
   /** Suppression de ligne via les actions de ligne de `daf-data-table`, plus un bouton maison. */
   readonly newSetRateTableConfig = computed<TableConfig>(() => ({
-    // En-têtes affichés : sans eux, on ne savait pas quelle colonne était la part salarié.
-    showHeader: true,
+    showHeader: false,
     emptyMessage: this.t('PAYROLL.ADMIN.CHARGES_EMPTY'),
+    // Outils de mise en page seulement, PAS de tri : chaque cellule est un champ lié à sa
+    // ligne de formulaire par sa position d'affichage (`let-i="index"`). Trier relierait
+    // les champs aux mauvais taux.
+    ...tableTools(this.translate),
     actions: [{ id: 'remove', icon: 'close', tooltip: this.t('PAYROLL.ADMIN.REMOVE'), variant: 'danger',
                 onClick: row => this.removeNewSetRate(this.rowIndex(row)) }],
   }));
 
   readonly editRateTableConfig = computed<TableConfig>(() => ({
-    showHeader: true,
+    showHeader: false,
     emptyMessage: this.t('PAYROLL.PARAMETER_SETS.CHARGES_EMPTY_EDITOR'),
+    // Outils de mise en page seulement, PAS de tri (voir `newSetRateTableConfig`).
+    ...tableTools(this.translate),
     actions: [{ id: 'remove', icon: 'close', tooltip: this.t('PAYROLL.PARAMETER_SETS.REMOVE'), variant: 'danger',
                 onClick: row => this.removeEditRate(this.rowIndex(row)) }],
   }));
 
   /** Tableaux en lecture seule de la page détail : en-têtes et message vide de la bibliothèque. */
   readTableConfig(emptyKey: string): TableConfig {
-    return { showHeader: true, emptyMessage: this.t(emptyKey) };
+    // Tri local : le détail d'un jeu (rubriques, avantages, charges) arrive entier.
+    return { showHeader: false, emptyMessage: this.t(emptyKey), ...tableTools(this.translate) };
   }
 
   /** Oui / Non en pastille de la bibliothèque (au lieu de « ✓ / — »). */

@@ -31,6 +31,8 @@ import { NotificationService } from '../../core/notification.service';
 import { PayrollApiService, PaysDto } from '../../core/payroll-api.service';
 import { PayslipBatchResult, PayslipBatchService, PayslipPageStatus } from '../../core/payslip-batch.service';
 import { dayRange, distinctSorted, inDayRange, pickValue, rangeSeed } from '../../shared/filter-utils';
+import { tableTools } from '../../shared/table-tools';
+import { PaysNamesService } from '../../core/pays-names.service';
 
 const MONTH_KEYS = [
   'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
@@ -98,6 +100,7 @@ export class PayslipBatchComponent implements OnInit {
   private readonly notification = inject(NotificationService);
   private readonly modalService = inject(ModalService);
   protected readonly translate  = inject(TranslateService);
+  private readonly paysNames = inject(PaysNamesService);
 
   /** Pop-up d'attente pendant le traitement — `ModalService` de la lib, corps =
    *  `#processingTpl` (un `daf-loading`). Le backend traite tout le lot en UNE requête
@@ -130,7 +133,7 @@ export class PayslipBatchComponent implements OnInit {
   private readonly paysList = signal<PaysDto[]>([]);
   readonly paysId = signal<number | null>(null);
   readonly paysOptions = computed<SelectOption[]>(() =>
-    this.paysList().map(p => ({ value: String(p.id), label: `${p.frenchLabel} (${p.isoCode})` })),
+    this.paysList().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})` })),
   );
 
   // First-load gate for `daf-page [loading]` — the pays dropdown is unusable until this
@@ -303,13 +306,19 @@ export class PayslipBatchComponent implements OnInit {
     }
   }
 
+  /** Outils de tableau communs (`tableTools`). Tri local : le détail d'un import arrive entier. */
+  readonly detailConfig = computed(() => ({
+    emptyMessage: this.t('PAYROLL.PAYSLIPS.TABLE.EMPTY'),
+    ...tableTools(this.translate),
+  }));
+
   readonly detailColumns = computed<TableColumn[]>(() => [
-    { key: 'pageNumber',     label: this.t('PAYROLL.PAYSLIPS.TABLE.PAGE'), width: '80px' },
-    { key: 'matricule',      label: this.t('PAYROLL.PAYSLIPS.TABLE.MATRICULE') },
-    { key: 'employee',       label: this.t('PAYROLL.PAYSLIPS.TABLE.EMPLOYEE') },
-    { key: 'status',         label: this.t('PAYROLL.PAYSLIPS.TABLE.STATUS'), type: 'badge' },
-    { key: 'sharePointUrl',  label: this.t('PAYROLL.PAYSLIPS.TABLE.SHAREPOINT_URL'), type: 'custom' },
-    { key: 'errorMessage',   label: this.t('PAYROLL.PAYSLIPS.TABLE.ERROR_MESSAGE') },
+    { key: 'pageNumber',     label: this.t('PAYROLL.PAYSLIPS.TABLE.PAGE'), width: '80px', sortable: true },
+    { key: 'matricule',      label: this.t('PAYROLL.PAYSLIPS.TABLE.MATRICULE'), sortable: true },
+    { key: 'employee',       label: this.t('PAYROLL.PAYSLIPS.TABLE.EMPLOYEE'), sortable: true },
+    { key: 'status',         label: this.t('PAYROLL.PAYSLIPS.TABLE.STATUS'), type: 'badge', sortable: true },
+    { key: 'sharePointUrl',  label: this.t('PAYROLL.PAYSLIPS.TABLE.SHAREPOINT_URL'), type: 'custom', sortable: true },
+    { key: 'errorMessage',   label: this.t('PAYROLL.PAYSLIPS.TABLE.ERROR_MESSAGE'), sortable: true },
   ]);
 
   readonly detailRows = computed<TableRow[]>(() =>
@@ -337,7 +346,7 @@ export class PayslipBatchComponent implements OnInit {
   // valeurs présentes dans l'historique.
   readonly historyFilterFields = computed<FilterField[]>(() => {
     const history = this.history();
-    const pays = new Map(history.map(h => [h.paysId, h.paysLabel || h.paysIso]));
+    const pays = new Map(history.map(h => [h.paysId, this.paysNames.name(h.paysId, h.paysLabel || h.paysIso)]));
     const periods = distinctSorted(history.map(h => periodKey(h.periodYear, h.periodMonth))).reverse();
     return [{
       name: 'status',
@@ -398,11 +407,14 @@ export class PayslipBatchComponent implements OnInit {
   readonly historyColumns = computed<TableColumn[]>(() => [
     { key: 'processedAt', label: this.t('PAYROLL.PAYSLIPS.HISTORY.DATE'), type: 'date', sortable: true,
       format: { dateStyle: 'short', timeStyle: 'short' } },
-    { key: 'pays',        label: this.t('PAYROLL.PAYSLIPS.HISTORY.PAYS'), type: 'badge' },
-    { key: 'period',      label: this.t('PAYROLL.PAYSLIPS.HISTORY.PERIOD') },
-    { key: 'fileName',    label: this.t('PAYROLL.PAYSLIPS.HISTORY.FILE'), type: 'custom' },
-    { key: 'count',       label: this.t('PAYROLL.PAYSLIPS.HISTORY.COUNT') },
-    { key: 'status',      label: this.t('PAYROLL.PAYSLIPS.HISTORY.STATUS'), type: 'badge' },
+    { key: 'pays',        label: this.t('PAYROLL.PAYSLIPS.HISTORY.PAYS'), type: 'badge', sortable: true },
+    // Mois écrit en toutes lettres : trié sur AAAA-MM, pas sur le libellé.
+    { key: 'period',      label: this.t('PAYROLL.PAYSLIPS.HISTORY.PERIOD'), sortable: true,
+      sortAccessor: row => row['_periodKey'] as string },
+    { key: 'fileName',    label: this.t('PAYROLL.PAYSLIPS.HISTORY.FILE'), type: 'custom', sortable: true },
+    { key: 'count',       label: this.t('PAYROLL.PAYSLIPS.HISTORY.COUNT'), sortable: true,
+      sortAccessor: row => row['_count'] as number },
+    { key: 'status',      label: this.t('PAYROLL.PAYSLIPS.HISTORY.STATUS'), type: 'badge', sortable: true },
   ]);
 
   readonly historyRows = computed<TableRow[]>(() => {
@@ -423,6 +435,8 @@ export class PayslipBatchComponent implements OnInit {
           pays:        { label: h.paysIso || h.paysLabel, options: { variant: 'neutral' as const, size: 'sm' as const } },
           period:      `${this.t(`PAYROLL.PAYSLIPS.MONTHS.${MONTH_KEYS[h.periodMonth - 1]}`)} ${h.periodYear}`,
           fileName:    h.fileName,
+          _periodKey:  periodKey(h.periodYear, h.periodMonth),
+          _count:      h.result.totalPages,
           count:       this.t('PAYROLL.PAYSLIPS.HISTORY.COUNT_VALUE', { count: h.result.totalPages }),
           status: {
             label: this.t(ok ? 'PAYROLL.PAYSLIPS.HISTORY.STATUS_SUCCESS' : 'PAYROLL.PAYSLIPS.HISTORY.STATUS_PARTIAL', {
@@ -436,6 +450,7 @@ export class PayslipBatchComponent implements OnInit {
 
   readonly historyConfig = computed(() => ({
     emptyMessage: this.t('PAYROLL.PAYSLIPS.HISTORY.EMPTY'),
+    ...tableTools(this.translate),
     defaultSort: { key: 'processedAt', dir: 'desc' as const },
     actions: [{
       id: 'view',

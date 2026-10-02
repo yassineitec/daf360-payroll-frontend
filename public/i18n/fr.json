@@ -1,6 +1,11 @@
 {
   "PAYROLL": {
     "COMMON": {
+      "CONTRACT_TYPE_CODE": {
+        "PERMANENT": "CDI", "FIXED_TERM": "CDD", "INTERN": "Stage", "CONSULTANT": "Consultant",
+        "CDI": "CDI", "CDD": "CDD", "CIVP": "CIVP", "STAGE": "Stage",
+        "DETACHEMENT": "Détachement", "PORTAGE": "Portage", "FREELANCE": "Freelance"
+      },
       "LOADING": "Chargement…",
       "CLOSE": "Fermer",
       "CLEAR": "Effacer",
@@ -12,6 +17,11 @@
         "SUMMARY": "{start}–{end} sur {total}",
         "FIRST": "Première page",
         "LAST": "Dernière page"
+      },
+      "TABLE": {
+        "COLUMN_PICKER": "Choisir les colonnes",
+        "RESET": "Réinitialiser l'affichage du tableau",
+        "SORT_BY": "Trier par {column}"
       }
     },
 
@@ -1148,9 +1158,6 @@
       "EMPTY_FILTERED": "Aucun jeu de paramètres ne correspond à la recherche.",
       "NO_PAYS_SELECTED": "Choisissez un pays dans le filtre pour afficher ses jeux de paramètres.",
       "EMPTY_FOR_PAYS": "Aucun jeu de paramètres pour ce pays.",
-      "KPI_EMPLOYEE_TOTAL": "Charges salariales",
-      "KPI_EMPLOYER_TOTAL": "Charges patronales",
-      "KPI_TAX_WEDGE": "Coin fiscal global",
       "READONLY_HINT": "Lecture seule ({{status}}) : créez une nouvelle version pour modifier ces règles.",
       "CONFIRM_SUBMIT": "Soumettre la {{version}} pour validation ? Elle ne pourra plus être modifiée.",
       "CONFIRM_HR": "Approuver la {{version}} en tant que Directeur Pays ?",

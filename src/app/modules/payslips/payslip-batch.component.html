@@ -178,7 +178,7 @@
         <daf-data-table
           [columns]="detailColumns()"
           [rows]="detailRows()"
-          [config]="{ emptyMessage: 'PAYROLL.PAYSLIPS.TABLE.EMPTY' | translate }">
+          [config]="detailConfig()">
           <ng-template [dafCell]="'sharePointUrl'" let-row>
             @if (row['sharePointUrl']) {
               <a [href]="row['sharePointUrl']" target="_blank" rel="noopener" class="sp-link">

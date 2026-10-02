@@ -38,7 +38,8 @@
       } @else {
         <!-- Page suivante / nouvelle recherche en vol : le tableau reste affiché, estompé. -->
         <div class="admin-table-scroll" [class.is-loading]="loading()">
-          <daf-data-table [columns]="employeeColumns()" [rows]="employeeRows()" [config]="tableConfig()" />
+          <daf-data-table [columns]="employeeColumns()" [rows]="employeeRows()" [config]="tableConfig()"
+            (sortChange)="onEmployeeSort($event)" (resetClick)="onEmployeeSort(null)" />
         </div>
         <app-admin-table-footer
           [total]="totalElements()" [page]="page()" [totalPages]="totalPages()"

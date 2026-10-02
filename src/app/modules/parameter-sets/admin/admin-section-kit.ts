@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal, type Signal } from '@angular/core';
-import { ButtonComponent, PaginationComponent } from '@khalilrebhiitec/daf360';
+import { ButtonComponent, PaginationComponent, type TableColumn, type TableRow } from '@khalilrebhiitec/daf360';
+import { TableSort, sortTableRows, toTableSort } from '../../../shared/table-tools';
 
 /**
  * Pièces communes aux sections de l'administration paie, reprises des sections de
@@ -98,22 +99,35 @@ export class AdminModalFooterComponent {
 /**
  * Découpe une liste (déjà filtrée) en pages de {@link ADMIN_PAGE_SIZE}. La page courante est
  * ramenée dans les bornes quand la liste rétrécit (recherche, filtre) — jamais de page vide.
+ *
+ * Avec `columns`, il porte aussi le tri d'en-tête du tableau : la liste ENTIÈRE est triée
+ * avant la découpe (`sortTableRows`), sinon la lib ne réordonnerait que la page affichée.
+ * Le tableau passe alors `manualSort` (`delegatedSort(untracked(pager.sort))`) et branche
+ * `(sortChange)="pager.onSort($event)"` / `(resetClick)="pager.onSort(null)"`.
  */
-export class AdminPager<T> {
+export class AdminPager<T extends TableRow> {
   readonly page = signal(0);
+  readonly sort = signal<TableSort | null>(null);
   readonly total: Signal<number>;
   readonly totalPages: Signal<number>;
   readonly current: Signal<number>;
   readonly rows: Signal<T[]>;
 
-  constructor(source: () => T[], size = ADMIN_PAGE_SIZE) {
+  constructor(source: () => T[], columns?: () => TableColumn[], size = ADMIN_PAGE_SIZE) {
+    const sorted = computed(() => columns ? sortTableRows(source(), columns(), this.sort()) : source());
     this.total = computed(() => source().length);
     this.totalPages = computed(() => Math.max(1, Math.ceil(this.total() / size)));
     this.current = computed(() => Math.min(this.page(), this.totalPages() - 1));
-    this.rows = computed(() => source().slice(this.current() * size, (this.current() + 1) * size));
+    this.rows = computed(() => sorted().slice(this.current() * size, (this.current() + 1) * size));
   }
 
   go(page: number): void {
     this.page.set(page);
+  }
+
+  /** Nouveau tri d'en-tête → retour à la première page. */
+  onSort(event: Parameters<typeof toTableSort>[0]): void {
+    this.sort.set(toTableSort(event));
+    this.page.set(0);
   }
 }

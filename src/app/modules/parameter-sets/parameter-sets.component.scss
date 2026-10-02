@@ -75,8 +75,14 @@
 .ps-item-actions { display: flex; gap: 8px; }
 
 /* Page détail : onglets à gauche, action de l'onglet (ou mention « lecture seule ») à droite. */
-.ps-detail-tabs { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
-.ps-detail-tabs__tabs { flex: 1 1 auto; min-width: 0; }
+/* Le trait sous les onglets court sur toute la rangée, sous la mention « lecture seule » ou le
+   bouton « Modifier » aussi : celui de `daf-tabs` s'arrêtait à la fin des onglets. Les onglets,
+   calés en bas et décalés de 1px, posent leur trait (et l'onglet actif) pile sur celui-ci. */
+.ps-detail-tabs {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  border-bottom: 1px solid var(--color-outline-variant);
+}
+.ps-detail-tabs__tabs { flex: 1 1 auto; min-width: 0; align-self: flex-end; margin-bottom: -1px; }
 .ps-readonly { display: inline-flex; align-items: center; gap: 6px; }
 .ps-readonly .material-symbols-outlined { font-size: 16px; }
 .admin-mobile-only { display: none; }
@@ -109,17 +115,6 @@
 .ps-form { display: flex; flex-direction: column; gap: 20px; }
 .field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 20px 24px; }
 .form-actions { display: flex; justify-content: flex-end; gap: 12px; padding-top: 4px; }
-
-/* ── Page détail : rangée des 3 chiffres des charges, posée seule sur la page (hors
-   carte), séparée du tableau par l'espacement de `.ps-layout`. ─────────────── */
-.charges-kpi-row {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(140px, 1fr));
-  gap: 24px;   /* grille de KPI de `daf-page` (`gap-6`) */
-}
-@media (max-width: 640px) {
-  .charges-kpi-row { grid-template-columns: 1fr; }
-}
 
 /* ── Pop-ups d'édition ────────────────────────────────────────────────────── */
 .charges-editor,
@@ -175,18 +170,6 @@
   gap: 10px;
   flex-wrap: wrap;
   margin-left: 24px;
-}
-
-/* ── Vue d'arbitrage DAF (page détail) ─────────────────────────────────────── */
-/* 4 tuiles au lieu de 3 : surcoût, patronal, salarial, coût employeur. */
-.charges-kpi-row--4 { grid-template-columns: repeat(4, minmax(150px, 1fr)); }
-@media (max-width: 1024px) {
-  .charges-kpi-row--4 { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
-}
-/* La règle 640px de `.charges-kpi-row` est moins spécifique que le modificateur : on la
-   répète pour qu'elle s'applique aussi aux 4 tuiles. */
-@media (max-width: 640px) {
-  .charges-kpi-row--4 { grid-template-columns: 1fr; }
 }
 
 /* Deux cartes côte à côte (famille de risque | checklist), empilées en dessous de 960px. */

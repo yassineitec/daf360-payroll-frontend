@@ -236,7 +236,7 @@
               <daf-data-table
                 [columns]="bonusColumns()"
                 [rows]="bonusRows()"
-                [config]="{ actions: bonusActions(), loading: bonusesLoading(), skeletonRows: 3, emptyMessage: ('PAYROLL.EMPLOYEE_CONFIG.NO_BONUSES' | translate) }">
+                [config]="bonusTableConfig()">
               </daf-data-table>
             </div>
           </div>

@@ -19,6 +19,7 @@ import {
   type BreadcrumbItem,
   type SelectOption,
   type TableAction,
+  type TableConfig,
   type TableColumn,
   type TableRow,
 } from '@khalilrebhiitec/daf360';
@@ -30,6 +31,7 @@ import {
   EmployeeConfigService, EmployeePayrollConfigDto, EmployeePayrollBonusDto,
 } from './employee-config.service';
 import { recallEmployee } from './employee-config-employee';
+import { tableTools } from '../../shared/table-tools';
 
 const BONUS_CURRENCIES = ['TND', 'EUR', 'USD', 'EGP', 'SAR', 'AED'];
 
@@ -218,17 +220,20 @@ export class EmployeeConfigComponent implements OnInit {
 
   // ── Tableau des primes ─────────────────────────────────────────────────
   readonly bonusColumns = computed<TableColumn[]>(() => [
-    { key: 'period',  label: this.t('PAYROLL.EMPLOYEE_CONFIG.BONUS_PERIOD') },
-    { key: 'label',   label: this.t('PAYROLL.EMPLOYEE_CONFIG.BONUS_LABEL') },
-    { key: 'comment', label: this.t('PAYROLL.EMPLOYEE_CONFIG.BONUS_COMMENT_COL') },
+    // Tri local (les primes du collaborateur arrivent toutes ensemble) ; la période,
+    // écrite en toutes lettres, se trie sur AAAA-MM.
+    { key: 'period',  label: this.t('PAYROLL.EMPLOYEE_CONFIG.BONUS_PERIOD'), sortable: true,
+      sortAccessor: row => row['_periodKey'] as string },
+    { key: 'label',   label: this.t('PAYROLL.EMPLOYEE_CONFIG.BONUS_LABEL'), sortable: true },
+    { key: 'comment', label: this.t('PAYROLL.EMPLOYEE_CONFIG.BONUS_COMMENT_COL'), sortable: true },
     // Montant brut formaté par la colonne ; une devise commune passe dans le format, sinon
     // chaque ligne affiche la sienne dans une colonne dédiée.
     {
-      key: 'amount', label: this.t('PAYROLL.EMPLOYEE_CONFIG.BONUS_AMOUNT'), type: 'currency',
+      key: 'amount', label: this.t('PAYROLL.EMPLOYEE_CONFIG.BONUS_AMOUNT'), type: 'currency', sortable: true,
       format: { currency: this.bonusCurrency() ?? undefined, minimumFractionDigits: 2, maximumFractionDigits: 2 },
     },
     ...(this.bonusCurrency() == null && this.bonuses().length
-      ? [{ key: 'currency', label: this.t('PAYROLL.EMPLOYEE_CONFIG.CURRENCY') }]
+      ? [{ key: 'currency', label: this.t('PAYROLL.EMPLOYEE_CONFIG.CURRENCY'), sortable: true }]
       : []),
   ]);
 
@@ -242,12 +247,22 @@ export class EmployeeConfigComponent implements OnInit {
     this.bonuses().map(b => ({
       id:      b.id,
       period:  `${this.monthLabel(b.periodMonth)} ${b.periodYear}`,
+      _periodKey: `${b.periodYear}-${String(b.periodMonth).padStart(2, '0')}`,
       label:   b.label,
       comment: b.comment || '—',
       amount:  b.amount,
       currency: b.currency || '—',
     })),
   );
+
+  /** Outils de tableau communs (`tableTools`) sur le tableau des primes. */
+  readonly bonusTableConfig = computed<TableConfig>(() => ({
+    actions: this.bonusActions(),
+    loading: this.bonusesLoading(),
+    skeletonRows: 3,
+    emptyMessage: this.t('PAYROLL.EMPLOYEE_CONFIG.NO_BONUSES'),
+    ...tableTools(this.translate),
+  }));
 
   readonly bonusActions = computed<TableAction[]>(() => [{
     id: 'delete',

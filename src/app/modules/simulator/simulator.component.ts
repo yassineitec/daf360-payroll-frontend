@@ -23,6 +23,7 @@ import {
 import { HrRefApiService, ConfigurableListValueDto } from '../../core/hr-ref-api.service';
 import { UserStore } from '../../core/user.store';
 import { EmployeeSelectComponent } from '../../shared/employee-select/employee-select.component';
+import { tableTools } from '../../shared/table-tools';
 import { Subject, takeUntil, forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -52,6 +53,7 @@ import type {
   SelectOption,
   StepperStep,
   TableColumn,
+  TableConfig,
   TableRow,
 } from '@khalilrebhiitec/daf360';
 
@@ -297,13 +299,14 @@ export class SimulatorComponent implements OnDestroy {
   // Same approach as the parameter-sets page, which shows the same charges/rubriques.
 
   readonly rubriquesColumns = computed((): TableColumn[] => [
-    { key: 'code',     label: this.t('PAYROLL.SIMULATOR.RUBRIQUES.COL_CODE') },
-    { key: 'nature',   label: this.t('PAYROLL.SIMULATOR.RUBRIQUES.COL_NATURE') },
-    { key: 'calcMode', label: this.t('PAYROLL.SIMULATOR.RUBRIQUES.COL_MODE') },
+    // Tri local (le résultat de la simulation arrive entier), sur les valeurs brutes.
+    { key: 'code',     label: this.t('PAYROLL.SIMULATOR.RUBRIQUES.COL_CODE'), sortable: true },
+    { key: 'nature',   label: this.t('PAYROLL.SIMULATOR.RUBRIQUES.COL_NATURE'), sortable: true },
+    { key: 'calcMode', label: this.t('PAYROLL.SIMULATOR.RUBRIQUES.COL_MODE'), sortable: true },
     // Signed amount: DEBIT negative. `signColor` paints it red, CREDIT green.
     {
       key: 'amount', label: this.t('PAYROLL.SIMULATOR.RUBRIQUES.COL_AMOUNT'),
-      type: 'number', align: 'right',
+      type: 'number', align: 'right', sortable: true,
       format: {
         locale: this.numberLocale(), minimumFractionDigits: 2, maximumFractionDigits: 2,
         signColor: true, signDisplay: true,
@@ -322,8 +325,10 @@ export class SimulatorComponent implements OnDestroy {
   );
 
   readonly irppColumns = computed((): TableColumn[] => [
-    { key: 'bracket', label: this.t('PAYROLL.SIMULATOR.REFERENTIAL.COL_BRACKET') },
-    { key: 'rate',    label: this.t('PAYROLL.SIMULATOR.REFERENTIAL.COL_RATE'), align: 'right' },
+    { key: 'bracket', label: this.t('PAYROLL.SIMULATOR.REFERENTIAL.COL_BRACKET'), sortable: true,
+      sortAccessor: row => row['_lower'] as number },
+    { key: 'rate',    label: this.t('PAYROLL.SIMULATOR.REFERENTIAL.COL_RATE'), align: 'right', sortable: true,
+      sortAccessor: row => row['_rate'] as number },
   ]);
 
   readonly irppRows = computed((): TableRow[] =>
@@ -331,13 +336,17 @@ export class SimulatorComponent implements OnDestroy {
       id:      b.lower,
       bracket: `${this.money(b.lower, '', 0)} — ${this.bracketUpper(b)}`,
       rate:    this.percent(b.rate),
+      _lower:  b.lower,
+      _rate:   b.rate,
     })),
   );
 
   readonly chargesColumns = computed((): TableColumn[] => [
-    { key: 'charge',   label: this.t('PAYROLL.SIMULATOR.REFERENTIAL.COL_CHARGE') },
-    { key: 'employee', label: this.t('PAYROLL.SIMULATOR.REFERENTIAL.COL_EMPLOYEE'), align: 'right' },
-    { key: 'employer', label: this.t('PAYROLL.SIMULATOR.REFERENTIAL.COL_EMPLOYER'), align: 'right' },
+    { key: 'charge',   label: this.t('PAYROLL.SIMULATOR.REFERENTIAL.COL_CHARGE'), sortable: true },
+    { key: 'employee', label: this.t('PAYROLL.SIMULATOR.REFERENTIAL.COL_EMPLOYEE'), align: 'right', sortable: true,
+      sortAccessor: row => row['_employeeRate'] as number },
+    { key: 'employer', label: this.t('PAYROLL.SIMULATOR.REFERENTIAL.COL_EMPLOYER'), align: 'right', sortable: true,
+      sortAccessor: row => row['_employerRate'] as number },
   ]);
 
   readonly chargesRows = computed((): TableRow[] =>
@@ -348,8 +357,16 @@ export class SimulatorComponent implements OnDestroy {
                   : c.chargeCode,
       employee: this.percent(c.employeeRate),
       employer: this.percent(c.employerRate),
+      _employeeRate: c.employeeRate,
+      _employerRate: c.employerRate,
     })),
   );
+
+  /** Outils de tableau communs (`tableTools`) pour les trois tableaux de résultat. */
+  readonly resultTableConfig = computed((): TableConfig => ({
+    showHeader: false,
+    ...tableTools(this.translate),
+  }));
 
   /** History is behind its own codes — RUN_SIMULATION alone gets a 403 there, so the
    *  panel is only requested and only rendered when the user may read it. */

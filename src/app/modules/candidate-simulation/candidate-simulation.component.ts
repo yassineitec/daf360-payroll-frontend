@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -24,12 +24,15 @@ import {
   type SearchToolbarFilterConfig,
   type SelectOption,
   type TableColumn,
+  type TableConfig,
   type TableRow,
   type ToolbarToggleOption,
 } from '@khalilrebhiitec/daf360';
 import { environment } from '../../../environments/environment';
 import { UserStore } from '../../core/user.store';
 import { dayRange, distinctSorted, inDayRange, pickValue, rangeSeed } from '../../shared/filter-utils';
+import { TableSort, delegatedSort, sortTableRows, tableTools, toTableSort } from '../../shared/table-tools';
+import { PaysNamesService } from '../../core/pays-names.service';
 
 interface PaysItem { id: number; iso_code: string; french_label: string; }
 
@@ -58,6 +61,7 @@ export class CandidateSimulationComponent implements OnInit {
   private readonly candSvc   = inject(CandidateSimulationService);
   private readonly http      = inject(HttpClient);
   private readonly translate = inject(TranslateService);
+  private readonly paysNames = inject(PaysNamesService);
   private readonly userStore = inject(UserStore);
 
   private t(key: string, params?: Record<string, unknown>): string {
@@ -81,7 +85,7 @@ export class CandidateSimulationComponent implements OnInit {
   private readonly paysList  = signal<PaysItem[]>([]);
   /** TOUS les pays du référentiel RH ; celui du profil est pré-sélectionné (`ngOnInit`). */
   readonly paysOptions = computed<SelectOption[]>(() =>
-    this.paysList().map(p => ({ value: String(p.id), label: `${p.french_label} (${p.iso_code})` })),
+    this.paysList().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.french_label)} (${p.iso_code})` })),
   );
   readonly candidateKpis = computed(() => {
     const list = this.candidateList();
@@ -298,13 +302,34 @@ export class CandidateSimulationComponent implements OnInit {
 
   readonly candidateColumns = computed<TableColumn[]>(() => [
     // Colonne candidat en `avatar` (initiales + nom), comme l'exemple de la bibliothèque.
-    { key: 'name',        label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_NAME'), type: 'avatar' },
-    { key: 'position',    label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_POSITION') },
-    { key: 'entity',      label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_ENTITY') },
-    { key: 'simulations', label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_SIMULATIONS'), type: 'number' },
-    { key: 'latest',      label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_LATEST'), type: 'date', format: { dateStyle: 'short' } },
-    { key: 'status',      label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_STATUS'), type: 'badge' },
+    { key: 'name',        label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_NAME'), type: 'avatar', sortable: true },
+    { key: 'position',    label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_POSITION'), sortable: true },
+    { key: 'entity',      label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_ENTITY'), sortable: true },
+    { key: 'simulations', label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_SIMULATIONS'), type: 'number', sortable: true },
+    { key: 'latest',      label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_LATEST'), type: 'date', format: { dateStyle: 'short' }, sortable: true },
+    { key: 'status',      label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_STATUS'), type: 'badge', sortable: true },
   ]);
+
+  /**
+   * Tri d'en-tête. La liste arrive entière en un appel puis est paginée ici : le tri porte
+   * sur tout le jeu filtré AVANT la découpe (`sortTableRows`), et la config passe
+   * `manualSort` pour que la lib ne retrie pas la seule page affichée.
+   */
+  readonly candidateSort = signal<TableSort | null>(null);
+
+  onCandidateSort(event: Parameters<typeof toTableSort>[0]): void {
+    this.candidateSort.set(toTableSort(event));
+    this.page.set(0);
+  }
+
+  /** Outils de tableau communs (`tableTools`), comme sur `/finance/affaires`. */
+  readonly candidateTableConfig = computed<TableConfig>(() => ({
+    actions: this.candidateActions(),
+    emptyMessage: this.emptyMessage(),
+    hoverable: true,
+    ...tableTools(this.translate, 'candidateId'),
+    ...delegatedSort(untracked(this.candidateSort)),
+  }));
 
   readonly candidateRows = computed<TableRow[]>(() =>
     this.filteredCandidates().map(c => ({
@@ -323,7 +348,8 @@ export class CandidateSimulationComponent implements OnInit {
   readonly totalPages = computed(() => Math.max(1, Math.ceil(this.candidateRows().length / this.pageSize())));
   readonly pagedCandidateRows = computed(() => {
     const start = this.page() * this.pageSize();
-    return this.candidateRows().slice(start, start + this.pageSize());
+    return sortTableRows(this.candidateRows(), this.candidateColumns(), this.candidateSort())
+      .slice(start, start + this.pageSize());
   });
   readonly pagedCandidateCards = computed(() => {
     const start = this.page() * this.pageSize();

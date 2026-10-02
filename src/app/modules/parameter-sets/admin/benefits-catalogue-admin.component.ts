@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, TemplateRef, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, TemplateRef, computed, inject, signal, viewChild, untracked } from '@angular/core';
 import { catchError, of } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
@@ -12,12 +12,14 @@ import {
 } from '../../../core/payroll-api.service';
 import { PAYROLL_EDIT_PARAMSET_PERMISSIONS } from '../../../core/payroll-nav';
 import { distinctSorted, pickValue } from '../../../shared/filter-utils';
+import { delegatedSort, tableTools } from '../../../shared/table-tools';
 import { ADMIN_SECTION_STYLES, AdminSectionHeaderComponent } from './admin-section-header.component';
 import {
   AdminModalFooterComponent, AdminPager, AdminSpinnerComponent, AdminTableFooterComponent,
 } from './admin-section-kit';
 import { NotificationService } from '../../../core/notification.service';
 import { UserStore } from '../../../core/user.store';
+import { PaysNamesService } from '../../../core/pays-names.service';
 
 const VALUATION_METHODS = ['TAX_AUTHORITY', 'ACTUAL_COST'] as const;
 
@@ -102,7 +104,8 @@ const VALUATION_METHODS = ['TAX_AUTHORITY', 'ACTUAL_COST'] as const;
         </div>
       } @else {
         <div class="admin-table-scroll">
-          <daf-data-table [columns]="columns()" [rows]="pager.rows()" [config]="tableConfig()" />
+          <daf-data-table [columns]="columns()" [rows]="pager.rows()" [config]="tableConfig()"
+            (sortChange)="pager.onSort($event)" (resetClick)="pager.onSort(null)" />
         </div>
         <app-admin-table-footer
           [total]="pager.total()" [page]="pager.current()" [totalPages]="pager.totalPages()"
@@ -169,6 +172,7 @@ const VALUATION_METHODS = ['TAX_AUTHORITY', 'ACTUAL_COST'] as const;
 export class BenefitsCatalogueAdminComponent implements OnInit {
   private readonly api       = inject(PayrollApiService);
   private readonly translate = inject(TranslateService);
+  private readonly paysNames = inject(PaysNamesService);
   private readonly userStore = inject(UserStore);
   private readonly modal     = inject(ModalService);
   private readonly notification = inject(NotificationService);
@@ -209,7 +213,7 @@ export class BenefitsCatalogueAdminComponent implements OnInit {
   }
 
   readonly paysOptions = computed<SelectOption[]>(() =>
-    this.pays().map(p => ({ value: String(p.id), label: `${p.frenchLabel} (${p.isoCode})` })));
+    this.pays().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})` })));
 
   readonly setOptions = computed<SelectOption[]>(() =>
     this.sets().map(s => ({
@@ -306,13 +310,13 @@ export class BenefitsCatalogueAdminComponent implements OnInit {
       ? { type: 'currency', format: { currency: devise, minimumFractionDigits: 0, maximumFractionDigits: 3 } }
       : { type: 'number',   format: { minimumFractionDigits: 0, maximumFractionDigits: 3 } };
     return [
-      { key: 'code',     label: this.t('PAYROLL.ADMIN_HOME.BENEFITS.COL_CODE') },
-      { key: 'label',    label: this.t('PAYROLL.ADMIN_HOME.BENEFITS.COL_LABEL') },
-      { key: 'method',   label: this.t('PAYROLL.ADMIN_HOME.BENEFITS.COL_METHOD') },
-      { key: 'monthly',  label: this.t('PAYROLL.ADMIN_HOME.BENEFITS.COL_MONTHLY'),  ...amount },
-      { key: 'employee', label: this.t('PAYROLL.ADMIN_HOME.BENEFITS.COL_EMPLOYEE'), ...amount },
-      { key: 'employer', label: this.t('PAYROLL.ADMIN_HOME.BENEFITS.COL_EMPLOYER'), ...amount },
-      { key: 'taxable',  label: this.t('PAYROLL.ADMIN_HOME.BENEFITS.COL_TAXABLE'),  type: 'badge' },
+      { key: 'code',     label: this.t('PAYROLL.ADMIN_HOME.BENEFITS.COL_CODE'), sortable: true },
+      { key: 'label',    label: this.t('PAYROLL.ADMIN_HOME.BENEFITS.COL_LABEL'), sortable: true },
+      { key: 'method',   label: this.t('PAYROLL.ADMIN_HOME.BENEFITS.COL_METHOD'), sortable: true },
+      { key: 'monthly',  label: this.t('PAYROLL.ADMIN_HOME.BENEFITS.COL_MONTHLY'),  ...amount, sortable: true },
+      { key: 'employee', label: this.t('PAYROLL.ADMIN_HOME.BENEFITS.COL_EMPLOYEE'), ...amount, sortable: true },
+      { key: 'employer', label: this.t('PAYROLL.ADMIN_HOME.BENEFITS.COL_EMPLOYER'), ...amount, sortable: true },
+      { key: 'taxable',  label: this.t('PAYROLL.ADMIN_HOME.BENEFITS.COL_TAXABLE'),  type: 'badge', sortable: true },
     ];
   });
 
@@ -345,7 +349,7 @@ export class BenefitsCatalogueAdminComponent implements OnInit {
   });
 
   /** Pages de 5 lignes, comme les sections de /rh/admin. */
-  readonly pager = new AdminPager(() => this.rows());
+  readonly pager = new AdminPager(() => this.rows(), () => this.columns());
 
   /** Message de la liste vide : pas de pays, échec, pas de jeu, jeu vide, ou filtre sans résultat. */
   readonly emptyKey = computed(() =>
@@ -356,7 +360,9 @@ export class BenefitsCatalogueAdminComponent implements OnInit {
       : 'PAYROLL.ADMIN_HOME.BENEFITS.EMPTY');
 
   readonly tableConfig = computed<TableConfig>(() => ({
-    showHeader: true, hoverable: true,
+    showHeader: false, hoverable: true,
+    ...tableTools(this.translate),
+    ...delegatedSort(untracked(this.pager.sort)),
     rowId: row => row['id'],
     emptyMessage: this.t(
       !this.paysId() ? 'PAYROLL.ADMIN_HOME.NO_PAYS'

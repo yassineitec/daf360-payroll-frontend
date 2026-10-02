@@ -1,11 +1,12 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { catchError, forkJoin, map, of } from 'rxjs';
 import {
-  HrProfileService, LIFECYCLE_STATUSES, type EmployeeFilterOptions, type EmployeeListItem,
+  HrProfileService, LIFECYCLE_STATUSES, contractTypeLabel, departmentFilterOptions,
+  type EmployeeFilterOptions, type EmployeeListItem,
 } from '../../core/hr-profile.service';
 import { PayrollEngineService, type PayrollResultsSummaryDto } from '../../core/payroll-engine.service';
 import { CURRENCY_GLYPHS, CurrencyService, SUPPORTED_CURRENCIES } from '../../core/currency.service';
@@ -28,11 +29,14 @@ import {
   type MetricCardOptions,
   type SearchToolbarFilterConfig,
   type TableColumn,
+  type TableConfig,
   type TableRow,
   type ToolbarToggleOption,
 } from '@khalilrebhiitec/daf360';
 import { environment } from '../../../environments/environment';
 import { rememberEmployee } from './engine-results-employee';
+import { TableSort, delegatedSort, tableTools, toTableSort } from '../../shared/table-tools';
+import { PaysNamesService } from '../../core/pays-names.service';
 
 interface PaysItem { id: number; iso_code: string; french_label: string; }
 
@@ -66,6 +70,7 @@ export class EngineResultsListComponent implements OnInit {
   private readonly router    = inject(Router);
   private readonly route     = inject(ActivatedRoute);
   private readonly translate = inject(TranslateService);
+  private readonly paysNames = inject(PaysNamesService);
 
   private t(key: string, params?: Record<string, unknown>): string {
     this.translate.currentLang();
@@ -309,6 +314,7 @@ export class EngineResultsListComponent implements OnInit {
       contract: this.contractFilter(),
       page: this.page(),
       size: this.pageSize(),
+      sort: this.employeeSortParam(),
     }).subscribe({
       next: p => {
         if (current !== this.seq) return;
@@ -349,7 +355,7 @@ export class EngineResultsListComponent implements OnInit {
     type: 'select',
     searchable: true,
     placeholder: this.t('PAYROLL.ENGINE_RESULTS.FILTER_ALL'),
-    options: this.paysList().map(p => ({ value: String(p.id), label: `${p.french_label} (${p.iso_code})` })),
+    options: this.paysList().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.french_label)} (${p.iso_code})` })),
   }, {
     name: 'status',
     label: this.t('PAYROLL.ENGINE_RESULTS.FILTER_STATUS'),
@@ -363,13 +369,13 @@ export class EngineResultsListComponent implements OnInit {
     type: 'select',
     searchable: true,
     placeholder: this.t('PAYROLL.ENGINE_RESULTS.FILTER_ALL'),
-    options: this.filterOptions()?.departments ?? [],
+    options: departmentFilterOptions(this.filterOptions(), this.translate.currentLang()),
   }, {
     name: 'contract',
     label: this.t('PAYROLL.ENGINE_RESULTS.FILTER_CONTRACT'),
     type: 'select',
     placeholder: this.t('PAYROLL.ENGINE_RESULTS.FILTER_ALL'),
-    options: (this.filterOptions()?.contractTypes ?? []).map(c => ({ value: c, label: c })),
+    options: (this.filterOptions()?.contractTypes ?? []).map(c => ({ value: c, label: contractTypeLabel(c, this.translate) })),
   }]);
 
   readonly filterConfig = computed<SearchToolbarFilterConfig>(() => ({
@@ -447,12 +453,48 @@ export class EngineResultsListComponent implements OnInit {
   );
 
   readonly employeeColumns = computed<TableColumn[]>(() => [
-    { key: 'name',       label: this.t('PAYROLL.ENGINE_RESULTS.COL_EMPLOYEE') },
-    { key: 'matricule',  label: this.t('PAYROLL.ENGINE_RESULTS.COL_MATRICULE') },
-    { key: 'department', label: this.t('PAYROLL.ENGINE_RESULTS.COL_DEPARTMENT') },
-    { key: 'contract',   label: this.t('PAYROLL.ENGINE_RESULTS.COL_CONTRACT') },
-    { key: 'pays',       label: this.t('PAYROLL.ENGINE_RESULTS.COL_PAYS') },
+    { key: 'name',       label: this.t('PAYROLL.ENGINE_RESULTS.COL_EMPLOYEE'),   sortable: true },
+    { key: 'matricule',  label: this.t('PAYROLL.ENGINE_RESULTS.COL_MATRICULE'),  sortable: true },
+    { key: 'department', label: this.t('PAYROLL.ENGINE_RESULTS.COL_DEPARTMENT'), sortable: true },
+    { key: 'contract',   label: this.t('PAYROLL.ENGINE_RESULTS.COL_CONTRACT'),   sortable: true },
+    { key: 'pays',       label: this.t('PAYROLL.ENGINE_RESULTS.COL_PAYS'),       sortable: true },
   ]);
+
+  /**
+   * Tri serveur : la liste est paginée par le service RH, la lib ne trie donc pas elle-même
+   * (`manualSort`). Colonne du tableau → clé acceptée par `GET /api/hr/profiles/employees`
+   * (`EmployeeProfileService.EMPLOYEE_SORT_COLUMNS` côté RH).
+   */
+  private static readonly EMPLOYEE_SORT_KEY: Record<string, string> = {
+    name:       'fullName',
+    matricule:  'employeeId',
+    department: 'department',
+    contract:   'contractType',
+    pays:       'pays',
+  };
+
+  readonly employeeSort = signal<TableSort | null>(null);
+
+  onEmployeeSort(event: Parameters<typeof toTableSort>[0]): void {
+    this.employeeSort.set(toTableSort(event));
+    this.page.set(0);
+    this.load();
+  }
+
+  private employeeSortParam(): string | null {
+    const sort = this.employeeSort();
+    const key = sort ? EngineResultsListComponent.EMPLOYEE_SORT_KEY[sort.key] : undefined;
+    return sort && key ? `${key},${sort.dir}` : null;
+  }
+
+  /** Outils de tableau communs (`tableTools`), comme sur `/finance/affaires`. */
+  readonly employeeTableConfig = computed<TableConfig>(() => ({
+    actions: this.employeeActions(),
+    emptyMessage: this.t('PAYROLL.ENGINE_RESULTS.EMPTY_EMPLOYEES'),
+    showHeader: false,
+    ...tableTools(this.translate),
+    ...delegatedSort(untracked(this.employeeSort)),
+  }));
 
   readonly employeeRows = computed<TableRow[]>(() =>
     this.employees().map(e => ({

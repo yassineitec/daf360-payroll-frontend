@@ -15,9 +15,11 @@ import {
   type BreadcrumbItem,
   type SelectOption,
   type TableColumn,
+  type TableConfig,
   type TableRow,
   type UploadedFile,
 } from '@khalilrebhiitec/daf360';
+import { tableTools } from '../../shared/table-tools';
 import { PayrollApiService, CalibrationCycleDto, PaysDto } from '../../core/payroll-api.service';
 
 /**
@@ -117,13 +119,14 @@ export class CalibrationComponent implements OnInit {
   }
 
   readonly cycleColumns = computed<TableColumn[]>(() => [
-    { key: 'id',         label: this.t('PAYROLL.CALIBRATION.COL_ID'), width: '70px' },
-    { key: 'period',     label: this.t('PAYROLL.CALIBRATION.COL_PERIOD') },
-    { key: 'status',     label: this.t('PAYROLL.CALIBRATION.COL_STATUS'), type: 'badge' },
-    { key: 'predicted',  label: this.t('PAYROLL.CALIBRATION.COL_PREDICTED'), type: 'number', align: 'right', format: { maximumFractionDigits: 0 } },
-    { key: 'actual',     label: this.t('PAYROLL.CALIBRATION.COL_ACTUAL'),    type: 'number', align: 'right', format: { maximumFractionDigits: 0 } },
-    { key: 'variance',   label: this.t('PAYROLL.CALIBRATION.COL_VARIANCE'),  type: 'number', align: 'right', format: { minimumFractionDigits: 2, maximumFractionDigits: 2, suffix: ' %', signColor: true } },
-    { key: 'headcount',  label: this.t('PAYROLL.CALIBRATION.COL_HEADCOUNT'), align: 'right' },
+    { key: 'id',         label: this.t('PAYROLL.CALIBRATION.COL_ID'), width: '70px', sortable: true },
+    { key: 'period',     label: this.t('PAYROLL.CALIBRATION.COL_PERIOD'), sortable: true },
+    { key: 'status',     label: this.t('PAYROLL.CALIBRATION.COL_STATUS'), type: 'badge', sortable: true },
+    { key: 'predicted',  label: this.t('PAYROLL.CALIBRATION.COL_PREDICTED'), type: 'number', align: 'right', format: { maximumFractionDigits: 0 }, sortable: true },
+    { key: 'actual',     label: this.t('PAYROLL.CALIBRATION.COL_ACTUAL'),    type: 'number', align: 'right', format: { maximumFractionDigits: 0 }, sortable: true },
+    { key: 'variance',   label: this.t('PAYROLL.CALIBRATION.COL_VARIANCE'),  type: 'number', align: 'right', format: { minimumFractionDigits: 2, maximumFractionDigits: 2, suffix: ' %', signColor: true }, sortable: true },
+    { key: 'headcount',  label: this.t('PAYROLL.CALIBRATION.COL_HEADCOUNT'), align: 'right', sortable: true,
+      sortAccessor: row => row['_headcount'] as number | null },
   ]);
 
   readonly cycleRows = computed<TableRow[]>(() =>
@@ -135,6 +138,10 @@ export class CalibrationComponent implements OnInit {
       actual:     c.actualTotalLoadedCost,
       variance:   c.variancePct,
       headcount:  c.headcount ?? '—',
+      _headcount: c.headcount ?? null,
     })),
   );
+
+  /** Outils de tableau communs (`tableTools`). Tri local : les cycles arrivent tous ensemble. */
+  readonly cycleTableConfig = computed<TableConfig>(() => ({ ...tableTools(this.translate) }));
 }

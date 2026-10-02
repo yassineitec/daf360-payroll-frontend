@@ -1,6 +1,11 @@
 {
   "PAYROLL": {
     "COMMON": {
+      "CONTRACT_TYPE_CODE": {
+        "PERMANENT": "Permanent", "FIXED_TERM": "Fixed-term", "INTERN": "Internship", "CONSULTANT": "Consultant",
+        "CDI": "CDI", "CDD": "CDD", "CIVP": "CIVP", "STAGE": "Internship",
+        "DETACHEMENT": "Secondment", "PORTAGE": "Umbrella", "FREELANCE": "Freelance"
+      },
       "LOADING": "Loading…",
       "CLOSE": "Close",
       "CLEAR": "Clear",
@@ -12,6 +17,11 @@
         "SUMMARY": "{start}–{end} of {total}",
         "FIRST": "First page",
         "LAST": "Last page"
+      },
+      "TABLE": {
+        "COLUMN_PICKER": "Choose columns",
+        "RESET": "Reset table layout",
+        "SORT_BY": "Sort by {column}"
       }
     },
 
@@ -1148,9 +1158,6 @@
       "EMPTY_FILTERED": "No parameter set matches the search.",
       "NO_PAYS_SELECTED": "Choose a country in the filter to show its parameter sets.",
       "EMPTY_FOR_PAYS": "No parameter set for this country.",
-      "KPI_EMPLOYEE_TOTAL": "Employee charges",
-      "KPI_EMPLOYER_TOTAL": "Employer charges",
-      "KPI_TAX_WEDGE": "Global tax wedge",
       "READONLY_HINT": "Read-only ({{status}}): create a new version to change these rules.",
       "CONFIRM_SUBMIT": "Submit {{version}} for approval? It can no longer be edited.",
       "CONFIRM_HR": "Approve {{version}} as Country Director?",

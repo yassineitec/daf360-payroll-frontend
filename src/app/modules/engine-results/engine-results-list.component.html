@@ -69,7 +69,9 @@
             <daf-data-table
               [columns]="employeeColumns()"
               [rows]="employeeRows()"
-              [config]="{ actions: employeeActions(), emptyMessage: ('PAYROLL.ENGINE_RESULTS.EMPTY_EMPLOYEES' | translate), showHeader: false }">
+              [config]="employeeTableConfig()"
+              (sortChange)="onEmployeeSort($event)"
+              (resetClick)="onEmployeeSort(null)">
             </daf-data-table>
           </daf-card>
         }

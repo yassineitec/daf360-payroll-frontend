@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -27,10 +27,12 @@ import {
   type FilterResult,
   type SearchToolbarFilterConfig,
   type TableColumn,
+  type TableConfig,
   type TableRow,
   type ToolbarToggleOption,
 } from '@khalilrebhiitec/daf360';
 import { dayRange, distinctSorted, inDayRange, monthName, pickValue, rangeSeed } from '../../shared/filter-utils';
+import { TableSort, delegatedSort, sortTableRows, tableTools, toTableSort } from '../../shared/table-tools';
 
 type RubriqueCategory = 'GAIN' | 'RETENUE' | 'AVANTAGE';
 
@@ -418,15 +420,16 @@ export class EngineResultsComponent {
   }
 
   readonly resultColumns = computed<TableColumn[]>(() => [
-    { key: 'resultId',     label: this.t('PAYROLL.ENGINE_RESULTS.COL_ID'), width: '70px' },
-    { key: 'period',       label: this.t('PAYROLL.ENGINE_RESULTS.COL_PERIOD') },
-    { key: 'gross',        label: this.t('PAYROLL.ENGINE_RESULTS.COL_GROSS'),        type: 'number', align: 'right', format: { minimumFractionDigits: 2, maximumFractionDigits: 2 } },
-    { key: 'taxableNet',   label: this.t('PAYROLL.ENGINE_RESULTS.COL_TAXABLE_NET'),  type: 'number', align: 'right', format: { minimumFractionDigits: 2, maximumFractionDigits: 2 } },
-    { key: 'netPay',       label: this.t('PAYROLL.ENGINE_RESULTS.COL_NET_PAY'),      type: 'number', align: 'right', format: { minimumFractionDigits: 2, maximumFractionDigits: 2 } },
-    { key: 'irpp',         label: this.t('PAYROLL.ENGINE_RESULTS.COL_IRPP'),         type: 'number', align: 'right', format: { minimumFractionDigits: 2, maximumFractionDigits: 2 } },
-    { key: 'loadedCost',   label: this.t('PAYROLL.ENGINE_RESULTS.COL_LOADED_COST'),  type: 'number', align: 'right', format: { minimumFractionDigits: 2, maximumFractionDigits: 2 } },
-    { key: 'convergence',  label: this.t('PAYROLL.ENGINE_RESULTS.COL_CONVERGENCE'),  type: 'badge' },
-    { key: 'calculatedAt', label: this.t('PAYROLL.ENGINE_RESULTS.COL_CALCULATED_AT'), type: 'date', format: { dateStyle: 'short', timeStyle: 'short' } },
+    { key: 'resultId',     label: this.t('PAYROLL.ENGINE_RESULTS.COL_ID'), width: '70px', sortable: true },
+    { key: 'period',       label: this.t('PAYROLL.ENGINE_RESULTS.COL_PERIOD'), sortable: true,
+      sortAccessor: row => row['_periodKey'] as number },
+    { key: 'gross',        label: this.t('PAYROLL.ENGINE_RESULTS.COL_GROSS'),        type: 'number', align: 'right', format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }, sortable: true },
+    { key: 'taxableNet',   label: this.t('PAYROLL.ENGINE_RESULTS.COL_TAXABLE_NET'),  type: 'number', align: 'right', format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }, sortable: true },
+    { key: 'netPay',       label: this.t('PAYROLL.ENGINE_RESULTS.COL_NET_PAY'),      type: 'number', align: 'right', format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }, sortable: true },
+    { key: 'irpp',         label: this.t('PAYROLL.ENGINE_RESULTS.COL_IRPP'),         type: 'number', align: 'right', format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }, sortable: true },
+    { key: 'loadedCost',   label: this.t('PAYROLL.ENGINE_RESULTS.COL_LOADED_COST'),  type: 'number', align: 'right', format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }, sortable: true },
+    { key: 'convergence',  label: this.t('PAYROLL.ENGINE_RESULTS.COL_CONVERGENCE'),  type: 'badge', sortable: true },
+    { key: 'calculatedAt', label: this.t('PAYROLL.ENGINE_RESULTS.COL_CALCULATED_AT'), type: 'date', format: { dateStyle: 'short', timeStyle: 'short' }, sortable: true },
   ]);
 
   readonly resultRows = computed<TableRow[]>(() =>
@@ -434,6 +437,8 @@ export class EngineResultsComponent {
       id:           r.resultId,
       resultId:     r.resultId,
       period:       `${r.periodMonth}/${r.periodYear}`,
+      // « 3/2026 » se trie mal en texte : l'année puis le mois, en un nombre.
+      _periodKey:   r.periodYear * 100 + r.periodMonth,
       gross:        r.aggregateGross,
       taxableNet:   r.strate4,
       netPay:       r.strate5,
@@ -453,8 +458,30 @@ export class EngineResultsComponent {
   readonly totalPages = computed(() => Math.max(1, Math.ceil(this.resultRows().length / this.pageSize())));
   readonly pagedResultRows = computed(() => {
     const start = this.page() * this.pageSize();
-    return this.resultRows().slice(start, start + this.pageSize());
+    return sortTableRows(this.resultRows(), this.resultColumns(), this.resultSort())
+      .slice(start, start + this.pageSize());
   });
+
+  /**
+   * Tri d'en-tête. Les résultats arrivent entiers en un appel puis sont paginés ici : le
+   * tri porte sur tout le jeu filtré AVANT la découpe (`sortTableRows`), et la config
+   * passe `manualSort` pour que la lib ne retrie pas la seule page affichée.
+   */
+  readonly resultSort = signal<TableSort | null>(null);
+
+  onResultSort(event: Parameters<typeof toTableSort>[0]): void {
+    this.resultSort.set(toTableSort(event));
+    this.page.set(0);
+  }
+
+  /** Outils de tableau communs (`tableTools`), comme sur `/finance/affaires`. */
+  readonly resultTableConfig = computed<TableConfig>(() => ({
+    actions: this.resultActions(),
+    emptyMessage: this.t('PAYROLL.ENGINE_RESULTS.EMPTY_FILTERED'),
+    hoverable: true,
+    ...tableTools(this.translate, 'resultId'),
+    ...delegatedSort(untracked(this.resultSort)),
+  }));
   readonly pagedResultCards = computed(() => {
     const start = this.page() * this.pageSize();
     return this.resultCards().slice(start, start + this.pageSize());

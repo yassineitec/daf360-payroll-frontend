@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, TemplateRef, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, TemplateRef, computed, inject, signal, viewChild, untracked } from '@angular/core';
 import { catchError, of } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
@@ -13,11 +13,13 @@ import {
 } from '../../../core/payroll-engine.service';
 import { PAYROLL_MANAGE_RUBRIQUES_PERMISSIONS } from '../../../core/payroll-nav';
 import { distinctSorted, pickValue } from '../../../shared/filter-utils';
+import { delegatedSort, tableTools } from '../../../shared/table-tools';
 import { ADMIN_SECTION_STYLES, AdminSectionHeaderComponent } from './admin-section-header.component';
 import {
   AdminModalFooterComponent, AdminPager, AdminSpinnerComponent, AdminTableFooterComponent,
 } from './admin-section-kit';
 import { UserStore } from '../../../core/user.store';
+import { PaysNamesService } from '../../../core/pays-names.service';
 
 /**
  * Section « Rubriques du moteur » de l'administration paie : ce que le moteur sait calculer
@@ -90,7 +92,8 @@ import { UserStore } from '../../../core/user.store';
         </div>
       } @else {
         <div class="admin-table-scroll">
-          <daf-data-table [columns]="columns()" [rows]="pager.rows()" [config]="tableConfig()" />
+          <daf-data-table [columns]="columns()" [rows]="pager.rows()" [config]="tableConfig()"
+            (sortChange)="pager.onSort($event)" (resetClick)="pager.onSort(null)" />
         </div>
         <app-admin-table-footer
           [total]="pager.total()" [page]="pager.current()" [totalPages]="pager.totalPages()"
@@ -199,6 +202,7 @@ export class EngineRubriquesAdminComponent implements OnInit {
   private readonly api       = inject(PayrollApiService);
   private readonly engine    = inject(PayrollEngineService);
   private readonly translate = inject(TranslateService);
+  private readonly paysNames = inject(PaysNamesService);
   private readonly userStore = inject(UserStore);
   private readonly modal     = inject(ModalService);
 
@@ -243,7 +247,7 @@ export class EngineRubriquesAdminComponent implements OnInit {
     PAYROLL_MANAGE_RUBRIQUES_PERMISSIONS.some(code => this.userStore.hasPermission(code)));
 
   readonly paysOptions = computed<SelectOption[]>(() =>
-    this.pays().map(p => ({ value: String(p.id), label: `${p.frenchLabel} (${p.isoCode})` })));
+    this.pays().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})` })));
 
   readonly modeOptions = computed<SelectOption[]>(() =>
     ENGINE_CALC_MODES.map(m => ({ value: m, label: this.modeLabel(m) })));
@@ -257,6 +261,13 @@ export class EngineRubriquesAdminComponent implements OnInit {
     { value: 'active',   label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.ACTIVE') },
     { value: 'inactive', label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.INACTIVE') },
   ]);
+
+  /** Nature code (GAIN/RETENUE/AVANTAGE/INDEMNITE/PRIME) → label; a free-typed code shows as itself. */
+  private natureLabel(nature: string): string {
+    const key = `PAYROLL.ENGINE_RUN.NATURE.${nature}`;
+    const label = this.t(key);
+    return label === key ? nature : label;
+  }
 
   private modeLabel(mode: string): string {
     const key = `PAYROLL.ADMIN_HOME.RUBRIQUES.MODE.${mode}`;
@@ -299,7 +310,7 @@ export class EngineRubriquesAdminComponent implements OnInit {
     return [
       { name: 'state', label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_STATE'), type: 'select', placeholder: all, options: this.stateOptions() },
       select('strate', 'PAYROLL.ADMIN_HOME.RUBRIQUES.COL_STRATE', list.map(r => r.strate)),
-      select('nature', 'PAYROLL.ADMIN_HOME.RUBRIQUES.COL_NATURE', list.map(r => r.nature)),
+      select('nature', 'PAYROLL.ADMIN_HOME.RUBRIQUES.COL_NATURE', list.map(r => r.nature), n => this.natureLabel(n)),
       select('mode',   'PAYROLL.ADMIN_HOME.RUBRIQUES.COL_MODE',   list.map(r => r.modeCalcul), m => this.modeLabel(m)),
       { name: 'prorata', label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.FILTER_PRORATA'), type: 'checkbox' },
     ];
@@ -316,16 +327,16 @@ export class EngineRubriquesAdminComponent implements OnInit {
 
   readonly columns = computed<TableColumn[]>(() => [
     // Colonnes numériques typées `number` : la bibliothèque les met en forme.
-    { key: 'order',     label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_ORDER'), type: 'number', width: '80px' },
-    { key: 'code',      label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_CODE') },
-    { key: 'label',     label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_LABEL') },
-    { key: 'strate',    label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_STRATE'), type: 'number' },
-    { key: 'nature',    label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_NATURE'), type: 'badge' },
-    { key: 'mode',      label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_MODE') },
-    { key: 'keys',      label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_KEYS') },
-    { key: 'period',    label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_PERIODICITY') },
-    { key: 'contracts', label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_CONTRACTS') },
-    { key: 'state',     label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_STATE'), type: 'badge' },
+    { key: 'order',     label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_ORDER'), type: 'number', width: '80px', sortable: true },
+    { key: 'code',      label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_CODE'), sortable: true },
+    { key: 'label',     label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_LABEL'), sortable: true },
+    { key: 'strate',    label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_STRATE'), type: 'number', sortable: true },
+    { key: 'nature',    label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_NATURE'), type: 'badge', sortable: true },
+    { key: 'mode',      label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_MODE'), sortable: true },
+    { key: 'keys',      label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_KEYS'), sortable: true },
+    { key: 'period',    label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_PERIODICITY'), sortable: true },
+    { key: 'contracts', label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_CONTRACTS'), sortable: true },
+    { key: 'state',     label: this.t('PAYROLL.ADMIN_HOME.RUBRIQUES.COL_STATE'), type: 'badge', sortable: true },
   ]);
 
   readonly rows = computed<TableRow[]>(() => {
@@ -350,7 +361,7 @@ export class EngineRubriquesAdminComponent implements OnInit {
         code: r.code,
         label: (lang === 'en' && r.labelEn) || r.labelFr,
         strate: r.strate,
-        nature: { label: r.nature, options: { variant: 'neutral', size: 'sm' } } satisfies BadgeCell,
+        nature: { label: this.natureLabel(r.nature), options: { variant: 'neutral', size: 'sm' } } satisfies BadgeCell,
         mode: this.modeLabel(r.modeCalcul),
         keys: [r.paramKeyTaux, r.paramKeyPlafond, r.paramKeyBareme].filter(Boolean).join(' · ') || '—',
         period: r.periodicite,
@@ -364,7 +375,7 @@ export class EngineRubriquesAdminComponent implements OnInit {
   });
 
   /** Pages de 5 lignes, comme les sections de /rh/admin. */
-  readonly pager = new AdminPager(() => this.rows());
+  readonly pager = new AdminPager(() => this.rows(), () => this.columns());
 
   /** Message de la liste vide : pas de pays, échec, aucune rubrique, ou filtre sans résultat. */
   readonly emptyKey = computed(() =>
@@ -374,7 +385,9 @@ export class EngineRubriquesAdminComponent implements OnInit {
       : 'PAYROLL.ADMIN_HOME.RUBRIQUES.EMPTY');
 
   readonly tableConfig = computed<TableConfig>(() => ({
-    showHeader: true, hoverable: true,
+    showHeader: false, hoverable: true,
+    ...tableTools(this.translate),
+    ...delegatedSort(untracked(this.pager.sort)),
     rowId: row => row['id'],
     emptyMessage: this.t(
       !this.paysId() ? 'PAYROLL.ADMIN_HOME.NO_PAYS'

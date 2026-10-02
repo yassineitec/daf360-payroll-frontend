@@ -156,7 +156,9 @@
         <daf-data-table
           [columns]="resultColumns()"
           [rows]="pagedResultRows()"
-          [config]="{ actions: resultActions(), emptyMessage: ('PAYROLL.ENGINE_RESULTS.EMPTY_FILTERED' | translate), hoverable: true }"
+          [config]="resultTableConfig()"
+          (sortChange)="onResultSort($event)"
+          (resetClick)="onResultSort(null)"
           (rowClick)="toggleDetail($event['resultId'])">
         </daf-data-table>
       }

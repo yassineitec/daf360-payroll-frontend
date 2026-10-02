@@ -17,6 +17,8 @@ import {
   ADVANCE_STATUSES, AdvancePolicy, AdvanceStatus, DISBURSEMENT_METHODS, DeductionRow, DisbursementMethod,
   InstallmentStatus, SalaryAdvance, SalaryAdvancesService,
 } from './salary-advances.service';
+import { tableTools } from '../../shared/table-tools';
+import { PaysNamesService } from '../../core/pays-names.service';
 
 type TabKey = 'payout' | 'deductions' | 'followup' | 'rules';
 
@@ -62,6 +64,7 @@ export class SalaryAdvancesComponent implements OnInit {
   private readonly payrollApi = inject(PayrollApiService);
   private readonly modal = inject(ModalService);
   private readonly translate = inject(TranslateService);
+  private readonly paysNames = inject(PaysNamesService);
 
   @ViewChild('payoutTpl') private payoutTpl!: TemplateRef<unknown>;
   @ViewChild('noteTpl')   private noteTpl!:   TemplateRef<unknown>;
@@ -352,11 +355,11 @@ export class SalaryAdvancesComponent implements OnInit {
 
   readonly paysOptions = computed<SelectOption[]>(() => {
     const taken = new Set(this.policies().map(p => p.paysId));
-    return this.pays().filter(p => !taken.has(p.id)).map(p => ({ value: String(p.id), label: p.frenchLabel }));
+    return this.pays().filter(p => !taken.has(p.id)).map(p => ({ value: String(p.id), label: this.paysNames.name(p.id, p.frenchLabel) }));
   });
 
   private paysName(id: number): string {
-    return this.pays().find(p => p.id === id)?.frenchLabel ?? `#${id}`;
+    return this.paysNames.name(id, this.pays().find(p => p.id === id)?.frenchLabel ?? `#${id}`);
   }
 
   private matches(name: string | null): boolean {
@@ -367,11 +370,16 @@ export class SalaryAdvancesComponent implements OnInit {
   // ── Tables ───────────────────────────────────────────────────────────────
   private advanceColumns(): TableColumn[] {
     const t = (k: string) => this.translate.instant(k);
+    // Tri local : ces listes arrivent entières et ne sont pas paginées, la lib trie donc
+    // bien tout le résultat — sur les valeurs brutes, pas sur les libellés formatés.
+    const src = (row: TableRow) => row['_source'] as SalaryAdvance;
     return [
-      { key: 'employee', label: t('PAYROLL.SALARY_ADVANCES.COL.EMPLOYEE'), type: 'avatar' },
-      { key: 'terms',    label: t('PAYROLL.SALARY_ADVANCES.COL.TERMS') },
-      { key: 'status',   label: t('PAYROLL.SALARY_ADVANCES.COL.STATUS'), type: 'badge' },
-      { key: 'amount',   label: t('PAYROLL.SALARY_ADVANCES.COL.AMOUNT'), align: 'right' },
+      { key: 'employee', label: t('PAYROLL.SALARY_ADVANCES.COL.EMPLOYEE'), type: 'avatar', sortable: true },
+      { key: 'terms',    label: t('PAYROLL.SALARY_ADVANCES.COL.TERMS'), sortable: true,
+        sortAccessor: row => src(row).firstDeductionMonth },
+      { key: 'status',   label: t('PAYROLL.SALARY_ADVANCES.COL.STATUS'), type: 'badge', sortable: true },
+      { key: 'amount',   label: t('PAYROLL.SALARY_ADVANCES.COL.AMOUNT'), align: 'right', sortable: true,
+        sortAccessor: row => src(row).amount },
       { key: '_actions', label: '', align: 'right', width: '1%' },
     ];
   }
@@ -379,6 +387,7 @@ export class SalaryAdvancesComponent implements OnInit {
   private advanceRow(a: SalaryAdvance): TableRow {
     const t = (k: string, p?: object) => this.translate.instant(k, p);
     return {
+      id: a.id,
       employee: { name: a.employeeName ?? '—', initials: initials(a.employeeName), subtitle: this.paysName(a.paysId) },
       terms: t('PAYROLL.SALARY_ADVANCES.TERMS', {
         monthly: this.money(a.monthlyAmount, a.currency), count: a.installments, month: monthLabel(a.firstDeductionMonth, this.locale()) }),
@@ -439,12 +448,16 @@ export class SalaryAdvancesComponent implements OnInit {
   readonly deductionColumns = computed<TableColumn[]>(() => {
     this.translate.currentLang();
     const t = (k: string) => this.translate.instant(k);
+    const src = (row: TableRow) => row['_source'] as DeductionRow;
     return [
-      { key: 'employee',    label: t('PAYROLL.SALARY_ADVANCES.COL.EMPLOYEE'), type: 'avatar' },
-      { key: 'position',    label: t('PAYROLL.SALARY_ADVANCES.COL.POSITION') },
-      { key: 'outstanding', label: t('PAYROLL.SALARY_ADVANCES.COL.OUTSTANDING') },
-      { key: 'status',      label: t('PAYROLL.SALARY_ADVANCES.COL.STATUS'), type: 'badge' },
-      { key: 'amount',      label: t('PAYROLL.SALARY_ADVANCES.COL.AMOUNT'), align: 'right' },
+      { key: 'employee',    label: t('PAYROLL.SALARY_ADVANCES.COL.EMPLOYEE'), type: 'avatar', sortable: true },
+      { key: 'position',    label: t('PAYROLL.SALARY_ADVANCES.COL.POSITION'), sortable: true,
+        sortAccessor: row => src(row).seq },
+      { key: 'outstanding', label: t('PAYROLL.SALARY_ADVANCES.COL.OUTSTANDING'), sortable: true,
+        sortAccessor: row => src(row).outstandingAmount },
+      { key: 'status',      label: t('PAYROLL.SALARY_ADVANCES.COL.STATUS'), type: 'badge', sortable: true },
+      { key: 'amount',      label: t('PAYROLL.SALARY_ADVANCES.COL.AMOUNT'), align: 'right', sortable: true,
+        sortAccessor: row => src(row).amount },
       { key: '_actions',    label: '', align: 'right', width: '1%' },
     ];
   });
@@ -470,6 +483,7 @@ export class SalaryAdvancesComponent implements OnInit {
         && (!firstOnly || r.seq === 1)
         && (!lastOnly || r.seq === r.installmentsTotal))
       .map(r => ({
+        id: r.installmentId,
         employee: {
           name: r.employeeName ?? '—', initials: initials(r.employeeName),
           // The key the payroll software matches on.
@@ -491,11 +505,14 @@ export class SalaryAdvancesComponent implements OnInit {
   readonly ruleColumns = computed<TableColumn[]>(() => {
     this.translate.currentLang();
     const t = (k: string) => this.translate.instant(k);
+    const src = (row: TableRow) => row['_source'] as AdvancePolicy;
     return [
-      { key: 'pays',      label: t('PAYROLL.SALARY_ADVANCES.RULES.PAYS') },
-      { key: 'months',    label: t('PAYROLL.SALARY_ADVANCES.RULES.MAX_MONTHS') },
-      { key: 'seniority', label: t('PAYROLL.SALARY_ADVANCES.RULES.SENIORITY') },
-      { key: 'state',     label: t('PAYROLL.SALARY_ADVANCES.RULES.STATE'), type: 'badge' },
+      { key: 'pays',      label: t('PAYROLL.SALARY_ADVANCES.RULES.PAYS'), sortable: true },
+      { key: 'months',    label: t('PAYROLL.SALARY_ADVANCES.RULES.MAX_MONTHS'), sortable: true,
+        sortAccessor: row => src(row).maxInstallments },
+      { key: 'seniority', label: t('PAYROLL.SALARY_ADVANCES.RULES.SENIORITY'), sortable: true,
+        sortAccessor: row => src(row).minSeniorityMonths },
+      { key: 'state',     label: t('PAYROLL.SALARY_ADVANCES.RULES.STATE'), type: 'badge', sortable: true },
       { key: '_actions',  label: '', align: 'right', width: '1%' },
     ];
   });
@@ -516,6 +533,8 @@ export class SalaryAdvancesComponent implements OnInit {
         && (!maxMonths || String(p.maxInstallments) === maxMonths)
         && (!seniority || String(p.minSeniorityMonths) === seniority))
       .map(p => ({
+      // Une règle par pays et par devise : c'est sa clé.
+      id: `${p.paysId}-${p.currency}`,
       pays: `${this.paysName(p.paysId)} · ${p.currency}`,
       months: t('PAYROLL.SALARY_ADVANCES.N_MONTHS', { count: p.maxInstallments }),
       seniority: p.minSeniorityMonths ? t('PAYROLL.SALARY_ADVANCES.N_MONTHS', { count: p.minSeniorityMonths }) : t('PAYROLL.SALARY_ADVANCES.RULES.NONE'),
@@ -527,9 +546,13 @@ export class SalaryAdvancesComponent implements OnInit {
     }));
   });
 
+  /** Outils de tableau communs (`tableTools`), comme sur `/finance/affaires`. */
   private config(loading: boolean, emptyKey: string, header = false): TableConfig {
     this.translate.currentLang();
-    return { showHeader: header, hoverable: false, loading, skeletonRows: 6, emptyMessage: this.translate.instant(emptyKey) };
+    return {
+      showHeader: header, hoverable: false, loading, skeletonRows: 6, emptyMessage: this.translate.instant(emptyKey),
+      ...tableTools(this.translate),
+    };
   }
 
   readonly payoutConfig    = computed(() => this.config(this.loading(), 'PAYROLL.SALARY_ADVANCES.EMPTY.PAYOUT'));

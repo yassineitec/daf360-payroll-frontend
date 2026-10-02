@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, untracked } from '@angular/core';
 import { catchError, of } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
@@ -8,9 +8,11 @@ import {
 } from '@khalilrebhiitec/daf360';
 import { PayrollApiService, type AuditEntryDto, type PaysDto } from '../../../core/payroll-api.service';
 import { dayRange, distinctSorted, inDayRange, pickValue } from '../../../shared/filter-utils';
+import { delegatedSort, tableTools } from '../../../shared/table-tools';
 import { ADMIN_SECTION_STYLES, AdminSectionHeaderComponent } from './admin-section-header.component';
 import { AdminPager, AdminSpinnerComponent, AdminTableFooterComponent } from './admin-section-kit';
 import { UserStore } from '../../../core/user.store';
+import { PaysNamesService } from '../../../core/pays-names.service';
 
 /**
  * Section « Journal des modifications » de l'administration paie : qui a changé la
@@ -59,7 +61,8 @@ import { UserStore } from '../../../core/user.store';
         <div class="admin-empty"><p>{{ emptyKey() | translate }}</p></div>
       } @else {
         <div class="admin-table-scroll">
-          <daf-data-table [columns]="columns()" [rows]="pager.rows()" [config]="tableConfig()" />
+          <daf-data-table [columns]="columns()" [rows]="pager.rows()" [config]="tableConfig()"
+            (sortChange)="pager.onSort($event)" (resetClick)="pager.onSort(null)" />
         </div>
         <app-admin-table-footer
           [total]="pager.total()" [page]="pager.current()" [totalPages]="pager.totalPages()"
@@ -73,6 +76,7 @@ import { UserStore } from '../../../core/user.store';
 export class PayrollAuditAdminComponent implements OnInit {
   private readonly api       = inject(PayrollApiService);
   private readonly translate = inject(TranslateService);
+  private readonly paysNames = inject(PaysNamesService);
   private readonly userStore = inject(UserStore);
 
   readonly pays    = signal<PaysDto[]>([]);
@@ -101,7 +105,7 @@ export class PayrollAuditAdminComponent implements OnInit {
   }
 
   readonly paysOptions = computed<SelectOption[]>(() =>
-    this.pays().map(p => ({ value: String(p.id), label: `${p.frenchLabel} (${p.isoCode})` })));
+    this.pays().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})` })));
 
   selectPays(raw: string | undefined): void {
     const id = raw ? Number(raw) : null;
@@ -168,11 +172,11 @@ export class PayrollAuditAdminComponent implements OnInit {
   readonly columns = computed<TableColumn[]>(() => [
     { key: 'at',      label: this.t('PAYROLL.ADMIN_HOME.AUDIT.COL_DATE'), type: 'date', sortable: true,
       format: { dateStyle: 'short', timeStyle: 'short' } },
-    { key: 'type',    label: this.t('PAYROLL.ADMIN_HOME.AUDIT.COL_TYPE'), type: 'badge' },
-    { key: 'subject', label: this.t('PAYROLL.ADMIN_HOME.AUDIT.COL_SUBJECT') },
-    { key: 'action',  label: this.t('PAYROLL.ADMIN_HOME.AUDIT.COL_ACTION') },
-    { key: 'detail',  label: this.t('PAYROLL.ADMIN_HOME.AUDIT.COL_DETAIL') },
-    { key: 'actor',   label: this.t('PAYROLL.ADMIN_HOME.AUDIT.COL_ACTOR') },
+    { key: 'type',    label: this.t('PAYROLL.ADMIN_HOME.AUDIT.COL_TYPE'), type: 'badge', sortable: true },
+    { key: 'subject', label: this.t('PAYROLL.ADMIN_HOME.AUDIT.COL_SUBJECT'), sortable: true },
+    { key: 'action',  label: this.t('PAYROLL.ADMIN_HOME.AUDIT.COL_ACTION'), sortable: true },
+    { key: 'detail',  label: this.t('PAYROLL.ADMIN_HOME.AUDIT.COL_DETAIL'), sortable: true },
+    { key: 'actor',   label: this.t('PAYROLL.ADMIN_HOME.AUDIT.COL_ACTOR'), sortable: true },
   ]);
 
   readonly rows = computed<TableRow[]>(() => {
@@ -199,9 +203,13 @@ export class PayrollAuditAdminComponent implements OnInit {
       .filter(r => !q || `${r.subject} ${r.action} ${r.detail} ${r.actor}`.toLowerCase().includes(q));
   });
 
-  /** Pages de 5 lignes, comme les sections de /rh/admin (le tri s'applique à la page affichée,
-   *  la liste arrivant déjà du plus récent au plus ancien). */
-  readonly pager = new AdminPager(() => this.rows());
+  /** Pages de 5 lignes, comme les sections de /rh/admin. Le tri porte sur tout le journal,
+   *  avant la découpe — du plus récent au plus ancien par défaut. */
+  readonly pager = (() => {
+    const p = new AdminPager(() => this.rows(), () => this.columns());
+    p.sort.set({ key: 'at', dir: 'desc' });
+    return p;
+  })();
 
   /** Message de la liste vide : pas de pays, échec, aucun historique, ou filtre sans résultat. */
   readonly emptyKey = computed(() =>
@@ -211,8 +219,10 @@ export class PayrollAuditAdminComponent implements OnInit {
       : 'PAYROLL.ADMIN_HOME.AUDIT.EMPTY');
 
   readonly tableConfig = computed<TableConfig>(() => ({
-    showHeader: true, hoverable: true,
-    defaultSort: { key: 'at', dir: 'desc' as const },
+    showHeader: false, hoverable: true,
+    ...tableTools(this.translate),
+    // La flèche « date décroissante » vient du tri initial du pager (voir son constructeur).
+    ...delegatedSort(untracked(this.pager.sort)),
     // Tableau triable : identité de ligne stable (règle de `daf-data-table`), sinon un tri
     // ré-affiche chaque ligne et déplace son état sur celle qui prend sa place.
     rowId: row => row['id'],

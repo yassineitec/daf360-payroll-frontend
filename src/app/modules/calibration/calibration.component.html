@@ -81,7 +81,7 @@
     @if (cycles().length) {
       <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
         <daf-section-title [title]="'PAYROLL.CALIBRATION.CYCLES_TITLE' | translate: { count: cycles().length }" />
-        <daf-data-table [columns]="cycleColumns()" [rows]="cycleRows()"></daf-data-table>
+        <daf-data-table [columns]="cycleColumns()" [rows]="cycleRows()" [config]="cycleTableConfig()"></daf-data-table>
       </daf-card>
     }
   </div>

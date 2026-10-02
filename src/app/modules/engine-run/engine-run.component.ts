@@ -26,13 +26,16 @@ import {
   type FilterResult,
   type SearchToolbarFilterConfig,
   type TableColumn,
+  type TableConfig,
   type TableRow,
 } from '@khalilrebhiitec/daf360';
 import { PayrollApiService, PaysDto } from '../../core/payroll-api.service';
 import { PayrollEngineService, RunPayrollResponse } from '../../core/payroll-engine.service';
 import { EmployeeSelectComponent } from '../../shared/employee-select/employee-select.component';
+import { tableTools } from '../../shared/table-tools';
 import { EmployeeListItem } from '../../core/hr-profile.service';
 import { NotificationService } from '../../core/notification.service';
+import { PaysNamesService } from '../../core/pays-names.service';
 
 /** One tile in the input sidebar's "recent presets" strip — saved to `localStorage`
  *  after each successful run, not backed by any API (no preset endpoint exists). */
@@ -308,7 +311,7 @@ function flagEmoji(isoCode: string | null | undefined): string {
               <daf-data-table
                 [columns]="rubriqueColumns()"
                 [rows]="rubriqueRows()"
-                [config]="{ emptyMessage: ('PAYROLL.ENGINE_RUN.EMPTY_RUBRIQUES' | translate) }" />
+                [config]="rubriqueTableConfig()" />
             </daf-card>
           }
         </main>
@@ -380,6 +383,7 @@ export class EngineRunComponent implements OnInit {
   private readonly api          = inject(PayrollEngineService);
   private readonly payrollApi   = inject(PayrollApiService);
   private readonly translate    = inject(TranslateService);
+  private readonly paysNames = inject(PaysNamesService);
   private readonly notification = inject(NotificationService);
 
   /** Même pattern que les autres pages : traduction synchrone pour ce qui ne passe pas
@@ -419,7 +423,7 @@ export class EngineRunComponent implements OnInit {
   readonly paysOptions = computed<SelectOption[]>(() =>
     this.paysList().map(p => ({
       value: String(p.id),
-      label: `${flagEmoji(p.isoCode)} ${p.frenchLabel} (${p.isoCode})`.trim(),
+      label: `${flagEmoji(p.isoCode)} ${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})`.trim(),
     })),
   );
 
@@ -699,13 +703,14 @@ export class EngineRunComponent implements OnInit {
   }
 
   readonly rubriqueColumns = computed<TableColumn[]>(() => [
-    { key: 'code',     label: this.t('PAYROLL.ENGINE_RUN.COL_CODE') },
-    { key: 'label',    label: this.t('PAYROLL.ENGINE_RUN.COL_LABEL') },
-    { key: 'strate',   label: this.t('PAYROLL.ENGINE_RUN.COL_STRATE'),   type: 'badge' },
-    { key: 'nature',   label: this.t('PAYROLL.ENGINE_RUN.COL_NATURE'),   type: 'badge' },
-    { key: 'assiette', label: this.t('PAYROLL.ENGINE_RUN.COL_ASSIETTE'), type: 'number', align: 'right', format: { minimumFractionDigits: 2, maximumFractionDigits: 2 } },
-    { key: 'amount',   label: this.t('PAYROLL.ENGINE_RUN.COL_AMOUNT'),   type: 'number', align: 'right', format: { minimumFractionDigits: 2, maximumFractionDigits: 2 } },
-    { key: 'mode',     label: this.t('PAYROLL.ENGINE_RUN.COL_MODE') },
+    { key: 'code',     label: this.t('PAYROLL.ENGINE_RUN.COL_CODE'), sortable: true },
+    { key: 'label',    label: this.t('PAYROLL.ENGINE_RUN.COL_LABEL'), sortable: true },
+    { key: 'strate',   label: this.t('PAYROLL.ENGINE_RUN.COL_STRATE'),   type: 'badge', sortable: true,
+      sortAccessor: row => row['_strate'] as number },
+    { key: 'nature',   label: this.t('PAYROLL.ENGINE_RUN.COL_NATURE'),   type: 'badge', sortable: true },
+    { key: 'assiette', label: this.t('PAYROLL.ENGINE_RUN.COL_ASSIETTE'), type: 'number', align: 'right', format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }, sortable: true },
+    { key: 'amount',   label: this.t('PAYROLL.ENGINE_RUN.COL_AMOUNT'),   type: 'number', align: 'right', format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }, sortable: true },
+    { key: 'mode',     label: this.t('PAYROLL.ENGINE_RUN.COL_MODE'), sortable: true },
   ]);
 
   readonly rubriqueRows = computed<TableRow[]>(() => {
@@ -718,6 +723,7 @@ export class EngineRunComponent implements OnInit {
         id:       r.rubriqueCode,
         code:     r.rubriqueCode,
         label:    r.labelFr,
+        _strate:  r.strate,
         strate:   { label: 'S' + r.strate, options: { variant: 'neutral' as BadgeVariant, size: 'sm' as const } },
         nature:   { label: this.natureLabel(r.nature), options: { variant: this.natureVariant(r.nature), size: 'sm' as const } },
         assiette: r.assiette,
@@ -725,6 +731,15 @@ export class EngineRunComponent implements OnInit {
         mode:     r.modeCalcul,
       }));
   });
+
+  /**
+   * Outils de tableau communs (`tableTools`), comme sur `/finance/affaires`. Tri local :
+   * les rubriques d'un calcul arrivent toutes ensemble et ne sont pas paginées.
+   */
+  readonly rubriqueTableConfig = computed<TableConfig>(() => ({
+    emptyMessage: this.t('PAYROLL.ENGINE_RUN.EMPTY_RUBRIQUES'),
+    ...tableTools(this.translate),
+  }));
 
   exportRubriquesCsv(): void {
     const columns = this.rubriqueColumns();

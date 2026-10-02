@@ -295,9 +295,8 @@
             }
           </div>
 
-          <!-- Chiffres et tableau séparés, directement sur la page (plus de carte englobante) :
-               les tuiles `daf-metric-card` d'un côté, le `daf-data-table` — qui a déjà son
-               propre cadre — de l'autre, avec le bouton "Modifier" juste au-dessus du tableau.
+          <!-- Tableau directement sur la page (plus de carte englobante) : le `daf-data-table`
+               a déjà son propre cadre, avec le bouton "Modifier" juste au-dessus.
                Pas de titre de section : il répétait l'onglet juste au-dessus. -->
           @switch (detailTab()) {
             @case ('rubriques') {
@@ -309,26 +308,6 @@
                 <daf-data-table [columns]="benefitsColumns()" [rows]="benefitsRows(ps)" [config]="readTableConfig('PAYROLL.PARAMETER_SETS.BENEFITS_EMPTY_READONLY')" />
             }
             @default {
-              @if (ps.socialChargeRates.length) {
-                <!-- Tuiles neutres : icône seule, couleurs par défaut de la bibliothèque. -->
-                <div class="charges-kpi-row">
-                  <daf-metric-card
-                    [label]="'PAYROLL.PARAMETER_SETS.KPI_EMPLOYEE_TOTAL' | translate"
-                    [value]="(chargeTotals(ps).employeeTotal | number:'1.2-2') + ' %'"
-                    [options]="{ icon: 'person' }">
-                  </daf-metric-card>
-                  <daf-metric-card
-                    [label]="'PAYROLL.PARAMETER_SETS.KPI_EMPLOYER_TOTAL' | translate"
-                    [value]="(chargeTotals(ps).employerTotal | number:'1.2-2') + ' %'"
-                    [options]="{ icon: 'domain' }">
-                  </daf-metric-card>
-                  <daf-metric-card
-                    [label]="'PAYROLL.PARAMETER_SETS.KPI_TAX_WEDGE' | translate"
-                    [value]="(chargeTotals(ps).wedge | number:'1.2-2') + ' %'"
-                    [options]="{ icon: 'balance' }">
-                  </daf-metric-card>
-                </div>
-              }
                 <div class="ps-field-block">
                   <daf-data-table [columns]="chargesColumns()" [rows]="chargesRows(ps)" [config]="readTableConfig('PAYROLL.PARAMETER_SETS.CHARGES_EMPTY_READONLY')" />
                 </div>
@@ -363,7 +342,8 @@
             <div class="admin-empty"><p>{{ emptyMessage() }}</p></div>
           } @else {
             <div class="admin-table-scroll">
-              <daf-data-table [columns]="setColumns()" [rows]="setPager.rows()" [config]="setTableConfig()" />
+              <daf-data-table [columns]="setColumns()" [rows]="setPager.rows()" [config]="setTableConfig()"
+                (sortChange)="setPager.onSort($event)" (resetClick)="setPager.onSort(null)" />
             </div>
             <app-admin-table-footer
               [total]="setPager.total()" [page]="setPager.current()" [totalPages]="setPager.totalPages()"
