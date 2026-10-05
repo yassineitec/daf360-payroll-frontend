@@ -45,7 +45,7 @@ module.exports = withNativeFederation({
     '@khalilrebhiitec/daf360': {
       singleton: true,
       strictVersion: false,
-      requiredVersion: '^5.3.0',
+      requiredVersion: '^5.4.0',
     },
     '@ngrx/store': {
       singleton: true,
