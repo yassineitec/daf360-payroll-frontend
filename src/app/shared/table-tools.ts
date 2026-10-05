@@ -84,3 +84,35 @@ export function sortTableRows<T extends TableRow>(rows: T[], columns: TableColum
 export function delegatedSort(seed: TableSort | null): Pick<TableConfig, 'manualSort' | 'defaultSort'> {
   return { manualSort: true, ...(seed ? { defaultSort: seed } : {}) };
 }
+
+/**
+ * Recherche texte côté client sur les lignes d'un tableau : garde les lignes dont **une des
+ * colonnes affichées** contient chaque mot de `query` (insensible à la casse et aux accents).
+ * Même valeur que le tri : `sortAccessor` s'il existe, sinon la cellule brute (`.name` d'un
+ * avatar, `.label` d'une pastille). Les colonnes sans libellé (actions) sont ignorées.
+ *
+ * Pour les tableaux qui n'avaient pas de barre : la `daf-search-toolbar` ajoutée au-dessus
+ * sert d'abord à porter `[table]` (réinitialiser + choix des colonnes à droite de Filtres),
+ * et sa recherche filtre réellement les lignes via cette fonction.
+ */
+export function searchTableRows<T extends TableRow>(rows: T[], columns: TableColumn[], query: string): T[] {
+  // NFD sépare les accents (U+0300–U+036F) de leur lettre, la classe les retire.
+  const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+  const words = norm(query.trim()).split(/\s+/).filter(Boolean);
+  if (!words.length) return rows;
+  const cols = columns.filter(c => c.label);
+  const text = (row: T, col: TableColumn): string => {
+    const v = col.sortAccessor ? col.sortAccessor(row) : row[col.key];
+    if (v == null) return '';
+    if (v instanceof Date) return v.toLocaleDateString();
+    if (typeof v === 'object') {
+      const o = v as { name?: string; label?: string };
+      return o.name ?? o.label ?? '';
+    }
+    return String(v);
+  };
+  return rows.filter(row => {
+    const hay = norm(cols.map(c => text(row, c)).join(' '));
+    return words.every(w => hay.includes(w));
+  });
+}

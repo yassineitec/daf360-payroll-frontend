@@ -37,7 +37,8 @@
       [filterConfig]="filterConfig()"
       (filterApply)="applyFilters($event)"
       [views]="viewOptions()"
-      [(view)]="viewMode">
+      [(view)]="viewMode"
+      [table]="table() ?? null">
     </daf-search-toolbar>
 
     @if (error()) {
@@ -65,15 +66,14 @@
             }
           </div>
         } @else {
-          <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
-            <daf-data-table
-              [columns]="employeeColumns()"
-              [rows]="employeeRows()"
-              [config]="employeeTableConfig()"
-              (sortChange)="onEmployeeSort($event)"
-              (resetClick)="onEmployeeSort(null)">
-            </daf-data-table>
-          </daf-card>
+          <!-- Tableau nu, sans carte autour — comme le modèle de la bibliothèque. -->
+          <daf-data-table
+            [columns]="employeeColumns()"
+            [rows]="employeeRows()"
+            [config]="employeeTableConfig()"
+            (sortChange)="onEmployeeSort($event)"
+            (resetClick)="onEmployeeSort(null)">
+          </daf-data-table>
         }
       </div>
 

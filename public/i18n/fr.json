@@ -21,7 +21,8 @@
       "TABLE": {
         "COLUMN_PICKER": "Choisir les colonnes",
         "RESET": "Réinitialiser l'affichage du tableau",
-        "SORT_BY": "Trier par {column}"
+        "SORT_BY": "Trier par {column}",
+        "SEARCH": "Rechercher…"
       }
     },
 

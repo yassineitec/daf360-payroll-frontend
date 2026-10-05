@@ -21,7 +21,8 @@
       "TABLE": {
         "COLUMN_PICKER": "Choose columns",
         "RESET": "Reset table layout",
-        "SORT_BY": "Sort by {column}"
+        "SORT_BY": "Sort by {column}",
+        "SEARCH": "Search…"
       }
     },
 

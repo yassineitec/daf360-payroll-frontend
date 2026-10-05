@@ -133,7 +133,8 @@
         [filterConfig]="filterConfig()"
         (filterApply)="applyFilters($event)"
         [views]="viewOptions()"
-        [(view)]="viewMode">
+        [(view)]="viewMode"
+        [table]="table() ?? null">
       </daf-search-toolbar>
 
       @if (viewMode() === 'grid') {

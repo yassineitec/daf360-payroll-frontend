@@ -10,6 +10,7 @@ import {
   ModalService,
   PageComponent,
   PageHeaderComponent,
+  SearchToolbarComponent,
   SectionCardComponent,
   SelectComponent,
   SkeletonComponent,
@@ -31,7 +32,7 @@ import {
   EmployeeConfigService, EmployeePayrollConfigDto, EmployeePayrollBonusDto,
 } from './employee-config.service';
 import { recallEmployee } from './employee-config-employee';
-import { tableTools } from '../../shared/table-tools';
+import { searchTableRows, tableTools } from '../../shared/table-tools';
 
 const BONUS_CURRENCIES = ['TND', 'EUR', 'USD', 'EGP', 'SAR', 'AED'];
 
@@ -54,7 +55,7 @@ const BONUS_CURRENCIES = ['TND', 'EUR', 'USD', 'EGP', 'SAR', 'AED'];
   imports: [
     TranslatePipe,
     ButtonComponent, CardComponent, CheckboxComponent, DataTableComponent, FormFieldComponent,
-    AdminSectionHeaderComponent, PageComponent, PageHeaderComponent, SectionCardComponent,
+    AdminSectionHeaderComponent, PageComponent, PageHeaderComponent, SearchToolbarComponent, SectionCardComponent,
     SelectComponent, SkeletonComponent, TabsComponent,
   ],
   templateUrl: './employee-config.component.html',
@@ -253,6 +254,18 @@ export class EmployeeConfigComponent implements OnInit {
       amount:  b.amount,
       currency: b.currency || '—',
     })),
+  );
+
+  /** Recherche de la barre au-dessus du tableau des primes. */
+  readonly bonusSearch = signal('');
+
+  /** Primes filtrées par la recherche — sur le texte affiché : la période en toutes
+   *  lettres (pas la clé de tri AAAA-MM) et le montant formaté. */
+  readonly filteredBonusRows = computed<TableRow[]>(() =>
+    searchTableRows(this.bonusRows(), this.bonusColumns().map(c =>
+      c.key === 'period' ? { ...c, sortAccessor: (row: TableRow) => row['period'] as string }
+      : c.key === 'amount' ? { ...c, sortAccessor: (row: TableRow) => this.money(row['amount'] as number, row['currency'] === '—' ? '' : row['currency'] as string) }
+      : c), this.bonusSearch()),
   );
 
   /** Outils de tableau communs (`tableTools`) sur le tableau des primes. */

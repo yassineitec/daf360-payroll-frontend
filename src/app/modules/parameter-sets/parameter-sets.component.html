@@ -329,18 +329,49 @@
           <!-- Tableau directement sur la page (plus de carte englobante) : le `daf-data-table`
                a déjà son propre cadre, avec le bouton "Modifier" juste au-dessus.
                Pas de titre de section : il répétait l'onglet juste au-dessus. -->
+          <!-- Une barre de recherche par onglet (dans le même bloc que son tableau) : elle filtre
+               les lignes, et porte à droite réinitialiser + choix des colonnes (`[table]`). -->
           @switch (detailTab()) {
             @case ('rubriques') {
                 <div class="ps-field-block">
-                  <daf-data-table [columns]="rubriquesColumns()" [rows]="rubriquesRows(ps)" [config]="readTableConfig('PAYROLL.PARAMETER_SETS.RUBRIQUES_EMPTY_READONLY')" />
+                  <div class="ps-toolbar">
+                    <daf-search-toolbar
+                      [card]="false"
+                      [showFilter]="false"
+                      [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
+                      [value]="rubriquesSearch()" [debounce]="200" (valueChange)="rubriquesSearch.set($event)"
+                      [table]="rubriquesTable" />
+                  </div>
+                  <daf-data-table #rubriquesTable [columns]="rubriquesColumns()" [rows]="rubriquesView()"
+                    [config]="readTableConfig(rubriquesSearch().trim() ? 'PAYROLL.ADMIN_HOME.NO_RESULT' : 'PAYROLL.PARAMETER_SETS.RUBRIQUES_EMPTY_READONLY')" />
                 </div>
             }
             @case ('benefits') {
-                <daf-data-table [columns]="benefitsColumns()" [rows]="benefitsRows(ps)" [config]="readTableConfig('PAYROLL.PARAMETER_SETS.BENEFITS_EMPTY_READONLY')" />
+                <div class="ps-field-block">
+                  <div class="ps-toolbar">
+                    <daf-search-toolbar
+                      [card]="false"
+                      [showFilter]="false"
+                      [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
+                      [value]="benefitsSearch()" [debounce]="200" (valueChange)="benefitsSearch.set($event)"
+                      [table]="benefitsTable" />
+                  </div>
+                  <daf-data-table #benefitsTable [columns]="benefitsColumns()" [rows]="benefitsView()"
+                    [config]="readTableConfig(benefitsSearch().trim() ? 'PAYROLL.ADMIN_HOME.NO_RESULT' : 'PAYROLL.PARAMETER_SETS.BENEFITS_EMPTY_READONLY')" />
+                </div>
             }
             @default {
                 <div class="ps-field-block">
-                  <daf-data-table [columns]="chargesColumns()" [rows]="chargesRows(ps)" [config]="readTableConfig('PAYROLL.PARAMETER_SETS.CHARGES_EMPTY_READONLY')" />
+                  <div class="ps-toolbar">
+                    <daf-search-toolbar
+                      [card]="false"
+                      [showFilter]="false"
+                      [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
+                      [value]="chargesSearch()" [debounce]="200" (valueChange)="chargesSearch.set($event)"
+                      [table]="chargesTable" />
+                  </div>
+                  <daf-data-table #chargesTable [columns]="chargesColumns()" [rows]="chargesView()"
+                    [config]="readTableConfig(chargesSearch().trim() ? 'PAYROLL.ADMIN_HOME.NO_RESULT' : 'PAYROLL.PARAMETER_SETS.CHARGES_EMPTY_READONLY')" />
                 </div>
             }
           }
@@ -360,7 +391,8 @@
               [debounce]="300"
               [filterFields]="filterFields()"
               [filterConfig]="filterConfig()"
-              (filterApply)="applyFilters($event)">
+              (filterApply)="applyFilters($event)"
+              [table]="setTable() ?? null">
             </daf-search-toolbar>
           </div>
 
@@ -372,7 +404,7 @@
             <div class="admin-empty"><p>{{ emptyMessage() }}</p></div>
           } @else {
             <div class="admin-table-scroll">
-              <daf-data-table [columns]="setColumns()" [rows]="setPager.rows()" [config]="setTableConfig()"
+              <daf-data-table #setTable [columns]="setColumns()" [rows]="setPager.rows()" [config]="setTableConfig()"
                 (sortChange)="setPager.onSort($event)" (resetClick)="setPager.onSort(null)" />
             </div>
             <app-admin-table-footer
@@ -396,11 +428,23 @@
             <daf-button [label]="'PAYROLL.PARAMETER_SETS.ADD_CHARGE_LINE' | translate" variant="secondary" [options]="{ size: 'sm', iconStart: 'add' }" (onClick)="addEditRate()" />
           </div>
 
+          <!-- Recherche dans les lignes saisies (figée à la frappe, voir `onEditRateSearch`) ;
+               réinitialiser + choix des colonnes du tableau à droite (`[table]`). -->
+          <daf-search-toolbar
+            [card]="false"
+            [showFilter]="false"
+            [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
+            [value]="editRateSearch()" [debounce]="200" (valueChange)="onEditRateSearch($event)"
+            [table]="editRateTable" />
+
           <!-- `daf-data-table` à cellules éditables (au lieu de la grille maison). En mode
                FORMULE, les colonnes salarié / patronal portent directement le champ de
-               formule et ses variables, et la colonne "Plaf. / Ordre" l'ordre d'évaluation. -->
-          <daf-data-table [columns]="editRateColumns()" [rows]="editRateRows()" [config]="editRateTableConfig()">
-            <ng-template dafCell="contractType" let-row let-i="index">
+               formule et ses variables, et la colonne "Plaf. / Ordre" l'ordre d'évaluation.
+               Chaque cellule relit l'index de son FormGroup (`rowIndex(row)`), pas sa position
+               d'affichage : la recherche peut masquer des lignes. -->
+          <daf-data-table #editRateTable [columns]="editRateColumns()" [rows]="editRateRows()" [config]="editRateTableConfig()">
+            <ng-template dafCell="contractType" let-row>
+              @let i = rowIndex(row);
               <daf-select
                 [options]="contractTypeOptions()"
                 [selected]="[editRateGroup(i).get('contractType')!.value]"
@@ -408,21 +452,24 @@
                 (selectedChange)="editRateGroup(i).get('contractType')!.setValue($event[0])">
               </daf-select>
             </ng-template>
-            <ng-template dafCell="chargeCode" let-row let-i="index">
+            <ng-template dafCell="chargeCode" let-row>
+              @let i = rowIndex(row);
               <daf-form-field
                 [options]="{ placeholder: 'CNSS' }"
                 [value]="editRateGroup(i).get('chargeCode')!.value"
                 (valueChange)="editRateGroup(i).get('chargeCode')!.setValue(($event ?? '').toString())">
               </daf-form-field>
             </ng-template>
-            <ng-template dafCell="chargeLabel" let-row let-i="index">
+            <ng-template dafCell="chargeLabel" let-row>
+              @let i = rowIndex(row);
               <daf-form-field
                 [options]="{ placeholder: 'PAYROLL.PARAMETER_SETS.CHARGE_LABEL_PLACEHOLDER' | translate }"
                 [value]="editRateGroup(i).get('chargeLabel')!.value"
                 (valueChange)="editRateGroup(i).get('chargeLabel')!.setValue(($event ?? '').toString())">
               </daf-form-field>
             </ng-template>
-            <ng-template dafCell="employeeRate" let-row let-i="index">
+            <ng-template dafCell="employeeRate" let-row>
+              @let i = rowIndex(row);
               @if (editRateGroup(i).get('baseCalculation')!.value !== 'FORMULE') {
                 <daf-form-field
                   [options]="{ type: 'number', placeholder: '0.0918' }"
@@ -444,7 +491,8 @@
                 </div>
               }
             </ng-template>
-            <ng-template dafCell="employerRate" let-row let-i="index">
+            <ng-template dafCell="employerRate" let-row>
+              @let i = rowIndex(row);
               @if (editRateGroup(i).get('baseCalculation')!.value !== 'FORMULE') {
                 <daf-form-field
                   [options]="{ type: 'number', placeholder: '0.1657' }"
@@ -466,7 +514,8 @@
                 </div>
               }
             </ng-template>
-            <ng-template dafCell="baseCalculation" let-row let-i="index">
+            <ng-template dafCell="baseCalculation" let-row>
+              @let i = rowIndex(row);
               <daf-select
                 [options]="baseCalcOptions()"
                 [selected]="[editRateGroup(i).get('baseCalculation')!.value]"
@@ -474,7 +523,8 @@
                 (selectedChange)="editRateGroup(i).get('baseCalculation')!.setValue($event[0])">
               </daf-select>
             </ng-template>
-            <ng-template dafCell="capAmount" let-row let-i="index">
+            <ng-template dafCell="capAmount" let-row>
+              @let i = rowIndex(row);
               @if (editRateGroup(i).get('baseCalculation')!.value !== 'FORMULE') {
                 <daf-form-field
                   [options]="{ type: 'number', placeholder: '—', suffixText: editorDevise() }"

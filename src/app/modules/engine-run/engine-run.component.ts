@@ -297,22 +297,21 @@ function flagEmoji(isoCode: string | null | undefined): string {
 
             <!-- ── Détail des rubriques — modèle de la bibliothèque, comme /payroll/engine-results
                  et /finance/affaires : 'daf-search-toolbar' (sa propre carte) avec la catégorie
-                 dans son panneau de filtre, puis le tableau dans une 'daf-card'. ── -->
+                 dans son panneau de filtre, puis le tableau nu, sans carte autour. ── -->
             <daf-search-toolbar
               [placeholder]="'PAYROLL.ENGINE_RUN.SEARCH_PLACEHOLDER' | translate"
               [(value)]="rubriqueSearch"
               [debounce]="200"
               [filterFields]="rubriqueFilterFields()"
               [filterConfig]="rubriqueFilterConfig()"
-              (filterApply)="applyRubriqueFilter($event)">
+              (filterApply)="applyRubriqueFilter($event)"
+              [table]="rubriqueTable">
             </daf-search-toolbar>
 
-            <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
-              <daf-data-table
-                [columns]="rubriqueColumns()"
-                [rows]="rubriqueRows()"
-                [config]="rubriqueTableConfig()" />
-            </daf-card>
+            <daf-data-table #rubriqueTable
+              [columns]="rubriqueColumns()"
+              [rows]="rubriqueRows()"
+              [config]="rubriqueTableConfig()" />
           }
         </main>
       </div>

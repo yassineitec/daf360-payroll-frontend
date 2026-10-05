@@ -174,10 +174,16 @@
         </daf-metric-card>
       </div>
 
+      <daf-search-toolbar
+        [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
+        [value]="detailSearch()" [debounce]="200" (valueChange)="detailSearch.set($event)"
+        [table]="detailTable" />
+
       <daf-card [options]="{ variant: 'outlined', padding: 'none', radius: 'xl' }">
         <daf-data-table
+          #detailTable
           [columns]="detailColumns()"
-          [rows]="detailRows()"
+          [rows]="filteredDetailRows()"
           [config]="detailConfig()">
           <ng-template [dafCell]="'sharePointUrl'" let-row>
             @if (row['sharePointUrl']) {
@@ -201,28 +207,24 @@
         <h2 class="section__title">{{ 'PAYROLL.PAYSLIPS.HISTORY.TITLE' | translate }}</h2>
         <p class="section__subtitle">{{ 'PAYROLL.PAYSLIPS.HISTORY.SUBTITLE' | translate }}</p>
       </div>
-      <div class="section__tools">
-        <!-- Bouton "Filtrer" de la lib (`daf-filter`), comme sur /payroll/parameter-sets —
-             panneau aligné à droite puisque le bouton est en bout d'en-tête. -->
-        <daf-filter
-          [fields]="historyFilterFields()"
-          [initialValues]="historyFilterSeed()"
-          [title]="'PAYROLL.PAYSLIPS.HISTORY.FILTER_TITLE' | translate"
-          [triggerLabel]="'PAYROLL.PAYSLIPS.HISTORY.FILTER_TRIGGER' | translate"
-          [applyLabel]="'PAYROLL.PAYSLIPS.HISTORY.FILTER_APPLY' | translate"
-          [cancelLabel]="'PAYROLL.PAYSLIPS.HISTORY.FILTER_CANCEL' | translate"
-          [resetLabel]="'PAYROLL.PAYSLIPS.HISTORY.FILTER_RESET' | translate"
-          align="right"
-          (apply)="applyHistoryFilter($event)"
-          (reset)="historyFilter.set('ALL')">
-        </daf-filter>
-      </div>
     </div>
+
+    <!-- Recherche + filtre de la lib (l'ancien `daf-filter` de l'en-tête, mêmes champs et
+         libellés) + outils du tableau (réinitialiser, colonnes) sur une seule ligne. -->
+    <daf-search-toolbar
+      [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
+      [value]="historySearch()" [debounce]="200" (valueChange)="historySearch.set($event)"
+      [filterFields]="historyFilterFields()"
+      [filterConfig]="historyFilterConfig()"
+      (filterApply)="applyHistoryFilter($event)"
+      (filterReset)="historyFilter.set('ALL')"
+      [table]="historyTable" />
 
     <daf-card [options]="{ variant: 'outlined', padding: 'none', radius: 'xl' }">
       <daf-data-table
+        #historyTable
         [columns]="historyColumns()"
-        [rows]="historyRows()"
+        [rows]="filteredHistoryRows()"
         [config]="historyConfig()">
         <ng-template [dafCell]="'fileName'" let-row>
           <span class="history-file" [title]="row['fileName']">

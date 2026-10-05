@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, untracked, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -323,6 +323,10 @@ export class CandidateSimulationComponent implements OnInit {
   }
 
   /** Outils de tableau communs (`tableTools`), comme sur `/finance/affaires`. */
+  /** Vue tableau uniquement (undefined en vue cartes) — passé au `[table]` de la barre pour placer
+   *  réinitialiser + choix des colonnes à droite de Filtres. */
+  readonly candidateTable = viewChild(DataTableComponent);
+
   readonly candidateTableConfig = computed<TableConfig>(() => ({
     actions: this.candidateActions(),
     emptyMessage: this.emptyMessage(),

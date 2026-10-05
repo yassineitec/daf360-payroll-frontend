@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, untracked, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -63,6 +63,10 @@ interface PaysItem { id: number; iso_code: string; french_label: string; }
   styleUrl: './engine-results-list.component.scss',
 })
 export class EngineResultsListComponent implements OnInit {
+  /** Vue tableau uniquement (undefined en vue cartes) — passé au `[table]` de la barre pour placer réinitialiser + choix des
+   *  colonnes à droite de Filtres, au lieu d'au-dessus du tableau. */
+  readonly table = viewChild(DataTableComponent);
+
   private readonly hrService = inject(HrProfileService);
   private readonly engineApi = inject(PayrollEngineService);
   private readonly currency  = inject(CurrencyService);

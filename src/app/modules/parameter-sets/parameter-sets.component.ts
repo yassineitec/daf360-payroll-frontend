@@ -57,7 +57,7 @@ import { AdminSectionHeaderComponent } from './admin/admin-section-header.compon
 import {
   AdminModalFooterComponent, AdminPager, AdminSpinnerComponent, AdminTableFooterComponent,
 } from './admin/admin-section-kit';
-import { delegatedSort, tableTools } from '../../shared/table-tools';
+import { delegatedSort, searchTableRows, tableTools } from '../../shared/table-tools';
 import { AdvanceRulesAdminComponent } from './admin/advance-rules-admin.component';
 import { BenefitsCatalogueAdminComponent } from './admin/benefits-catalogue-admin.component';
 import { EngineParamsAdminComponent } from './admin/engine-params-admin.component';
@@ -168,6 +168,10 @@ function sectionParam(ids: () => readonly ParamSetsSection[]) {
   styleUrl: './parameter-sets.component.scss',
 })
 export class ParameterSetsComponent implements OnInit {
+  /** Liste des jeux de paramètres — passée au `[table]` de sa barre : réinitialiser + choix des
+   *  colonnes à droite de Filtres. Les tableaux du détail / de l'édition n'ont pas de barre. */
+  readonly setTable = viewChild<DataTableComponent>('setTable');
+
   private readonly api          = inject(PayrollApiService);
   private readonly hr           = inject(HrProfileService);
   private readonly fb           = inject(FormBuilder);
@@ -803,6 +807,7 @@ export class ParameterSetsComponent implements OnInit {
     })));
     this.editingChargesId.set(ps.id);
     this.chargesError.set(null);
+    this.onEditRateSearch('');
     const tpl = this.chargesEditorTpl();
     if (!tpl) return;
     this.chargesModalRef = this.modalService.open({
@@ -1236,6 +1241,52 @@ export class ParameterSetsComponent implements OnInit {
     }));
   }
 
+  // ── Recherche des tableaux du détail (une barre par onglet, un seul visible) ─
+  // Remises à zéro à chaque changement de jeu ou d'onglet. Pas de pagination ici : le
+  // détail d'un jeu arrive entier et s'affiche d'un bloc.
+  readonly rubriquesSearch = signal('');
+  readonly benefitsSearch  = signal('');
+  readonly chargesSearch   = signal('');
+
+  private readonly resetDetailSearch = effect(() => {
+    this.openSetId();
+    this.detailTab();
+    untracked(() => {
+      this.rubriquesSearch.set('');
+      this.benefitsSearch.set('');
+      this.chargesSearch.set('');
+    });
+  });
+
+  /** Nombre tel qu'affiché par la colonne (séparateurs de la langue), pour la recherche. */
+  private searchNumber(v: unknown, maximumFractionDigits: number): unknown {
+    return typeof v === 'number' ? v.toLocaleString(this.numberLocale, { maximumFractionDigits }) : v;
+  }
+
+  readonly rubriquesView = computed<TableRow[]>(() => {
+    const ps = this.detailSet();
+    return ps ? searchTableRows(this.rubriquesRows(ps), this.rubriquesColumns(), this.rubriquesSearch()) : [];
+  });
+
+  readonly benefitsView = computed<TableRow[]>(() => {
+    const ps = this.detailSet();
+    if (!ps) return [];
+    const columns = this.benefitsColumns().map(c => c.key === 'monthlyValue'
+      ? { ...c, sortAccessor: (row: TableRow) => this.searchNumber(row[c.key], 0) as string }
+      : c);
+    return searchTableRows(this.benefitsRows(ps), columns, this.benefitsSearch());
+  });
+
+  readonly chargesView = computed<TableRow[]>(() => {
+    const ps = this.detailSet();
+    if (!ps) return [];
+    // Parts salarié / patronale : brutes (la colonne `percent` formate) → texte affiché.
+    const columns = this.chargesColumns().map(c => c.type === 'percent'
+      ? { ...c, sortAccessor: (row: TableRow) => this.searchNumber(row[c.key], 2) as string }
+      : c);
+    return searchTableRows(this.chargesRows(ps), columns, this.chargesSearch());
+  });
+
   private get numberLocale(): string {
     return this.translate.currentLang() === 'en' ? 'en-US' : 'fr-FR';
   }
@@ -1427,9 +1478,9 @@ export class ParameterSetsComponent implements OnInit {
 
   // ── Tableaux de saisie des charges (daf-data-table + cellules `dafCell`) ─────
   // Remplacent l'ancienne grille maison `.rates-head`/`.rates-row`. Une ligne du tableau =
-  // un FormGroup, retrouvé par son index (`let-i="index"` du gabarit de cellule) ; `id`
-  // stable par position pour que le tableau garde les champs (et le focus) d'une frappe
-  // à l'autre.
+  // un FormGroup, retrouvé par l'index porté dans son `id` (`rowIndex(row)`, pas la position
+  // d'affichage : la recherche masque des lignes) ; `id` stable par position dans le
+  // formulaire pour que le tableau garde les champs (et le focus) d'une frappe à l'autre.
   readonly editRateColumns = computed<TableColumn[]>(() => [
     { key: 'contractType',    label: this.t('PAYROLL.PARAMETER_SETS.COL_TYPE'),           width: '130px' },
     { key: 'chargeCode',      label: this.t('PAYROLL.PARAMETER_SETS.COL_CODE'),           width: '120px' },
@@ -1440,12 +1491,51 @@ export class ParameterSetsComponent implements OnInit {
     { key: 'capAmount',       label: this.t('PAYROLL.PARAMETER_SETS.COL_CAP_OR_ORDER'),   width: '130px' },
   ]);
 
-  private indexRows(count: number): TableRow[] {
-    return Array.from({ length: count }, (_, i) => ({ id: `line-${i}` }));
-  }
-  editRateRows(): TableRow[]   { return this.indexRows(this.editRates.length); }
+  // Recherche du tableau de saisie. Une ligne garde l'index de SON FormGroup dans `id`
+  // (`line-<index du formulaire>`), et les cellules le relisent par `rowIndex(row)` — jamais
+  // par la position d'affichage, qui change dès que la recherche masque des lignes.
+  // Le résultat est figé à la frappe (contrôles retenus, par identité) : modifier un champ
+  // ne fait pas disparaître sa ligne en cours de saisie, une ligne ajoutée ensuite reste
+  // visible, et une suppression (qui décale les index) ne mélange pas les lignes.
+  readonly editRateSearch = signal('');
+  private editRateMatches: { all: Set<AbstractControl>; matched: Set<AbstractControl> } | null = null;
 
-  private rowIndex(row: TableRow): number { return Number(String(row['id']).slice('line-'.length)); }
+  /** Colonnes de recherche : le texte affiché dans les champs (formule en mode FORMULE,
+   *  libellé de la base de calcul, ordre d'évaluation à la place du plafond). */
+  private editRateSearchRow(ctrl: AbstractControl, i: number): TableRow {
+    const v = (ctrl as FormGroup).getRawValue();
+    const formula = v['baseCalculation'] === 'FORMULE';
+    return {
+      id:              `line-${i}`,
+      contractType:    v['contractType'] ?? '',
+      chargeCode:      v['chargeCode'] ?? '',
+      chargeLabel:     v['chargeLabel'] ?? '',
+      employeeRate:    formula ? (v['formulaEe'] ?? '') : (v['employeeRate'] ?? ''),
+      employerRate:    formula ? (v['formulaEr'] ?? '') : (v['employerRate'] ?? ''),
+      baseCalculation: this.baseCalcOptions().find(o => o.value === v['baseCalculation'])?.label ?? v['baseCalculation'] ?? '',
+      capAmount:       formula ? (v['evalOrder'] ?? '') : (v['capAmount'] ?? ''),
+    };
+  }
+
+  onEditRateSearch(value: string | null | undefined): void {
+    const query = value ?? '';
+    this.editRateSearch.set(query);
+    if (!query.trim()) { this.editRateMatches = null; return; }
+    const controls = this.editRates.controls;
+    const found = searchTableRows(controls.map((c, i) => this.editRateSearchRow(c, i)), this.editRateColumns(), query);
+    this.editRateMatches = { all: new Set(controls), matched: new Set(found.map(r => controls[this.rowIndex(r)])) };
+  }
+
+  editRateRows(): TableRow[] {
+    const m = this.editRateMatches;
+    return this.editRates.controls
+      .map((ctrl, i) => ({ ctrl, i }))
+      .filter(({ ctrl }) => !m || m.matched.has(ctrl) || !m.all.has(ctrl))
+      .map(({ i }) => ({ id: `line-${i}` }));
+  }
+
+  /** Index du FormGroup d'une ligne du tableau de saisie (pas sa position d'affichage). */
+  rowIndex(row: TableRow): number { return Number(String(row['id']).slice('line-'.length)); }
 
   // ── Charges de « Nouveau jeu » : une carte par charge (plus de tableau de champs) ──
   // Le tableau de 7 colonnes de champs débordait de la carte et n'avait pas d'en-têtes ;
@@ -1504,10 +1594,11 @@ export class ParameterSetsComponent implements OnInit {
 
   readonly editRateTableConfig = computed<TableConfig>(() => ({
     showHeader: false,
-    emptyMessage: this.t('PAYROLL.PARAMETER_SETS.CHARGES_EMPTY_EDITOR'),
-    // Outils de mise en page seulement, PAS de tri : chaque cellule est un champ lié à sa
-    // ligne de formulaire par sa position d'affichage (`let-i="index"`). Trier relierait
-    // les champs aux mauvais taux.
+    emptyMessage: this.t(this.editRateSearch().trim()
+      ? 'PAYROLL.ADMIN_HOME.NO_RESULT' : 'PAYROLL.PARAMETER_SETS.CHARGES_EMPTY_EDITOR'),
+    // Outils de mise en page seulement, PAS de tri : l'ordre des lignes est l'ordre
+    // d'évaluation des charges (variables de formule des lignes précédentes). Chaque
+    // cellule retrouve son FormGroup par `rowIndex(row)`.
     ...tableTools(this.translate),
     actions: [{ id: 'remove', icon: 'close', tooltip: this.t('PAYROLL.PARAMETER_SETS.REMOVE'), variant: 'danger',
                 onClick: row => this.removeEditRate(this.rowIndex(row)) }],

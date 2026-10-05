@@ -81,7 +81,14 @@
     @if (cycles().length) {
       <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
         <daf-section-title [title]="'PAYROLL.CALIBRATION.CYCLES_TITLE' | translate: { count: cycles().length }" />
-        <daf-data-table [columns]="cycleColumns()" [rows]="cycleRows()" [config]="cycleTableConfig()"></daf-data-table>
+        <!-- Barre sans carte (déjà dans une daf-card) : porte les outils du tableau
+             (réinitialiser + colonnes) et filtre les cycles affichés. -->
+        <daf-search-toolbar
+          [card]="false"
+          [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
+          [value]="cycleSearch()" [debounce]="200" (valueChange)="cycleSearch.set($event)"
+          [table]="cycleTable" />
+        <daf-data-table #cycleTable [columns]="cycleColumns()" [rows]="filteredCycleRows()" [config]="cycleTableConfig()"></daf-data-table>
       </daf-card>
     }
   </div>

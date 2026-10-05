@@ -233,9 +233,17 @@
                 {{ 'PAYROLL.EMPLOYEE_CONFIG.SECTION_SAVED_BONUSES' | translate }}{{ bonuses().length ? ' · ' + bonuses().length : '' }}
               </h3>
               <p class="ec-hint">{{ 'PAYROLL.EMPLOYEE_CONFIG.BONUSES_HINT' | translate }}</p>
+              <!-- Barre sans carte (déjà dans une daf-card) : porte les outils du tableau
+                   (réinitialiser + colonnes) et filtre les primes affichées. -->
+              <daf-search-toolbar
+                [card]="false"
+                [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
+                [value]="bonusSearch()" [debounce]="200" (valueChange)="bonusSearch.set($event)"
+                [table]="bonusTable" />
               <daf-data-table
+                #bonusTable
                 [columns]="bonusColumns()"
-                [rows]="bonusRows()"
+                [rows]="filteredBonusRows()"
                 [config]="bonusTableConfig()">
               </daf-data-table>
             </div>

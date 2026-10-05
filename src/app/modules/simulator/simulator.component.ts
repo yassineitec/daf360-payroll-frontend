@@ -23,7 +23,7 @@ import {
 import { HrRefApiService, ConfigurableListValueDto } from '../../core/hr-ref-api.service';
 import { UserStore } from '../../core/user.store';
 import { EmployeeSelectComponent } from '../../shared/employee-select/employee-select.component';
-import { tableTools } from '../../shared/table-tools';
+import { searchTableRows, tableTools } from '../../shared/table-tools';
 import { Subject, takeUntil, forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -39,6 +39,7 @@ import {
   PageComponent,
   PageHeaderComponent,
   RadioGroupComponent,
+  SearchToolbarComponent,
   SectionTitleComponent,
   SelectComponent,
   StatusBadgeComponent,
@@ -92,7 +93,7 @@ interface IrppBracketRow {
     CommonModule, ReactiveFormsModule, TranslatePipe, EmployeeSelectComponent,
     AccordionCardComponent, ButtonComponent, CardComponent, CheckboxComponent,
     DataTableComponent, FormFieldComponent, MetricCardComponent, PageComponent,
-    PageHeaderComponent, RadioGroupComponent, SectionTitleComponent, SelectComponent,
+    PageHeaderComponent, RadioGroupComponent, SearchToolbarComponent, SectionTitleComponent, SelectComponent,
     StatusBadgeComponent, StepperComponent,
   ],
   // Pas de `styleUrl` : Tailwind + composants de la lib uniquement, comme les autres
@@ -360,6 +361,47 @@ export class SimulatorComponent implements OnDestroy {
       _employeeRate: c.employeeRate,
       _employerRate: c.employerRate,
     })),
+  );
+
+  // ── Recherche des trois tableaux ───────────────────────────────────────────
+  // Chaque tableau a sa `daf-search-toolbar` (qui porte aussi réinitialiser + choix des
+  // colonnes). Le filtre porte sur le texte AFFICHÉ : les colonnes de recherche
+  // ci-dessous rendent la cellule formatée, là où les `sortAccessor` des colonnes du
+  // tableau rendent la valeur brute (montant, borne, taux décimal).
+
+  readonly rubriquesSearch = signal('');
+  readonly irppSearch      = signal('');
+  readonly chargesSearch   = signal('');
+
+  private readonly rubriquesSearchColumns = computed((): TableColumn[] => [
+    { key: 'code',     label: 'code' },
+    { key: 'nature',   label: 'nature' },
+    { key: 'calcMode', label: 'mode' },
+    { key: 'amount',   label: 'amount', sortAccessor: row => this.money(row['amount'] as number, '', 2) },
+  ]);
+
+  /** `bracket`, `rate`, `charge`, `employee`, `employer` sont déjà des chaînes affichées. */
+  private readonly irppSearchColumns: TableColumn[] = [
+    { key: 'bracket', label: 'bracket' },
+    { key: 'rate',    label: 'rate' },
+  ];
+
+  private readonly chargesSearchColumns: TableColumn[] = [
+    { key: 'charge',   label: 'charge' },
+    { key: 'employee', label: 'employee' },
+    { key: 'employer', label: 'employer' },
+  ];
+
+  readonly filteredRubriquesRows = computed(() =>
+    searchTableRows(this.rubriquesRows(), this.rubriquesSearchColumns(), this.rubriquesSearch()),
+  );
+
+  readonly filteredIrppRows = computed(() =>
+    searchTableRows(this.irppRows(), this.irppSearchColumns, this.irppSearch()),
+  );
+
+  readonly filteredChargesRows = computed(() =>
+    searchTableRows(this.chargesRows(), this.chargesSearchColumns, this.chargesSearch()),
   );
 
   /** Outils de tableau communs (`tableTools`) pour les trois tableaux de résultat. */
@@ -833,6 +875,7 @@ export class SimulatorComponent implements OnDestroy {
   /** Re-open a past run in the result view. The DTO is complete, so nothing is refetched. */
   openHistoryEntry(entry: SimulationResultDto): void {
     this.result.set(entry);
+    this.clearResultSearches();
     this.error.set(null);
     this.closeHistory();
     this.showResult();
@@ -859,6 +902,14 @@ export class SimulatorComponent implements OnDestroy {
   private closeHistory(): void {
     this.historyModalRef?.close();
     this.historyModalRef = null;
+  }
+
+  /** A new result (fresh run or history entry) starts with empty table searches — a term
+   *  left over from the previous simulation would otherwise hide lines of the new payslip. */
+  private clearResultSearches(): void {
+    this.rubriquesSearch.set('');
+    this.irppSearch.set('');
+    this.chargesSearch.set('');
   }
 
   /** Replaces the form with the result view — see `resultView`. */
@@ -976,6 +1027,7 @@ export class SimulatorComponent implements OnDestroy {
     }).subscribe({
       next: res => {
         this.result.set(res);
+        this.clearResultSearches();
         this.loading.set(false);
         this.showResult();
         const paysId = this.form.getRawValue().paysId;

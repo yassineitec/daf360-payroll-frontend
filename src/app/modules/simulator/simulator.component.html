@@ -969,11 +969,22 @@
           radius: 'xl',
         }"
       >
-        <daf-data-table
-          [columns]="rubriquesColumns()"
-          [rows]="rubriquesRows()"
-          [config]="resultTableConfig()"
-        />
+        <!-- Barre de recherche : porte réinitialiser + choix des colonnes du tableau
+             (`[table]`) et filtre les rubriques. `[card]="false"` : déjà dans une carte. -->
+        <div class="flex flex-col gap-3">
+          <daf-search-toolbar
+            [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
+            [(value)]="rubriquesSearch"
+            [card]="false"
+            [table]="rubriquesTable"
+          />
+          <daf-data-table
+            #rubriquesTable
+            [columns]="rubriquesColumns()"
+            [rows]="filteredRubriquesRows()"
+            [config]="resultTableConfig()"
+          />
+        </div>
       </daf-accordion-card>
     }
   }
@@ -994,9 +1005,16 @@
             [title]="'PAYROLL.SIMULATOR.REFERENTIAL.IRPP_TITLE' | translate"
           />
           @if (irppBrackets().length) {
+            <daf-search-toolbar
+              [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
+              [(value)]="irppSearch"
+              [card]="false"
+              [table]="irppTable"
+            />
             <daf-data-table
+              #irppTable
               [columns]="irppColumns()"
-              [rows]="irppRows()"
+              [rows]="filteredIrppRows()"
               [config]="resultTableConfig()"
             />
           } @else {
@@ -1014,9 +1032,16 @@
             "
           />
           @if (applicableCharges().length) {
+            <daf-search-toolbar
+              [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
+              [(value)]="chargesSearch"
+              [card]="false"
+              [table]="chargesTable"
+            />
             <daf-data-table
+              #chargesTable
               [columns]="chargesColumns()"
-              [rows]="chargesRows()"
+              [rows]="filteredChargesRows()"
               [config]="resultTableConfig()"
             />
           } @else {

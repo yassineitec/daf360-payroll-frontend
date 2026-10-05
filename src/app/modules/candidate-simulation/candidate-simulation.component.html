@@ -68,7 +68,8 @@
         [filterConfig]="filterConfig()"
         (filterApply)="applyFilters($event)"
         [views]="viewOptions()"
-        [(view)]="viewMode">
+        [(view)]="viewMode"
+        [table]="candidateTable() ?? null">
       </daf-search-toolbar>
 
       @if (viewMode() === 'grid') {

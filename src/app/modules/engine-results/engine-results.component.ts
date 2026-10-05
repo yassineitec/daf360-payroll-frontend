@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal, untracked, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -85,6 +85,10 @@ const RUBRIQUE_TABS: { id: RubriqueCategory; label: string }[] = [
   styleUrl: './engine-results.component.scss',
 })
 export class EngineResultsComponent {
+  /** Vue tableau uniquement (undefined en vue cartes) — passé au `[table]` de la barre pour placer réinitialiser + choix des
+   *  colonnes à droite de Filtres, au lieu d'au-dessus du tableau. */
+  readonly table = viewChild(DataTableComponent);
+
   private readonly engineApi  = inject(PayrollEngineService);
   private readonly translate  = inject(TranslateService);
   private readonly router     = inject(Router);

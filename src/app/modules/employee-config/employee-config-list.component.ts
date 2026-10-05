@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, untracked, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { catchError, of } from 'rxjs';
@@ -50,6 +50,10 @@ import { PaysNamesService } from '../../core/pays-names.service';
   styleUrls: ['./employee-config-list.component.scss'],
 })
 export class EmployeeConfigListComponent implements OnInit {
+  /** Tableau (absent tant que la liste charge ou est vide) — passé au `[table]` de la barre pour placer réinitialiser + choix des
+   *  colonnes à droite de Filtres, au lieu d'au-dessus du tableau. */
+  readonly table = viewChild(DataTableComponent);
+
   private readonly hrService  = inject(HrProfileService);
   private readonly payrollApi = inject(PayrollApiService);
   private readonly router     = inject(Router);

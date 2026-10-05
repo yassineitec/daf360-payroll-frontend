@@ -9,18 +9,19 @@ import {
   DafCellDirective,
   DataTableComponent,
   FileUploadComponent,
-  FilterComponent,
   LoadingComponent,
   MetricCardComponent,
   ModalService,
   PageComponent,
   PageHeaderComponent,
+  SearchToolbarComponent,
   SelectComponent,
   StatusBadgeComponent,
   type BadgeVariant,
   type BreadcrumbItem,
   type FilterField,
   type FilterResult,
+  type SearchToolbarFilterConfig,
   type ModalRef,
   type SelectOption,
   type TableColumn,
@@ -31,7 +32,7 @@ import { NotificationService } from '../../core/notification.service';
 import { PayrollApiService, PaysDto } from '../../core/payroll-api.service';
 import { PayslipBatchResult, PayslipBatchService, PayslipPageStatus } from '../../core/payslip-batch.service';
 import { dayRange, distinctSorted, inDayRange, pickValue, rangeSeed } from '../../shared/filter-utils';
-import { tableTools } from '../../shared/table-tools';
+import { searchTableRows, tableTools } from '../../shared/table-tools';
 import { PaysNamesService } from '../../core/pays-names.service';
 
 const MONTH_KEYS = [
@@ -89,7 +90,7 @@ function periodKey(year: number, month: number): string {
     CommonModule, TranslatePipe,
     ButtonComponent, CardComponent, DafCellDirective, DataTableComponent, FileUploadComponent,
     MetricCardComponent, PageComponent, PageHeaderComponent,
-    FilterComponent, LoadingComponent, SelectComponent, StatusBadgeComponent,
+    LoadingComponent, SearchToolbarComponent, SelectComponent, StatusBadgeComponent,
   ],
   templateUrl: './payslip-batch.component.html',
   styleUrl: './payslip-batch.component.scss',
@@ -267,6 +268,7 @@ export class PayslipBatchComponent implements OnInit {
       this.closeProcessingModal();
       if (!result) return;
       this.result.set(result);
+      this.detailSearch.set('');
       this.resultFileName.set(file.name);
       this.clearFile();
       this.addToHistory(paysId, year, month, file.name, result);
@@ -333,7 +335,19 @@ export class PayslipBatchComponent implements OnInit {
     })),
   );
 
+  /** Recherche de la barre au-dessus du détail du lot. */
+  readonly detailSearch = signal('');
+
+  /** Détail filtré par la recherche — le lien SharePoint s'affiche « Ouvrir », son URL
+   *  n'est donc pas cherchée. */
+  readonly filteredDetailRows = computed<TableRow[]>(() =>
+    searchTableRows(this.detailRows(), this.detailColumns().map(c =>
+      c.key === 'sharePointUrl' ? { ...c, sortAccessor: () => '' } : c), this.detailSearch()),
+  );
+
   // ── Historique des importations ──────────────────────────────────────────
+  /** Recherche de la barre au-dessus de l'historique. */
+  readonly historySearch = signal('');
   readonly history = signal<PayslipHistoryEntry[]>([]);
   readonly historyFilter = signal<HistoryStatusFilter>('ALL');
   readonly historyPaysFilter   = signal<number | null>(null);
@@ -385,6 +399,17 @@ export class PayslipBatchComponent implements OnInit {
     pays:        this.historyPaysFilter() != null ? [String(this.historyPaysFilter())] : [],
     period:      this.historyPeriodFilter() ? [this.historyPeriodFilter()!] : [],
     processedAt: this.historyProcessedFilter(),
+  }));
+
+  /** Panneau du filtre de la barre — mêmes libellés que l'ancien `daf-filter` de l'en-tête. */
+  readonly historyFilterConfig = computed<SearchToolbarFilterConfig>(() => ({
+    title:        this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_TITLE'),
+    triggerLabel: this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_TRIGGER'),
+    applyLabel:   this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_APPLY'),
+    cancelLabel:  this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_CANCEL'),
+    resetLabel:   this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_RESET'),
+    align:        'right',
+    initialValues: this.historyFilterSeed(),
   }));
 
   applyHistoryFilter(result: FilterResult): void {
@@ -448,6 +473,21 @@ export class PayslipBatchComponent implements OnInit {
       });
   });
 
+  /** Historique filtré par la recherche — sur le texte affiché : date de traitement
+   *  formatée (pas l'ISO), période en toutes lettres et nombre de fiches écrit en clair
+   *  (pas les clés de tri). */
+  readonly filteredHistoryRows = computed<TableRow[]>(() => {
+    const dateFmt = new Intl.DateTimeFormat(this.translate.currentLang() === 'en' ? 'en-US' : 'fr-FR',
+      { dateStyle: 'short', timeStyle: 'short' });
+    const display: Record<string, (row: TableRow) => string> = {
+      processedAt: row => dateFmt.format(new Date(row['processedAt'] as string)),
+      period:      row => row['period'] as string,
+      count:       row => row['count'] as string,
+    };
+    return searchTableRows(this.historyRows(), this.historyColumns().map(c =>
+      display[c.key] ? { ...c, sortAccessor: display[c.key] } : c), this.historySearch());
+  });
+
   readonly historyConfig = computed(() => ({
     emptyMessage: this.t('PAYROLL.PAYSLIPS.HISTORY.EMPTY'),
     ...tableTools(this.translate),
@@ -464,6 +504,7 @@ export class PayslipBatchComponent implements OnInit {
     const entry = this.history().find(h => h.id === id);
     if (!entry) return;
     this.result.set(entry.result);
+    this.detailSearch.set('');
     this.resultFileName.set(entry.fileName);
     document.getElementById('payslip-report')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }

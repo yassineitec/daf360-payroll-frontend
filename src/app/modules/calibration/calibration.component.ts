@@ -9,6 +9,7 @@ import {
   FormFieldComponent,
   PageComponent,
   PageHeaderComponent,
+  SearchToolbarComponent,
   SectionTitleComponent,
   SelectComponent,
   type BadgeVariant,
@@ -19,7 +20,7 @@ import {
   type TableRow,
   type UploadedFile,
 } from '@khalilrebhiitec/daf360';
-import { tableTools } from '../../shared/table-tools';
+import { searchTableRows, tableTools } from '../../shared/table-tools';
 import { PayrollApiService, CalibrationCycleDto, PaysDto } from '../../core/payroll-api.service';
 
 /**
@@ -33,7 +34,7 @@ import { PayrollApiService, CalibrationCycleDto, PaysDto } from '../../core/payr
   imports: [
     CommonModule, TranslatePipe,
     ButtonComponent, CardComponent, DataTableComponent, FileUploadComponent, FormFieldComponent,
-    PageComponent, PageHeaderComponent, SectionTitleComponent, SelectComponent,
+    PageComponent, PageHeaderComponent, SearchToolbarComponent, SectionTitleComponent, SelectComponent,
   ],
   templateUrl: './calibration.component.html',
   styleUrl: './calibration.component.scss',
@@ -141,6 +142,24 @@ export class CalibrationComponent implements OnInit {
       _headcount: c.headcount ?? null,
     })),
   );
+
+  /** Recherche de la barre au-dessus du tableau des cycles. */
+  readonly cycleSearch = signal('');
+
+  /** Cycles filtrés par la recherche — montants et écart cherchés tels qu'affichés
+   *  (séparateurs de la langue, « % »), pas sur la valeur brute. */
+  readonly filteredCycleRows = computed<TableRow[]>(() => {
+    const locale = this.translate.currentLang() === 'en' ? 'en-US' : 'fr-FR';
+    const num = (v: unknown, opts: Intl.NumberFormatOptions, suffix = '') =>
+      typeof v === 'number' ? v.toLocaleString(locale, opts) + suffix : '';
+    const display: Record<string, (row: TableRow) => string> = {
+      predicted: row => num(row['predicted'], { maximumFractionDigits: 0 }),
+      actual:    row => num(row['actual'], { maximumFractionDigits: 0 }),
+      variance:  row => num(row['variance'], { minimumFractionDigits: 2, maximumFractionDigits: 2 }, ' %'),
+    };
+    return searchTableRows(this.cycleRows(), this.cycleColumns().map(c =>
+      display[c.key] ? { ...c, sortAccessor: display[c.key] } : c), this.cycleSearch());
+  });
 
   /** Outils de tableau communs (`tableTools`). Tri local : les cycles arrivent tous ensemble. */
   readonly cycleTableConfig = computed<TableConfig>(() => ({ ...tableTools(this.translate) }));

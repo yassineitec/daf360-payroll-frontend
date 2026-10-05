@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, untracked, viewChild } from '@angular/core';
 import { catchError, of } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
@@ -50,7 +50,8 @@ import { PaysNamesService } from '../../../core/pays-names.service';
             [value]="search()" [debounce]="200" (valueChange)="search.set($event ?? '')"
             [filterFields]="filterFields()"
             [filterConfig]="filterConfig()"
-            (filterApply)="filters.set($event)" />
+            (filterApply)="filters.set($event)"
+            [table]="table() ?? null" />
         </div>
       </app-admin-section-header>
 
@@ -74,6 +75,10 @@ import { PaysNamesService } from '../../../core/pays-names.service';
   styles: [ADMIN_SECTION_STYLES],
 })
 export class PayrollAuditAdminComponent implements OnInit {
+  /** Le tableau (absent pendant le chargement / liste vide) — passé au `[table]` de la barre pour
+   *  placer réinitialiser + choix des colonnes à droite de Filtres, au lieu d'au-dessus. */
+  readonly table = viewChild(DataTableComponent);
+
   private readonly api       = inject(PayrollApiService);
   private readonly translate = inject(TranslateService);
   private readonly paysNames = inject(PaysNamesService);

@@ -20,7 +20,7 @@ import { ADMIN_SECTION_STYLES, AdminSectionHeaderComponent } from './admin-secti
 import {
   AdminModalFooterComponent, AdminPager, AdminSpinnerComponent, AdminTableFooterComponent,
 } from './admin-section-kit';
-import { delegatedSort, tableTools } from '../../../shared/table-tools';
+import { delegatedSort, searchTableRows, tableTools } from '../../../shared/table-tools';
 
 type ParamKind = 'number' | 'text' | 'boolean' | 'bareme';
 
@@ -91,8 +91,16 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
           }
         </div>
       } @else {
+        <!-- Recherche sur les versions ; réinitialiser + choix des colonnes du tableau à droite
+             de la barre ([table]). -->
+        <daf-search-toolbar
+          [card]="false"
+          [showFilter]="false"
+          [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
+          [value]="versionSearch()" [debounce]="200" (valueChange)="onVersionSearch($event)"
+          [table]="versionTable" />
         <div class="admin-table-scroll">
-          <daf-data-table [columns]="versionColumns()" [rows]="versionPager.rows()" [config]="versionConfig()"
+          <daf-data-table #versionTable [columns]="versionColumns()" [rows]="versionPager.rows()" [config]="versionConfig()"
             (sortChange)="versionPager.onSort($event)" (resetClick)="versionPager.onSort(null)" />
         </div>
         <app-admin-table-footer
@@ -137,7 +145,8 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
           [card]="false"
           [showFilter]="false"
           [placeholder]="'PAYROLL.ADMIN_HOME.ENGINE_PARAMS.SEARCH' | translate"
-          [value]="paramSearch()" [debounce]="200" (valueChange)="paramSearch.set($event ?? '')" />
+          [value]="paramSearch()" [debounce]="200" (valueChange)="paramSearch.set($event ?? '')"
+          [table]="paramTable() ?? null" />
 
         @if (!paramRows().length) {
           <div class="admin-empty">
@@ -148,7 +157,7 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
           </div>
         } @else {
           <div class="admin-table-scroll">
-            <daf-data-table [columns]="paramColumns()" [rows]="paramPager.rows()" [config]="paramConfig()"
+            <daf-data-table #paramTable [columns]="paramColumns()" [rows]="paramPager.rows()" [config]="paramConfig()"
               (sortChange)="paramPager.onSort($event)" (resetClick)="paramPager.onSort(null)" />
           </div>
           <app-admin-table-footer
@@ -226,6 +235,10 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
   `],
 })
 export class EngineParamsAdminComponent implements OnInit {
+  /** Tableau des paramètres de la version choisie — passé au
+   *  `[table]` de sa barre : réinitialiser + choix des colonnes à droite de la recherche. */
+  readonly paramTable = viewChild<DataTableComponent>('paramTable');
+
   private readonly api          = inject(PayrollApiService);
   private readonly engine       = inject(PayrollEngineService);
   private readonly translate    = inject(TranslateService);
@@ -245,6 +258,7 @@ export class EngineParamsAdminComponent implements OnInit {
   readonly failed     = signal(false);
   readonly busy       = signal(false);
   readonly paramSearch = signal('');
+  readonly versionSearch = signal('');
   private seq = 0;
 
   /** Pop-up paramètre : la saisie et la clé modifiée (null = ajout). */
@@ -306,6 +320,7 @@ export class EngineParamsAdminComponent implements OnInit {
     this.versions.set([]);
     this.rubriques.set([]);
     this.selectedId.set(null);
+    this.versionSearch.set('');
     this.failed.set(false);
     if (!id) return;
     const current = ++this.seq;
@@ -376,8 +391,26 @@ export class EngineParamsAdminComponent implements OnInit {
       _source: v,
     })));
 
+  /** Colonnes de recherche des versions : le texte AFFICHÉ (« v12 », dates en `Date` mises en
+   *  forme par `searchTableRows`), pas la valeur de tri (le numéro seul). */
+  private readonly versionSearchColumns = computed<TableColumn[]>(() => this.versionColumns().map(c => {
+    if (c.key === 'version') return { ...c, sortAccessor: row => row['version'] as string };
+    if (c.type === 'date') return { ...c, sortAccessor: row => (row[c.key] ? new Date(row[c.key] as string) : null) };
+    return c;
+  }));
+
+  /** Versions retenues par la recherche, avant tri et découpe en pages. */
+  readonly filteredVersionRows = computed(() =>
+    searchTableRows(this.versionRows(), this.versionSearchColumns(), this.versionSearch()));
+
+  /** Nouvelle recherche → retour à la première page. */
+  onVersionSearch(value: string | null | undefined): void {
+    this.versionSearch.set(value ?? '');
+    this.versionPager.go(0);
+  }
+
   /** Pages de 5 lignes, comme les sections de /rh/admin. */
-  readonly versionPager = new AdminPager(() => this.versionRows(), () => this.versionColumns());
+  readonly versionPager = new AdminPager(() => this.filteredVersionRows(), () => this.versionColumns());
   readonly paramPager   = new AdminPager(() => this.paramRows(), () => this.paramColumns());
 
   readonly versionConfig = computed<TableConfig>(() => {
@@ -388,7 +421,8 @@ export class EngineParamsAdminComponent implements OnInit {
       ...delegatedSort(untracked(this.versionPager.sort)),
       rowId: row => row['id'],
       emptyMessage: this.t(
-        !this.paysId() ? 'PAYROLL.ADMIN_HOME.NO_PAYS'
+        this.versionSearch().trim() ? 'PAYROLL.ADMIN_HOME.NO_RESULT'
+          : !this.paysId() ? 'PAYROLL.ADMIN_HOME.NO_PAYS'
           : this.failed() ? 'PAYROLL.ADMIN_HOME.LOAD_ERROR'
           : 'PAYROLL.ADMIN_HOME.ENGINE_PARAMS.EMPTY'),
       actions: [

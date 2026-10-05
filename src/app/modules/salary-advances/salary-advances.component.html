@@ -41,8 +41,9 @@
           [value]="search()" [debounce]="200" (valueChange)="search.set($event ?? '')"
           [filterFields]="filterFields().payout"
           [filterConfig]="filterConfigs().payout"
-          (filterApply)="onFilter('payout', $event)" />
-        <daf-data-table [columns]="payoutColumns()" [rows]="payoutRows()" [config]="payoutConfig()">
+          (filterApply)="onFilter('payout', $event)"
+          [table]="payoutTable" />
+        <daf-data-table #payoutTable [columns]="payoutColumns()" [rows]="payoutRows()" [config]="payoutConfig()">
           <ng-template dafCell="_actions" let-row>
             <div class="flex items-center justify-end gap-2">
               <daf-button
@@ -133,8 +134,9 @@
           [value]="search()" [debounce]="200" (valueChange)="search.set($event ?? '')"
           [filterFields]="filterFields().deductions"
           [filterConfig]="filterConfigs().deductions"
-          (filterApply)="onFilter('deductions', $event)" />
-        <daf-data-table [columns]="deductionColumns()" [rows]="deductionRows()" [config]="deductionConfig()">
+          (filterApply)="onFilter('deductions', $event)"
+          [table]="deductionTable" />
+        <daf-data-table #deductionTable [columns]="deductionColumns()" [rows]="deductionRows()" [config]="deductionConfig()">
           <ng-template dafCell="_actions" let-row>
             @if (row['_source'].status === 'PLANNED') {
               <div class="flex items-center justify-end gap-1">
@@ -160,8 +162,9 @@
           [value]="search()" [debounce]="200" (valueChange)="search.set($event ?? '')"
           [filterFields]="filterFields().followup"
           [filterConfig]="filterConfigs().followup"
-          (filterApply)="onFilter('followup', $event)" />
-        <daf-data-table [columns]="payoutColumns()" [rows]="followupRows()" [config]="followupConfig()">
+          (filterApply)="onFilter('followup', $event)"
+          [table]="followupTable" />
+        <daf-data-table #followupTable [columns]="payoutColumns()" [rows]="followupRows()" [config]="followupConfig()">
           <ng-template dafCell="_actions" let-row>
             <div class="flex items-center justify-end">
               <daf-button
@@ -187,8 +190,9 @@
           [value]="search()" [debounce]="200" (valueChange)="search.set($event ?? '')"
           [filterFields]="filterFields().rules"
           [filterConfig]="filterConfigs().rules"
-          (filterApply)="onFilter('rules', $event)" />
-        <daf-data-table [columns]="ruleColumns()" [rows]="ruleRows()" [config]="ruleConfig()">
+          (filterApply)="onFilter('rules', $event)"
+          [table]="ruleTable" />
+        <daf-data-table #ruleTable [columns]="ruleColumns()" [rows]="ruleRows()" [config]="ruleConfig()">
           <ng-template dafCell="_actions" let-row>
             <div class="flex items-center justify-end">
               <daf-button

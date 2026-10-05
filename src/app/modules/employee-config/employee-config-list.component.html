@@ -24,7 +24,8 @@
           [debounce]="300"
           [filterFields]="filterFields()"
           [filterConfig]="filterConfig()"
-          (filterApply)="applyFilters($event)">
+          (filterApply)="applyFilters($event)"
+          [table]="table() ?? null">
         </daf-search-toolbar>
       </div>
 
