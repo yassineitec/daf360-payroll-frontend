@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, untracked, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -36,6 +36,7 @@ import {
 import { environment } from '../../../environments/environment';
 import { rememberEmployee } from './engine-results-employee';
 import { TableSort, delegatedSort, tableTools, toTableSort } from '../../shared/table-tools';
+import { EngineResultsListStateService } from './engine-results-list-state.service';
 import { PaysNamesService } from '../../core/pays-names.service';
 
 interface PaysItem { id: number; iso_code: string; french_label: string; }
@@ -105,7 +106,49 @@ export class EngineResultsListComponent implements OnInit {
   private readonly paysList = signal<PaysItem[]>([]);
   private readonly filterOptions = signal<EmployeeFilterOptions | null>(null);
 
+  // ── Mémoire de la liste ────────────────────────────────────────────────────
+  private readonly listState = inject(EngineResultsListStateService);
+
+  /**
+   * Chaque changement de recherche, de filtre, de vue, de tri ou de page est mémorisé, pour
+   * que le retour depuis l'historique d'un collaborateur retrouve la liste telle qu'on l'a
+   * quittée. Le premier passage a lieu après `ngOnInit`, donc après la restauration.
+   */
+  private readonly persistState = effect(() => {
+    this.listState.save({
+      searchText:       this.searchText(),
+      paysFilter:       this.paysFilter(),
+      statusFilter:     this.statusFilter(),
+      departmentFilter: this.departmentFilter(),
+      contractFilter:   this.contractFilter(),
+      viewMode:         this.viewMode(),
+      employeeSort:     this.employeeSort(),
+      page:             this.page(),
+      pageSize:         this.pageSize(),
+    });
+  });
+
+  /**
+   * Avant les premiers chargements et le premier rendu : la liste ET le bandeau KPI suivent
+   * le filtre pays, `daf-filter` ne lit `initialValues` qu'une fois, et le tableau ne lit son
+   * tri (`delegatedSort`) qu'à sa création.
+   */
+  private restoreState(): void {
+    const s = this.listState.restore();
+    if (!s) return;
+    this.searchText.set(s.searchText);
+    this.paysFilter.set(s.paysFilter);
+    this.statusFilter.set(s.statusFilter);
+    this.departmentFilter.set(s.departmentFilter);
+    this.contractFilter.set(s.contractFilter);
+    this.viewMode.set(s.viewMode);
+    this.employeeSort.set(s.employeeSort);
+    this.page.set(s.page);
+    this.pageSize.set(s.pageSize);
+  }
+
   ngOnInit(): void {
+    this.restoreState();
     this.http.get<PaysItem[]>(`${environment.hrApiUrl}/api/hr/config/hs/pays-list`)
       .pipe(catchError(() => of([] as PaysItem[])))
       .subscribe(list => this.paysList.set(list));
@@ -322,6 +365,13 @@ export class EngineResultsListComponent implements OnInit {
     }).subscribe({
       next: p => {
         if (current !== this.seq) return;
+        // Page restaurée devenue hors limites (collaborateurs sortis entre-temps) : on
+        // retombe sur la première plutôt que d'afficher une page vide.
+        if (!p.content?.length && this.page() > 0) {
+          this.page.set(0);
+          this.load();
+          return;
+        }
         this.employees.set(p.content ?? []);
         this.totalElements.set(p.totalElements ?? 0);
         this.totalPages.set(Math.max(1, p.totalPages ?? 1));

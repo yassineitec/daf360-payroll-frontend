@@ -54,6 +54,7 @@ import {
   PAYROLL_SALARY_ADVANCES_PERMISSIONS,
 } from '../../core/payroll-nav';
 import { AdminSectionHeaderComponent } from './admin/admin-section-header.component';
+import { rememberAdminState } from './admin/admin-section-state';
 import {
   AdminModalFooterComponent, AdminPager, AdminSpinnerComponent, AdminTableFooterComponent,
 } from './admin/admin-section-kit';
@@ -543,6 +544,23 @@ export class ParameterSetsComponent implements OnInit {
 
   /** Pages de 5 lignes, comme les sections de /rh/admin. */
   readonly setPager = new AdminPager(() => this.setRows(), () => this.setColumns());
+
+  // ── Mémoire de la section « Jeux de paramètres » ───────────────────────────
+  /**
+   * Recherche, filtres, tri et page de la liste des jeux. Ce composant survit au passage
+   * d'une section à l'autre, mais pas à l'ouverture de « Salaires des collaborateurs »
+   * (une autre page) : sans cette mémoire, revenir de là effaçait la liste filtrée. Le pays
+   * reste porté par `?pays=` dans l'URL, comme avant (voir `rememberAdminState`).
+   */
+  private readonly memory = rememberAdminState('list', {
+    searchText:       this.searchText,
+    statusFilter:     this.statusFilter,
+    fiscalYearFilter: this.fiscalYearFilter,
+    approvalFilter:   this.approvalFilter,
+    createdFilter:    this.createdFilter,
+    page:             this.setPager.page,
+    sort:             this.setPager.sort,
+  });
 
   readonly setTableConfig = computed<TableConfig>(() => ({
     showHeader: false, hoverable: true,

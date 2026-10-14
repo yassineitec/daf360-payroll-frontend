@@ -17,6 +17,7 @@ import { ADMIN_SECTION_STYLES, AdminSectionHeaderComponent } from './admin-secti
 import {
   AdminModalFooterComponent, AdminPager, AdminSpinnerComponent, AdminTableFooterComponent,
 } from './admin-section-kit';
+import { rememberAdminState } from './admin-section-state';
 import { NotificationService } from '../../../core/notification.service';
 import { UserStore } from '../../../core/user.store';
 import { PaysNamesService } from '../../../core/pays-names.service';
@@ -211,9 +212,14 @@ export class BenefitsCatalogueAdminComponent implements OnInit {
       this.pays.set(list);
       // Pays pré-sélectionné = celui du profil de l'utilisateur connecté (s'il est dans la
       // liste), sinon le seul pays possible ; il reste modifiable dans le select.
+      // Le pays (et son jeu) restaurés par la mémoire de la section passent avant, s'ils
+      // sont toujours proposés.
       const userPaysId = this.userStore.currentUser()?.paysId;
-      const initial = list.find(p => p.id === userPaysId) ?? (list.length === 1 ? list[0] : null);
-      if (initial) this.selectPays(String(initial.id));
+      const restored = this.paysId();
+      const restoredSet = this.setId();
+      const initial = list.find(p => p.id === restored)
+        ?? list.find(p => p.id === userPaysId) ?? (list.length === 1 ? list[0] : null);
+      this.selectPays(initial ? String(initial.id) : undefined, initial != null && initial.id === restored ? restoredSet : null);
     });
   }
 
@@ -247,7 +253,8 @@ export class BenefitsCatalogueAdminComponent implements OnInit {
     return this.t('PAYROLL.ADMIN_HOME.BENEFITS.READONLY_RIGHT');
   });
 
-  selectPays(raw: string | undefined): void {
+  /** `preferredSetId` : jeu restauré à reprendre au premier chargement, s'il existe encore. */
+  selectPays(raw: string | undefined, preferredSetId: number | null = null): void {
     const id = raw ? Number(raw) : null;
     this.paysId.set(id);
     this.sets.set([]);
@@ -262,7 +269,8 @@ export class BenefitsCatalogueAdminComponent implements OnInit {
         // Le plus récent d'abord ; le jeu actif proposé d'office, sinon le plus récent.
         const sorted = [...list].sort((a, b) => b.fiscalYear - a.fiscalYear || b.version - a.version);
         this.sets.set(sorted);
-        this.setId.set((sorted.find(s => s.status === 'ACTIVE') ?? sorted[0])?.id ?? null);
+        this.setId.set((sorted.find(s => s.id === preferredSetId)
+          ?? sorted.find(s => s.status === 'ACTIVE') ?? sorted[0])?.id ?? null);
         this.loading.set(false);
       },
       error: () => { if (current === this.seq) { this.failed.set(true); this.loading.set(false); } },
@@ -302,6 +310,11 @@ export class BenefitsCatalogueAdminComponent implements OnInit {
     cancelLabel: this.t('PAYROLL.ADMIN_HOME.FILTER_CANCEL'),
     resetLabel: this.t('PAYROLL.ADMIN_HOME.FILTER_RESET'),
     align: 'right',
+    // Amorçage de `daf-filter` (lu une fois), à sa forme interne : un `select` y est un `string[]`.
+    initialValues: {
+      method:  seedSelect(this.filters(), 'method'),
+      taxable: seedSelect(this.filters(), 'taxable'),
+    },
   }));
 
   /** Devise du pays choisi (référentiel `listPays`) — les montants sont dans cette devise. */
@@ -355,6 +368,13 @@ export class BenefitsCatalogueAdminComponent implements OnInit {
 
   /** Pages de 5 lignes, comme les sections de /rh/admin. */
   readonly pager = new AdminPager(() => this.rows(), () => this.columns());
+
+  // ── Mémoire de la section ──────────────────────────────────────────────────
+  /** Pays, jeu, recherche, filtres, tri et page gardés tant qu'on reste dans l'administration paie (voir `rememberAdminState`). */
+  private readonly memory = rememberAdminState('benefits', {
+    paysId: this.paysId, setId: this.setId, search: this.search, filters: this.filters,
+    page: this.pager.page, sort: this.pager.sort,
+  });
 
   /** Message de la liste vide : pas de pays, échec, pas de jeu, jeu vide, ou filtre sans résultat. */
   readonly emptyKey = computed(() =>
@@ -472,6 +492,12 @@ export class BenefitsCatalogueAdminComponent implements OnInit {
       },
     });
   }
+}
+
+/** Amorce d'un `select` de `daf-filter` (`string[]`) depuis le filtre appliqué. */
+function seedSelect(applied: FilterResult, name: string): string[] {
+  const v = pickValue(applied, name);
+  return v ? [v] : [];
 }
 
 function blankBenefit(): BenefitCatalogueDto {

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, untracked, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { catchError, of } from 'rxjs';
@@ -27,6 +27,7 @@ import { AdminSpinnerComponent, AdminTableFooterComponent } from '../parameter-s
 import { rememberEmployee } from './employee-config-employee';
 import { TableSort, delegatedSort, tableTools, toTableSort } from '../../shared/table-tools';
 import { PaysNamesService } from '../../core/pays-names.service';
+import { EmployeeConfigListStateService } from './employee-config-list-state.service';
 
 /**
  * `/payroll/employee-config` — « Salaires des collaborateurs », ouverte depuis sa carte de
@@ -92,7 +93,44 @@ export class EmployeeConfigListComponent implements OnInit {
   private readonly paysList = signal<PaysDto[]>([]);
   private readonly filterOptions = signal<EmployeeFilterOptions | null>(null);
 
+  // ── Mémoire de la liste ────────────────────────────────────────────────────
+  private readonly listState = inject(EmployeeConfigListStateService);
+
+  /**
+   * Chaque changement de recherche, de filtre, de tri ou de page est mémorisé, pour que le
+   * retour depuis la configuration d'un collaborateur retrouve la liste telle qu'on l'a
+   * quittée. Le premier passage a lieu après `ngOnInit`, donc après la restauration.
+   */
+  private readonly persistState = effect(() => {
+    this.listState.save({
+      searchText:       this.searchText(),
+      paysFilter:       this.paysFilter(),
+      statusFilter:     this.statusFilter(),
+      departmentFilter: this.departmentFilter(),
+      contractFilter:   this.contractFilter(),
+      employeeSort:     this.employeeSort(),
+      page:             this.page(),
+    });
+  });
+
+  /**
+   * Avant le premier chargement et le premier rendu : `daf-filter` ne lit `initialValues`
+   * qu'une fois, et le tableau ne lit son tri (`delegatedSort`) qu'à sa création.
+   */
+  private restoreState(): void {
+    const s = this.listState.restore();
+    if (!s) return;
+    this.searchText.set(s.searchText);
+    this.paysFilter.set(s.paysFilter);
+    this.statusFilter.set(s.statusFilter);
+    this.departmentFilter.set(s.departmentFilter);
+    this.contractFilter.set(s.contractFilter);
+    this.employeeSort.set(s.employeeSort);
+    this.page.set(s.page);
+  }
+
   ngOnInit(): void {
+    this.restoreState();
     this.payrollApi.listPays()
       .pipe(catchError(() => of([] as PaysDto[])))
       .subscribe(list => this.paysList.set(list));
@@ -119,6 +157,13 @@ export class EmployeeConfigListComponent implements OnInit {
     }).subscribe({
       next: p => {
         if (current !== this.seq) return;
+        // Page restaurée devenue hors limites (collaborateurs sortis entre-temps) : on
+        // retombe sur la première plutôt que d'afficher une page vide.
+        if (!p.content?.length && this.page() > 0) {
+          this.page.set(0);
+          this.load();
+          return;
+        }
         this.employees.set(p.content ?? []);
         this.totalElements.set(p.totalElements ?? 0);
         this.totalPages.set(Math.max(1, p.totalPages ?? 1));

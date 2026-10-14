@@ -20,6 +20,7 @@ import { ADMIN_SECTION_STYLES, AdminSectionHeaderComponent } from './admin-secti
 import {
   AdminModalFooterComponent, AdminPager, AdminSpinnerComponent, AdminTableFooterComponent,
 } from './admin-section-kit';
+import { rememberAdminState } from './admin-section-state';
 import { delegatedSort, searchTableRows, tableTools } from '../../../shared/table-tools';
 
 type ParamKind = 'number' | 'text' | 'boolean' | 'bareme';
@@ -278,8 +279,11 @@ export class EngineParamsAdminComponent implements OnInit {
     this.api.listPays().pipe(catchError(() => of([] as PaysDto[]))).subscribe(list => {
       this.pays.set(list);
       const userPaysId = this.userStore.currentUser()?.paysId;
-      const initial = list.find(p => p.id === userPaysId) ?? (list.length === 1 ? list[0] : null);
-      if (initial) this.selectPays(String(initial.id));
+      // Pays restauré par la mémoire de la section d'abord, s'il est toujours proposé.
+      const restored = this.paysId();
+      const initial = list.find(p => p.id === restored)
+        ?? list.find(p => p.id === userPaysId) ?? (list.length === 1 ? list[0] : null);
+      this.selectPays(initial ? String(initial.id) : undefined, initial != null && initial.id === restored);
     });
   }
 
@@ -314,13 +318,14 @@ export class EngineParamsAdminComponent implements OnInit {
   }
 
   // ── Chargement ────────────────────────────────────────────────────────────
-  selectPays(raw: string | undefined): void {
+  /** `keepView` : premier chargement d'un pays restauré — sa recherche restaurée est gardée. */
+  selectPays(raw: string | undefined, keepView = false): void {
     const id = raw ? Number(raw) : null;
     this.paysId.set(id);
     this.versions.set([]);
     this.rubriques.set([]);
     this.selectedId.set(null);
-    this.versionSearch.set('');
+    if (!keepView) this.versionSearch.set('');
     this.failed.set(false);
     if (!id) return;
     const current = ++this.seq;
@@ -412,6 +417,14 @@ export class EngineParamsAdminComponent implements OnInit {
   /** Pages de 5 lignes, comme les sections de /rh/admin. */
   readonly versionPager = new AdminPager(() => this.filteredVersionRows(), () => this.versionColumns());
   readonly paramPager   = new AdminPager(() => this.paramRows(), () => this.paramColumns());
+
+  // ── Mémoire de la section ──────────────────────────────────────────────────
+  /** Pays, recherches, tris et pages gardés tant qu'on reste dans l'administration paie (voir `rememberAdminState`). */
+  private readonly memory = rememberAdminState('engine-params', {
+    paysId: this.paysId, versionSearch: this.versionSearch, paramSearch: this.paramSearch,
+    versionPage: this.versionPager.page, versionSort: this.versionPager.sort,
+    paramPage: this.paramPager.page, paramSort: this.paramPager.sort,
+  });
 
   readonly versionConfig = computed<TableConfig>(() => {
     const status = (row: TableRow) => (row['_source'] as EngineParamSetDto).status;

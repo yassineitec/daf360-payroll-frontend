@@ -14,6 +14,7 @@ import { ADMIN_SECTION_STYLES, AdminSectionHeaderComponent } from './admin-secti
 import {
   AdminModalFooterComponent, AdminPager, AdminSpinnerComponent, AdminTableFooterComponent,
 } from './admin-section-kit';
+import { rememberAdminState } from './admin-section-state';
 import { PaysNamesService } from '../../../core/pays-names.service';
 
 const CURRENCIES = ['TND', 'EGP', 'EUR', 'USD'];
@@ -228,6 +229,11 @@ export class AdvanceRulesAdminComponent implements OnInit {
     cancelLabel: this.t('PAYROLL.SALARY_ADVANCES.FILTER.CANCEL'),
     resetLabel: this.t('PAYROLL.SALARY_ADVANCES.FILTER.RESET'),
     align: 'right',
+    // Amorçage de `daf-filter` (lu une fois), à sa forme interne : un `select` y est un `string[]`.
+    initialValues: {
+      state:    seedSelect(this.filters(), 'state'),
+      currency: seedSelect(this.filters(), 'currency'),
+    },
   }));
 
   readonly columns = computed<TableColumn[]>(() => [
@@ -264,6 +270,12 @@ export class AdvanceRulesAdminComponent implements OnInit {
 
   /** Pages de 5 lignes, comme les sections de /rh/admin. */
   readonly pager = new AdminPager(() => this.rows(), () => this.columns());
+
+  // ── Mémoire de la section ──────────────────────────────────────────────────
+  /** Recherche, filtres, tri et page gardés tant qu'on reste dans l'administration paie (voir `rememberAdminState`). */
+  private readonly memory = rememberAdminState('advance-rules', {
+    search: this.search, filters: this.filters, page: this.pager.page, sort: this.pager.sort,
+  });
 
   readonly tableConfig = computed<TableConfig>(() => ({
     showHeader: false, hoverable: true,
@@ -391,6 +403,12 @@ type PolicyForm = Omit<AdvancePolicy, 'maxInstallments' | 'minSeniorityMonths'> 
   maxInstallments: number | null;
   minSeniorityMonths: number | null;
 };
+
+/** Amorce d'un `select` de `daf-filter` (`string[]`) depuis le filtre appliqué. */
+function seedSelect(applied: FilterResult, name: string): string[] {
+  const v = pickValue(applied, name);
+  return v ? [v] : [];
+}
 
 function blankPolicy(): PolicyForm {
   return { paysId: 0, currency: 'TND', maxInstallments: 3, minSeniorityMonths: 3, isActive: true };

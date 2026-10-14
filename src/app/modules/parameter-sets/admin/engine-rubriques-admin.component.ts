@@ -18,6 +18,7 @@ import { ADMIN_SECTION_STYLES, AdminSectionHeaderComponent } from './admin-secti
 import {
   AdminModalFooterComponent, AdminPager, AdminSpinnerComponent, AdminTableFooterComponent,
 } from './admin-section-kit';
+import { rememberAdminState } from './admin-section-state';
 import { UserStore } from '../../../core/user.store';
 import { PaysNamesService } from '../../../core/pays-names.service';
 
@@ -241,9 +242,12 @@ export class EngineRubriquesAdminComponent implements OnInit {
       this.pays.set(list);
       // Pays pré-sélectionné = celui du profil de l'utilisateur connecté (s'il est dans la
       // liste), sinon le seul pays possible ; il reste modifiable dans le select.
+      // Le pays restauré par la mémoire de la section passe avant, s'il est toujours proposé.
       const userPaysId = this.userStore.currentUser()?.paysId;
-      const initial = list.find(p => p.id === userPaysId) ?? (list.length === 1 ? list[0] : null);
-      if (initial) this.selectPays(String(initial.id));
+      const restored = this.paysId();
+      const initial = list.find(p => p.id === restored)
+        ?? list.find(p => p.id === userPaysId) ?? (list.length === 1 ? list[0] : null);
+      this.selectPays(initial ? String(initial.id) : undefined);
     });
   }
 
@@ -328,6 +332,14 @@ export class EngineRubriquesAdminComponent implements OnInit {
     cancelLabel: this.t('PAYROLL.ADMIN_HOME.FILTER_CANCEL'),
     resetLabel: this.t('PAYROLL.ADMIN_HOME.FILTER_RESET'),
     align: 'right',
+    // Amorçage de `daf-filter` (lu une fois), à sa forme interne : un `select` y est un `string[]`.
+    initialValues: {
+      state:   seedSelect(this.filters(), 'state'),
+      strate:  seedSelect(this.filters(), 'strate'),
+      nature:  seedSelect(this.filters(), 'nature'),
+      mode:    seedSelect(this.filters(), 'mode'),
+      prorata: this.filters()['prorata'] === true,
+    },
   }));
 
   readonly columns = computed<TableColumn[]>(() => [
@@ -381,6 +393,12 @@ export class EngineRubriquesAdminComponent implements OnInit {
 
   /** Pages de 5 lignes, comme les sections de /rh/admin. */
   readonly pager = new AdminPager(() => this.rows(), () => this.columns());
+
+  // ── Mémoire de la section ──────────────────────────────────────────────────
+  /** Pays, recherche, filtres, tri et page gardés tant qu'on reste dans l'administration paie (voir `rememberAdminState`). */
+  private readonly memory = rememberAdminState('rubriques', {
+    paysId: this.paysId, search: this.search, filters: this.filters, page: this.pager.page, sort: this.pager.sort,
+  });
 
   /** Message de la liste vide : pas de pays, échec, aucune rubrique, ou filtre sans résultat. */
   readonly emptyKey = computed(() =>
@@ -471,6 +489,12 @@ export class EngineRubriquesAdminComponent implements OnInit {
       },
     });
   }
+}
+
+/** Amorce d'un `select` de `daf-filter` (`string[]`) depuis le filtre appliqué. */
+function seedSelect(applied: FilterResult, name: string): string[] {
+  const v = pickValue(applied, name);
+  return v ? [v] : [];
 }
 
 function sortRubriques(list: EngineRubriqueDefDto[]): EngineRubriqueDefDto[] {
