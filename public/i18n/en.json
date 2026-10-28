@@ -1361,6 +1361,9 @@
         "ERR_EUR_RATE": "Invalid EUR rate: must be strictly positive.",
         "ERR_USD_RATE": "Invalid USD rate: must be strictly positive.",
         "ERR_CHF_RATE": "Invalid CHF rate: must be strictly positive.",
+        "EUR_RATE_HINT": "Overrides the platform-wide default EUR exchange rate for this country — leave blank to use the default. Up to 6 decimals.",
+        "USD_RATE_HINT": "Overrides the platform-wide default USD exchange rate for this country — leave blank to use the default. Up to 6 decimals.",
+        "CHF_RATE_HINT": "Overrides the platform-wide default CHF exchange rate for this country — leave blank to use the default. Up to 6 decimals.",
         "ERR_FOREX": "Exchange-rate sources: invalid JSON (array or object expected)."
       },
       "AUDIT": {

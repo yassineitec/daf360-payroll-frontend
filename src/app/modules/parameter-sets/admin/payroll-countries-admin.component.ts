@@ -110,17 +110,26 @@ import { PaysNamesService } from '../../../core/pays-names.service';
               hint: ('PAYROLL.ADMIN_HOME.COUNTRIES.CURRENCY_HINT' | translate)
             }" />
           <daf-form-field
-            [value]="form().eurRate?.toString() ?? ''"
+            [value]="form().eurRate"
             (valueChange)="patch({ eurRate: numOrNull($event) })"
-            [options]="{ label: ('PAYROLL.ADMIN_HOME.COUNTRIES.COL_EUR_RATE' | translate), type: 'number', fullWidth: true }" />
+            [options]="{
+              label: ('PAYROLL.ADMIN_HOME.COUNTRIES.COL_EUR_RATE' | translate), type: 'number', align: 'end', fullWidth: true,
+              hint: ('PAYROLL.ADMIN_HOME.COUNTRIES.EUR_RATE_HINT' | translate)
+            }" />
           <daf-form-field
-            [value]="form().usdRate?.toString() ?? ''"
+            [value]="form().usdRate"
             (valueChange)="patch({ usdRate: numOrNull($event) })"
-            [options]="{ label: ('PAYROLL.ADMIN_HOME.COUNTRIES.COL_USD_RATE' | translate), type: 'number', fullWidth: true }" />
+            [options]="{
+              label: ('PAYROLL.ADMIN_HOME.COUNTRIES.COL_USD_RATE' | translate), type: 'number', align: 'end', fullWidth: true,
+              hint: ('PAYROLL.ADMIN_HOME.COUNTRIES.USD_RATE_HINT' | translate)
+            }" />
           <daf-form-field
-            [value]="form().chfRate?.toString() ?? ''"
+            [value]="form().chfRate"
             (valueChange)="patch({ chfRate: numOrNull($event) })"
-            [options]="{ label: ('PAYROLL.ADMIN_HOME.COUNTRIES.COL_CHF_RATE' | translate), type: 'number', fullWidth: true }" />
+            [options]="{
+              label: ('PAYROLL.ADMIN_HOME.COUNTRIES.COL_CHF_RATE' | translate), type: 'number', align: 'end', fullWidth: true,
+              hint: ('PAYROLL.ADMIN_HOME.COUNTRIES.CHF_RATE_HINT' | translate)
+            }" />
           <daf-select
             [options]="monthOptions()"
             [selected]="['' + form().fiscalYearStartMonth]"

@@ -1361,6 +1361,9 @@
         "ERR_EUR_RATE": "Taux EUR invalide : doit être strictement positif.",
         "ERR_USD_RATE": "Taux USD invalide : doit être strictement positif.",
         "ERR_CHF_RATE": "Taux CHF invalide : doit être strictement positif.",
+        "EUR_RATE_HINT": "Remplace le taux de change EUR par défaut pour ce pays — laisser vide pour utiliser le défaut. Jusqu'à 6 décimales.",
+        "USD_RATE_HINT": "Remplace le taux de change USD par défaut pour ce pays — laisser vide pour utiliser le défaut. Jusqu'à 6 décimales.",
+        "CHF_RATE_HINT": "Remplace le taux de change CHF par défaut pour ce pays — laisser vide pour utiliser le défaut. Jusqu'à 6 décimales.",
         "ERR_FOREX": "Sources de change : JSON invalide (tableau ou objet attendu)."
       },
       "AUDIT": {
