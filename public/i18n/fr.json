@@ -1339,6 +1339,9 @@
         "FILTER_NO_FOREX": "Sans source de change uniquement",
         "COL_PAYS": "Pays",
         "COL_CURRENCY": "Devise",
+        "COL_EUR_RATE": "Taux EUR",
+        "COL_USD_RATE": "Taux USD",
+        "COL_CHF_RATE": "Taux CHF",
         "COL_FISCAL_START": "Début de l'exercice",
         "COL_FOREX": "Sources de change",
         "COL_STATE": "État",
@@ -1355,6 +1358,9 @@
         "DEACTIVATE_WARNING": "Un pays inactif n'a plus de rubriques moteur ni de calcul de paie.",
         "ERR_PAYS": "Choisissez un pays.",
         "ERR_CURRENCY": "Devise invalide : code ISO de 3 lettres attendu.",
+        "ERR_EUR_RATE": "Taux EUR invalide : doit être strictement positif.",
+        "ERR_USD_RATE": "Taux USD invalide : doit être strictement positif.",
+        "ERR_CHF_RATE": "Taux CHF invalide : doit être strictement positif.",
         "ERR_FOREX": "Sources de change : JSON invalide (tableau ou objet attendu)."
       },
       "AUDIT": {

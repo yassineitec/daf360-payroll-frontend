@@ -13,17 +13,17 @@ const RATES_KEY    = 'payroll_currency_rates';
 const DISPLAY_KEY  = 'payroll_display_currency';
 const RATES_TTL_MS = 24 * 60 * 60 * 1000;
 
-export const SUPPORTED_CURRENCIES = ['TND', 'EUR', 'USD', 'EGP'] as const;
+export const SUPPORTED_CURRENCIES = ['TND', 'EUR', 'USD', 'EGP', 'SAR', 'AED'] as const;
 
 /** 1–3 characters drawn in the radial menu circle (`glyph`). */
-export const CURRENCY_GLYPHS: Record<string, string> = { TND: 'DT', EUR: '€', USD: '$', EGP: 'E£' };
+export const CURRENCY_GLYPHS: Record<string, string> = { TND: 'DT', EUR: '€', USD: '$', EGP: 'E£', SAR: 'SR', AED: 'DH' };
 
 @Injectable({ providedIn: 'root' })
 export class CurrencyService {
   private readonly http = inject(HttpClient);
 
   /** 1 EUR = X currency. */
-  readonly rates = signal<Record<string, number>>({ EUR: 1, USD: 1.08, TND: 3.35, EGP: 52.4 });
+  readonly rates = signal<Record<string, number>>({ EUR: 1, USD: 1.08, TND: 3.35, EGP: 52.4, SAR: 4.05, AED: 3.97 });
 
   /** Currency chosen in the radial menu; `null` = show each amount in its own currency. */
   readonly display = signal<string | null>(this.read(DISPLAY_KEY));
