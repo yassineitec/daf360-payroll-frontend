@@ -1354,6 +1354,7 @@
         "ADD": "Ajouter un pays",
         "EDIT_TITLE": "Modifier le pays de paie — {{pays}}",
         "CURRENCY_HINT": "Code ISO de 3 lettres (TND, EGP, EUR…).",
+        "CURRENCY_MANAGED_ELSEWHERE": "Géré depuis l'écran d'administration des devises d'entité, côté Facturation.",
         "FOREX_HINT": "Facultatif. JSON : un tableau (une entrée par source) ou un objet.",
         "DEACTIVATE_WARNING": "Un pays inactif n'a plus de rubriques moteur ni de calcul de paie.",
         "ERR_PAYS": "Choisissez un pays.",

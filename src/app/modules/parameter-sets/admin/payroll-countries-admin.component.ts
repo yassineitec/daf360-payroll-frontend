@@ -102,13 +102,22 @@ import { PaysNamesService } from '../../../core/pays-names.service';
               [config]="{ label: ('PAYROLL.ADMIN_HOME.COUNTRIES.COL_PAYS' | translate), required: true, searchable: true, fullWidth: true }"
               (selectedChange)="pickPays($event[0])" />
           }
-          <daf-form-field
-            [value]="form().currencyCode"
-            (valueChange)="patch({ currencyCode: text($event).toUpperCase() })"
-            [options]="{
-              label: ('PAYROLL.ADMIN_HOME.COUNTRIES.COL_CURRENCY' | translate), placeholder: 'TND', required: true, fullWidth: true,
-              hint: ('PAYROLL.ADMIN_HOME.COUNTRIES.CURRENCY_HINT' | translate)
-            }" />
+          @if (editing() === null) {
+            <daf-form-field
+              [value]="form().currencyCode"
+              (valueChange)="patch({ currencyCode: text($event).toUpperCase() })"
+              [options]="{
+                label: ('PAYROLL.ADMIN_HOME.COUNTRIES.COL_CURRENCY' | translate), placeholder: 'TND', required: true, fullWidth: true,
+                hint: ('PAYROLL.ADMIN_HOME.COUNTRIES.CURRENCY_HINT' | translate)
+              }" />
+          } @else {
+            <daf-form-field
+              [value]="form().currencyCode"
+              [options]="{
+                label: ('PAYROLL.ADMIN_HOME.COUNTRIES.COL_CURRENCY' | translate), type: 'text', readonly: true, fullWidth: true,
+                hint: ('PAYROLL.ADMIN_HOME.COUNTRIES.CURRENCY_MANAGED_ELSEWHERE' | translate)
+              }" />
+          }
           <daf-form-field
             [value]="form().eurRate"
             (valueChange)="patch({ eurRate: numOrNull($event) })"
@@ -371,8 +380,9 @@ export class PayrollCountriesAdminComponent implements OnInit {
 
   /** Contrôles du serveur repris ici, pour un message avant l'envoi. */
   private validate(f: SavePayrollCountryRequest): string | null {
-    if (this.editing() === null && !f.paysId) return this.t('PAYROLL.ADMIN_HOME.COUNTRIES.ERR_PAYS');
-    if (!/^[A-Z]{3}$/.test(f.currencyCode)) return this.t('PAYROLL.ADMIN_HOME.COUNTRIES.ERR_CURRENCY');
+    const isCreate = this.editing() === null;
+    if (isCreate && !f.paysId) return this.t('PAYROLL.ADMIN_HOME.COUNTRIES.ERR_PAYS');
+    if (isCreate && !/^[A-Z]{3}$/.test(f.currencyCode)) return this.t('PAYROLL.ADMIN_HOME.COUNTRIES.ERR_CURRENCY');
     if (f.eurRate != null && f.eurRate <= 0) return this.t('PAYROLL.ADMIN_HOME.COUNTRIES.ERR_EUR_RATE');
     if (f.usdRate != null && f.usdRate <= 0) return this.t('PAYROLL.ADMIN_HOME.COUNTRIES.ERR_USD_RATE');
     if (f.chfRate != null && f.chfRate <= 0) return this.t('PAYROLL.ADMIN_HOME.COUNTRIES.ERR_CHF_RATE');

@@ -1354,6 +1354,7 @@
         "ADD": "Add a country",
         "EDIT_TITLE": "Edit payroll country — {{pays}}",
         "CURRENCY_HINT": "3-letter ISO code (TND, EGP, EUR…).",
+        "CURRENCY_MANAGED_ELSEWHERE": "Managed in Facturation's entity currency admin screen.",
         "FOREX_HINT": "Optional. JSON: an array (one entry per source) or an object.",
         "DEACTIVATE_WARNING": "An inactive country no longer has engine line items or payroll calculation.",
         "ERR_PAYS": "Choose a country.",
