@@ -21,6 +21,7 @@ import {
 import { rememberAdminState } from './admin-section-state';
 import { PaysNamesService } from '../../../core/pays-names.service';
 
+import { flagDataUri } from '../../../shared/country-flags';
 /**
  * Section « Pays de paie » de l'administration paie : la configuration du moteur par pays
  * (`payroll_countries`) — devise, premier mois de l'exercice, sources de taux de change,
@@ -39,23 +40,13 @@ import { PaysNamesService } from '../../../core/pays-names.service';
     AdminTableFooterComponent, ButtonComponent, DataTableComponent, FieldMessageComponent, FormFieldComponent,
     SearchToolbarComponent, SelectComponent,
   ],
-  // Comme une section de /rh/admin : en-tête (titre, aide, recherche + bouton vert
-  // « Ajouter » à droite), puis le tableau — modifier : action de ligne.
+  // Comme une section de /rh/admin : en-tête (titre, aide, bouton vert « Ajouter » à
+  // droite), barre de recherche, puis le tableau — modifier : action de ligne.
   template: `
     <div class="admin-section">
       <app-admin-section-header
         [title]="'PAYROLL.ADMIN_HOME.CARDS.COUNTRIES' | translate"
         [subtitle]="'PAYROLL.ADMIN_HOME.COUNTRIES.HINT' | translate">
-        <div class="admin-search">
-          <daf-search-toolbar
-            [card]="false"
-            [placeholder]="'PAYROLL.ADMIN_HOME.COUNTRIES.SEARCH' | translate"
-            [value]="search()" [debounce]="200" (valueChange)="search.set($event ?? '')"
-            [filterFields]="filterFields()"
-            [filterConfig]="filterConfig()"
-            (filterApply)="filters.set($event)"
-            [table]="table() ?? null" />
-        </div>
         @if (canManage() && freePaysOptions().length) {
           <daf-button class="admin-desktop-only"
             [label]="'PAYROLL.ADMIN_HOME.COUNTRIES.ADD' | translate"
@@ -69,6 +60,16 @@ import { PaysNamesService } from '../../../core/pays-names.service';
             (onClick)="openCountry(null)" />
         }
       </app-admin-section-header>
+      <!-- Sous le titre : la barre de recherche sur sa carte blanche, toute la largeur — filtre
+           et colonnes à droite. -->
+      <daf-search-toolbar
+        [card]="true"
+        [placeholder]="'PAYROLL.ADMIN_HOME.COUNTRIES.SEARCH' | translate"
+        [value]="search()" [debounce]="200" (valueChange)="search.set($event ?? '')"
+        [filterFields]="filterFields()"
+        [filterConfig]="filterConfig()"
+        (filterApply)="filters.set($event)"
+        [table]="table() ?? null" />
 
       <!-- Comme les sections RH : indicateur, message centré si vide, sinon tableau paginé. -->
       @if (loading()) {
@@ -199,7 +200,7 @@ export class PayrollCountriesAdminComponent implements OnInit {
   readonly freePaysOptions = computed<SelectOption[]>(() => {
     const taken = new Set(this.countries().map(c => c.paysId));
     return this.pays().filter(p => !taken.has(p.id))
-      .map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})` }));
+      .map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})`, imageUrl: flagDataUri(p.isoCode) }));
   });
 
   readonly monthOptions = computed<SelectOption[]>(() => {

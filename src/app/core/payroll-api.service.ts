@@ -125,6 +125,68 @@ export interface RubriqueAppliedItem {
   amount:    number;
 }
 
+/** Une ligne de la liste `/payroll/simulator` (`SimulationListItemDto` côté backend). */
+export interface SimulationListItemDto {
+  id: number;
+  paysId: number;
+  simulatedAt: string;
+  profileUserId: number | null;
+  /** Libellé du candidat, ou nom du collaborateur (`users_ref`). */
+  subjectLabel: string | null;
+  poste: string | null;
+  grade: string | null;
+  discipline: string | null;
+  contractType: string | null;
+  mode: SimulationMode | null;
+  gross: number | null;
+  /** Net versé réel (brut − charges salariales − IRPP), quel que soit le sens. */
+  netPaid: number | null;
+  loadedCost: number | null;
+  costNetRatio: number | null;
+  localCurrency: string | null;
+  convergenceOk: boolean | null;
+  simulatedByName: string | null;
+}
+
+export interface SimulationPageDto {
+  content: SimulationListItemDto[];
+  totalElements: number;
+  totalPages: number;
+  page: number;
+  size: number;
+  /** Bandeau KPI — calculé sur tout le périmètre filtré, pas seulement la page. */
+  summary: {
+    total: number;
+    employees: number;
+    candidates: number;
+    /** Simulations du mois en cours / du mois précédent (tendance). */
+    monthCount: number;
+    prevMonthCount: number;
+    /** Simulations en convergence partielle — résultats estimés. */
+    partialCount: number;
+    avgLoadedCost: number | null;
+    minLoadedCost: number | null;
+    maxLoadedCost: number | null;
+    avgRatio: number | null;
+    prevMonthAvgRatio: number | null;
+  };
+}
+
+export interface SimulationListQuery {
+  paysId: number;
+  page: number;
+  size: number;
+  contractType?: string | null;
+  mode?: string | null;
+  /** `CANDIDATE` | `EMPLOYEE` */
+  subject?: string | null;
+  search?: string | null;
+  /** Seulement les simulations en convergence partielle. */
+  partialOnly?: boolean;
+  /** `colonne,asc|desc` */
+  sort?: string | null;
+}
+
 /** Parse the JSON blob stored in {@link SimulationResultDto.rubriquesApplied}. */
 export function parseRubriquesApplied(json: string | null | undefined): RubriqueAppliedItem[] {
   if (!json) return [];
@@ -363,6 +425,11 @@ export class PayrollApiService {
     return this.http.get<ParameterSetDto[]>(`${this.base}/parameter-sets`, { params });
   }
 
+  /** Un jeu par son id — p. ex. celui qui a servi à une simulation (`parameterSetId`). */
+  getParameterSet(id: number): Observable<ParameterSetDto> {
+    return this.http.get<ParameterSetDto>(`${this.base}/parameter-sets/${id}`);
+  }
+
   getActiveParameterSet(paysId: number): Observable<ParameterSetDto> {
     const params = new HttpParams().set('paysId', paysId);
     return this.http.get<ParameterSetDto>(`${this.base}/parameter-sets/active`, { params });
@@ -403,8 +470,33 @@ export class PayrollApiService {
     return this.http.get<SimulationResultDto[]>(`${this.base}/simulations/individual/history`, { params });
   }
 
+  /** Liste `/payroll/simulator` — simulations individuelles d'un pays, paginées côté serveur. */
+  listSimulations(opts: SimulationListQuery): Observable<SimulationPageDto> {
+    let params = new HttpParams()
+      .set('paysId', opts.paysId)
+      .set('page', opts.page)
+      .set('size', opts.size);
+    if (opts.contractType) params = params.set('contractType', opts.contractType);
+    if (opts.mode)         params = params.set('mode', opts.mode);
+    if (opts.subject)      params = params.set('subject', opts.subject);
+    if (opts.search?.trim()) params = params.set('search', opts.search.trim());
+    if (opts.partialOnly)  params = params.set('partialOnly', true);
+    if (opts.sort)         params = params.set('sort', opts.sort);
+    return this.http.get<SimulationPageDto>(`${this.base}/simulations/individual`, { params });
+  }
+
+  /** Fiche `/payroll/simulator/:id`. */
+  getSimulation(id: number): Observable<SimulationResultDto> {
+    return this.http.get<SimulationResultDto>(`${this.base}/simulations/${id}`);
+  }
+
   downloadSimulationPdf(id: number): Observable<Blob> {
     return this.http.get(`${this.base}/simulations/${id}/export-pdf`, { responseType: 'blob' });
+  }
+
+  /** Fiche de simulation en Excel, générée par le backend (libellés selon `lang`). */
+  downloadSimulationXlsx(id: number, lang: string): Observable<Blob> {
+    return this.http.get(`${this.base}/simulations/${id}/export.xlsx`, { params: { lang }, responseType: 'blob' });
   }
 
   runCohortSimulation(req: CohortSimulationRequest): Observable<SimulationResultDto[]> {

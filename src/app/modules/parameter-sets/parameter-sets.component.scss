@@ -17,7 +17,10 @@
 @media (max-width: 768px)  { :host { margin: 0; } }
 
 /* Accueil : titre + entité (`.page-header` / `.page-title` / `.page-sub` de /rh/admin). */
-.ps-home-header { padding: 24px 24px 0; }
+.ps-home-header { padding: 24px 24px 0; display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.ps-home-header__text { min-width: 0; }
+/* « Changer de pays », comme /rh/admin : à droite du titre, largeur bornée. */
+.ps-home-pays { width: 260px; max-width: 100%; }
 .ps-home-title {
   font-family: var(--font-sans);
   font-size: 24px;
@@ -51,6 +54,13 @@
 .ps-breadcrumb-header { display: block; }
 .ps-breadcrumb-header ::ng-deep h1 { display: none; }
 .ps-breadcrumb-header ::ng-deep nav { font-size: 15px; line-height: 1.4; }
+/* Fil d'Ariane à gauche, actions (choix du pays) à droite sur la même ligne. */
+.ps-breadcrumb-header--actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.ps-breadcrumb-header--actions ::ng-deep nav { margin-bottom: 0; }
+.ps-header-pays { width: 260px; max-width: 100%; }
+@media (max-width: 640px) {
+  .ps-header-pays { width: 100%; }
+}
 
 @media (max-width: 640px) {
   .ps-home-header { padding: 16px 16px 0; }
@@ -229,3 +239,25 @@
 
 /* Filtre rapide et bouton "Modifier" sur une ligne, repliés sur mobile. */
 .ps-section-head { flex-wrap: wrap; }
+
+/* Paramètres avancés du formulaire de création : corps du `daf-accordion-card` (la carte de
+   la lib n'a pas de marge intérieure, padding « none »). */
+.ps-advanced { padding: 0 1.25rem 1.25rem; }
+
+/* ── Barème IRPP en tableau : début (calculé) · jusqu'à · taux · supprimer ───────────── */
+.irpp-table { display: flex; flex-direction: column; gap: 8px; }
+.irpp-row   { display: grid; grid-template-columns: minmax(110px, 1fr) minmax(150px, 2fr) minmax(110px, 1.2fr) 40px;
+              gap: 12px; align-items: start; }
+.irpp-row--head { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+                  color: var(--color-on-surface-variant); }
+/* Début de tranche et « et plus » : texte, aligné sur la hauteur d'un champ. */
+.irpp-from,
+.irpp-open  { display: flex; align-items: center; min-height: 44px; font-size: 14px; font-variant-numeric: tabular-nums;
+              color: var(--color-on-surface); }
+.irpp-open  { color: var(--color-on-surface-variant); font-style: italic; }
+.irpp-actions { display: flex; align-items: center; min-height: 44px; }
+.irpp-error { margin: 0; font-size: 12px; color: var(--color-danger, #ba1a1a); }
+@media (max-width: 640px) {
+  .irpp-row { grid-template-columns: 1fr 1fr; }
+  .irpp-row--head { display: none; }
+}

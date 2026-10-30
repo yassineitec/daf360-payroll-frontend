@@ -21,7 +21,7 @@
       autocomplete="off"
       spellcheck="false"
       [value]="displayText()"
-      [placeholder]="selected() ? '' : 'Rechercher un collaborateur…'"
+      [placeholder]="selected() ? '' : ('PAYROLL.SELECT.EMPLOYEE_PLACEHOLDER' | translate)"
       [disabled]="isDisabled()"
       (focus)="onFocus()"
       (input)="onInput($event)"
@@ -30,7 +30,7 @@
     @if (selected() && !isDisabled()) {
       <button type="button" tabindex="-1"
               class="shrink-0 text-on-surface-variant hover:text-danger transition-colors"
-              title="Effacer"
+              [title]="'PAYROLL.COMMON.CLEAR' | translate"
               (mousedown)="clear($event)">
         <span class="material-symbols-outlined text-[18px]">close</span>
       </button>
@@ -54,9 +54,9 @@
          [style.width.px]="dropdownWidth()">
 
       @if (loading()) {
-        <p class="px-3 py-2 text-label-md text-on-surface-variant">Chargement…</p>
+        <p class="px-3 py-2 text-label-md text-on-surface-variant">{{ 'PAYROLL.COMMON.LOADING' | translate }}</p>
       } @else if (!employees().length) {
-        <p class="px-3 py-2 text-label-md text-on-surface-variant">Aucun collaborateur trouvé</p>
+        <p class="px-3 py-2 text-label-md text-on-surface-variant">{{ 'PAYROLL.SELECT.EMPLOYEE_EMPTY' | translate }}</p>
       }
 
       @for (e of employees(); track e.userId) {
@@ -73,7 +73,7 @@
             </span>
           }
           @if (e.contractType) {
-            <span class="shrink-0 text-[11px] text-outline">{{ e.contractType }}</span>
+            <span class="shrink-0 text-[11px] text-outline">{{ contractLabel(e.contractType) }}</span>
           }
         </div>
       }

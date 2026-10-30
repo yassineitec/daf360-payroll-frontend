@@ -1,8 +1,7 @@
-<daf-page [breadcrumbs]="true">
+<daf-page>
   <daf-page-header
     [title]="'PAYROLL.ENGINE_RESULTS.TITLE' | translate"
-    [subtitle]="'PAYROLL.ENGINE_RESULTS.LIST_SUBTITLE' | translate"
-    [breadcrumbs]="breadcrumbs()">
+    [subtitle]="'PAYROLL.ENGINE_RESULTS.LIST_SUBTITLE' | translate">
   </daf-page-header>
 
   <div class="page-body">
@@ -12,16 +11,19 @@
     @if (kpiTiles(); as k) {
       <p class="kpi-period">
         {{ 'PAYROLL.ENGINE_RESULTS.KPI_PERIOD' | translate: { period: k.period } }}
+        @if (displayCurrencyName(); as cur) {
+          · {{ 'PAYROLL.ENGINE_RESULTS.AMOUNTS_IN' | translate: { currency: cur } }}
+        }
         @if (isConverted()) {
           · {{ 'PAYROLL.ENGINE_RESULTS.CURRENCY.CONVERTED_NOTE' | translate: { from: convertedFrom(), to: displayCurrency() } }}
         }
       </p>
       <section
-        class="grid grid-cols-4 gap-2 sm:gap-6 kpi-section transition-opacity"
+        class="kpi-row transition-opacity"
         [class.opacity-60]="kpiLoading()"
         [attr.aria-busy]="kpiLoading()">
         @for (tile of k.tiles; track tile.label) {
-          <daf-metric-card [label]="tile.label" [value]="tile.value" [options]="tile.options" />
+          <daf-metric-card class="kpi-cell" [label]="tile.label" [value]="tile.value" [delta]="tile.delta" [options]="tile.options" />
         }
       </section>
     }
@@ -52,7 +54,7 @@
     } @else {
       <div [class.is-loading]="loading()">
         @if (viewMode() === 'grid') {
-          <div class="grid grid-cols-3 gap-5">
+          <div class="grid grid-cols-3 gap-5 same-height-cards">
             @for (card of employeeCards(); track card.id) {
               <daf-entity-card
                 [options]="card.options"

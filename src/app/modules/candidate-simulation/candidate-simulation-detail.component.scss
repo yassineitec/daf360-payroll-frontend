@@ -1,0 +1,138 @@
+/* Squelette de la fiche uniquement — mêmes règles que les `styles` de la fiche simulateur
+   (`simulator.component.ts`). En styles de composant et non en classes Tailwind neuves :
+   le CSS d'un remote ne contient que les classes déjà vues par son scan. Tout le reste
+   (couleurs, typo, espacements internes) vient des composants et classes de la lib. */
+
+/* ── Les deux colonnes ─────────────────────────────────────────────────────── */
+.detail-split { display: flex; flex-wrap: wrap; gap: 2rem; align-items: flex-start; padding: 0 0 2rem; }
+.detail-aside { flex: 0 1 30%; min-width: 320px; max-width: 420px; }
+.detail-aside__sticky { position: sticky; top: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
+.detail-main  { flex: 1 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 1.5rem; }
+
+/* ── Rangée de KPI ─────────────────────────────────────────────────────────── */
+.kpi-row  { display: grid; gap: 1.5rem; align-items: stretch; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.kpi-cell { display: flex; flex-direction: column; min-width: 0; min-height: 118px; }
+
+@media (max-width: 1400px) {
+  .detail-split { gap: 1.5rem; }
+  .detail-aside { min-width: 300px; max-width: 360px; }
+}
+@media (max-width: 1150px) {
+  .detail-aside { flex: 1 1 100%; max-width: none; min-width: 0; }
+  .detail-aside__sticky { position: static; }
+}
+@media (max-width: 640px) {
+  .kpi-row { gap: 1rem; }
+}
+
+/* ── Panneau de détails — mêmes styles que la fiche simulateur / fiche affaire ── */
+.dp-card  { display: flex; flex-direction: column; }
+.dp-block { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; }
+.dp-label {
+  margin: 0; font-size: 9px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--color-on-surface-variant, #44474c);
+}
+.dp-rows { margin: 0; }
+/* Pas de filet entre les lignes d'un bloc (Pays, Simulations…) — même rendu que la carte
+   Détails de la fiche simulateur. */
+.dp-row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 5px 0;
+}
+.dp-row:last-child { padding-bottom: 0; }
+.dp-row__key { margin: 0; font-size: 12px; color: var(--color-on-surface-variant, #44474c); }
+.dp-row__val {
+  margin: 0; font-size: 12.5px; font-weight: 600; text-align: right;
+  color: var(--color-on-surface, #191c1e);
+}
+
+/* Décomposition : − retenues, + charges patronales, = sous-totaux (jetons de la lib). */
+.dp-row--minus .dp-row__key::before { content: '− '; }
+.dp-row--plus  .dp-row__key::before { content: '+ '; }
+.dp-row--minus .dp-row__val { color: var(--color-danger); }
+.dp-row--total .dp-row__key { font-weight: 700; color: var(--color-on-surface, #191c1e); }
+.dp-row--total .dp-row__val { color: var(--color-primary); }
+
+/* Les trois blocs côte à côte quand la place le permet. */
+.blocks { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+
+/* ── Fil de la négociation : une étape par proposition, reliées par un trait ─────────── */
+.timeline        { display: flex; flex-direction: column; gap: .75rem; }
+.timeline__list  { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.timeline__item  { position: relative; padding: 0 0 .75rem 1.75rem; }
+/* Trait vertical entre deux points (pas sous le dernier). */
+.timeline__item::before { content: ''; position: absolute; left: .4375rem; top: 1.1rem; bottom: 0; width: 2px;
+                          background: var(--color-outline-variant, #c5c6cd); }
+.timeline__item--last::before { display: none; }
+.timeline__dot   { position: absolute; left: 0; top: .6rem; width: 1rem; height: 1rem; border-radius: 999px;
+                   border: 3px solid var(--color-surface, #fff); background: var(--color-outline, #74777f); }
+.timeline__dot--success { background: var(--color-success, #1b873f); }
+.timeline__dot--danger  { background: var(--color-danger, #ba1a1a); }
+.timeline__dot--warning { background: var(--color-warning, #b7791f); }
+.timeline__card  { display: flex; flex-direction: column; gap: .3rem; width: 100%; text-align: left; cursor: pointer;
+                   padding: .75rem 1rem; border-radius: .75rem; border: 1px solid var(--color-outline-variant, #c5c6cd);
+                   background: var(--color-surface-container-lowest, #fff); font: inherit; color: inherit;
+                   transition: border-color .15s, background .15s; }
+.timeline__card:hover,
+.timeline__card:focus-visible { border-color: var(--color-tertiary, #00c1ad); outline: none;
+                                background: var(--color-surface-container-low, #f2f4f6); }
+.timeline__head  { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.timeline__title { font-weight: 700; font-size: .875rem; color: var(--color-on-surface, #191c1e); }
+.timeline__kind  { font-size: .75rem; color: var(--color-on-surface-variant, #44474c); flex: 1 1 auto; }
+.timeline__line  { display: flex; align-items: center; gap: .375rem; flex-wrap: wrap; font-size: .8125rem;
+                   color: var(--color-on-surface, #191c1e); }
+.timeline__icon  { font-size: 1rem; color: var(--color-on-surface-variant, #44474c); }
+.timeline__muted { color: var(--color-on-surface-variant, #44474c); }
+.timeline__note  { font-size: .75rem; font-style: italic; color: var(--color-on-surface-variant, #44474c); }
+
+/* ── Pop-up de détail d'une proposition ─────────────────────────────────────────────── */
+.pd        { display: flex; flex-direction: column; gap: 1.25rem; font-size: .875rem; }
+.pd-nav    { display: flex; justify-content: space-between; gap: .5rem; margin-top: -.5rem; }
+
+/* Bandeau de décision (et d'alerte) — mêmes valeurs que les bandeaux des autres pages paie. */
+.pd-banner        { display: flex; align-items: flex-start; gap: .625rem; padding: .875rem 1rem; border-radius: .75rem; }
+.pd-banner__icon  { font-size: 20px; flex: 0 0 auto; }
+.pd-banner__body  { display: flex; flex-direction: column; gap: .25rem; min-width: 0; flex: 1 1 auto; }
+.pd-banner__head  { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
+.pd-banner__title { font-weight: 700; }
+.pd-banner__date  { font-size: .75rem; opacity: .85; }
+.pd-banner__note  { font-style: italic; color: var(--color-on-surface, #191c1e); }
+.pd-banner--success { color: var(--color-success, #1b873f);
+                      background: color-mix(in srgb, var(--color-success, #1b873f) 10%, transparent); }
+.pd-banner--warning { color: var(--color-warning, #8a5a00);
+                      background: color-mix(in srgb, var(--color-warning, #b7791f) 10%, transparent); }
+.pd-banner--danger  { color: var(--color-danger, #ba1a1a);
+                      background: color-mix(in srgb, var(--color-danger, #ba1a1a) 8%, transparent); }
+
+/* Décision de la DAF sur une ligne : icône et titre colorés, date à droite — plus discret
+   qu'un bandeau, pour laisser la place aux chiffres. */
+.pd-decision        { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.pd-decision__icon  { font-size: 20px; flex: 0 0 auto; }
+.pd-decision__title { font-weight: 700; flex: 1 1 auto; min-width: 0; }
+.pd-decision__date  { font-size: .75rem; color: var(--color-on-surface-variant, #44474c); }
+.pd-decision__note  { margin: -.75rem 0 0 1.75rem; font-style: italic; color: var(--color-on-surface, #191c1e); }
+.pd-decision--success { color: var(--color-success, #1b873f); }
+.pd-decision--warning { color: var(--color-warning, #8a5a00); }
+.pd-decision--danger  { color: var(--color-danger, #ba1a1a); }
+
+/* Trois chiffres clés : `daf-metric-card` de la lib, sur trois colonnes (une seule sur mobile). */
+.pd-figures { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; }
+@media (max-width: 640px) { .pd-figures { grid-template-columns: 1fr; } }
+
+/* Décomposition en lignes de bulletin, trait avant chaque total. */
+.pd-block        { display: flex; flex-direction: column; gap: .375rem; }
+.pd-line         { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.pd-line__key    { color: var(--color-on-surface-variant, #44474c); }
+.pd-line__val    { font-variant-numeric: tabular-nums; text-align: right; color: var(--color-on-surface, #191c1e); font-weight: 500; }
+.pd-line__muted  { color: var(--color-outline, #74777f); font-size: .75rem; }
+.pd-line--total  { margin-top: .25rem; padding-top: .5rem; border-top: 1px solid var(--color-outline-variant, #c5c6cd); }
+.pd-line--total .pd-line__key,
+.pd-line--total .pd-line__val { font-weight: 700; color: var(--color-on-surface, #191c1e); }
+.pd-hint         { font-size: .75rem; color: var(--color-on-surface-variant, #44474c); }
+/* Signes du calcul : − retenue, + ajout, = total ; « dont » en retrait, plus petit. */
+.pd-line--minus .pd-line__key::before { content: "− "; }
+.pd-line--plus  .pd-line__key::before { content: "+ "; }
+.pd-line--total .pd-line__key::before { content: "= "; }
+.pd-line--sub   { padding-left: 1rem; font-size: .75rem; }
+.pd-line--sub .pd-line__key,
+.pd-line--sub .pd-line__val { color: var(--color-outline, #74777f); font-weight: 400; }

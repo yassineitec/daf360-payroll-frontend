@@ -1,0 +1,306 @@
+<!-- headerSize="md" doit concorder avec le size="md" du daf-page-header ci-dessous
+     (même réglage que /payroll/engine-results/:id et /finance/affaires/:id). -->
+<daf-page [loading]="pageLoading()" [kpis]="0" headerSize="md">
+
+  <!-- Deux colonnes, comme /payroll/engine-results/:id : GAUCHE (30 %, sticky) le titre
+       de page puis la carte « Paramètres de calcul » ; DROITE (70 %) les KPI — alignés
+       sur le titre —, le résultat, la décomposition et les rubriques. La carte de
+       paramètres reste à l'écran pendant un calcul : on ajuste et on relance sans perdre
+       le résultat de vue. -->
+  <div class="detail-split">
+
+    <!-- ══ COLONNE GAUCHE — titre + paramètres de calcul ══════════════════════ -->
+    <div class="detail-aside">
+      <daf-page-header
+        size="md"
+        [title]="'PAYROLL.ENGINE_RUN.TITLE' | translate"
+        [titleWrap]="true"
+        [subtitle]="'PAYROLL.ENGINE_RUN.SUBTITLE' | translate"
+        [badges]="headerBadges()" />
+
+      <daf-section-card>
+        <div class="dp-card">
+
+          <!-- En-tête de carte : icône + titre, comme les cartes de /payroll/budget. Pas de
+               sous-titre (redit celui de la page) ni de pastille Prêt / À configurer (le
+               bouton « Lancer le calcul » actif ou grisé le dit déjà). -->
+          <section class="dp-block dp-head">
+            <div class="dp-head__top">
+              <span class="material-symbols-outlined dp-head__icon" style="font-variation-settings:'FILL' 1">tune</span>
+              <h2 class="dp-head__title">{{ 'PAYROLL.ENGINE_RUN.SIDEBAR_TITLE' | translate }}</h2>
+            </div>
+
+            @if (recentPresets().length) {
+              <div class="presets">
+                <span class="dp-label">{{ 'PAYROLL.ENGINE_RUN.PRESETS_LABEL' | translate }}</span>
+                <div class="presets__chips">
+                  @for (p of recentPresets(); track p.key) {
+                    <button type="button" class="preset-chip" (click)="loadPreset(p)">{{ presetLabel(p) }}</button>
+                  }
+                </div>
+              </div>
+            }
+          </section>
+
+          <div class="dp-rule dp-rule--major"></div>
+
+          <!-- 1. Salarié -->
+          <section class="dp-block" aria-labelledby="er-h-employee">
+            <h3 class="dp-label" id="er-h-employee">{{ 'PAYROLL.ENGINE_RUN.SECTION_EMPLOYEE' | translate }}</h3>
+            <daf-select
+              [options]="paysOptions()"
+              [selected]="paysId() ? ['' + paysId()] : []"
+              [config]="{
+                label: 'PAYROLL.ENGINE_RUN.PAYS' | translate,
+                placeholder: paysOptions().length
+                  ? ('PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate)
+                  : ('PAYROLL.ENGINE_RUN.PAYS_EMPTY' | translate),
+                searchable: true,
+                required: true,
+                fullWidth: true,
+                disabled: !paysOptions().length
+              }"
+              (selectedChange)="onPaysChange($event)">
+            </daf-select>
+
+            <!-- `daf-select` recherchable de la lib, comme /payroll/simulator : les salariés
+                 du pays sont chargés en une fois, la lib filtre en local. -->
+            <daf-select
+              [options]="employeeOptions()"
+              [config]="{
+                label: 'PAYROLL.ENGINE_RUN.EMPLOYEE' | translate,
+                placeholder: employeesLoading()
+                  ? ('PAYROLL.COMMON.LOADING' | translate)
+                  : employeeOptions().length
+                    ? ('PAYROLL.SELECT.EMPLOYEE_PLACEHOLDER' | translate)
+                    : ('PAYROLL.SELECT.EMPLOYEE_EMPTY' | translate),
+                searchable: true,
+                required: true,
+                fullWidth: true,
+                disabled: !paysId() || employeesLoading() || !employeeOptions().length
+              }"
+              [selected]="employeeSelection()"
+              (selectedChange)="setEmployeeSelection($event)">
+            </daf-select>
+
+            <!-- Seulement ce que le select n'affiche pas (le nom y est déjà) : département
+                 et statut du salarié. -->
+            @if (selectedEmployee(); as emp) {
+              @if (emp.department || employeeStatusBadge()) {
+                <div class="employee-summary">
+                  <span class="employee-summary__meta">{{ emp.department }}</span>
+                  @if (employeeStatusBadge(); as b) {
+                    <daf-badge [label]="b.label" [options]="{ variant: b.variant, size: 'sm' }" />
+                  }
+                </div>
+              }
+            }
+          </section>
+
+          <div class="dp-rule dp-rule--major"></div>
+
+          <!-- 2. Période -->
+          <section class="dp-block" aria-labelledby="er-h-period">
+            <h3 class="dp-label" id="er-h-period">{{ 'PAYROLL.ENGINE_RUN.SECTION_PERIOD' | translate }}</h3>
+            <!-- Mois + Année côte à côte : seul le mois compte pour le moteur (l'ancien
+                 calendrier faisait choisir un jour sans effet). Chaque select dans un
+                 `flex-1 min-w-0`, comme les paires de /payroll/simulator. -->
+            <div class="flex gap-3">
+              <div class="flex-1 min-w-0">
+                <daf-select
+                  [options]="monthOptions()"
+                  [selected]="['' + periodMonth()]"
+                  [config]="{ label: 'PAYROLL.ENGINE_RUN.PERIOD_MONTH' | translate, required: true, fullWidth: true }"
+                  (selectedChange)="setPeriodMonth($event)">
+                </daf-select>
+              </div>
+              <div class="w-28 shrink-0">
+                <daf-select
+                  [options]="yearOptions()"
+                  [selected]="['' + periodYear()]"
+                  [config]="{ label: 'PAYROLL.ENGINE_RUN.PERIOD_YEAR' | translate, required: true, fullWidth: true }"
+                  (selectedChange)="setPeriodYear($event)">
+                </daf-select>
+              </div>
+            </div>
+          </section>
+
+          <div class="dp-rule dp-rule--major"></div>
+
+          <!-- 3. Contrat -->
+          <section class="dp-block" aria-labelledby="er-h-contract">
+            <h3 class="dp-label" id="er-h-contract">{{ 'PAYROLL.ENGINE_RUN.SECTION_CONTRACT' | translate }}</h3>
+            <!-- Chaque champ sur sa propre ligne, pleine largeur (empilés par le flex
+                 colonne de `.dp-block`). -->
+            <!-- Contrats tarifés par le jeu de paramètres actif du pays, comme /payroll/simulator. -->
+              <daf-select
+                [options]="contractTypeOptions()"
+                [selected]="contractTypeCode() ? [contractTypeCode()] : []"
+                [config]="{
+                  label: 'PAYROLL.ENGINE_RUN.CONTRACT_TYPE' | translate,
+                  placeholder: contractPlaceholder(),
+                  required: true,
+                  fullWidth: true,
+                  disabled: !contractTypeOptions().length,
+                  hint: contractHint()
+                }"
+                (selectedChange)="contractTypeCode.set($event[0] ?? '')">
+              </daf-select>
+              <daf-form-field
+                [options]="{ label: 'PAYROLL.ENGINE_RUN.WORKDAYS' | translate, type: 'number', prefixIcon: 'calendar_view_day', suffixText: 'j',
+                             hint: 'PAYROLL.ENGINE_RUN.WORKDAYS_HINT' | translate }"
+                [value]="joursOuvresMois()"
+                (valueChange)="joursOuvresMois.set(+($event ?? 0))">
+              </daf-form-field>
+          </section>
+
+          <!-- Actions -->
+          <section class="dp-block dp-actions">
+            <!-- Avertissements avant lancement : collaborateur sorti, mois déjà calculé (un
+                 nouveau lancement AJOUTE un résultat — confirmation demandée au clic). -->
+            @if (employeeExitWarning(); as w) {
+              <div class="notice notice--warning" role="status">
+                <span class="material-symbols-outlined notice__icon">person_off</span>
+                <span>{{ w }}</span>
+              </div>
+            }
+            @if (existingWarning(); as w) {
+              <div class="notice notice--warning" role="status">
+                <span class="material-symbols-outlined notice__icon">history</span>
+                <span>{{ w }}</span>
+              </div>
+            }
+            @if (error()) {
+              <div class="alert-error">
+                <span class="material-symbols-outlined text-base">error</span>
+                {{ error() }}
+              </div>
+            }
+
+            <daf-button
+              [label]="(running() ? 'PAYROLL.ENGINE_RUN.RUNNING' : 'PAYROLL.ENGINE_RUN.RUN_BUTTON') | translate"
+              variant="teal"
+              [options]="{ loading: running(), disabled: !canRun() || running(), iconStart: 'calculate', fullWidth: true }"
+              (onClick)="run()">
+            </daf-button>
+            <!-- Le calcul n'est pas un essai : il est enregistré dans « Résultats de paie ». Dit
+                 avant le premier calcul seulement ; ensuite la pastille « Enregistré · Résultat
+                 n° » et le bouton « Voir dans Résultats de paie » le disent. -->
+            @if (!result()) {
+              <p class="m-0 text-center text-body-sm text-on-surface-variant">
+                {{ 'PAYROLL.ENGINE_RUN.SAVE_NOTE' | translate }}
+              </p>
+            }
+            <!-- Comparaison N-1 : alimente les écarts (delta) des tuiles KPI. -->
+            @if (result()) {
+              <daf-button
+                [label]="'PAYROLL.ENGINE_RUN.COMPARE_BUTTON' | translate"
+                variant="ghost"
+                [options]="{ iconStart: 'trending_up', disabled: comparing(), loading: comparing(), fullWidth: true }"
+                (onClick)="compareWithPreviousYear()">
+              </daf-button>
+            }
+            <div class="dp-actions__status">
+              <daf-button
+                [label]="'PAYROLL.ENGINE_RUN.RESET_BUTTON' | translate"
+                variant="ghost"
+                [options]="{ iconStart: 'restart_alt', size: 'sm' }"
+                (onClick)="reset()">
+              </daf-button>
+              @if (result(); as r) {
+                <span class="last-run">
+                  {{ 'PAYROLL.ENGINE_RUN.LAST_RUN_AT' | translate: { date: (r.calculatedAt | date:'dd/MM/yyyy HH:mm') } }}
+                  @if (compareResult(); as c) { · {{ 'PAYROLL.ENGINE_RUN.COMPARE_TAG' | translate: { year: c.periodYear } }} }
+                </span>
+              }
+            </div>
+          </section>
+        </div>
+      </daf-section-card>
+    </div>
+
+    <!-- ══ COLONNE DROITE — le bulletin calculé ═════════════════════════════════
+         De haut en bas : titre (qui · quand · contrat), bandeau « paramètres changés »,
+         4 indicateurs, actions, bulletin (Gains → Retenues → Net à payer), puis la barre
+         « Où va le brut ? ». -->
+    <div class="detail-main">
+
+      <!-- Avant le premier calcul : les trois gestes à faire, numérotés. « Calcul en
+           cours… » n'est affiché que sur le bouton. -->
+      @if (!result()) {
+        <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+          <div class="empty-state">
+            <span class="material-symbols-outlined empty-state__icon">receipt_long</span>
+            <p class="empty-state__title">{{ 'PAYROLL.ENGINE_RUN.EMPTY_TITLE' | translate }}</p>
+            <ol class="empty-steps">
+              <li><span class="empty-steps__n">1</span>{{ 'PAYROLL.ENGINE_RUN.EMPTY_STEP_1' | translate }}</li>
+              <li><span class="empty-steps__n">2</span>{{ 'PAYROLL.ENGINE_RUN.EMPTY_STEP_2' | translate }}</li>
+              <li><span class="empty-steps__n">3</span>{{ 'PAYROLL.ENGINE_RUN.EMPTY_STEP_3' | translate }}</li>
+            </ol>
+          </div>
+        </daf-card>
+      }
+
+      @if (result(); as r) {
+        <!-- ── Titre du résultat : figé au lancement (`runContext`) ── -->
+        @if (resultTitle(); as title) {
+          <div class="result-head">
+            <span class="material-symbols-outlined result-head__icon" style="font-variation-settings:'FILL' 1">receipt_long</span>
+            <h2 class="result-head__title">{{ title }}</h2>
+          </div>
+        }
+
+        <!-- Le formulaire ne correspond plus à ce qui est affiché. -->
+        @if (paramsChanged()) {
+          <div class="notice notice--warning" role="status">
+            <span class="material-symbols-outlined notice__icon">sync_problem</span>
+            <span>{{ 'PAYROLL.ENGINE_RUN.PARAMS_CHANGED' | translate }}</span>
+          </div>
+        }
+
+        <!-- ── Bulletin partagé (`app-payslip-bulletin`) — même affichage que
+             /payroll/engine-results/:id : 4 indicateurs (+ écarts N-1 ici), recherche,
+             Gains, Retenues, Net à payer, « Où va le brut ? ». Les actions de la page
+             (exports, impression, historique) sont projetées sous les indicateurs. ── -->
+        @if (kpis(); as k) {
+          <app-payslip-bulletin
+            [details]="r.rubriqueDetails"
+            [totals]="k"
+            [currency]="resultCurrency()"
+            [prorataDays]="runContext()?.jours ?? null"
+            [deltas]="kpiDeltas()"
+            [employerCost]="employerCost()"
+            [(search)]="rubriqueSearch">
+            <div class="result-actions">
+              <daf-button
+                [label]="(exportingXlsx() ? 'PAYROLL.ENGINE_RUN.EXPORTING' : 'PAYROLL.ENGINE_RUN.EXPORT_XLSX') | translate"
+                variant="secondary"
+                [options]="{ size: 'sm', iconStart: 'description', disabled: exportingXlsx() }"
+                (onClick)="exportXlsx()">
+              </daf-button>
+              <daf-button
+                [label]="(exportingPdf() ? 'PAYROLL.ENGINE_RUN.EXPORTING' : 'PAYROLL.ENGINE_RUN.EXPORT_PDF') | translate"
+                variant="secondary"
+                [options]="{ size: 'sm', iconStart: 'picture_as_pdf', disabled: exportingPdf() }"
+                (onClick)="exportPdf()">
+              </daf-button>
+              <daf-button
+                [label]="'PAYROLL.ENGINE_RUN.PRINT' | translate"
+                variant="ghost"
+                [options]="{ size: 'sm', iconStart: 'print' }"
+                (onClick)="print()">
+              </daf-button>
+              <span class="result-actions__spacer"></span>
+              <daf-button
+                [label]="'PAYROLL.ENGINE_RUN.OPEN_IN_RESULTS' | translate"
+                variant="ghost"
+                [options]="{ size: 'sm', iconEnd: 'arrow_forward' }"
+                (onClick)="openInResults()">
+              </daf-button>
+            </div>
+          </app-payslip-bulletin>
+        }
+      }
+    </div>
+  </div>
+</daf-page>

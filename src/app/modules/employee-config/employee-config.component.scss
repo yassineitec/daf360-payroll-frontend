@@ -28,7 +28,16 @@
 .form-actions       { display: flex; justify-content: flex-end; gap: 12px; padding-top: 20px;
                       border-top: 1px solid var(--color-outline-variant, #c5c6cd); }
 
-/* Titre de bloc sans barre d'accent (remplace daf-section-title) — même typographie
-   majuscule que les libellés de section de la bibliothèque. */
-.ec-section-title   { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
-                      color: var(--color-on-surface-variant, #44474c); }
+/* Titres de bloc : `daf-section-title` de la lib (comme /payroll/engine-run). */
+
+/* Bandeaux d'information — mêmes valeurs que ceux de /payroll/engine-run (la lib n'a pas
+   de composant d'alerte) : modifications non enregistrées, configuration jamais enregistrée. */
+.notice          { display: flex; align-items: flex-start; gap: .5rem; padding: .75rem 1rem; border-radius: .75rem; font-size: 13px; }
+.notice__icon    { font-size: 18px; flex: 0 0 auto; }
+.notice--warning { color: var(--color-warning, #8a5a00);
+                   background: color-mix(in srgb, var(--color-warning, #b7791f) 10%, transparent); }
+.notice--info    { color: var(--color-on-surface-variant, #44474c);
+                   background: var(--color-surface-container, #eceef0); }
+
+/* Formulaire de la pop-up « Ajouter une prime » : espacement plus serré que la carte. */
+.ec-modal-form { gap: 16px; }

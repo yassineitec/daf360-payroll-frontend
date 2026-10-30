@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ChangeDetectionStrategy, Component, DestroyRef, TemplateRef, computed, inject, OnInit, signal, viewChild } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   ButtonComponent,
@@ -12,10 +12,12 @@ import {
   PageHeaderComponent,
   SearchToolbarComponent,
   SectionCardComponent,
+  SectionTitleComponent,
   SelectComponent,
   SkeletonComponent,
   TabsComponent,
   tabParam,
+  type ModalRef,
   type TabItem,
   type BreadcrumbItem,
   type SelectOption,
@@ -25,16 +27,24 @@ import {
   type TableRow,
 } from '@khalilrebhiitec/daf360';
 import { PayrollApiService, BenefitCatalogueDto, PaysDto } from '../../core/payroll-api.service';
-import { HrProfileService, HrContractType } from '../../core/hr-profile.service';
+import { HrProfileService, HrContractType, contractTypeLabel } from '../../core/hr-profile.service';
 import { AdminSectionHeaderComponent } from '../parameter-sets/admin/admin-section-header.component';
 import { NotificationService } from '../../core/notification.service';
+import { UserStore } from '../../core/user.store';
 import {
-  EmployeeConfigService, EmployeePayrollConfigDto, EmployeePayrollBonusDto,
+  PAYROLL_AUDIT_PERMISSIONS,
+} from '../../core/payroll-nav';
+import {
+  EmployeeConfigService, EmployeePayrollConfigDto, EmployeePayrollBonusDto, EmployeePayrollConfigHistoryDto,
 } from './employee-config.service';
 import { recallEmployee } from './employee-config-employee';
 import { searchTableRows, tableTools } from '../../shared/table-tools';
+import { flagDataUri } from '../../shared/country-flags';
 
 const BONUS_CURRENCIES = ['TND', 'EUR', 'USD', 'EGP', 'SAR', 'AED'];
+
+/** Anciens codes RH (assistant d'intégration d'avant migration) → codes de la paie. */
+const LEGACY_CONTRACT: Record<string, string> = { PERMANENT: 'CDI', FIXED_TERM: 'CDD', INTERN: 'STAGE' };
 
 /**
  * `/payroll/employee-config/:userId` — assign a payroll configuration (country, contract
@@ -43,10 +53,11 @@ const BONUS_CURRENCIES = ['TND', 'EUR', 'USD', 'EGP', 'SAR', 'AED'];
  * daf360-rh-frontend's Rémunération tab — both call the same
  * `GET/PUT /api/payroll/employee-configs/{id}`.
  *
- * En-tête = le collaborateur ouvert, puis deux `daf-tabs` : configuration de paie et primes
- * exceptionnelles, chacune dans une `daf-section-card`. Retours
- * d'action en toasts (`NotificationService` → `daf-toast-host` du shell), suppression
- * confirmée via `ModalService`.
+ * En-tête = le collaborateur ouvert (dernière modification, liens vers ses bulletins et son
+ * calcul), puis trois `daf-tabs` : configuration de paie, primes exceptionnelles (modèle
+ * des sections /rh/admin : barre + « Ajouter » → pop-up), historique des versions.
+ * Retours d'action en toasts, suppression et sortie sans enregistrer confirmées via
+ * `ModalService`.
  */
 @Component({
   selector: 'app-employee-config',
@@ -56,7 +67,7 @@ const BONUS_CURRENCIES = ['TND', 'EUR', 'USD', 'EGP', 'SAR', 'AED'];
     TranslatePipe,
     ButtonComponent, CardComponent, CheckboxComponent, DataTableComponent, FormFieldComponent,
     AdminSectionHeaderComponent, PageComponent, PageHeaderComponent, SearchToolbarComponent, SectionCardComponent,
-    SelectComponent, SkeletonComponent, TabsComponent,
+    SectionTitleComponent, SelectComponent, SkeletonComponent, TabsComponent,
   ],
   templateUrl: './employee-config.component.html',
   styleUrl: './employee-config.component.scss',
@@ -69,6 +80,9 @@ export class EmployeeConfigComponent implements OnInit {
   private notify = inject(NotificationService);
   private modal = inject(ModalService);
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private userStore = inject(UserStore);
+  private destroyRef = inject(DestroyRef);
 
   /** Même pattern que `cohort`/`simulator` : lire `currentLang()` rend les `computed`
    *  réactifs au changement de langue du shell. */
@@ -98,16 +112,35 @@ export class EmployeeConfigComponent implements OnInit {
     { label: this.employeeName() },
   ]);
 
-  /** Matricule · département · pays ; phrase générique si la page est ouverte par lien. */
+  /** Matricule · département · pays, puis la dernière modification enregistrée ; phrase
+   *  générique si la page est ouverte par lien et jamais configurée. */
   readonly employeeSubtitle = computed(() => {
     const e = this.employee();
-    const parts = e ? [e.employeeId, e.department, e.paysLabel].filter(Boolean) : [];
+    const parts = e ? [e.employeeId, e.department, e.paysLabel].filter(Boolean) as string[] : [];
+    const last = this.lastChangeText();
+    if (last) parts.push(last);
     return parts.length ? parts.join(' · ') : this.t('PAYROLL.EMPLOYEE_CONFIG.SUBTITLE');
   });
 
-  // ── Onglets : "Configuration de paie" / "Primes exceptionnelles" — `tabParam` porte
-  //    l'onglet actif dans `?tab=` (F5, lien partagé, précédent/suivant), comme parameter-sets.
-  readonly activeTab = tabParam(['config', 'bonuses'] as const, 'config');
+  /** Liens d'en-tête vers les autres écrans du collaborateur, selon les droits. */
+  readonly canViewResults = computed(() => this.userStore.hasPermission('PAYROLL_VIEW_RESULTS'));
+  readonly canRunEngine   = computed(() => this.userStore.hasPermission('PAYROLL_RUN_ENGINE'));
+
+  openResults(): void {
+    this.router.navigate(['/payroll/engine-results', this.userId]);
+  }
+
+  /** Calcul de paie, collaborateur et pays pré-sélectionnés (lus par /payroll/engine-run). */
+  openEngineRun(): void {
+    const paysId = this.savedConfig()?.paysId ?? this.employee()?.paysId ?? null;
+    this.router.navigate(['/payroll/engine-run'], {
+      queryParams: { employee: this.userId, ...(paysId != null ? { pays: paysId } : {}) },
+    });
+  }
+
+  // ── Onglets : configuration / primes / historique — `tabParam` porte l'onglet actif
+  //    dans `?tab=` (F5, lien partagé, précédent/suivant), comme parameter-sets.
+  readonly activeTab = tabParam(['config', 'bonuses', 'history'] as const, 'config');
 
   readonly tabs = computed<TabItem[]>(() => [
     { id: 'config',  label: this.t('PAYROLL.EMPLOYEE_CONFIG.CONFIG_TITLE'), icon: 'manage_accounts' },
@@ -115,6 +148,10 @@ export class EmployeeConfigComponent implements OnInit {
       id: 'bonuses', label: this.t('PAYROLL.EMPLOYEE_CONFIG.BONUSES'), icon: 'redeem',
       // `null` pendant le chargement : l'espace du badge reste réservé, pas de saut.
       count: this.bonusesLoading() ? null : this.bonuses().length,
+    },
+    {
+      id: 'history', label: this.t('PAYROLL.EMPLOYEE_CONFIG.HISTORY'), icon: 'history',
+      count: this.historyLoading() ? null : this.history().length,
     },
   ]);
 
@@ -124,7 +161,7 @@ export class EmployeeConfigComponent implements OnInit {
   readonly benefits = signal<BenefitCatalogueDto[]>([]);
 
   readonly paysOptions = computed<SelectOption[]>(() =>
-    this.paysList().map(p => ({ value: String(p.id), label: `${p.frenchLabel} (${p.isoCode})` })),
+    this.paysList().map(p => ({ value: String(p.id), label: `${p.frenchLabel} (${p.isoCode})`, imageUrl: flagDataUri(p.isoCode) })),
   );
 
   readonly contractTypeOptions = computed<SelectOption[]>(() => {
@@ -134,8 +171,6 @@ export class EmployeeConfigComponent implements OnInit {
       label: (en ? ct.labelEn : ct.labelFr) || ct.code,
     }));
   });
-
-  readonly currencyOptions: SelectOption[] = BONUS_CURRENCIES.map(c => ({ value: c, label: c }));
 
   readonly monthOptions = computed<SelectOption[]>(() => {
     const fmt = new Intl.DateTimeFormat(this.locale(), { month: 'long' });
@@ -171,15 +206,32 @@ export class EmployeeConfigComponent implements OnInit {
    *  et à annuler les modifications. */
   private readonly savedConfig = signal<EmployeePayrollConfigDto | null>(null);
 
+  /** Jamais enregistrée : la configuration affichée est une proposition par défaut. */
+  readonly neverSaved = computed(() => !!this.savedConfig() && this.savedConfig()!.updatedAt == null);
+
+  private static benefitKey(c: EmployeePayrollConfigDto): string {
+    return [...c.selectedBenefitCodes].sort().join(',');
+  }
+
+  /** Pays, contrat ou avantages modifiés — ce qui change le calcul du net côté serveur. */
+  private readonly calcInputsChanged = computed(() => {
+    const a = this.config(), b = this.savedConfig();
+    if (!a || !b) return false;
+    return a.paysId !== b.paysId || a.contractType !== b.contractType
+      || EmployeeConfigComponent.benefitKey(a) !== EmployeeConfigComponent.benefitKey(b);
+  });
+
   readonly dirty = computed(() => {
     const a = this.config(), b = this.savedConfig();
     if (!a || !b) return false;
-    const codes = (c: EmployeePayrollConfigDto) => [...c.selectedBenefitCodes].sort().join(',');
-    return a.paysId !== b.paysId || a.contractType !== b.contractType
-      || a.currentGrossSalary !== b.currentGrossSalary || a.currentNetSalary !== b.currentNetSalary
-      || codes(a) !== codes(b);
+    return this.calcInputsChanged()
+      || a.currentGrossSalary !== b.currentGrossSalary || a.currentNetSalary !== b.currentNetSalary;
   });
   readonly reason = signal('');
+  /** Enregistrement tenté sans motif : l'erreur s'affiche sous le champ. */
+  readonly reasonTried = signal(false);
+  readonly reasonError = computed(() =>
+    this.reasonTried() && this.reason().trim() === '' ? this.t('PAYROLL.EMPLOYEE_CONFIG.REASON_REQUIRED') : undefined);
 
   readonly loading = signal(false);
   readonly saving = signal(false);
@@ -188,6 +240,103 @@ export class EmployeeConfigComponent implements OnInit {
   /** Refus d'enregistrement (motif du serveur), en bandeau au-dessus des boutons. */
   readonly saveError = signal<string | null>(null);
 
+  // ── Contrat repris de la fiche RH ─────────────────────────────────────────
+  /** Contrat de la fiche RH du collaborateur, en code de la paie (« CDI », « CIVP »…). */
+  private readonly hrContract = computed(() => {
+    const code = this.employee()?.contractType?.trim().toUpperCase();
+    return code ? (LEGACY_CONTRACT[code] ?? code) : null;
+  });
+
+  /** Aide sous le select du contrat : d'où vient la valeur, ou en quoi elle diffère. */
+  readonly contractHint = computed(() => {
+    const hr = this.hrContract();
+    const current = this.config()?.contractType;
+    if (!hr || !current || !this.contractTypes().length) return '';
+    return current === hr
+      ? this.t('PAYROLL.EMPLOYEE_CONFIG.CONTRACT_FROM_HR')
+      : this.t('PAYROLL.EMPLOYEE_CONFIG.CONTRACT_HR_DIFFERS', { contract: contractTypeLabel(hr, this.translate) });
+  });
+
+  // ── Net calculé automatiquement à partir du brut ──────────────────────────
+  // Le net n'est plus saisi : il est recalculé (après une courte pause de frappe) à chaque
+  // changement du brut, par le serveur. ⚠ Le serveur calcule avec le pays, le contrat et les
+  // avantages ENREGISTRÉS : après un enregistrement qui les change, le net est recalculé et
+  // réenregistré (voir `save`).
+
+  private grossTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Aide sous le net : comment il est obtenu, ou pourquoi il n'est pas encore à jour. */
+  readonly netHint = computed(() => {
+    if (this.savedConfig()?.paysId == null) return this.t('PAYROLL.EMPLOYEE_CONFIG.NET_NEEDS_PAYS');
+    if (this.calcInputsChanged()) return this.t('PAYROLL.EMPLOYEE_CONFIG.NET_AFTER_SAVE');
+    return this.t('PAYROLL.EMPLOYEE_CONFIG.NET_AUTO_HINT');
+  });
+
+  // ── Historique (versions enregistrées) ───────────────────────────────────
+  readonly history = signal<EmployeePayrollConfigHistoryDto[]>([]);
+  readonly historyLoading = signal(false);
+  /** Nom des auteurs, lu dans le journal d'audit du pays (le service d'historique ne
+   *  renvoie que leur id). Vide sans droit d'audit : repli sur « n° id ». */
+  private readonly actorNames = signal<Map<number, string>>(new Map());
+
+  private actorLabel(id: number | null): string {
+    if (id == null) return '—';
+    if (id === this.userStore.currentUser()?.userId) return this.t('PAYROLL.EMPLOYEE_CONFIG.ACTOR_YOU');
+    return this.actorNames().get(id) ?? this.t('PAYROLL.EMPLOYEE_CONFIG.ACTOR_ID', { id });
+  }
+
+  private dateTime(iso: string | null | undefined): string {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleString(this.locale(), { dateStyle: 'short', timeStyle: 'short' });
+  }
+
+  /** « Modifié le 12/10/2026 14:05 par S. Ben Ali — revalorisation annuelle ». */
+  readonly lastChangeText = computed(() => {
+    const h = this.history()[0];
+    if (!h) return null;
+    return this.t('PAYROLL.EMPLOYEE_CONFIG.LAST_CHANGE', {
+      date: this.dateTime(h.changedAt), actor: this.actorLabel(h.changedBy),
+    }) + (h.reason ? ` — ${h.reason}` : '');
+  });
+
+  readonly historyColumns = computed<TableColumn[]>(() => [
+    { key: 'date',     label: this.t('PAYROLL.EMPLOYEE_CONFIG.HIST_COL_DATE'), sortable: true,
+      sortAccessor: row => row['_at'] as string },
+    { key: 'actor',    label: this.t('PAYROLL.EMPLOYEE_CONFIG.HIST_COL_ACTOR'), sortable: true },
+    { key: 'gross',    label: this.t('PAYROLL.EMPLOYEE_CONFIG.GROSS_SALARY'), align: 'right' },
+    { key: 'net',      label: this.t('PAYROLL.EMPLOYEE_CONFIG.CURRENT_SALARY'), align: 'right' },
+    { key: 'contract', label: this.t('PAYROLL.EMPLOYEE_CONFIG.CONTRACT_TYPE') },
+    { key: 'benefits', label: this.t('PAYROLL.EMPLOYEE_CONFIG.BENEFITS'), align: 'right' },
+    { key: 'reason',   label: this.t('PAYROLL.EMPLOYEE_CONFIG.HIST_COL_REASON') },
+  ]);
+
+  readonly historyRows = computed<TableRow[]>(() =>
+    this.history().map((h, i) => {
+      const cur = this.paysList().find(p => p.id === h.paysId)?.devise ?? '';
+      return {
+        id:       `${h.changedAt}-${i}`,
+        _at:      h.changedAt,
+        date:     this.dateTime(h.changedAt),
+        actor:    this.actorLabel(h.changedBy),
+        gross:    this.money(h.currentGrossSalary, cur) ?? '—',
+        net:      this.money(h.currentNetSalary, cur) ?? '—',
+        contract: h.contractType ? contractTypeLabel(h.contractType, this.translate) : '—',
+        benefits: String(h.selectedBenefitCodes?.length ?? 0),
+        reason:   h.reason || '—',
+      };
+    }));
+
+  readonly historyTableConfig = computed<TableConfig>(() => ({
+    loading: this.historyLoading(),
+    skeletonRows: 3,
+    emptyMessage: this.t('PAYROLL.EMPLOYEE_CONFIG.HISTORY_EMPTY'),
+    hoverable: true,
+    defaultSort: { key: 'date', dir: 'desc' },
+    ...tableTools(this.translate),
+  }));
+
+  // ── Primes ─────────────────────────────────────────────────────────────
   readonly bonuses = signal<EmployeePayrollBonusDto[]>([]);
   readonly bonusesLoading = signal(false);
   readonly addingBonus = signal(false);
@@ -200,10 +349,19 @@ export class EmployeeConfigComponent implements OnInit {
   /** Les erreurs de champ n'apparaissent qu'après une première tentative d'ajout. */
   readonly bonusSubmitted = signal(false);
 
-  /** Le formulaire contient une saisie (hors valeurs par défaut) — active « Effacer ». */
-  readonly bonusFormTouched = computed(() =>
-    this.newBonusAmount() != null || this.newBonusLabel() !== '' || this.newBonusComment() !== ''
-    || this.newBonusCurrency() !== 'TND' || this.bonusSubmitted());
+  /** Devise du pays enregistré du collaborateur — devise proposée pour une nouvelle prime
+   *  (avant : TND pour tout le monde). */
+  private readonly countryCurrency = computed(() => {
+    const id = this.savedConfig()?.paysId ?? this.config()?.paysId ?? this.employee()?.paysId;
+    return this.paysList().find(p => p.id === id)?.devise?.trim().toUpperCase() || null;
+  });
+
+  readonly currencyOptions = computed<SelectOption[]>(() => {
+    const list = [...BONUS_CURRENCIES];
+    const c = this.countryCurrency();
+    if (c && !list.includes(c)) list.unshift(c);
+    return list.map(code => ({ value: code, label: code }));
+  });
 
   readonly bonusErrors = computed(() => {
     if (!this.bonusSubmitted()) return {};
@@ -286,7 +444,7 @@ export class EmployeeConfigComponent implements OnInit {
   }]);
 
   // ── Formatage ──────────────────────────────────────────────────────────
-  private money(v: number | null | undefined, currency: string): string | null {
+  money(v: number | null | undefined, currency: string): string | null {
     if (v == null) return null;
     const n = v.toLocaleString(this.locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return currency ? `${n} ${currency}` : n;
@@ -307,6 +465,13 @@ export class EmployeeConfigComponent implements OnInit {
   ngOnInit(): void {
     this.payrollApi.listPays().subscribe(pays => this.paysList.set(pays));
     if (Number.isFinite(this.userId)) this.load(this.userId);
+    // Fermeture ou rechargement de l'onglet du navigateur avec des modifications en cours.
+    const beforeUnload = (e: BeforeUnloadEvent) => { if (this.dirty()) e.preventDefault(); };
+    window.addEventListener('beforeunload', beforeUnload);
+    this.destroyRef.onDestroy(() => {
+      window.removeEventListener('beforeunload', beforeUnload);
+      if (this.grossTimer) clearTimeout(this.grossTimer);
+    });
   }
 
   private load(userId: number): void {
@@ -322,6 +487,7 @@ export class EmployeeConfigComponent implements OnInit {
         if (cfg.paysId != null) {
           this.loadBenefitsFor(cfg.paysId);
           this.loadContractTypesFor(cfg.paysId);
+          this.loadActorNames(cfg.paysId);
         }
       },
       error: () => {
@@ -330,6 +496,7 @@ export class EmployeeConfigComponent implements OnInit {
       },
     });
     this.loadBonuses(userId);
+    this.loadHistory(userId);
   }
 
   private loadBonuses(userId: number): void {
@@ -340,6 +507,30 @@ export class EmployeeConfigComponent implements OnInit {
         this.bonusesLoading.set(false);
         this.notify.error(this.t('PAYROLL.EMPLOYEE_CONFIG.BONUS_LOAD_ERROR'));
       },
+    });
+  }
+
+  private loadHistory(userId: number): void {
+    this.historyLoading.set(true);
+    this.svc.getHistory(userId).subscribe({
+      next: list => { this.history.set(list); this.historyLoading.set(false); },
+      error: () => { this.history.set([]); this.historyLoading.set(false); },
+    });
+  }
+
+  /** Noms des auteurs : entrées « configuration » de ce collaborateur dans le journal
+   *  d'audit du pays. Silencieux sans droit d'audit (les ids restent affichés). */
+  private loadActorNames(paysId: number): void {
+    if (!PAYROLL_AUDIT_PERMISSIONS.some(code => this.userStore.hasPermission(code))) return;
+    this.payrollApi.getAudit(paysId, 500).subscribe({
+      next: entries => {
+        const names = new Map(this.actorNames());
+        for (const e of entries) {
+          if (e.actorId != null && e.actorName) names.set(e.actorId, e.actorName);
+        }
+        this.actorNames.set(names);
+      },
+      error: () => { /* noms indisponibles : repli sur l'id */ },
     });
   }
 
@@ -357,30 +548,43 @@ export class EmployeeConfigComponent implements OnInit {
     if (cfg) this.config.set({ ...cfg, contractType });
   }
 
+  /** Brut saisi → net recalculé automatiquement après une courte pause de frappe. */
   onGrossSalaryChange(currentGrossSalary: number | null): void {
     const cfg = this.config();
-    if (cfg) this.config.set({ ...cfg, currentGrossSalary });
+    if (!cfg) return;
+    this.config.set({ ...cfg, currentGrossSalary });
+    if (this.grossTimer) clearTimeout(this.grossTimer);
+    if (currentGrossSalary == null) {
+      this.config.set({ ...this.config()!, currentNetSalary: null });
+      return;
+    }
+    this.grossTimer = setTimeout(() => this.calculateNet(), 600);
   }
 
-  onSalaryChange(currentNetSalary: number | null): void {
+  /** Net du brut courant, par le serveur — avec la configuration ENREGISTRÉE (pays, contrat,
+   *  avantages). `then` reçoit le net obtenu. */
+  calculateNet(then?: (net: number) => void, otherwise?: () => void): void {
     const cfg = this.config();
-    if (cfg) this.config.set({ ...cfg, currentNetSalary });
-  }
-
-  calculateNet(): void {
-    const cfg = this.config();
-    if (cfg === null || cfg.currentGrossSalary == null) return;
+    if (cfg === null || cfg.currentGrossSalary == null || this.savedConfig()?.paysId == null) { otherwise?.(); return; }
+    const gross = cfg.currentGrossSalary;
     this.calculatingNet.set(true);
-    this.svc.calculateNet(this.userId, cfg.currentGrossSalary).subscribe({
+    this.svc.calculateNet(this.userId, gross).subscribe({
       next: res => {
         this.calculatingNet.set(false);
-        // Relit la config courante : l'utilisateur a pu modifier un autre champ entre-temps.
+        // Relit la config courante : l'utilisateur a pu modifier un autre champ entre-temps,
+        // et un brut changé depuis rend ce net périmé.
         const current = this.config();
-        if (current) this.config.set({ ...current, currentNetSalary: res.netInHand });
+        if (current && current.currentGrossSalary === gross) {
+          this.config.set({ ...current, currentNetSalary: res.netInHand });
+          then?.(res.netInHand);
+        } else {
+          otherwise?.();
+        }
       },
       error: () => {
         this.calculatingNet.set(false);
         this.notify.error(this.t('PAYROLL.EMPLOYEE_CONFIG.CALCULATE_ERROR'));
+        otherwise?.();
       },
     });
   }
@@ -392,6 +596,7 @@ export class EmployeeConfigComponent implements OnInit {
     const paysChanged = saved.paysId !== this.config()?.paysId;
     this.config.set(saved);
     this.reason.set('');
+    this.reasonTried.set(false);
     if (paysChanged && saved.paysId != null) {
       this.loadBenefitsFor(saved.paysId);
       this.loadContractTypesFor(saved.paysId);
@@ -411,31 +616,51 @@ export class EmployeeConfigComponent implements OnInit {
     this.config.set({ ...cfg, selectedBenefitCodes: selected });
   }
 
+  /**
+   * Enregistre la configuration. Sans motif : l'erreur s'affiche sous le champ (le bouton
+   * n'est plus grisé sans explication). Si pays, contrat ou avantages ont changé, le net est
+   * ensuite recalculé avec la nouvelle configuration et, s'il a bougé, réenregistré avec le
+   * même motif — le serveur ne calcule qu'avec la configuration enregistrée.
+   */
   save(): void {
     const cfg = this.config();
-    // cfg.paysId == null is also checked here, not just on the save button's disabled
-    // option: this narrows it to `number` for the request below.
-    if (cfg === null || cfg.paysId == null || this.reason().trim() === '' || this.saving()) return;
+    if (cfg === null || cfg.paysId == null || this.saving()) return;
+    if (this.reason().trim() === '') { this.reasonTried.set(true); return; }
     if ((cfg.currentGrossSalary ?? 0) < 0 || (cfg.currentNetSalary ?? 0) < 0) {
       this.saveError.set(this.t('PAYROLL.EMPLOYEE_CONFIG.NEGATIVE_SALARY'));
       return;
     }
+    const recalc = this.calcInputsChanged() && cfg.currentGrossSalary != null;
+    const reason = this.reason().trim();
     this.saveError.set(null);
     this.saving.set(true);
+    this.upsert(cfg, reason, updated => {
+      if (!recalc) { this.afterSave(); return; }
+      this.calculateNet(
+        net => {
+          if (net === updated.currentNetSalary) { this.afterSave(); return; }
+          this.upsert({ ...this.config()!, currentNetSalary: net },
+            `${reason} ${this.t('PAYROLL.EMPLOYEE_CONFIG.NET_RECALC_SUFFIX')}`, () => this.afterSave());
+        },
+        // Recalcul impossible (erreur déjà signalée) : l'enregistrement principal est fait.
+        () => this.afterSave(),
+      );
+    });
+  }
+
+  private upsert(cfg: EmployeePayrollConfigDto, reason: string, done: (u: EmployeePayrollConfigDto) => void): void {
     this.svc.upsert(this.userId, {
-      paysId: cfg.paysId,
+      paysId: cfg.paysId!,
       contractType: cfg.contractType,
       selectedBenefitCodes: cfg.selectedBenefitCodes,
       currentGrossSalary: cfg.currentGrossSalary,
       currentNetSalary: cfg.currentNetSalary,
-      reason: this.reason(),
+      reason,
     }).subscribe({
       next: updated => {
-        this.saving.set(false);
         this.config.set(updated);
         this.savedConfig.set(updated);
-        this.reason.set('');
-        this.notify.success(this.t('PAYROLL.EMPLOYEE_CONFIG.SAVE_SUCCESS'));
+        done(updated);
       },
       error: err => {
         const body = (err as { error?: { detail?: string; message?: string } } | null)?.error;
@@ -445,8 +670,72 @@ export class EmployeeConfigComponent implements OnInit {
     });
   }
 
-  // ── Primes ─────────────────────────────────────────────────────────────
+  private afterSave(): void {
+    if (!this.saving()) return;
+    this.saving.set(false);
+    this.reason.set('');
+    this.reasonTried.set(false);
+    this.notify.success(this.t('PAYROLL.EMPLOYEE_CONFIG.SAVE_SUCCESS'));
+    this.loadHistory(this.userId);
+    const paysId = this.savedConfig()?.paysId;
+    if (paysId != null) this.loadActorNames(paysId);
+  }
+
+  /** Sortie de la page (`canDeactivate`) avec des modifications non enregistrées : on
+   *  demande confirmation dans une pop-up de la lib. */
+  canLeave(): boolean | Promise<boolean> {
+    if (!this.dirty()) return true;
+    return new Promise<boolean>(resolve => {
+      let answered = false;
+      // La pop-up de la lib est un `<daf-modal-host>` ajouté au document puis retiré à sa
+      // fermeture : fermée sans réponse (croix, Échap), on reste sur la page.
+      const hosts = () => document.querySelectorAll('daf-modal-host').length;
+      const before = hosts();
+      this.modal.open({
+        title: this.t('PAYROLL.EMPLOYEE_CONFIG.LEAVE_TITLE'),
+        icon: 'warning',
+        size: 'sm',
+        closeOnBackdrop: false,
+        body: this.t('PAYROLL.EMPLOYEE_CONFIG.LEAVE_BODY'),
+        buttons: [
+          { label: this.t('PAYROLL.EMPLOYEE_CONFIG.LEAVE_STAY'), variant: 'secondary',
+            action: ref => { answered = true; ref.close(); resolve(false); } },
+          { label: this.t('PAYROLL.EMPLOYEE_CONFIG.LEAVE_GO'), variant: 'primary', icon: 'logout',
+            action: ref => { answered = true; ref.close(); resolve(true); } },
+        ],
+      });
+      const watch = setInterval(() => {
+        if (answered) { clearInterval(watch); return; }
+        if (hosts() <= before) { clearInterval(watch); resolve(false); }
+      }, 300);
+    });
+  }
+
+  // ── Primes : modèle des sections /rh/admin — barre + « Ajouter » → pop-up ───────
+  private readonly bonusFormTpl = viewChild<TemplateRef<unknown>>('bonusFormTpl');
+  private bonusModalRef: ModalRef | null = null;
+
+  openAddBonus(): void {
+    const tpl = this.bonusFormTpl();
+    if (!tpl) return;
+    this.resetBonusForm();
+    this.bonusModalRef = this.modal.open({
+      title: this.t('PAYROLL.EMPLOYEE_CONFIG.ADD_BONUS'),
+      icon: 'redeem',
+      size: 'md',
+      closeOnBackdrop: false,
+      body: tpl,
+      buttons: [
+        { label: this.t('PAYROLL.EMPLOYEE_CONFIG.CANCEL'), variant: 'secondary',
+          action: ref => { ref.close(); this.bonusModalRef = null; } },
+        { label: this.t('PAYROLL.EMPLOYEE_CONFIG.ADD_BONUS'), variant: 'primary', icon: 'add',
+          action: () => this.addBonus() },
+      ],
+    });
+  }
+
   addBonus(): void {
+    if (this.addingBonus()) return;
     this.bonusSubmitted.set(true);
     const errors = this.bonusErrors();
     if (errors.amount || errors.month || errors.year || errors.label) return;
@@ -462,7 +751,8 @@ export class EmployeeConfigComponent implements OnInit {
       next: created => {
         this.addingBonus.set(false);
         this.bonuses.set([created, ...this.bonuses()]);
-        this.resetBonusForm();
+        this.bonusModalRef?.close();
+        this.bonusModalRef = null;
         this.notify.success(this.t('PAYROLL.EMPLOYEE_CONFIG.BONUS_SAVE_SUCCESS'));
       },
       error: () => {
@@ -472,10 +762,11 @@ export class EmployeeConfigComponent implements OnInit {
     });
   }
 
-  /** Vide le formulaire « Nouvelle prime » ; période remise au mois en cours. */
+  /** Formulaire « Nouvelle prime » remis à zéro : période = mois en cours, devise = celle du
+   *  pays du collaborateur. */
   resetBonusForm(): void {
     this.newBonusAmount.set(null);
-    this.newBonusCurrency.set('TND');
+    this.newBonusCurrency.set(this.countryCurrency() ?? 'TND');
     this.newBonusMonth.set(new Date().getMonth() + 1);
     this.newBonusYear.set(new Date().getFullYear());
     this.newBonusLabel.set('');
@@ -522,9 +813,23 @@ export class EmployeeConfigComponent implements OnInit {
     });
   }
 
+  /**
+   * Contrats du pays. Configuration jamais enregistrée : le contrat de la fiche RH est
+   * repris d'office s'il existe dans le pays (la version « enregistrée » de référence suit,
+   * pour ne pas afficher « modifications non enregistrées » à l'ouverture).
+   */
   private loadContractTypesFor(paysId: number): void {
     this.hrService.getContractTypes(paysId).subscribe({
-      next: types => this.contractTypes.set(types),
+      next: types => {
+        this.contractTypes.set(types);
+        const hr = this.hrContract();
+        const cfg = this.config();
+        if (this.neverSaved() && cfg && hr && cfg.contractType !== hr && types.some(t => t.code === hr)) {
+          this.config.set({ ...cfg, contractType: hr });
+          const saved = this.savedConfig();
+          if (saved) this.savedConfig.set({ ...saved, contractType: hr });
+        }
+      },
       error: () => this.contractTypes.set([]),
     });
   }

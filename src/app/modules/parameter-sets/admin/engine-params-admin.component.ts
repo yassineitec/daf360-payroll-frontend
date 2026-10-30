@@ -3,10 +3,12 @@ import { catchError, of, type Observable } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   ButtonComponent, DataTableComponent, FieldMessageComponent, FormFieldComponent, ModalService, SearchToolbarComponent,
-  SectionTitleComponent, SelectComponent,
-  type BadgeCell, type BadgeVariant, type ModalRef, type SelectOption,
+  SectionTitleComponent, SelectComponent, StepperComponent,
+  type BadgeCell, type ModalRef, type SelectOption, type StepperConfig, type StepperStep,
   type TableColumn, type TableConfig, type TableRow,
 } from '@khalilrebhiitec/daf360';
+import { flagDataUri } from '../../../shared/country-flags';
+import { PaysNamesService } from '../../../core/pays-names.service';
 import { PayrollApiService, type PaysDto } from '../../../core/payroll-api.service';
 import {
   PayrollEngineService, type EngineParamSetDto, type EngineRubriqueDefDto,
@@ -21,27 +23,38 @@ import {
   AdminModalFooterComponent, AdminPager, AdminSpinnerComponent, AdminTableFooterComponent,
 } from './admin-section-kit';
 import { rememberAdminState } from './admin-section-state';
-import { delegatedSort, searchTableRows, tableTools } from '../../../shared/table-tools';
+import { delegatedSort, tableTools } from '../../../shared/table-tools';
 
 type ParamKind = 'number' | 'text' | 'boolean' | 'bareme';
 
 /** Un paramètre du jeu : sa clé, sa nature, et sa valeur saisie (le barème en JSON). */
 interface ParamEntry { key: string; kind: ParamKind; value: string; }
 
-const STATUS_VARIANT: Record<string, BadgeVariant> = {
-  DRAFT: 'warning', SUBMITTED: 'info', APPROVED_HR: 'info', APPROVED_FINANCE: 'info', ACTIVE: 'success', ARCHIVED: 'neutral',
+/** Une tranche de barème telle que saisie : « jusqu'à » (vide = sans limite, dernière tranche) et taux en %. */
+interface BracketRow { upper: string; rate: string; }
+
+/** Circuit d'une version, dans l'ordre — une étape du `daf-stepper` chacune (l'archivée termine le circuit). */
+const CIRCUIT = ['DRAFT', 'SUBMITTED', 'APPROVED_HR', 'APPROVED_FINANCE', 'ACTIVE'] as const;
+type CircuitStep = 'SUBMIT' | 'APPROVE_HR' | 'APPROVE_FINANCE' | 'ACTIVATE';
+/** Action qui fait passer une version de son statut au suivant. */
+const NEXT_STEP: Partial<Record<string, CircuitStep>> = {
+  DRAFT: 'SUBMIT', SUBMITTED: 'APPROVE_HR', APPROVED_HR: 'APPROVE_FINANCE', APPROVED_FINANCE: 'ACTIVATE',
 };
 
 /**
- * Section « Paramètres du moteur » de l'administration paie : les valeurs que le moteur de
- * paie utilise RÉELLEMENT pour calculer — taux (en %), montants fixes, plafonds, barèmes
- * progressifs — par pays et par version (`payroll_parameter_sets`, jeu ACTIF chargé à
- * chaque calcul). Les rubriques du moteur y renvoient par leurs clés.
+ * Section « Taux et barèmes » (paramètres du moteur) de l'administration paie : les valeurs
+ * que le CALCUL DE PAIE (/payroll/engine-run) utilise — taux (en %), montants fixes,
+ * plafonds, barèmes par tranches — par pays et par version (`payroll_parameter_sets`, jeu
+ * ACTIF chargé à chaque calcul). Les « Éléments du bulletin » y renvoient par leurs clés. Le
+ * simulateur, lui, lit « Règles de paie » : l'aide de la section le dit.
  *
- * Cycle : « Nouvelle version » (brouillon, copie de l'active) → modification des paramètres
- * → Soumettre → Approuver (RH) → Approuver (Finance) → Activer (l'ancienne active est
- * archivée). Chaque étape avec ses droits, mêmes codes que le serveur, qui refuse aussi de
- * soumettre une version à laquelle manque une clé utilisée par une rubrique active.
+ * Cycle, dessiné par le `daf-stepper` de la lib au-dessus de la version ouverte, avec le
+ * bouton de l'étape suivante : « Nouvelle version » (brouillon, copie de l'active) →
+ * modification des paramètres → Soumettre → Approuver (RH) → Approuver (Finance) → Activer
+ * (l'ancienne active est archivée). Chaque étape avec ses droits, mêmes codes que le serveur,
+ * qui refuse aussi de soumettre une version à laquelle manque une clé utilisée par une
+ * rubrique active. Un barème se saisit en tableau de tranches (De / Jusqu'à / Taux), comme
+ * celui de l'IRPP dans « Règles de paie » ; le JSON n'est plus montré.
  */
 @Component({
   selector: 'app-engine-params-admin',
@@ -50,22 +63,18 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
   imports: [
     TranslatePipe, AdminModalFooterComponent, AdminSectionHeaderComponent, AdminSpinnerComponent,
     AdminTableFooterComponent, ButtonComponent, DataTableComponent, FieldMessageComponent,
-    FormFieldComponent, SearchToolbarComponent, SectionTitleComponent, SelectComponent,
+    FormFieldComponent, SearchToolbarComponent, SectionTitleComponent, SelectComponent, StepperComponent,
   ],
-  // Comme une section de /rh/admin : en-tête (titre, aide, pays + bouton vert à droite),
-  // tableau des versions (actions du circuit par ligne), puis la version ouverte.
+  // Comme une section de /rh/admin : en-tête (titre, aide, bouton vert à droite ; le pays
+  // est en haut de la page), pastilles des versions, puis la version ouverte dans une
+  // carte : son circuit en étapes, l'action suivante, ses paramètres.
   template: `
     <div class="admin-section">
       <app-admin-section-header
         [title]="'PAYROLL.ADMIN_HOME.CARDS.ENGINE_PARAMS' | translate"
         [subtitle]="'PAYROLL.ADMIN_HOME.ENGINE_PARAMS.HINT' | translate">
-        <div class="admin-pays">
-          <daf-select
-            [options]="paysOptions()"
-            [selected]="paysId() ? ['' + paysId()] : []"
-            [config]="{ placeholder: ('PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate), searchable: true, fullWidth: true }"
-            (selectedChange)="selectPays($event[0])" />
-        </div>
+        <!-- Le choix du pays est dans l'en-tête de la page (parameter-sets, ligne du fil
+             d'Ariane), qui appelle paysOptions() / paysId() / selectPays(). -->
         @if (canCreateDraft()) {
           <daf-button class="admin-desktop-only"
             [label]="'PAYROLL.ADMIN_HOME.ENGINE_PARAMS.NEW_VERSION' | translate"
@@ -92,27 +101,26 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
           }
         </div>
       } @else {
-        <!-- Recherche sur les versions ; réinitialiser + choix des colonnes du tableau à droite
-             de la barre ([table]). -->
-        <daf-search-toolbar
-          [card]="false"
-          [showFilter]="false"
-          [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
-          [value]="versionSearch()" [debounce]="200" (valueChange)="onVersionSearch($event)"
-          [table]="versionTable" />
-        <div class="admin-table-scroll">
-          <daf-data-table #versionTable [columns]="versionColumns()" [rows]="versionPager.rows()" [config]="versionConfig()"
-            (sortChange)="versionPager.onSort($event)" (resetClick)="versionPager.onSort(null)" />
+        <!-- Versions du pays en sélecteur compact (1 à 3 en pratique), de la plus ancienne à la
+             plus récente : la version ouverte occupe le reste de la page. -->
+        <div class="versions" role="group" [attr.aria-label]="'PAYROLL.ADMIN_HOME.ENGINE_PARAMS.VERSIONS_LABEL' | translate">
+          @for (v of chronologicalVersions(); track v.id) {
+            <button type="button" class="version-chip" [class.version-chip--on]="v.id === selectedId()"
+                    [attr.aria-pressed]="v.id === selectedId()" (click)="openVersion(v.id)">
+              <span class="version-chip__num">v{{ v.versionNumber }}</span>
+              <span class="version-chip__status" [attr.data-status]="v.status">{{ statusLabel(v.status) }}</span>
+            </button>
+          }
         </div>
-        <app-admin-table-footer
-          [total]="versionPager.total()" [page]="versionPager.current()" [totalPages]="versionPager.totalPages()"
-          [unit]="'PAYROLL.ADMIN_HOME.COUNT.VERSIONS' | translate"
-          (pageChange)="versionPager.go($event)" />
       }
 
       @if (selected(); as ps) {
+        <div class="version-card">
         <div class="params-head">
-          <daf-section-title [title]="'PAYROLL.ADMIN_HOME.ENGINE_PARAMS.VERSION_TITLE' | translate: { version: ps.versionNumber, status: statusLabel(ps.status) }" />
+          <div class="params-head__title">
+            <h3 class="version-title">{{ 'PAYROLL.ADMIN_HOME.ENGINE_PARAMS.VERSION_TITLE' | translate: { version: ps.versionNumber, status: statusLabel(ps.status) } }}</h3>
+            <p class="version-meta">{{ versionMeta(ps) }}</p>
+          </div>
           <div class="params-head__actions">
             @if (isEditable()) {
               <div class="params-date">
@@ -135,6 +143,26 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
           </div>
         </div>
 
+        <!-- Circuit de validation de la version ouverte : où elle en est, et l'action suivante
+             (bouton si l'utilisateur en a le droit, sinon qui doit la faire). -->
+        <div class="circuit">
+          <daf-stepper orientation="horizontal" [steps]="circuitSteps()" [currentStep]="circuitIndex()" [config]="circuitConfig()" />
+          @if (nextStep(); as step) {
+            <div class="circuit__next">
+              <span class="circuit__text">{{ ('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.NEXT.' + step) | translate }}</span>
+              @if (canDo(step)) {
+                <daf-button
+                  [label]="('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.' + step) | translate"
+                  variant="teal"
+                  [options]="{ size: 'sm', iconStart: stepIcon(step), disabled: busy() || (step === 'SUBMIT' && missingKeys().length > 0) }"
+                  (onClick)="confirmStep(ps, step)" />
+              } @else {
+                <span class="circuit__who">{{ ('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.WAITING.' + step) | translate }}</span>
+              }
+            </div>
+          }
+        </div>
+
         @if (!isEditable()) {
           <daf-field-message [hint]="'PAYROLL.ADMIN_HOME.ENGINE_PARAMS.READONLY' | translate" />
         }
@@ -143,7 +171,7 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
         }
 
         <daf-search-toolbar
-          [card]="false"
+          [card]="true"
           [showFilter]="false"
           [placeholder]="'PAYROLL.ADMIN_HOME.ENGINE_PARAMS.SEARCH' | translate"
           [value]="paramSearch()" [debounce]="200" (valueChange)="paramSearch.set($event ?? '')"
@@ -166,6 +194,7 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
             [unit]="'PAYROLL.ADMIN_HOME.COUNT.PARAMS' | translate"
             (pageChange)="paramPager.go($event)" />
         }
+        </div>
       }
     </div>
 
@@ -174,8 +203,8 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
         <div class="param-form__grid">
           <daf-form-field
             [value]="form().key"
-            (valueChange)="patch({ key: text($event) })"
-            [options]="{ label: ('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_KEY' | translate), placeholder: 'CNSS_TAUX_SALARIE', required: true, fullWidth: true,
+            (valueChange)="patch({ key: keyFromInput($event) })"
+            [options]="{ label: ('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_KEY' | translate), placeholder: 'PRIME_PANIER_MONTANT', required: true, fullWidth: true,
                          disabled: editKey() !== null, hint: ('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.KEY_HINT' | translate) }" />
           <daf-select
             [options]="kindOptions()"
@@ -199,11 +228,53 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
               (selectedChange)="patch({ value: $event[0] === 'true' ? 'true' : 'false' })" />
           }
           @case ('bareme') {
-            <daf-form-field
-              [value]="form().value"
-              (valueChange)="patch({ value: ($event ?? '').toString() })"
-              [options]="{ label: ('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.BAREME' | translate), type: 'textarea', rows: 8, required: true, fullWidth: true,
-                           placeholder: baremePlaceholder, hint: ('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.BAREME_HINT' | translate) }" />
+            <!-- Tranches en tableau (même saisie que le barème IRPP des Règles de paie) : chaque
+                 tranche commence où finit la précédente, la dernière n'a pas de limite. Le JSON
+                 {min, max, rate} est reconstruit à chaque saisie. -->
+            <div class="brk">
+              <div class="brk__head">
+                <daf-section-title [title]="'PAYROLL.ADMIN_HOME.ENGINE_PARAMS.BAREME' | translate" />
+                <daf-button
+                  [label]="'PAYROLL.ADMIN.IRPP_ADD' | translate"
+                  variant="secondary"
+                  [options]="{ size: 'sm', iconStart: 'add' }"
+                  (onClick)="addBracket()" />
+              </div>
+              <p class="brk__hint">{{ 'PAYROLL.ADMIN_HOME.ENGINE_PARAMS.BAREME_HINT' | translate }}</p>
+              <div class="brk__row brk__row--head" role="row">
+                <span>{{ 'PAYROLL.ADMIN.IRPP_COL_FROM' | translate }}</span>
+                <span>{{ 'PAYROLL.ADMIN.IRPP_COL_TO' | translate }}</span>
+                <span>{{ 'PAYROLL.ADMIN.IRPP_COL_RATE' | translate }}</span>
+                <span></span>
+              </div>
+              @for (row of brackets(); track $index; let i = $index; let last = $last) {
+                <div class="brk__row" role="row">
+                  <span class="brk__from">{{ bracketFrom(i) }}</span>
+                  @if (last) {
+                    <span class="brk__open">{{ 'PAYROLL.ADMIN.IRPP_AND_MORE' | translate }}</span>
+                  } @else {
+                    <daf-form-field
+                      [options]="{ type: 'number', placeholder: '20000', error: bracketError(i, 'upper') }"
+                      [value]="row.upper"
+                      (valueChange)="setBracket(i, { upper: text($event) })" />
+                  }
+                  <daf-form-field
+                    [options]="{ type: 'number', placeholder: '26', suffixText: '%', error: bracketError(i, 'rate') }"
+                    [value]="row.rate"
+                    (valueChange)="setBracket(i, { rate: text($event) })" />
+                  <span>
+                    @if (brackets().length > 1) {
+                      <daf-button
+                        variant="ghost"
+                        [attr.title]="'PAYROLL.ADMIN.IRPP_REMOVE' | translate"
+                        [attr.aria-label]="'PAYROLL.ADMIN.IRPP_REMOVE' | translate"
+                        [options]="{ size: 'sm', iconStart: 'delete' }"
+                        (onClick)="removeBracket(i)" />
+                    }
+                  </span>
+                </div>
+              }
+            </div>
           }
           @default {
             <daf-form-field
@@ -214,6 +285,8 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
         }
         @if (usedBy(form().key).length) {
           <daf-field-message [hint]="'PAYROLL.ADMIN_HOME.ENGINE_PARAMS.USED_BY' | translate: { codes: usedBy(form().key).join(', ') }" />
+        } @else if (form().key && editKey() !== null) {
+          <daf-field-message [hint]="'PAYROLL.ADMIN_HOME.ENGINE_PARAMS.UNUSED' | translate" />
         }
         @if (error()) {
           <div class="admin-error-banner" role="alert">{{ error() }}</div>
@@ -228,11 +301,46 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
     </ng-template>
   `,
   styles: [ADMIN_SECTION_STYLES, `
-    .params-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: 8px; }
+    /* Sélecteur des versions : une pastille par version, la version ouverte en couleur. */
+    .versions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .version-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+                    font: inherit; font-size: 13px; color: var(--color-on-surface); background: var(--color-surface-container-lowest);
+                    border: 1px solid var(--color-outline-variant); transition: border-color .15s, background-color .15s; }
+    .version-chip:hover { border-color: var(--color-primary); }
+    .version-chip:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+    .version-chip--on { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface-container-lowest)); }
+    .version-chip__num { font-weight: 700; }
+    .version-chip__status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-on-surface-variant); }
+    .version-chip__status::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--color-outline); }
+    .version-chip__status[data-status="DRAFT"]::before { background: var(--color-warning); }
+    .version-chip__status[data-status="SUBMITTED"]::before,
+    .version-chip__status[data-status="APPROVED_HR"]::before,
+    .version-chip__status[data-status="APPROVED_FINANCE"]::before { background: var(--color-primary); }
+    .version-chip__status[data-status="ACTIVE"]::before { background: var(--color-success); }
+    /* Version ouverte : une carte avec son titre, son circuit et ses paramètres. */
+    .version-card { display: flex; flex-direction: column; gap: 16px; padding: 20px; border-radius: 16px;
+                    background: var(--color-surface-container-lowest); border: 1px solid color-mix(in srgb, var(--color-outline-variant) 60%, transparent); }
+    .version-title { margin: 0; font-size: 18px; font-weight: 700; color: var(--color-on-surface); }
+    .version-meta { margin: 4px 0 0; font-size: 12px; color: var(--color-on-surface-variant); }
+    .params-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
     .params-head__actions { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
     .params-date { width: 200px; max-width: 100%; }
     .param-form { display: flex; flex-direction: column; gap: 16px; }
     .param-form__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    /* Circuit de la version ouverte : étapes de la lib, puis l'action suivante. */
+    .circuit { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 12px;
+               border: 1px solid color-mix(in srgb, var(--color-outline-variant) 60%, transparent); }
+    .circuit__next { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+    .circuit__text { font-size: 13px; color: var(--color-on-surface); }
+    .circuit__who { font-size: 12px; color: var(--color-on-surface-variant); font-style: italic; }
+    /* Barème en tranches — mêmes proportions que le barème IRPP des Règles de paie. */
+    .brk { display: flex; flex-direction: column; gap: 8px; }
+    .brk__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .brk__hint { margin: 0; font-size: 12px; color: var(--color-on-surface-variant); }
+    .brk__row { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(130px, 2fr) minmax(110px, 1.4fr) 40px; gap: 12px; align-items: start; }
+    .brk__row--head { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--color-on-surface-variant); }
+    .brk__from, .brk__open { display: flex; align-items: center; min-height: 44px; font-size: 14px; font-variant-numeric: tabular-nums; }
+    .brk__open { color: var(--color-on-surface-variant); font-style: italic; }
   `],
 })
 export class EngineParamsAdminComponent implements OnInit {
@@ -246,6 +354,7 @@ export class EngineParamsAdminComponent implements OnInit {
   private readonly userStore    = inject(UserStore);
   private readonly modal        = inject(ModalService);
   private readonly notification = inject(NotificationService);
+  private readonly paysNames    = inject(PaysNamesService);
 
   private readonly paramTpl = viewChild.required<TemplateRef<unknown>>('paramTpl');
   modalRef: ModalRef | null = null;
@@ -259,7 +368,6 @@ export class EngineParamsAdminComponent implements OnInit {
   readonly failed     = signal(false);
   readonly busy       = signal(false);
   readonly paramSearch = signal('');
-  readonly versionSearch = signal('');
   private seq = 0;
 
   /** Pop-up paramètre : la saisie et la clé modifiée (null = ajout). */
@@ -267,8 +375,10 @@ export class EngineParamsAdminComponent implements OnInit {
   readonly editKey = signal<string | null>(null);
   readonly error   = signal<string | null>(null);
 
-  /** Exemple de barème — JSON valide, recopiable tel quel. */
-  readonly baremePlaceholder = '[\n  {"min": 0, "max": 5000, "rate": 0},\n  {"min": 5000, "max": 20000, "rate": 26},\n  {"min": 20000, "max": null, "rate": 35}\n]';
+  /** Tranches du barème en cours de saisie ; `bracketStart` = début de la première tranche
+   *  (celui du barème existant, sinon 0). Le JSON de `form().value` en est reconstruit. */
+  readonly brackets = signal<BracketRow[]>([]);
+  private bracketStart = 0;
 
   private t(key: string, params?: Record<string, unknown>): string {
     this.translate.currentLang();
@@ -301,7 +411,7 @@ export class EngineParamsAdminComponent implements OnInit {
     && !this.versions().some(v => v.status === 'DRAFT'));
 
   readonly paysOptions = computed<SelectOption[]>(() =>
-    this.pays().map(p => ({ value: String(p.id), label: `${p.frenchLabel} (${p.isoCode})` })));
+    this.pays().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})`, imageUrl: flagDataUri(p.isoCode) })));
 
   readonly kindOptions = computed<SelectOption[]>(() =>
     (['number', 'text', 'boolean', 'bareme'] as const).map(k => ({ value: k, label: this.t(`PAYROLL.ADMIN_HOME.ENGINE_PARAMS.KIND.${k}`) })));
@@ -325,7 +435,7 @@ export class EngineParamsAdminComponent implements OnInit {
     this.versions.set([]);
     this.rubriques.set([]);
     this.selectedId.set(null);
-    if (!keepView) this.versionSearch.set('');
+    if (!keepView) this.paramSearch.set('');
     this.failed.set(false);
     if (!id) return;
     const current = ++this.seq;
@@ -362,99 +472,98 @@ export class EngineParamsAdminComponent implements OnInit {
     return [...used].filter(k => !present.has(k)).sort();
   });
 
-  /** Codes des rubriques actives qui utilisent une clé. */
+  /** Libellés des éléments du bulletin (rubriques actives) qui utilisent une clé. */
   usedBy(key: string): string[] {
+    const en = this.translate.getCurrentLang() === 'en';
     return this.rubriques()
       .filter(r => [r.paramKeyTaux, r.paramKeyPlafond, r.paramKeyBareme].includes(key))
-      .map(r => r.code);
+      .map(r => (en && r.labelEn) || r.labelFr || r.code);
   }
 
-  // ── Tableau des versions ──────────────────────────────────────────────────
-  readonly versionColumns = computed<TableColumn[]>(() => [
-    // « v12 » se trierait mal en texte (v10 avant v9) : trié sur le numéro.
-    { key: 'version',   label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_VERSION'), sortable: true,
-      sortAccessor: row => (row['_source'] as EngineParamSetDto).versionNumber },
-    { key: 'status',    label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_STATUS'), type: 'badge', sortable: true },
-    { key: 'effective', label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.EFFECTIVE_DATE'), type: 'date', format: { dateStyle: 'short' }, sortable: true },
-    { key: 'count',     label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_COUNT'), type: 'number', sortable: true },
-    { key: 'createdBy', label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_CREATED_BY'), sortable: true },
-    { key: 'activated', label: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.COL_ACTIVATED'), type: 'date', format: { dateStyle: 'short' }, sortable: true },
-  ]);
+  // ── Circuit de la version ouverte (daf-stepper) ───────────────────────────
+  /** Position dans le circuit ; une version archivée a fait tout le circuit. */
+  readonly circuitIndex = computed(() => {
+    const status = this.selected()?.status ?? 'DRAFT';
+    const i = (CIRCUIT as readonly string[]).indexOf(status);
+    return i < 0 ? CIRCUIT.length - 1 : i;
+  });
 
-  readonly versionRows = computed<TableRow[]>(() =>
-    this.versions().map(v => ({
-      id: v.id,
-      version: `v${v.versionNumber}${v.id === this.selectedId() ? ' ◂' : ''}`,
-      status: {
-        label: this.statusLabel(v.status),
-        options: { variant: STATUS_VARIANT[v.status] ?? 'neutral', size: 'sm', dot: true },
-      } satisfies BadgeCell,
-      effective: v.effectiveDate,
-      count: parseParams(v.parameters).length,
-      createdBy: v.createdBy ?? '—',
-      activated: v.activatedAt,
-      _source: v,
-    })));
+  readonly circuitSteps = computed<StepperStep[]>(() => {
+    const v = this.selected();
+    if (!v) return [];
+    const date = (iso: string | null) => iso
+      ? new Intl.DateTimeFormat(this.translate.getCurrentLang() === 'en' ? 'en-US' : 'fr-FR', { dateStyle: 'short' }).format(new Date(iso))
+      : '';
+    const who = (name: string | null, at: string | null) => [name, date(at)].filter(Boolean).join(' · ') || undefined;
+    const subtitles: Record<string, string | undefined> = {
+      DRAFT:            who(v.createdBy, v.createdAt),
+      SUBMITTED:        who(v.submittedBy, v.submittedAt),
+      APPROVED_HR:      who(v.approvedByHr, v.approvedAtHr),
+      APPROVED_FINANCE: who(v.approvedByFinance, v.approvedAtFinance),
+      ACTIVE:           v.status === 'ARCHIVED' ? this.statusLabel('ARCHIVED') : who(null, v.activatedAt),
+    };
+    const current = this.circuitIndex();
+    const done = v.status === 'ACTIVE' || v.status === 'ARCHIVED';
+    return CIRCUIT.map((s, i) => ({
+      title: this.statusLabel(s),
+      subtitle: i <= current ? subtitles[s] : undefined,
+      // Complétion explicite : l'étape en cours n'est « faite » qu'une fois la version active.
+      completed: i < current || (done && i === current),
+    }));
+  });
 
-  /** Colonnes de recherche des versions : le texte AFFICHÉ (« v12 », dates en `Date` mises en
-   *  forme par `searchTableRows`), pas la valeur de tri (le numéro seul). */
-  private readonly versionSearchColumns = computed<TableColumn[]>(() => this.versionColumns().map(c => {
-    if (c.key === 'version') return { ...c, sortAccessor: row => row['version'] as string };
-    if (c.type === 'date') return { ...c, sortAccessor: row => (row[c.key] ? new Date(row[c.key] as string) : null) };
-    return c;
+  readonly circuitConfig = computed<StepperConfig>(() => ({
+    chrome: 'header-only',
+    labelDensity: 'quiet',
+    stepperLabel: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.CIRCUIT'),
   }));
 
-  /** Versions retenues par la recherche, avant tri et découpe en pages. */
-  readonly filteredVersionRows = computed(() =>
-    searchTableRows(this.versionRows(), this.versionSearchColumns(), this.versionSearch()));
+  /** Action suivante de la version ouverte (aucune une fois active ou archivée). */
+  readonly nextStep = computed<CircuitStep | null>(() => NEXT_STEP[this.selected()?.status ?? ''] ?? null);
 
-  /** Nouvelle recherche → retour à la première page. */
-  onVersionSearch(value: string | null | undefined): void {
-    this.versionSearch.set(value ?? '');
-    this.versionPager.go(0);
+  /** Mêmes droits que les actions de ligne du tableau des versions. */
+  canDo(step: CircuitStep): boolean {
+    return step === 'SUBMIT' || step === 'APPROVE_HR' ? this.canSubmit() : this.canFinance();
+  }
+
+  stepIcon(step: CircuitStep): string {
+    return { SUBMIT: 'send', APPROVE_HR: 'how_to_reg', APPROVE_FINANCE: 'verified', ACTIVATE: 'rocket_launch' }[step];
+  }
+
+  // ── Versions du pays ──────────────────────────────────────────────────────
+  /** Pastilles du sélecteur, de la plus ancienne à la plus récente. */
+  readonly chronologicalVersions = computed(() => [...this.versions()].reverse());
+
+  /** Une autre version ouverte : sa recherche et sa page repartent de zéro. */
+  openVersion(id: number): void {
+    if (id === this.selectedId()) return;
+    this.selectedId.set(id);
+    this.paramSearch.set('');
+    this.paramPager.go(0);
+  }
+
+  /** « Créée par … le … · 3 paramètre(s) · en vigueur au … · activée le … » sous le titre de la version. */
+  versionMeta(v: EngineParamSetDto): string {
+    const date = (iso: string | null) => iso
+      ? new Intl.DateTimeFormat(this.translate.getCurrentLang() === 'en' ? 'en-US' : 'fr-FR', { dateStyle: 'short' }).format(new Date(iso))
+      : '';
+    const P = 'PAYROLL.ADMIN_HOME.ENGINE_PARAMS.META_';
+    return [
+      v.createdBy ? this.t(P + 'CREATED_BY', { who: v.createdBy, date: date(v.createdAt) }) : this.t(P + 'CREATED', { date: date(v.createdAt) }),
+      `${parseParams(v.parameters).length} ${this.t('PAYROLL.ADMIN_HOME.COUNT.PARAMS')}`,
+      v.effectiveDate ? this.t(P + 'EFFECTIVE', { date: date(v.effectiveDate) }) : '',
+      v.activatedAt ? this.t(P + 'ACTIVATED', { date: date(v.activatedAt) }) : '',
+    ].filter(Boolean).join(' · ');
   }
 
   /** Pages de 5 lignes, comme les sections de /rh/admin. */
-  readonly versionPager = new AdminPager(() => this.filteredVersionRows(), () => this.versionColumns());
-  readonly paramPager   = new AdminPager(() => this.paramRows(), () => this.paramColumns());
+  readonly paramPager = new AdminPager(() => this.paramRows(), () => this.paramColumns());
 
   // ── Mémoire de la section ──────────────────────────────────────────────────
   /** Pays, recherches, tris et pages gardés tant qu'on reste dans l'administration paie (voir `rememberAdminState`). */
   private readonly memory = rememberAdminState('engine-params', {
-    paysId: this.paysId, versionSearch: this.versionSearch, paramSearch: this.paramSearch,
-    versionPage: this.versionPager.page, versionSort: this.versionPager.sort,
+    paysId: this.paysId, paramSearch: this.paramSearch,
     paramPage: this.paramPager.page, paramSort: this.paramPager.sort,
-  });
-
-  readonly versionConfig = computed<TableConfig>(() => {
-    const status = (row: TableRow) => (row['_source'] as EngineParamSetDto).status;
-    return {
-      showHeader: false, hoverable: true,
-      ...tableTools(this.translate),
-      ...delegatedSort(untracked(this.versionPager.sort)),
-      rowId: row => row['id'],
-      emptyMessage: this.t(
-        this.versionSearch().trim() ? 'PAYROLL.ADMIN_HOME.NO_RESULT'
-          : !this.paysId() ? 'PAYROLL.ADMIN_HOME.NO_PAYS'
-          : this.failed() ? 'PAYROLL.ADMIN_HOME.LOAD_ERROR'
-          : 'PAYROLL.ADMIN_HOME.ENGINE_PARAMS.EMPTY'),
-      actions: [
-        { id: 'open', icon: 'visibility', tooltip: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.OPEN'),
-          onClick: row => this.selectedId.set(row['id'] as number) },
-        { id: 'submit', icon: 'send', tooltip: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.SUBMIT'),
-          hidden: row => !(status(row) === 'DRAFT' && this.canSubmit()),
-          onClick: row => this.confirmStep(row['_source'] as EngineParamSetDto, 'SUBMIT') },
-        { id: 'approve-hr', icon: 'how_to_reg', tooltip: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.APPROVE_HR'),
-          hidden: row => !(status(row) === 'SUBMITTED' && this.canSubmit()),
-          onClick: row => this.confirmStep(row['_source'] as EngineParamSetDto, 'APPROVE_HR') },
-        { id: 'approve-finance', icon: 'verified', tooltip: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.APPROVE_FINANCE'),
-          hidden: row => !(status(row) === 'APPROVED_HR' && this.canFinance()),
-          onClick: row => this.confirmStep(row['_source'] as EngineParamSetDto, 'APPROVE_FINANCE') },
-        { id: 'activate', icon: 'rocket_launch', tooltip: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.ACTIVATE'),
-          hidden: row => !(status(row) === 'APPROVED_FINANCE' && this.canFinance()),
-          onClick: row => this.confirmStep(row['_source'] as EngineParamSetDto, 'ACTIVATE') },
-      ],
-    };
   });
 
   // ── Tableau des paramètres ────────────────────────────────────────────────
@@ -497,9 +606,14 @@ export class EngineParamsAdminComponent implements OnInit {
   private display(e: ParamEntry): string {
     if (e.kind === 'boolean') return this.t(e.value === 'true' ? 'PAYROLL.ADMIN_HOME.YES' : 'PAYROLL.ADMIN_HOME.NO');
     if (e.kind === 'bareme') {
+      // « 3 tranches · de 0 % à 35 % » plutôt que le JSON.
       try {
-        const n = (JSON.parse(e.value) as unknown[]).length;
-        return this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.BRACKETS', { count: n });
+        const rates = (JSON.parse(e.value) as { rate: number }[]).map(b => b.rate);
+        const fmt = (n: number) => new Intl.NumberFormat(this.translate.getCurrentLang() === 'en' ? 'en-US' : 'fr-FR',
+          { maximumFractionDigits: 4 }).format(n);
+        return this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.BRACKETS', {
+          count: rates.length, min: fmt(Math.min(...rates)), max: fmt(Math.max(...rates)),
+        });
       } catch { return e.value; }
     }
     if (e.kind === 'number') {
@@ -520,7 +634,7 @@ export class EngineParamsAdminComponent implements OnInit {
     });
   }
 
-  private confirmStep(v: EngineParamSetDto, step: 'SUBMIT' | 'APPROVE_HR' | 'APPROVE_FINANCE' | 'ACTIVATE'): void {
+  confirmStep(v: EngineParamSetDto, step: CircuitStep): void {
     const by = this.userStore.currentUser()?.fullName ?? undefined;
     const call$ = {
       SUBMIT:          () => this.engine.submitParamSet(v.id, by),
@@ -572,6 +686,81 @@ export class EngineParamsAdminComponent implements OnInit {
   changeKind(kind: string | undefined): void {
     const k = (kind ?? 'number') as ParamKind;
     this.patch({ kind: k, value: k === 'boolean' ? 'false' : k === 'bareme' ? '' : this.form().value });
+    if (k === 'bareme') this.loadBrackets('');
+  }
+
+  /** Nouvelle clé : majuscules, sans accents, espaces et tirets en `_` (format exigé par le serveur). */
+  keyFromInput(value: unknown): string {
+    return this.text(value).normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toUpperCase().replace(/[\s-]+/g, '_').replace(/[^A-Z0-9_.]/g, '').slice(0, 50);
+  }
+
+  // ── Barème en tranches ────────────────────────────────────────────────────
+  /** Tranches depuis le JSON {min, max, rate} ; vide ou illisible = une tranche à remplir. */
+  private loadBrackets(json: string): void {
+    let list: { min: number; max: number | null; rate: number }[] = [];
+    try { const v = JSON.parse(json || '[]'); if (Array.isArray(v)) list = v; } catch { /* une tranche vide */ }
+    this.bracketStart = typeof list[0]?.min === 'number' ? list[0].min : 0;
+    this.brackets.set(list.length
+      ? list.map((b, i) => ({ upper: i === list.length - 1 || b.max == null ? '' : String(b.max), rate: String(b.rate ?? '') }))
+      : [{ upper: '', rate: '' }]);
+  }
+
+  /** « De » d'une tranche = « Jusqu'à » de la précédente (début du barème pour la première). */
+  bracketFrom(i: number): string {
+    const raw = i === 0 ? String(this.bracketStart) : this.brackets()[i - 1].upper;
+    const n = Number(raw);
+    if (raw === '' || isNaN(n)) return '…';
+    return new Intl.NumberFormat(this.translate.getCurrentLang() === 'en' ? 'en-US' : 'fr-FR').format(n);
+  }
+
+  bracketError(i: number, field: 'upper' | 'rate'): string | undefined {
+    const row = this.brackets()[i];
+    if (field === 'rate') {
+      return row.rate !== '' && (isNaN(Number(row.rate)) || Number(row.rate) < 0)
+        ? this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.ERR_RATE') : undefined;
+    }
+    if (row.upper === '') return undefined;
+    const from = i === 0 ? this.bracketStart : Number(this.brackets()[i - 1].upper);
+    return isNaN(Number(row.upper)) || Number(row.upper) <= from
+      ? this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.ERR_UPPER') : undefined;
+  }
+
+  setBracket(i: number, change: Partial<BracketRow>): void {
+    this.brackets.update(list => list.map((r, j) => (j === i ? { ...r, ...change } : r)));
+    this.writeBrackets();
+  }
+
+  /** Nouvelle tranche en fin de barème : l'ancienne dernière reçoit une limite à saisir. */
+  addBracket(): void {
+    this.brackets.update(list => [...list, { upper: '', rate: '' }]);
+    this.writeBrackets();
+  }
+
+  removeBracket(i: number): void {
+    this.brackets.update(list => {
+      const next = list.filter((_, j) => j !== i);
+      if (next.length) next[next.length - 1] = { ...next[next.length - 1], upper: '' };
+      return next;
+    });
+    this.writeBrackets();
+  }
+
+  /** JSON {min, max, rate} du barème saisi — vide (donc refusé à l'enregistrement) tant qu'une case manque ou est fausse. */
+  private writeBrackets(): void {
+    const rows = this.brackets();
+    const last = rows.length - 1;
+    const complete = rows.every((r, i) => r.rate !== '' && (i === last || r.upper !== ''))
+      && rows.every((_, i) => !this.bracketError(i, 'upper') && !this.bracketError(i, 'rate'));
+    if (!complete) { this.patch({ value: '' }); return; }
+    let min = this.bracketStart;
+    const json = rows.map((r, i) => {
+      const max = i === last ? null : Number(r.upper);
+      const b = { min, max, rate: Number(r.rate) };
+      if (max != null) min = max;
+      return b;
+    });
+    this.patch({ value: JSON.stringify(json) });
   }
 
   saveEffectiveDate(value: unknown): void {
@@ -585,6 +774,7 @@ export class EngineParamsAdminComponent implements OnInit {
     const current = key ? this.entries().find(e => e.key === key) : undefined;
     this.editKey.set(key);
     this.form.set(current ? { ...current } : { key: '', kind: 'number', value: '' });
+    if (current?.kind === 'bareme') this.loadBrackets(current.value);
     this.error.set(null);
     this.modalRef = this.modal.open({
       title: key ? this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.EDIT_PARAM', { key }) : this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.ADD_PARAM'),

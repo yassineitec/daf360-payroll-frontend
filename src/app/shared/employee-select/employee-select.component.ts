@@ -4,13 +4,14 @@ import {
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { HrProfileService, EmployeeListItem } from '../../core/hr-profile.service';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { HrProfileService, EmployeeListItem, contractTypeLabel } from '../../core/hr-profile.service';
 
 @Component({
   selector: 'app-employee-select',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule],
+  imports: [CommonModule, TranslatePipe],
   providers: [{
     provide: NG_VALUE_ACCESSOR,
     useExisting: forwardRef(() => EmployeeSelectComponent),
@@ -28,6 +29,13 @@ export class EmployeeSelectComponent implements ControlValueAccessor, OnChanges,
   @Output() employeeSelected = new EventEmitter<EmployeeListItem | null>();
 
   private readonly hrService = inject(HrProfileService);
+  private readonly translate = inject(TranslateService);
+
+  /** Code de contrat (CDI, PERMANENT…) → libellé dans la langue courante. */
+  contractLabel(code: string): string {
+    this.translate.currentLang();
+    return contractTypeLabel(code, this.translate);
+  }
 
   readonly employees   = signal<EmployeeListItem[]>([]);
   readonly query       = signal('');

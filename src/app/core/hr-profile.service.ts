@@ -1,8 +1,9 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { catchError, map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
+import type { ConfigurableListValueDto } from './hr-ref-api.service';
 
 export interface HrContractType {
   code: string;
@@ -107,11 +108,30 @@ export class HrProfileService {
       .pipe(catchError(() => of({ departments: [], grades: [], pays: [], contractTypes: [] })));
   }
 
+  /** Types de contrat du pays (`GET /api/hr/lists/CONTRACT_TYPE?pays=`, admin RH › listes
+   *  configurables › Type de contrat) : valeurs globales + celles du pays, actives seulement.
+   *  L'ancien appel visait `/api/hr/ref/contract-types`, que le rh-service n'expose pas : le
+   *  404 était avalé par le `catchError` et toutes les listes « Contrat » restaient vides.
+   *  Codes rognés (l'admin en stocke avec des espaces) et dédoublonnés sans tenir compte de
+   *  la casse : une valeur du pays et une valeur globale peuvent porter le même code. */
   getContractTypes(paysId?: number | null): Observable<HrContractType[]> {
     let params = new HttpParams();
-    if (paysId != null) params = params.set('paysId', paysId);
-    return this.http.get<HrContractType[]>(`${this.base}/api/hr/ref/contract-types`, { params })
-      .pipe(catchError(() => of([])));
+    if (paysId != null) params = params.set('pays', paysId);
+    return this.http.get<ConfigurableListValueDto[]>(`${this.base}/api/hr/lists/CONTRACT_TYPE`, { params })
+      .pipe(
+        map(values => {
+          const seen = new Set<string>();
+          const types: HrContractType[] = [];
+          for (const v of values ?? []) {
+            const code = v.valueCode?.trim();
+            if (!code || v.isActive === false || seen.has(code.toUpperCase())) continue;
+            seen.add(code.toUpperCase());
+            types.push({ code, labelFr: v.labelFr, labelEn: v.labelEn ?? v.labelFr });
+          }
+          return types;
+        }),
+        catchError(() => of([])),
+      );
   }
 
   /** Fiche complète (`GET /api/hr/profiles/{id}`, par `profileId`) — carte « Détails » de

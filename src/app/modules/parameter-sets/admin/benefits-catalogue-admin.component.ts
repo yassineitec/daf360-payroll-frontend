@@ -22,6 +22,7 @@ import { NotificationService } from '../../../core/notification.service';
 import { UserStore } from '../../../core/user.store';
 import { PaysNamesService } from '../../../core/pays-names.service';
 
+import { flagDataUri } from '../../../shared/country-flags';
 const VALUATION_METHODS = ['TAX_AUTHORITY', 'ACTUAL_COST'] as const;
 
 /**
@@ -224,7 +225,7 @@ export class BenefitsCatalogueAdminComponent implements OnInit {
   }
 
   readonly paysOptions = computed<SelectOption[]>(() =>
-    this.pays().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})` })));
+    this.pays().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})`, imageUrl: flagDataUri(p.isoCode) })));
 
   readonly setOptions = computed<SelectOption[]>(() =>
     this.sets().map(s => ({

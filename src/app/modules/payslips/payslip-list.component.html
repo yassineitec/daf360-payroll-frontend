@@ -1,0 +1,99 @@
+<!--
+  /payroll/payslips — historique des lots de fiches de paie distribués.
+
+  Même squelette que /payroll/simulator : en-tête avec l'action teal « Distribuer des
+  fiches de paie », 4 KPI en grille, barre de recherche + filtres + bascule cartes /
+  tableau, puis les lots (cartes par défaut). Un clic ouvre le rapport du lot.
+-->
+<daf-page [kpis]="4" headerSize="md">
+
+  <daf-page-header
+    [title]="'PAYROLL.PAYSLIPS.TITLE' | translate"
+    [subtitle]="'PAYROLL.PAYSLIPS.SUBTITLE' | translate"
+    size="md">
+    <daf-button pageActions
+      [options]="{ variant: 'teal', label: ('PAYROLL.PAYSLIPS.LIST.NEW_BTN' | translate), iconStart: 'add' }"
+      (onClick)="newBatch()" />
+  </daf-page-header>
+
+  <!-- KPI — sur le dernier lot de chaque pays + mois (un mois relancé ne compte qu'une fois).
+       Tuiles de RÉSULTAT, aucune cliquable : les lots à vérifier se filtrent dans le panneau.
+       D'abord la question qu'on se pose : quel mois est distribué, et à quel point. -->
+  <section class="grid grid-cols-4 gap-2 sm:gap-6">
+    <daf-metric-card
+      [label]="'PAYROLL.PAYSLIPS.LIST.KPI.LAST_PERIOD' | translate"
+      [value]="kpiLastPeriod()" [delta]="kpiLastPeriodDelta()" [options]="kpiLastPeriodOptions()" />
+    <daf-metric-card
+      [label]="'PAYROLL.PAYSLIPS.LIST.KPI.FILED' | translate"
+      [value]="kpiFiled()" [delta]="kpiFiledDelta()" [options]="kpiFiledOptions()" />
+    <daf-metric-card
+      [label]="'PAYROLL.PAYSLIPS.LIST.KPI.TO_FIX' | translate"
+      [value]="kpiToFix()" [delta]="kpiToFixDelta()" [options]="kpiToFixOptions()" />
+    <daf-metric-card
+      [label]="'PAYROLL.PAYSLIPS.LIST.KPI.BATCHES' | translate"
+      [value]="kpiBatches()" [options]="kpiBatchesOptions()" />
+  </section>
+
+  <!-- Le journal ne vit que dans ce navigateur (le service RH ne garde pas les lots). -->
+  <div class="notice notice--info" role="note">
+    <span class="material-symbols-outlined notice__icon" aria-hidden="true">info</span>
+    <span>{{ 'PAYROLL.PAYSLIPS.LIST.BROWSER_NOTE' | translate }}</span>
+  </div>
+
+  <daf-search-toolbar
+    [placeholder]="'PAYROLL.PAYSLIPS.LIST.SEARCH' | translate"
+    [value]="search()" [debounce]="200" (valueChange)="search.set($event)"
+    [filterFields]="filterFields()"
+    [filterConfig]="filterConfig()"
+    (filterApply)="applyFilters($event)"
+    (filterReset)="resetFilters()"
+    [views]="viewOptions()"
+    [view]="viewMode()"
+    (viewChange)="setViewMode($event)"
+    [table]="viewMode() === 'list' ? historyTable : null" />
+
+  @if (viewMode() === 'grid') {
+    <div class="grid grid-cols-3 gap-5">
+      @for (card of cards(); track card.id) {
+        <daf-entity-card
+          [options]="card.options"
+          (cardClick)="open(card.id)"
+          (viewClick)="open(card.id)" />
+      } @empty {
+        <div class="col-span-full flex flex-col items-center gap-3 rounded-xl
+                    border border-dashed border-outline-variant/50 px-6 py-14
+                    text-center text-on-surface-variant">
+          <span class="material-symbols-outlined text-[40px] text-outline-variant">
+            {{ history().length ? 'search_off' : 'upload_file' }}
+          </span>
+          <p class="text-body-md">
+            {{ (history().length ? 'PAYROLL.PAYSLIPS.LIST.EMPTY_FILTERED' : 'PAYROLL.PAYSLIPS.HISTORY.EMPTY') | translate }}
+          </p>
+          @if (!history().length) {
+            <daf-button
+              [options]="{ variant: 'teal', label: ('PAYROLL.PAYSLIPS.LIST.NEW_BTN' | translate), iconStart: 'add' }"
+              (onClick)="newBatch()" />
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Toujours rendu (masqué en vue cartes) : la barre a besoin de la référence du tableau
+       pour ses outils (réinitialiser, colonnes) dès qu'on bascule en vue tableau. -->
+  <div [hidden]="viewMode() !== 'list'">
+    <daf-data-table
+      #historyTable
+      [columns]="columns()"
+      [rows]="filteredRows()"
+      [config]="tableConfig()"
+      (rowClick)="open($any($event['id']))">
+      <ng-template [dafCell]="'fileName'" let-row>
+        <span class="history-file" [title]="row['fileName']">
+          <span class="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>
+          <span class="history-file__name">{{ row['fileName'] }}</span>
+        </span>
+      </ng-template>
+    </daf-data-table>
+  </div>
+</daf-page>

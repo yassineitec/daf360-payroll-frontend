@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy, Component, OnInit, TemplateRef, ViewChild, computed, effect, inject, signal, untracked,
 } from '@angular/core';
+import { Router } from '@angular/router';
 import { Subscription, catchError, of } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
@@ -14,13 +15,14 @@ import type {
 
 import { PayrollApiService, PaysDto } from '../../core/payroll-api.service';
 import {
-  ADVANCE_STATUSES, AdvancePolicy, AdvanceStatus, DISBURSEMENT_METHODS, DeductionRow, DisbursementMethod,
+  ADVANCE_STATUSES, AdvanceStatus, DISBURSEMENT_METHODS, DeductionRow, DisbursementMethod,
   InstallmentStatus, SalaryAdvance, SalaryAdvancesService,
 } from './salary-advances.service';
 import { tableTools } from '../../shared/table-tools';
 import { PaysNamesService } from '../../core/pays-names.service';
+import { UserStore } from '../../core/user.store';
 
-type TabKey = 'payout' | 'deductions' | 'followup' | 'rules';
+type TabKey = 'payout' | 'deductions' | 'followup';
 
 const ADVANCE_VARIANT: Record<AdvanceStatus, BadgeVariant> = {
   PENDING_FINANCE: 'warning', APPROVED: 'info', REPAYING: 'success',
@@ -29,7 +31,6 @@ const ADVANCE_VARIANT: Record<AdvanceStatus, BadgeVariant> = {
 const INSTALLMENT_VARIANT: Record<InstallmentStatus, BadgeVariant> = {
   PLANNED: 'warning', DEDUCTED: 'success', SKIPPED: 'neutral', WAIVED: 'info',
 };
-const CURRENCIES = ['TND', 'EGP', 'EUR', 'USD'];
 const INSTALLMENT_STATUSES: InstallmentStatus[] = ['PLANNED', 'DEDUCTED', 'SKIPPED', 'WAIVED'];
 
 /** Schedules reach a few months out; past that there is nothing to deduct yet. */
@@ -38,14 +39,16 @@ const MAX_MONTHS_AHEAD = 3;
 /**
  * `/payroll/salary-advances` — payroll owns the salary advances: they exist to be deducted
  * from the next salaries. Finance only approves or declines them (its cost approval queue);
- * the employee asks from self-service. Four tabs:
+ * the employee asks from self-service. Three tabs:
  *
  *  - **À verser**  — approved by finance: record the payout, which creates the schedule;
  *  - **Retenues**  — one payroll month: export the list for the payroll software, then mark
  *                    each line deducted once the payslip carries it (or postpone / settle it);
- *  - **Suivi**     — every advance, by status, with its schedule;
- *  - **Règles**    — per country: maximum repayment period, minimum seniority, open or closed.
- *                    No ceiling on the amount — finance judges it.
+ *  - **Suivi**     — every advance, by status, with its schedule.
+ *
+ * The per-country rules (maximum repayment period, minimum seniority, open or closed) are set
+ * in ONE place: /payroll/admin, card « Avances sur salaire » (advance-rules-admin). The header
+ * links there for whoever may open the administration.
  */
 @Component({
   selector: 'app-salary-advances',
@@ -65,10 +68,11 @@ export class SalaryAdvancesComponent implements OnInit {
   private readonly modal = inject(ModalService);
   private readonly translate = inject(TranslateService);
   private readonly paysNames = inject(PaysNamesService);
+  private readonly router = inject(Router);
+  private readonly userStore = inject(UserStore);
 
   @ViewChild('payoutTpl') private payoutTpl!: TemplateRef<unknown>;
   @ViewChild('noteTpl')   private noteTpl!:   TemplateRef<unknown>;
-  @ViewChild('policyTpl') private policyTpl!: TemplateRef<unknown>;
   @ViewChild('detailTpl') private detailTpl!: TemplateRef<unknown>;
   private modalRef: ModalRef | null = null;
   private deductionsSub?: Subscription;
@@ -77,7 +81,6 @@ export class SalaryAdvancesComponent implements OnInit {
   readonly toPay      = signal<SalaryAdvance[]>([]);
   readonly all        = signal<SalaryAdvance[]>([]);
   readonly deductions = signal<DeductionRow[]>([]);
-  readonly policies   = signal<AdvancePolicy[]>([]);
   readonly pays       = signal<PaysDto[]>([]);
 
   readonly firstLoad          = signal(true);
@@ -86,7 +89,7 @@ export class SalaryAdvancesComponent implements OnInit {
   readonly error              = signal<string | null>(null);
 
   // ── View state ───────────────────────────────────────────────────────────
-  readonly activeTab    = tabParam<TabKey>(['payout', 'deductions', 'followup', 'rules'], 'payout');
+  readonly activeTab    = tabParam<TabKey>(['payout', 'deductions', 'followup'], 'payout');
   readonly search       = signal('');
   readonly month        = signal(currentYearMonth());
   readonly exporting    = signal(false);
@@ -100,8 +103,6 @@ export class SalaryAdvancesComponent implements OnInit {
   readonly note        = signal('');
   readonly noteRow     = signal<DeductionRow | null>(null);
   readonly noteKind    = signal<'skip' | 'waive'>('skip');
-  readonly policyForm  = signal<AdvancePolicy>(blankPolicy(0));
-  readonly policyIsNew = signal(false);
   readonly modalError  = signal<string | null>(null);
 
   readonly kpiPayout: MetricCardOptions      = { icon: 'account_balance', iconColor: 'text-warning', iconBg: 'bg-warning/10' };
@@ -136,7 +137,6 @@ export class SalaryAdvancesComponent implements OnInit {
       error: err => { this.error.set(this.message(err)); this.loading.set(false); this.firstLoad.set(false); },
     });
     this.svc.list().pipe(catchError(() => of([] as SalaryAdvance[]))).subscribe(list => this.all.set(list));
-    this.svc.policies().pipe(catchError(() => of([] as AdvancePolicy[]))).subscribe(list => this.policies.set(list));
   }
 
   /** Only the latest month's response may land: switching months fast must not show an older one. */
@@ -179,7 +179,6 @@ export class SalaryAdvancesComponent implements OnInit {
       { id: 'payout',     label: t('PAYROLL.SALARY_ADVANCES.TAB.PAYOUT'),     icon: 'account_balance', count: this.toPay().length || null },
       { id: 'deductions', label: t('PAYROLL.SALARY_ADVANCES.TAB.DEDUCTIONS'), icon: 'receipt_long',    count: this.planned().length || null },
       { id: 'followup',   label: t('PAYROLL.SALARY_ADVANCES.TAB.FOLLOWUP'),   icon: 'list_alt' },
-      { id: 'rules',      label: t('PAYROLL.SALARY_ADVANCES.TAB.RULES'),      icon: 'tune' },
     ];
   });
 
@@ -247,7 +246,6 @@ export class SalaryAdvancesComponent implements OnInit {
     const toPay = this.toPay();
     const advances = this.all();
     const deductions = this.deductions();
-    const policies = this.policies();
     return {
       payout: [
         pays(toPay.map(a => a.paysId)),
@@ -283,19 +281,6 @@ export class SalaryAdvancesComponent implements OnInit {
         { name: 'requested', label: t('PAYROLL.SALARY_ADVANCES.FILTER.REQUESTED'), type: 'daterange' },
         { name: 'outstanding', label: t('PAYROLL.SALARY_ADVANCES.FILTER.OUTSTANDING_ONLY'), type: 'checkbox' },
       ],
-      rules: [
-        {
-          name: 'state', label: t('PAYROLL.SALARY_ADVANCES.RULES.STATE'), type: 'select', placeholder: all,
-          options: [
-            { value: 'open', label: t('PAYROLL.SALARY_ADVANCES.RULES.OPEN') },
-            { value: 'closed', label: t('PAYROLL.SALARY_ADVANCES.RULES.CLOSED') },
-          ],
-        },
-        currency(policies.map(p => p.currency)),
-        pays(policies.map(p => p.paysId)),
-        months('maxMonths', 'PAYROLL.SALARY_ADVANCES.RULES.MAX_MONTHS', policies.map(p => p.maxInstallments)),
-        months('seniority', 'PAYROLL.SALARY_ADVANCES.RULES.SENIORITY', policies.map(p => p.minSeniorityMonths)),
-      ],
     };
   });
 
@@ -306,7 +291,7 @@ export class SalaryAdvancesComponent implements OnInit {
   }
 
   /** Applied filter per tab, as the panel emitted it. */
-  readonly filters = signal<Record<TabKey, FilterResult>>({ payout: {}, deductions: {}, followup: {}, rules: {} });
+  readonly filters = signal<Record<TabKey, FilterResult>>({ payout: {}, deductions: {}, followup: {} });
 
   onFilter(tab: TabKey, result: FilterResult): void {
     this.filters.update(f => ({ ...f, [tab]: result }));
@@ -330,7 +315,7 @@ export class SalaryAdvancesComponent implements OnInit {
       align: 'right',
       initialValues: toSeed(fields[tab], applied[tab]),
     });
-    return { payout: config('payout'), deductions: config('deductions'), followup: config('followup'), rules: config('rules') };
+    return { payout: config('payout'), deductions: config('deductions'), followup: config('followup') };
   });
 
   /** A select's applied value, or null when unset. */
@@ -349,13 +334,6 @@ export class SalaryAdvancesComponent implements OnInit {
   readonly methodOptions = computed<SelectOption[]>(() => {
     this.translate.currentLang();
     return DISBURSEMENT_METHODS.map(m => ({ value: m, label: this.translate.instant(`PAYROLL.SALARY_ADVANCES.METHOD.${m}`) }));
-  });
-
-  readonly currencyOptions: SelectOption[] = CURRENCIES.map(c => ({ value: c, label: c }));
-
-  readonly paysOptions = computed<SelectOption[]>(() => {
-    const taken = new Set(this.policies().map(p => p.paysId));
-    return this.pays().filter(p => !taken.has(p.id)).map(p => ({ value: String(p.id), label: this.paysNames.name(p.id, p.frenchLabel) }));
   });
 
   private paysName(id: number): string {
@@ -502,50 +480,6 @@ export class SalaryAdvancesComponent implements OnInit {
       }));
   });
 
-  readonly ruleColumns = computed<TableColumn[]>(() => {
-    this.translate.currentLang();
-    const t = (k: string) => this.translate.instant(k);
-    const src = (row: TableRow) => row['_source'] as AdvancePolicy;
-    return [
-      { key: 'pays',      label: t('PAYROLL.SALARY_ADVANCES.RULES.PAYS'), sortable: true },
-      { key: 'months',    label: t('PAYROLL.SALARY_ADVANCES.RULES.MAX_MONTHS'), sortable: true,
-        sortAccessor: row => src(row).maxInstallments },
-      { key: 'seniority', label: t('PAYROLL.SALARY_ADVANCES.RULES.SENIORITY'), sortable: true,
-        sortAccessor: row => src(row).minSeniorityMonths },
-      { key: 'state',     label: t('PAYROLL.SALARY_ADVANCES.RULES.STATE'), type: 'badge', sortable: true },
-      { key: '_actions',  label: '', align: 'right', width: '1%' },
-    ];
-  });
-
-  readonly ruleRows = computed<TableRow[]>(() => {
-    this.translate.currentLang();
-    const t = (k: string, p?: object) => this.translate.instant(k, p);
-    const state = this.pick('rules', 'state');
-    const currency = this.pick('rules', 'currency');
-    const pays = this.pick('rules', 'pays');
-    const maxMonths = this.pick('rules', 'maxMonths');
-    const seniority = this.pick('rules', 'seniority');
-    return this.policies()
-      .filter(p => this.matches(this.paysName(p.paysId))
-        && (!state || p.isActive === (state === 'open'))
-        && (!currency || p.currency === currency)
-        && (!pays || String(p.paysId) === pays)
-        && (!maxMonths || String(p.maxInstallments) === maxMonths)
-        && (!seniority || String(p.minSeniorityMonths) === seniority))
-      .map(p => ({
-      // Une règle par pays et par devise : c'est sa clé.
-      id: `${p.paysId}-${p.currency}`,
-      pays: `${this.paysName(p.paysId)} · ${p.currency}`,
-      months: t('PAYROLL.SALARY_ADVANCES.N_MONTHS', { count: p.maxInstallments }),
-      seniority: p.minSeniorityMonths ? t('PAYROLL.SALARY_ADVANCES.N_MONTHS', { count: p.minSeniorityMonths }) : t('PAYROLL.SALARY_ADVANCES.RULES.NONE'),
-      state: {
-        label: t(p.isActive ? 'PAYROLL.SALARY_ADVANCES.RULES.OPEN' : 'PAYROLL.SALARY_ADVANCES.RULES.CLOSED'),
-        options: { variant: p.isActive ? 'success' : 'neutral', size: 'sm', dot: true },
-      } satisfies BadgeCell,
-      _source: p,
-    }));
-  });
-
   /** Outils de tableau communs (`tableTools`), comme sur `/finance/affaires`. */
   private config(loading: boolean, emptyKey: string, header = false): TableConfig {
     this.translate.currentLang();
@@ -558,9 +492,16 @@ export class SalaryAdvancesComponent implements OnInit {
   readonly payoutConfig    = computed(() => this.config(this.loading(), 'PAYROLL.SALARY_ADVANCES.EMPTY.PAYOUT'));
   readonly followupConfig  = computed(() => this.config(this.loading(), 'PAYROLL.SALARY_ADVANCES.EMPTY.FOLLOWUP'));
   readonly deductionConfig = computed(() => this.config(this.deductionsLoading(), 'PAYROLL.SALARY_ADVANCES.EMPTY.DEDUCTIONS', true));
-  readonly ruleConfig      = computed(() => this.config(this.loading(), 'PAYROLL.SALARY_ADVANCES.EMPTY.RULES', true));
 
   // ── Actions ──────────────────────────────────────────────────────────────
+  /** Lien « Règles des avances » de l'en-tête : seulement pour qui peut ouvrir l'administration
+   *  (même code que la route /payroll/admin) — les règles ne se modifient plus qu'à cet endroit. */
+  readonly canOpenRules = computed(() => this.userStore.hasPermission('PAYROLL_VIEW_PARAMSET'));
+
+  openRules(): void {
+    this.router.navigate(['/payroll/admin'], { queryParams: { tab: 'advance-rules' } });
+  }
+
   openDetail(a: SalaryAdvance): void {
     this.svc.get(a.id).pipe(catchError(() => of(a))).subscribe(full => {
       this.selected.set(full);
@@ -676,43 +617,6 @@ export class SalaryAdvancesComponent implements OnInit {
     });
   }
 
-  openPolicy(p: AdvancePolicy | null): void {
-    this.policyIsNew.set(!p);
-    this.policyForm.set(p ? { ...p } : blankPolicy(0));
-    this.modalError.set(null);
-    const t = (k: string) => this.translate.instant(k);
-    this.modalRef = this.modal.open({
-      title: t(p ? 'PAYROLL.SALARY_ADVANCES.RULES.EDIT' : 'PAYROLL.SALARY_ADVANCES.RULES.ADD'),
-      icon: 'tune',
-      body: this.policyTpl,
-      size: 'md',
-      closeOnBackdrop: false,
-      buttons: [
-        { label: t('PAYROLL.SALARY_ADVANCES.CANCEL'), variant: 'secondary', action: r => r.close() },
-        { label: t('PAYROLL.SALARY_ADVANCES.RULES.SAVE'), variant: 'primary', action: () => this.submitPolicy() },
-      ],
-    });
-  }
-
-  patchPolicy(change: Partial<AdvancePolicy>): void {
-    this.policyForm.update(f => ({ ...f, ...change }));
-  }
-
-  private submitPolicy(): void {
-    const f = this.policyForm();
-    const valid = f.paysId > 0 && f.currency.length === 3
-      && Number.isInteger(f.maxInstallments) && f.maxInstallments >= 1 && f.maxInstallments <= 24
-      && Number.isInteger(f.minSeniorityMonths) && f.minSeniorityMonths >= 0;
-    if (!valid) { this.modalError.set(this.translate.instant('PAYROLL.SALARY_ADVANCES.RULES.INVALID')); return; }
-    this.svc.savePolicy(f).subscribe({
-      next: saved => {
-        this.modalRef?.close();
-        this.policies.update(list => [...list.filter(p => p.paysId !== saved.paysId), saved].sort((x, y) => x.paysId - y.paysId));
-      },
-      error: err => this.modalError.set(this.message(err)),
-    });
-  }
-
   // ── Display ──────────────────────────────────────────────────────────────
   money(value: number | null | undefined, currency: string | null): string {
     if (value === null || value === undefined) return '—';
@@ -724,19 +628,10 @@ export class SalaryAdvancesComponent implements OnInit {
     return monthLabel(ym, this.locale());
   }
 
-  toNumber(value: unknown): number {
-    const n = Number(value);
-    return isNaN(n) ? 0 : n;
-  }
-
   private message(err: unknown): string {
     const body = (err as { error?: { detail?: string; message?: string } } | null)?.error;
     return body?.detail || body?.message || this.translate.instant('PAYROLL.SALARY_ADVANCES.ERROR');
   }
-}
-
-function blankPolicy(paysId: number): AdvancePolicy {
-  return { paysId, currency: 'TND', maxInstallments: 3, minSeniorityMonths: 3, isActive: true };
 }
 
 function currentYearMonth(today = new Date()): string {
