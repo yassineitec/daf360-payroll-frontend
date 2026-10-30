@@ -41,6 +41,9 @@ import { PaysNamesService } from '../../core/pays-names.service';
 
 interface PaysItem { id: number; iso_code: string; french_label: string; }
 
+/** Return shape of `total()` — the summed amount plus whether it relied on a fallback rate. */
+interface TotalResult { value: number; approximate: boolean; }
+
 /**
  * `/payroll/engine-results` — annuaire des collaborateurs (cartes ou tableau). Un clic
  * ouvre `/payroll/engine-results/:employeeId`, l'historique de paie de ce collaborateur
@@ -241,7 +244,7 @@ export class EngineResultsListComponent implements OnInit {
   /** Somme d'un montant sur tous les pays, chacun converti dans la devise d'affichage. Flags the
    *  result as approximate when any contributing country's currency (or the display target
    *  itself) needed CurrencyService's fallback rate rather than a live one. */
-  private total(field: 'totalGross' | 'totalLoadedCost'): { value: number; approximate: boolean } {
+  private total(field: 'totalGross' | 'totalLoadedCost'): TotalResult {
     const target = this.displayCurrency();
     let approximate = !!target && this.currency.needsFallbackRate(target);
     const value = (this.summaries() ?? []).reduce((acc, s) => {
