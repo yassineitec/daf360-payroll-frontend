@@ -238,26 +238,35 @@ export class EngineResultsListComponent implements OnInit {
     this.currency.setDisplay(item.id);
   }
 
-  /** Somme d'un montant sur tous les pays, chacun converti dans la devise d'affichage. */
-  private total(field: 'totalGross' | 'totalLoadedCost'): number {
+  /** Somme d'un montant sur tous les pays, chacun converti dans la devise d'affichage. Flags the
+   *  result as approximate when any contributing country's currency (or the display target
+   *  itself) needed CurrencyService's fallback rate rather than a live one. */
+  private total(field: 'totalGross' | 'totalLoadedCost'): { value: number; approximate: boolean } {
     const target = this.displayCurrency();
-    return (this.summaries() ?? []).reduce((acc, s) => {
+    let approximate = !!target && this.currency.needsFallbackRate(target);
+    const value = (this.summaries() ?? []).reduce((acc, s) => {
       const v = s[field] ?? 0;
-      return acc + (s.currencyCode && target ? this.currency.convert(v, s.currencyCode, target) : v);
+      if (!s.currencyCode || !target) return acc + v;
+      if (s.currencyCode !== target && this.currency.needsFallbackRate(s.currencyCode)) {
+        approximate = true;
+      }
+      return acc + this.currency.convert(v, s.currencyCode, target);
     }, 0);
+    return { value, approximate };
   }
 
-  private money(amount: number): string {
+  private money(amount: number, approximate = false): string {
     const target = this.displayCurrency();
     const locale = this.translate.getCurrentLang() === 'en' ? 'en-US' : 'fr-FR';
+    const prefix = approximate ? '≈ ' : '';
     if (target) {
       try {
-        return new Intl.NumberFormat(locale, { style: 'currency', currency: target, maximumFractionDigits: 0 })
+        return prefix + new Intl.NumberFormat(locale, { style: 'currency', currency: target, maximumFractionDigits: 0 })
           .format(amount);
       } catch { /* code ISO inconnu d'Intl — repli ci-dessous */ }
     }
     const n = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(amount);
-    return target ? `${n} ${target}` : n;
+    return target ? `${prefix}${n} ${target}` : `${prefix}${n}`;
   }
 
   /** Dernier mois calculé ; une plage quand les pays n'en sont pas au même mois. */
@@ -288,9 +297,11 @@ export class EngineResultsListComponent implements OnInit {
         ] satisfies { label: string; value: string | number; options: MetricCardOptions }[],
       };
     }
+    const totalGross      = this.total('totalGross');
+    const totalLoadedCost = this.total('totalLoadedCost');
     const s = {
-      totalGross:          this.total('totalGross'),
-      totalLoadedCost:     this.total('totalLoadedCost'),
+      totalGross,
+      totalLoadedCost,
       employeeCount:       list.reduce((acc, x) => acc + x.employeeCount, 0),
       convergenceFailures: list.reduce((acc, x) => acc + x.convergenceFailures, 0),
     };
@@ -302,7 +313,7 @@ export class EngineResultsListComponent implements OnInit {
       tiles: [
         {
           label: this.t('PAYROLL.ENGINE_RESULTS.KPI_GROSS_PAYROLL'),
-          value: this.money(s.totalGross),
+          value: this.money(s.totalGross.value, s.totalGross.approximate),
           options: {
             icon: 'account_balance_wallet',
             helpTitle: this.t('PAYROLL.ENGINE_RESULTS.KPI_GROSS_PAYROLL'),
@@ -311,7 +322,7 @@ export class EngineResultsListComponent implements OnInit {
         },
         {
           label: this.t('PAYROLL.ENGINE_RESULTS.KPI_LOADED_COST'),
-          value: this.money(s.totalLoadedCost),
+          value: this.money(s.totalLoadedCost.value, s.totalLoadedCost.approximate),
           options: {
             valueColor: 'text-primary', icon: 'account_balance',
             helpTitle: this.t('PAYROLL.ENGINE_RESULTS.KPI_LOADED_COST'),
