@@ -1,39 +1,30 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
+import { catchError, of } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import {
-  AvatarComponent,
   ButtonComponent,
   CardComponent,
-  DataTableComponent,
   FormFieldComponent,
-  MetricCardComponent,
-  MultiDatePickerComponent,
+  ModalService,
   PageComponent,
   PageHeaderComponent,
-  SearchToolbarComponent,
-  SectionTitleComponent,
+  SectionCardComponent,
   SelectComponent,
   StatusBadgeComponent,
   deriveInitials,
   type BadgeVariant,
-  type BreadcrumbItem,
   type MetricDelta,
   type PageHeaderBadge,
   type SelectOption,
-  type FilterField,
-  type FilterResult,
-  type SearchToolbarFilterConfig,
-  type TableColumn,
-  type TableConfig,
-  type TableRow,
 } from '@khalilrebhiitec/daf360';
 import { PayrollApiService, PaysDto } from '../../core/payroll-api.service';
 import { PayrollEngineService, RunPayrollResponse } from '../../core/payroll-engine.service';
-import { EmployeeSelectComponent } from '../../shared/employee-select/employee-select.component';
-import { tableTools } from '../../shared/table-tools';
-import { EmployeeListItem } from '../../core/hr-profile.service';
+import { readBlobError, saveBlob } from '../../shared/blob-download';
+import { PayslipBulletinComponent, employerCostOf, type PayslipDeltas } from '../../shared/payslip-bulletin/payslip-bulletin.component';
+import { EmployeeListItem, HrProfileService, contractTypeLabel } from '../../core/hr-profile.service';
 import { NotificationService } from '../../core/notification.service';
 import { PaysNamesService } from '../../core/pays-names.service';
 
@@ -51,36 +42,25 @@ interface EnginePreset {
   joursOuvresMois: number;
 }
 
-/** One slice of the loaded cost, for the stacked bar + legend — same shape as
- *  `simulator.component.ts`'s `BreakdownSegment`. */
-interface CostBreakdownSegment {
-  key:    string;
-  label:  string;
-  amount: number;
-  /** Share of the loaded cost, 0–100. */
-  pct:    number;
-  /** Complete literal Tailwind classes — a runtime-built `bg-${x}` compiles to nothing. */
-  bar:    string;
-  dot:    string;
+/** Ce qui a servi au calcul affiché, figé au lancement (le formulaire peut changer ensuite). */
+interface RunContext {
+  employeeId: number;
+  employeeName: string;
+  paysId: number;
+  periodYear: number;
+  periodMonth: number;
+  contractTypeCode: string;
+  jours: number;
 }
-
-type RubriqueTab = 'all' | 'credit' | 'debit';
 
 const PRESETS_STORAGE_KEY = 'payroll.engineRun.recentPresets';
 const MAX_PRESETS = 5;
 
-/** ISO 3166-1 alpha-2 → flag emoji, e.g. "FR" → 🇫🇷. Pure client-side computation, no
- *  flag asset/data needed — `PaysDto` only carries the two-letter code. */
-function flagEmoji(isoCode: string | null | undefined): string {
-  if (!isoCode || isoCode.length !== 2) return '';
-  const points = [...isoCode.toUpperCase()].map(c => 127397 + c.charCodeAt(0));
-  return String.fromCodePoint(...points);
-}
-
 /**
- * `/payroll/engine-run` — "cockpit" layout: a persistent input sidebar (left) next to a
- * live results dashboard (right), so a payroll manager can tweak one parameter and re-run
- * without losing the result on screen (no more accordion that collapses the form away).
+ * `/payroll/engine-run` — same two-column layout as `/payroll/engine-results/:id`: page
+ * title + sticky "Paramètres de calcul" card (left, 30 %) next to the results (right, 70 %:
+ * KPIs, cost breakdown, strata summary, rubriques), so a payroll manager can
+ * tweak one parameter and re-run without losing the result on screen.
  *
  * A few things the redesign brief asked for have no backing data anywhere in this app yet
  * (contractual hourly base, personalized PAS rate, Navigo/meal-voucher amounts, collective-
@@ -95,288 +75,12 @@ function flagEmoji(isoCode: string | null | undefined): string {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    CommonModule, ReactiveFormsModule, TranslatePipe, EmployeeSelectComponent,
-    AvatarComponent, ButtonComponent, CardComponent, DataTableComponent, FormFieldComponent,
-    MetricCardComponent, MultiDatePickerComponent, PageComponent, PageHeaderComponent, SearchToolbarComponent,
-    SectionTitleComponent, SelectComponent, StatusBadgeComponent,
+    CommonModule, TranslatePipe,
+    ButtonComponent, CardComponent, FormFieldComponent, PageComponent, PageHeaderComponent,
+    SectionCardComponent, SelectComponent, StatusBadgeComponent, PayslipBulletinComponent,
   ],
-  template: `
-    <daf-page [loading]="pageLoading()" [kpis]="0" [breadcrumbs]="true" headerSize="md">
-      <daf-page-header
-        [title]="'PAYROLL.ENGINE_RUN.TITLE' | translate"
-        [subtitle]="'PAYROLL.ENGINE_RUN.SUBTITLE' | translate"
-        [breadcrumbs]="breadcrumbs()"
-        [breadcrumbLabel]="'PAYROLL.ENGINE_RUN.BREADCRUMB_ARIA' | translate"
-        [badges]="headerBadges()"
-        size="md">
-        <div pageActions class="topbar-actions">
-          <daf-button
-            [label]="'PAYROLL.ENGINE_RUN.COMPARE_BUTTON' | translate"
-            variant="ghost"
-            [options]="{ iconStart: 'trending_up', disabled: !result() || comparing(), loading: comparing() }"
-            (onClick)="compareWithPreviousYear()">
-          </daf-button>
-          <daf-button
-            [label]="'PAYROLL.ENGINE_RUN.EXPORT_CSV' | translate"
-            variant="ghost"
-            [options]="{ iconStart: 'download', disabled: !result() }"
-            (onClick)="exportRubriquesCsv()">
-          </daf-button>
-        </div>
-      </daf-page-header>
-
-      <div class="cockpit">
-        <!-- ══════════════════════ SIDEBAR — PARAMÈTRES DE CALCUL ══════════════════════ -->
-        <aside class="cockpit-sidebar">
-          <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }" class="sidebar-card">
-
-            <div class="sidebar-header">
-              <div class="sidebar-header__top">
-                <h2 class="sidebar-header__title">{{ 'PAYROLL.ENGINE_RUN.SIDEBAR_TITLE' | translate }}</h2>
-                <daf-badge [label]="readyBadge().label" [options]="{ variant: readyBadge().variant, size: 'sm' }" />
-              </div>
-              <p class="sidebar-header__subtitle">{{ 'PAYROLL.ENGINE_RUN.SIDEBAR_SUBTITLE' | translate }}</p>
-            </div>
-
-            @if (recentPresets().length) {
-              <div class="presets">
-                <span class="presets__label">{{ 'PAYROLL.ENGINE_RUN.PRESETS_LABEL' | translate }}</span>
-                <div class="presets__chips">
-                  @for (p of recentPresets(); track p.key) {
-                    <button type="button" class="preset-chip" (click)="loadPreset(p)">{{ p.chipLabel }}</button>
-                  }
-                </div>
-              </div>
-            }
-
-            <div class="sidebar-field">
-              <daf-select
-                [options]="paysOptions()"
-                [selected]="paysId() ? ['' + paysId()] : []"
-                [config]="{ label: 'PAYROLL.ENGINE_RUN.PAYS' | translate, placeholder: 'PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate, searchable: true, fullWidth: true }"
-                (selectedChange)="paysId.set($event[0] ? +$event[0] : null)">
-              </daf-select>
-            </div>
-
-            <div class="sidebar-field">
-              <label class="sidebar-field__label">{{ 'PAYROLL.ENGINE_RUN.EMPLOYEE' | translate }}</label>
-              <app-employee-select
-                [formControl]="$any(employeeIdCtrl)"
-                [paysId]="paysId()"
-                (employeeSelected)="onEmployeeSelected($event)">
-              </app-employee-select>
-
-              @if (selectedEmployee(); as emp) {
-                <div class="employee-summary">
-                  <daf-avatar [data]="{ name: emp.fullName, subtitle: employeeSubtitle(emp) }" size="md" />
-                  @if (employeeStatusBadge(); as b) {
-                    <daf-badge [label]="b.label" [options]="{ variant: b.variant, size: 'sm' }" />
-                  }
-                </div>
-              }
-            </div>
-
-            <div class="sidebar-field">
-              <daf-multi-date-picker
-                [config]="{ label: 'PAYROLL.ENGINE_RUN.PERIOD' | translate, selectionMode: 'single', fullWidth: true }"
-                [value]="periodDate()"
-                (valueChange)="onPeriodChange($event)">
-              </daf-multi-date-picker>
-              <span class="period-range">{{ periodRangeLabel() }}</span>
-            </div>
-
-            <div class="sidebar-row">
-              <daf-select
-                [options]="contractTypeOptions()"
-                [selected]="[contractTypeCode()]"
-                [config]="{ label: 'PAYROLL.ENGINE_RUN.CONTRACT_TYPE' | translate, fullWidth: true }"
-                (selectedChange)="contractTypeCode.set($event[0])">
-              </daf-select>
-              <daf-form-field
-                [options]="{ label: 'PAYROLL.ENGINE_RUN.WORKDAYS' | translate, type: 'number', prefixIcon: 'calendar_view_day', suffixText: 'j' }"
-                [value]="joursOuvresMois()"
-                (valueChange)="joursOuvresMois.set(+($event ?? 0))">
-              </daf-form-field>
-            </div>
-
-            @if (error()) {
-              <div class="alert alert--error">{{ error() }}</div>
-            }
-
-            <div class="sidebar-actions">
-              <daf-button
-                [label]="(running() ? 'PAYROLL.ENGINE_RUN.RUNNING' : 'PAYROLL.ENGINE_RUN.RUN_BUTTON') | translate"
-                variant="teal"
-                [options]="{ loading: running(), disabled: !canRun() || running(), iconStart: 'calculate', fullWidth: true }"
-                (onClick)="run()">
-              </daf-button>
-              <div class="sidebar-actions__status">
-                <button type="button" class="sidebar-reset" (click)="reset()">{{ 'PAYROLL.ENGINE_RUN.RESET_BUTTON' | translate }}</button>
-                @if (result(); as r) {
-                  <span class="sidebar-last-run">{{ 'PAYROLL.ENGINE_RUN.LAST_RUN_AT' | translate: { date: (r.calculatedAt | date:'dd/MM/yyyy HH:mm') } }}</span>
-                }
-              </div>
-            </div>
-          </daf-card>
-        </aside>
-
-        <!-- ══════════════════════ ZONE PRINCIPALE — RÉSULTATS ══════════════════════ -->
-        <main class="cockpit-main">
-          <!-- ── Bandeau KPI — en tête de la colonne résultats, à côté de la carte de
-               calcul, comme /finance/affaires/:id?tab=overview (panneau à gauche, tuiles
-               en haut de la colonne principale) : lancer un calcul ne repousse plus la
-               carte de paramètres vers le bas. ── -->
-          @if (result(); as r) {
-            <div class="kpi-banner">
-              @if (compareResult(); as c) {
-                <span class="kpi-banner__note">{{ 'PAYROLL.ENGINE_RUN.COMPARE_TAG' | translate: { year: c.periodYear } }}</span>
-              }
-              <div class="kpi-grid">
-                <daf-metric-card
-                  [label]="'PAYROLL.ENGINE_RUN.KPI_NET_PAY' | translate"
-                  [value]="(r.strate5 | number:'1.2-2') ?? ''"
-                  [delta]="netPayDelta()"
-                  [options]="{ valueColor: 'text-primary', icon: 'payments', iconBg: 'bg-primary/10', iconColor: 'text-primary' }">
-                </daf-metric-card>
-                <daf-metric-card
-                  [label]="'PAYROLL.ENGINE_RUN.KPI_EMPLOYER_COST' | translate"
-                  [value]="(r.loadedCost | number:'1.2-2') ?? ''"
-                  [delta]="loadedCostDelta()"
-                  [options]="{ icon: 'account_balance', iconBg: 'bg-teal/10', iconColor: 'text-teal' }">
-                </daf-metric-card>
-                <daf-metric-card
-                  [label]="'PAYROLL.ENGINE_RUN.KPI_TAXABLE_NET' | translate"
-                  [value]="(r.strate4 | number:'1.2-2') ?? ''"
-                  [delta]="taxableNetDelta()"
-                  [options]="{ icon: 'account_balance_wallet', iconBg: 'bg-tertiary/10', iconColor: 'text-tertiary' }">
-                </daf-metric-card>
-                <daf-metric-card
-                  [label]="'PAYROLL.ENGINE_RUN.STRATE_IRPP' | translate"
-                  [value]="(r.aggregateIrpp | number:'1.2-2') ?? ''"
-                  [delta]="irppDelta()"
-                  [options]="{ icon: 'request_quote', iconBg: 'bg-warning/10', iconColor: 'text-warning' }">
-                </daf-metric-card>
-              </div>
-            </div>
-          }
-
-          @if (!result() && !running()) {
-            <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
-              <p class="empty-state">{{ 'PAYROLL.ENGINE_RUN.EMPTY_RESULT_HINT' | translate }}</p>
-            </daf-card>
-          }
-
-          @if (result()) {
-            <!-- ── Décomposition du coût chargé — barre empilée + légende, même pattern
-                 que /payroll/simulator (RESULT.BREAKDOWN_*) plutôt que 5 cartes déconnectées :
-                 les segments sont de vraies parts indépendantes qui somment au coût chargé,
-                 pas les strates cumulées (voir costBreakdown() ci-dessous). ── -->
-            <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
-              <daf-section-title [title]="'PAYROLL.ENGINE_RUN.COST_BREAKDOWN_TITLE' | translate" />
-              <div class="flex flex-col gap-3">
-                <div
-                  class="flex h-2.5 w-full overflow-hidden rounded-full bg-surface-container"
-                  role="img"
-                  [attr.aria-label]="'PAYROLL.ENGINE_RUN.COST_BREAKDOWN_ARIA' | translate">
-                  @for (seg of costBreakdown(); track seg.key) {
-                    <span class="block h-full" [class]="seg.bar" [style.width.%]="seg.pct"></span>
-                  }
-                </div>
-                <div class="flex flex-col">
-                  @for (seg of costBreakdown(); track seg.key) {
-                    <div class="flex items-center gap-3 border-b border-outline-variant/40 py-2 last:border-0 text-[12px] tabular-nums">
-                      <span class="h-2 w-2 shrink-0 rounded-full" [class]="seg.dot"></span>
-                      <span class="flex-1 min-w-0 truncate text-on-surface-variant">{{ seg.label }}</span>
-                      <span class="w-24 text-right tabular-nums">{{ seg.amount | number:'1.2-2' }}</span>
-                      <span class="w-14 text-right text-outline">{{ seg.pct | number:'1.0-1' }} %</span>
-                    </div>
-                  }
-                </div>
-              </div>
-            </daf-card>
-
-            <!-- ── Détail des rubriques — modèle de la bibliothèque, comme /payroll/engine-results
-                 et /finance/affaires : 'daf-search-toolbar' (sa propre carte) avec la catégorie
-                 dans son panneau de filtre, puis le tableau nu, sans carte autour. ── -->
-            <daf-search-toolbar
-              [placeholder]="'PAYROLL.ENGINE_RUN.SEARCH_PLACEHOLDER' | translate"
-              [(value)]="rubriqueSearch"
-              [debounce]="200"
-              [filterFields]="rubriqueFilterFields()"
-              [filterConfig]="rubriqueFilterConfig()"
-              (filterApply)="applyRubriqueFilter($event)"
-              [table]="rubriqueTable">
-            </daf-search-toolbar>
-
-            <daf-data-table #rubriqueTable
-              [columns]="rubriqueColumns()"
-              [rows]="rubriqueRows()"
-              [config]="rubriqueTableConfig()" />
-          }
-        </main>
-      </div>
-    </daf-page>
-  `,
-  styles: [`
-    .topbar-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
-
-    /* ── Split-screen cockpit ─────────────────────────────────────────────── */
-    .cockpit         { display: flex; align-items: flex-start; gap: 1.5rem; padding: 0 0 2rem; }
-    .cockpit-sidebar { flex: 0 0 360px; position: sticky; top: 1.5rem; }
-    .cockpit-main    { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 1.5rem; }
-    @media (max-width: 1024px) {
-      .cockpit          { flex-direction: column; }
-      .cockpit-sidebar  { flex-basis: auto; width: 100%; position: static; }
-    }
-
-    /* ── Sidebar ──────────────────────────────────────────────────────────── */
-    .sidebar-card    { display: flex; flex-direction: column; gap: 1.25rem; }
-    .sidebar-header__top    { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
-    .sidebar-header__title  { margin: 0; font-size: 1.0625rem; font-weight: 600; }
-    .sidebar-header__subtitle { margin: .25rem 0 0; font-size: .8125rem; color: var(--color-on-surface-variant, #6b7280); }
-
-    .presets         { display: flex; flex-direction: column; gap: .5rem; }
-    .presets__label  { font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em;
-                        color: var(--color-on-surface-variant, #6b7280); }
-    .presets__chips  { display: flex; flex-wrap: wrap; gap: .5rem; }
-    .preset-chip     { border: 1px solid var(--color-outline-variant, #c5c6cd); background: var(--color-surface-container-low, #f2f4f6);
-                        border-radius: 999px; padding: .3rem .75rem; font-size: .75rem; font-weight: 500;
-                        cursor: pointer; transition: background .15s, border-color .15s; }
-    .preset-chip:hover { background: var(--color-tertiary-container, #d7f7f2); border-color: var(--color-tertiary, #00c1ad); }
-
-    .sidebar-field        { display: flex; flex-direction: column; gap: .375rem; }
-    .sidebar-field__label { font-size: .875rem; font-weight: 500; }
-    .sidebar-row          { display: flex; gap: .75rem; }
-    .sidebar-row > *      { flex: 1; min-width: 0; }
-
-    .employee-summary { display: flex; align-items: center; justify-content: space-between; gap: .5rem;
-                         margin-top: .5rem; padding: .625rem .75rem; border-radius: .625rem;
-                         background: var(--color-surface-container-low, #f2f4f6); }
-
-    .period-range     { font-size: .75rem; color: var(--color-on-surface-variant, #6b7280); }
-
-    .sidebar-actions          { display: flex; flex-direction: column; gap: .625rem; margin-top: .25rem; }
-    .sidebar-actions__status  { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
-    .sidebar-reset            { background: none; border: none; padding: 0; font-size: .8125rem; font-weight: 500;
-                                 color: var(--color-on-surface-variant, #6b7280); cursor: pointer; text-decoration: underline; }
-    .sidebar-reset:hover      { color: var(--color-on-surface, #191c1e); }
-    .sidebar-last-run         { font-size: .75rem; color: var(--color-on-surface-variant, #6b7280); }
-
-    .alert--error { background: #fee2e2; color: #991b1b; padding: .75rem 1rem; border-radius: 6px; font-size: .875rem; }
-
-    /* ── Main / résultats ─────────────────────────────────────────────────── */
-    .empty-state   { text-align: center; color: var(--color-on-surface-variant, #6b7280); margin: 2rem 0; }
-
-    .kpi-banner            { display: flex; flex-direction: column; gap: .5rem; }
-    .kpi-banner__note      { font-size: .8125rem; color: var(--color-on-surface-variant, #6b7280); }
-    /* 4 colonnes égales dans la colonne résultats (plus étroite que la page : un
-       auto-fill à 230px y cassait en 3 + 1), 2 × 2 quand la place manque. */
-    .kpi-grid              { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
-    @media (max-width: 1280px) {
-      .kpi-grid            { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    }
-
-  `],
+  templateUrl: './engine-run.component.html',
+  styleUrl: './engine-run.component.scss',
 })
 export class EngineRunComponent implements OnInit {
   private readonly api          = inject(PayrollEngineService);
@@ -384,6 +88,11 @@ export class EngineRunComponent implements OnInit {
   private readonly translate    = inject(TranslateService);
   private readonly paysNames = inject(PaysNamesService);
   private readonly notification = inject(NotificationService);
+  private readonly hrProfiles   = inject(HrProfileService);
+  private readonly modalService = inject(ModalService);
+  private readonly router       = inject(Router);
+  private readonly route        = inject(ActivatedRoute);
+  private readonly destroyRef   = inject(DestroyRef);
 
   /** Même pattern que les autres pages : traduction synchrone pour ce qui ne passe pas
    *  par le pipe `| translate` du template. */
@@ -395,19 +104,20 @@ export class EngineRunComponent implements OnInit {
   readonly running = signal(false);
   readonly error   = signal<string | null>(null);
   readonly result  = signal<RunPayrollResponse | null>(null);
+  /** « Coût pour l'entreprise » du bulletin (cotisations patronales, coût employeur). */
+  readonly employerCost = computed(() => employerCostOf(this.result()));
 
-  readonly breadcrumbs = computed((): BreadcrumbItem[] => [
-    { label: this.t('PAYROLL.COMMON.BREADCRUMB_ROOT'), link: '/payroll' },
-    { label: this.t('PAYROLL.ENGINE_RUN.BREADCRUMB_GROUP') },
-    { label: this.t('PAYROLL.ENGINE_RUN.BREADCRUMB') },
-  ]);
-
+  /** Pastille du titre de page : le calcul affiché est ENREGISTRÉ (chaque lancement insère un
+   *  résultat de paie côté serveur), avec son numéro pour le retrouver dans « Résultats de
+   *  paie ». Remplace l'ancienne pastille de convergence : le moteur ne la passe jamais à
+   *  l'échec, elle affichait toujours « Algorithme convergé ». */
   readonly headerBadges = computed((): PageHeaderBadge[] => {
     const r = this.result();
     if (!r) return [];
     return [{
-      label: this.t(r.convergenceOk ? 'PAYROLL.ENGINE_RUN.CONVERGENCE_OK' : 'PAYROLL.ENGINE_RUN.CONVERGENCE_FAILED'),
-      variant: r.convergenceOk ? 'success' : 'danger',
+      label: this.t('PAYROLL.ENGINE_RUN.SAVED_BADGE', { id: r.resultId }),
+      variant: 'success',
+      dot: true,
     }];
   });
 
@@ -419,10 +129,14 @@ export class EngineRunComponent implements OnInit {
   readonly pageLoading = signal(true);
   private readonly paysList = signal<PaysDto[]>([]);
   readonly paysId = signal<number | null>(null);
+  /** Pays du dernier calcul lancé — fixe la devise du résultat affiché. */
+  private readonly runPaysId = signal<number | null>(null);
+  /** Même libellé que les autres pages (« Tunisie (TN) ») — plus de drapeau emoji, rendu
+   *  en lettres « TN » sous Windows ; la lib n'accepte un drapeau qu'en `imageUrl`. */
   readonly paysOptions = computed<SelectOption[]>(() =>
     this.paysList().map(p => ({
       value: String(p.id),
-      label: `${flagEmoji(p.isoCode)} ${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})`.trim(),
+      label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})`,
     })),
   );
 
@@ -432,18 +146,170 @@ export class EngineRunComponent implements OnInit {
       error: () => this.pageLoading.set(false),
     });
     this.recentPresets.set(this.loadPresetsFromStorage());
+
+    // Arrivée depuis la fiche « Salaires des collaborateurs » (« Calculer sa paie ») :
+    // `?pays=` et `?employee=` pré-sélectionnent le pays puis le collaborateur, une fois la
+    // liste de ses collègues chargée (voir `loadEmployees`).
+    const params = this.route.snapshot.queryParamMap;
+    const pays = Number(params.get('pays'));
+    const employee = Number(params.get('employee'));
+    if (pays > 0) {
+      if (employee > 0) this.pendingEmployeeId = employee;
+      this.onPaysChange([String(pays)]);
+    }
   }
 
-  // ── Salarié ───────────────────────────────────────────────────────────
-  readonly employeeIdCtrl = new FormControl<number | null>(null);
-  readonly selectedEmployee = signal<EmployeeListItem | null>(null);
+  /** Collaborateur à sélectionner dès que la liste du pays arrive (`?employee=`). */
+  private pendingEmployeeId: number | null = null;
 
-  onEmployeeSelected(e: EmployeeListItem | null): void {
-    this.selectedEmployee.set(e);
+  /** Changement de pays depuis le select : la liste des salariés suit, le salarié choisi
+   *  (d'un autre pays) est retiré. */
+  onPaysChange(selected: string[]): void {
+    const id = selected[0] ? +selected[0] : null;
+    if (id === this.paysId()) return;
+    this.paysId.set(id);
+    this.employeeId.set(null);
+    this.loadCountry(id);
   }
 
-  employeeSubtitle(emp: EmployeeListItem): string {
-    return [emp.contractType, emp.department].filter(Boolean).join(' · ');
+  /** Tout ce qui dépend du pays : ses salariés et les contrats de son jeu de paramètres. */
+  private loadCountry(paysId: number | null): void {
+    this.loadEmployees(paysId);
+    this.loadContractTypes(paysId);
+  }
+
+  // ── Salarié — `daf-select` recherchable de la lib, comme /payroll/simulator : les
+  //    salariés du pays sont chargés en une fois (`loadEmployees`), la lib filtre ensuite
+  //    en local. Libellé : « Nom · matricule · contrat ».
+  readonly employeeId       = signal<number | null>(null);
+  readonly employeesOfPays  = signal<EmployeeListItem[]>([]);
+  readonly employeesLoading = signal(false);
+
+  readonly employeeOptions = computed<SelectOption[]>(() =>
+    this.employeesOfPays().map(e => ({
+      value: String(e.userId),
+      label: [e.fullName, e.employeeId, e.contractType ? contractTypeLabel(e.contractType, this.translate) : null]
+        .filter(Boolean).join(' · '),
+    })),
+  );
+
+  readonly employeeSelection = computed(() => {
+    const id = this.employeeId();
+    return id == null ? [] : [String(id)];
+  });
+
+  readonly selectedEmployee = computed(() =>
+    this.employeesOfPays().find(e => e.userId === this.employeeId()) ?? null);
+
+  /** Choix d'un collaborateur : son contrat de la fiche RH est repris d'office quand le jeu
+   *  du pays le tarifie (avant : CDI pour tout le monde). Un préréglage passe par
+   *  `loadPreset`, qui garde le contrat qu'il avait mémorisé. */
+  setEmployeeSelection(selected: string[]): void {
+    this.employeeId.set(selected[0] ? +selected[0] : null);
+    const hr = this.employeeHrContract();
+    if (hr && this.contractTypes().includes(hr)) this.contractTypeCode.set(hr);
+  }
+
+  /** Anciens codes RH (assistant d'intégration d'avant migration) → codes de la paie. */
+  private static readonly LEGACY_CONTRACT: Record<string, string> = {
+    PERMANENT: 'CDI', FIXED_TERM: 'CDD', INTERN: 'STAGE',
+  };
+
+  /** Contrat de la fiche RH du collaborateur choisi, en code de la paie (« CDI », « CIVP »…). */
+  private readonly employeeHrContract = computed(() => {
+    const code = this.selectedEmployee()?.contractType?.trim().toUpperCase();
+    return code ? (EngineRunComponent.LEGACY_CONTRACT[code] ?? code) : null;
+  });
+
+  /** Aide sous le select du contrat : d'où vient la valeur, ou pourquoi elle diffère de la
+   *  fiche RH. Vide tant qu'aucun collaborateur n'est choisi. */
+  readonly contractHint = computed(() => {
+    const hr = this.employeeHrContract();
+    if (!hr || !this.contractTypes().length) return '';
+    const contract = contractTypeLabel(hr, this.translate);
+    if (!this.contractTypes().includes(hr)) return this.t('PAYROLL.ENGINE_RUN.CONTRACT_HR_NOT_PRICED', { contract });
+    return this.contractTypeCode() === hr
+      ? this.t('PAYROLL.ENGINE_RUN.CONTRACT_FROM_HR')
+      : this.t('PAYROLL.ENGINE_RUN.CONTRACT_HR_DIFFERS', { contract });
+  });
+
+  /** Collaborateur sorti ou archivé : le calcul reste possible, mais signalé. */
+  readonly employeeExitWarning = computed(() => {
+    const status = this.selectedEmployee()?.lifecycleStatus;
+    if (status !== 'TERMINATED' && status !== 'ARCHIVED') return null;
+    return this.t('PAYROLL.ENGINE_RUN.EXIT_WARNING', {
+      status: this.t(`PAYROLL.ENGINE_RUN.LIFECYCLE.${status}`).toLowerCase(),
+    });
+  });
+
+  // ── Calculs déjà enregistrés du collaborateur choisi — pour prévenir qu'un nouveau
+  //    lancement sur le même mois AJOUTE un résultat (le serveur ne remplace jamais). ──
+  private readonly employeeResults = signal<RunPayrollResponse[]>([]);
+  private resultsSeq = 0;
+
+  private readonly loadEmployeeResults = effect(() => {
+    const id = this.employeeId();
+    const seq = ++this.resultsSeq;
+    untracked(() => {
+      this.employeeResults.set([]);
+      if (id == null) return;
+      this.api.getResults(id)
+        .pipe(catchError(() => of([] as RunPayrollResponse[])), takeUntilDestroyed(this.destroyRef))
+        .subscribe(list => { if (seq === this.resultsSeq) this.employeeResults.set(list); });
+    });
+  });
+
+  /** Dernier résultat déjà enregistré pour ce collaborateur et ce mois, s'il y en a un. */
+  readonly existingResult = computed(() => {
+    const y = this.periodYear(), m = this.periodMonth();
+    return this.employeeResults()
+      .filter(r => r.periodYear === y && r.periodMonth === m)
+      .sort((a, b) => (b.resultId ?? 0) - (a.resultId ?? 0))[0] ?? null;
+  });
+
+  /** « octobre 2026 » — la période en toutes lettres, pour les messages. */
+  private periodText(year: number, month: number): string {
+    const locale = this.translate.currentLang() === 'en' ? 'en-GB' : 'fr-FR';
+    return new Date(year, month - 1, 1).toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+  }
+
+  /** Bandeau « un calcul existe déjà » — pas pour le calcul qu'on vient de lancer et qui est
+   *  affiché (la pastille « Enregistré · Résultat n° » le dit déjà). La confirmation au clic
+   *  sur « Lancer », elle, reste (voir `run()`). */
+  readonly existingWarning = computed(() => {
+    const r = this.existingResult();
+    if (r && r.resultId === this.result()?.resultId) return null;
+    return r ? this.t('PAYROLL.ENGINE_RUN.EXISTING_WARNING', {
+      period: this.periodText(r.periodYear, r.periodMonth), id: r.resultId,
+    }) : null;
+  });
+
+  private employeesSeq = 0;
+  private loadEmployees(paysId: number | null): void {
+    const seq = ++this.employeesSeq;
+    this.employeesOfPays.set([]);
+    if (paysId == null) { this.employeesLoading.set(false); return; }
+    this.employeesLoading.set(true);
+    this.hrProfiles.listEmployees({ paysId, page: 0, size: 1000, sort: 'fullName,asc' })
+      .pipe(catchError(() => of(null)), takeUntilDestroyed(this.destroyRef))
+      .subscribe(page => {
+        if (seq !== this.employeesSeq) return;   // réponse dépassée (pays changé entre-temps)
+        const list = page?.content ?? [];
+        this.employeesOfPays.set(list);
+        this.employeesLoading.set(false);
+        // Collaborateur demandé par l'adresse : sélection comme un choix dans la liste (son
+        // contrat de la fiche RH est alors repris).
+        const pending = this.pendingEmployeeId;
+        this.pendingEmployeeId = null;
+        if (pending != null && list.some(e => e.userId === pending)) {
+          this.setEmployeeSelection([String(pending)]);
+          return;
+        }
+        // Salarié d'un préréglage qui n'est plus dans la liste du pays : on le retire
+        // plutôt que de garder un id que le select n'affiche pas.
+        const id = this.employeeId();
+        if (id != null && !list.some(e => e.userId === id)) this.employeeId.set(null);
+      });
   }
 
   private static readonly LIFECYCLE_VARIANT: Record<string, BadgeVariant> = {
@@ -460,69 +326,160 @@ export class EngineRunComponent implements OnInit {
     };
   });
 
-  // ── Période : Année + Mois fusionnés en un seul sélecteur de date — seuls l'année et
-  //    le mois du jour choisi comptent, le moteur de paie n'a pas de notion de jour.
+  // ── Période : deux listes, Mois et Année — le moteur de paie n'a pas de notion de jour,
+  //    et la lib n'a pas de sélecteur de mois (l'ancien calendrier faisait choisir un jour
+  //    sans effet). `periodDate` reste la source, au 1er du mois.
   readonly periodDate = signal<Date>(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   readonly periodYear  = computed(() => this.periodDate().getFullYear());
   readonly periodMonth = computed(() => this.periodDate().getMonth() + 1);
 
-  readonly periodRangeLabel = computed(() => {
-    const y = this.periodYear(), m = this.periodMonth();
+  /** Janvier … Décembre, dans la langue courante. */
+  readonly monthOptions = computed<SelectOption[]>(() => {
     const locale = this.translate.currentLang() === 'en' ? 'en-GB' : 'fr-FR';
-    const fmt = (d: Date) => d.toLocaleDateString(locale, { day: '2-digit', month: '2-digit' });
-    return `${fmt(new Date(y, m - 1, 1))} – ${fmt(new Date(y, m, 0))}/${y}`;
+    return Array.from({ length: 12 }, (_, i) => {
+      const name = new Date(2000, i, 1).toLocaleDateString(locale, { month: 'long' });
+      return { value: String(i + 1), label: name.charAt(0).toUpperCase() + name.slice(1) };
+    });
   });
 
-  onPeriodChange(value: Date | Date[] | null): void {
-    if (value instanceof Date) this.periodDate.set(value);
+  /** Trois ans en arrière jusqu'à l'an prochain — plus l'année affichée si elle sort de
+   *  cette plage (préréglage ancien). */
+  readonly yearOptions = computed<SelectOption[]>(() => {
+    const now = new Date().getFullYear();
+    const years = new Set<number>([now - 3, now - 2, now - 1, now, now + 1, this.periodYear()]);
+    return [...years].sort((a, b) => b - a).map(y => ({ value: String(y), label: String(y) }));
+  });
+
+  setPeriodMonth(selected: string[]): void {
+    if (selected[0]) this.periodDate.set(new Date(this.periodYear(), +selected[0] - 1, 1));
+  }
+
+  setPeriodYear(selected: string[]): void {
+    if (selected[0]) this.periodDate.set(new Date(+selected[0], this.periodMonth() - 1, 1));
   }
 
   readonly joursOuvresMois = signal(22);
-  readonly contractTypeCode = signal('CDI');
+  readonly contractTypeCode = signal('');
 
-  readonly contractTypeOptions = computed<SelectOption[]>(() => [
-    { value: 'CDI',   label: 'CDI' },
-    { value: 'CDD',   label: 'CDD' },
-    { value: 'STAGE', label: this.t('PAYROLL.ENGINE_RUN.CONTRACT_STAGE') },
-    { value: 'CIVP',  label: 'CIVP' },
-  ]);
+  // ── Type de contrat — comme /payroll/simulator : les contrats que le jeu de paramètres
+  //    actif du pays tarifie (`socialChargeRates`), plus de liste « CDI, CDD, STAGE, CIVP »
+  //    en dur, qui envoyait le moteur en 500 sur un contrat non tarifé. Pas de jeu actif
+  //    (404) = aucun contrat proposé, et le calcul ne peut pas partir.
+  readonly contractTypes        = signal<string[]>([]);
+  readonly contractTypesLoading = signal(false);
+  /** `true` quand le pays est choisi mais n'a aucun jeu de paramètres actif. */
+  readonly parameterSetMissing  = signal(false);
 
-  readonly readyBadge = computed(() => this.canRun()
-    ? { label: this.t('PAYROLL.ENGINE_RUN.STATUS_READY'), variant: 'success' as BadgeVariant }
-    : { label: this.t('PAYROLL.ENGINE_RUN.STATUS_NOT_READY'), variant: 'neutral' as BadgeVariant });
+  /** Contrats en clair (« Contrat à durée indéterminée »…) ; le code reste la valeur envoyée. */
+  readonly contractTypeOptions = computed<SelectOption[]>(() =>
+    this.contractTypes().map(ct => ({ value: ct, label: contractTypeLabel(ct, this.translate) })));
+
+  readonly contractPlaceholder = computed(() =>
+    !this.paysId()                ? this.t('PAYROLL.ENGINE_RUN.CONTRACT_NO_PAYS')
+    : this.contractTypesLoading() ? this.t('PAYROLL.COMMON.LOADING')
+    : this.parameterSetMissing()  ? this.t('PAYROLL.ENGINE_RUN.CONTRACT_NO_PS')
+    :                               this.t('PAYROLL.ENGINE_RUN.CONTRACT_PLACEHOLDER'));
+
+  private contractSeq = 0;
+  private loadContractTypes(paysId: number | null): void {
+    const seq = ++this.contractSeq;
+    this.contractTypes.set([]);
+    this.parameterSetMissing.set(false);
+    if (paysId == null) { this.contractTypesLoading.set(false); this.contractTypeCode.set(''); return; }
+    this.contractTypesLoading.set(true);
+    this.payrollApi.getActiveParameterSet(paysId)
+      .pipe(catchError(() => of(null)), takeUntilDestroyed(this.destroyRef))
+      .subscribe(ps => {
+        if (seq !== this.contractSeq) return;   // réponse dépassée (pays changé entre-temps)
+        const types = [...new Set((ps?.socialChargeRates ?? []).map(r => r.contractType))].sort();
+        this.contractTypes.set(types);
+        this.parameterSetMissing.set(!ps);
+        this.contractTypesLoading.set(false);
+        // Garde le contrat déjà choisi (préréglage) s'il est tarifé, sinon celui de la fiche RH
+        // du collaborateur, sinon CDI, sinon le premier.
+        const current = this.contractTypeCode();
+        const hr = this.employeeHrContract();
+        if (!types.includes(current)) {
+          this.contractTypeCode.set(
+            hr && types.includes(hr) ? hr : types.includes('CDI') ? 'CDI' : types[0] ?? '');
+        }
+      });
+  }
 
   canRun(): boolean {
     const jours = this.joursOuvresMois();
-    return !!this.paysId() && !!this.employeeIdCtrl.value && jours >= 1;
+    return !!this.paysId() && !!this.employeeId() && !!this.contractTypeCode() && jours >= 1;
   }
 
   reset(): void {
-    this.employeeIdCtrl.setValue(null);
-    this.selectedEmployee.set(null);
+    this.employeeId.set(null);
     this.paysId.set(null);
+    this.loadCountry(null);
     this.periodDate.set(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
     this.joursOuvresMois.set(22);
-    this.contractTypeCode.set('CDI');
     this.result.set(null);
+    this.runContext.set(null);
     this.compareResult.set(null);
     this.error.set(null);
   }
 
+  /** Bouton « Lancer le calcul » : si ce collaborateur a déjà un résultat pour ce mois,
+   *  confirmation d'abord — un nouveau lancement AJOUTE un résultat, il ne remplace pas
+   *  l'existant (comportement du serveur). */
   run(): void {
+    if (!this.canRun()) return;
+    const existing = this.existingResult();
+    if (!existing) { this.doRun(); return; }
+    this.modalService.open({
+      title: this.t('PAYROLL.ENGINE_RUN.EXISTING_CONFIRM_TITLE'),
+      icon: 'warning',
+      size: 'sm',
+      body: this.t('PAYROLL.ENGINE_RUN.EXISTING_CONFIRM_BODY', {
+        name: this.selectedEmployee()?.fullName ?? '',
+        period: this.periodText(existing.periodYear, existing.periodMonth),
+        id: existing.resultId,
+      }),
+      buttons: [
+        { label: this.t('PAYROLL.ENGINE_RUN.EXISTING_CONFIRM_CANCEL'), variant: 'secondary', action: ref => ref.close() },
+        { label: this.t('PAYROLL.ENGINE_RUN.EXISTING_CONFIRM_OK'), variant: 'primary', icon: 'calculate',
+          action: ref => { ref.close(); this.doRun(); } },
+      ],
+    });
+  }
+
+  private doRun(): void {
     if (!this.canRun()) return;
     this.running.set(true);
     this.error.set(null);
     this.result.set(null);
+    this.runContext.set(null);
     this.compareResult.set(null);
-    this.api.runPayroll({
-      employeeId:       this.employeeIdCtrl.value!,
+    this.runPaysId.set(this.paysId());
+    const ctx: RunContext = {
+      employeeId:       this.employeeId()!,
+      employeeName:     this.selectedEmployee()?.fullName ?? '',
       paysId:           this.paysId()!,
       periodYear:       this.periodYear(),
       periodMonth:      this.periodMonth(),
       contractTypeCode: this.contractTypeCode(),
-      joursOuvresMois:  this.joursOuvresMois(),
+      jours:            this.joursOuvresMois(),
+    };
+    this.api.runPayroll({
+      employeeId:       ctx.employeeId,
+      paysId:           ctx.paysId,
+      periodYear:       ctx.periodYear,
+      periodMonth:      ctx.periodMonth,
+      contractTypeCode: ctx.contractTypeCode,
+      joursOuvresMois:  ctx.jours,
     }).subscribe({
-      next: r  => { this.result.set(r); this.running.set(false); this.savePreset(); },
+      next: r  => {
+        this.runContext.set(ctx);
+        this.result.set(r);
+        this.running.set(false);
+        this.savePreset();
+        // Le résultat qui vient d'être enregistré compte pour l'avertissement « déjà calculé ».
+        if (r.employeeId === this.employeeId()) this.employeeResults.update(list => [...list, r]);
+      },
       error: e => { this.error.set(e?.error?.message ?? this.t('PAYROLL.ENGINE_RUN.ERROR')); this.running.set(false); },
     });
   }
@@ -564,18 +521,28 @@ export class EngineRunComponent implements OnInit {
     try { localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(next)); } catch { /* private browsing — non-blocking */ }
   }
 
+  /** Libellé d'une pastille « Calculs récents » : « A. Ben Ali · oct. 2026 » — le nom plutôt
+   *  que les initiales. Calculé à l'affichage, donc valable aussi pour les préréglages déjà
+   *  enregistrés (dont `chipLabel` garde l'ancien format). */
+  presetLabel(p: EnginePreset): string {
+    const parts = (p.employeeLabel ?? '').trim().split(/\s+/).filter(Boolean);
+    const name = parts.length > 1 ? `${parts[0][0]}. ${parts.slice(1).join(' ')}` : (parts[0] ?? '');
+    const locale = this.translate.currentLang() === 'en' ? 'en-GB' : 'fr-FR';
+    const month = new Date(p.periodYear, p.periodMonth - 1, 1).toLocaleDateString(locale, { month: 'short' });
+    return name ? `${name} · ${month} ${p.periodYear}` : p.chipLabel;
+  }
+
   loadPreset(p: EnginePreset): void {
-    this.paysId.set(p.paysId);
-    this.employeeIdCtrl.setValue(p.employeeId);
-    // Placeholder until `EmployeeSelectComponent` resolves the id against a fetched page
-    // and re-emits the full record (see its `fetch()`).
-    this.selectedEmployee.set({
-      userId: p.employeeId, profileId: null, fullName: p.employeeLabel,
-      employeeId: null, paysId: p.paysId, paysLabel: null,
-      contractType: null, department: null, lifecycleStatus: null,
-    });
-    this.periodDate.set(new Date(p.periodYear, p.periodMonth - 1, 1));
+    this.employeeId.set(p.employeeId);
+    // Avant `loadCountry` : le chargement des contrats garde ce choix s'il est tarifé.
     this.contractTypeCode.set(p.contractTypeCode);
+    if (p.paysId !== this.paysId()) {
+      this.paysId.set(p.paysId);
+      this.loadCountry(p.paysId);
+    } else if (!this.contractTypes().includes(p.contractTypeCode)) {
+      this.contractTypeCode.set(this.contractTypes().includes('CDI') ? 'CDI' : this.contractTypes()[0] ?? '');
+    }
+    this.periodDate.set(new Date(p.periodYear, p.periodMonth - 1, 1));
     this.joursOuvresMois.set(p.joursOuvresMois);
   }
 
@@ -614,149 +581,154 @@ export class EngineRunComponent implements OnInit {
     };
   }
 
-  readonly netPayDelta      = computed(() => this.delta(this.result()?.strate5 ?? null, this.compareResult()?.strate5 ?? null));
-  readonly loadedCostDelta  = computed(() => this.delta(this.result()?.loadedCost ?? null, this.compareResult()?.loadedCost ?? null));
-  readonly taxableNetDelta  = computed(() => this.delta(this.result()?.strate4 ?? null, this.compareResult()?.strate4 ?? null));
-  readonly irppDelta        = computed(() => this.delta(this.result()?.aggregateIrpp ?? null, this.compareResult()?.aggregateIrpp ?? null));
+  // ── KPI : Brut → Prélèvements → Net, lus sur les strates RÉELLES du moteur. Vérifié sur
+  //    `payroll_rubriques` / `payroll_results` (2026-10-20) :
+  //      S1 SALAIRE_BASE · S2 PRIME_TRANSPORT · S3 CNSS_EE (part SALARIALE) · S4 IRPP · S5 NET_A_PAYER
+  //    S3 n'est donc pas des charges patronales, S4 n'est pas le net imposable, et
+  //    `loadedCost` (= S1+S2+S3) n'est pas un coût employeur : les charges patronales
+  //    (CHARGES_ER) ne sont pas renvoyées par le backend — pas de tuile « coût » tant
+  //    qu'elles ne le sont pas.
+  private static gross(r: RunPayrollResponse): number {
+    return r.aggregateGross ?? (r.strate1 ?? 0) + (r.strate2 ?? 0);
+  }
 
-  // ── Décomposition du coût chargé ─────────────────────────────────────
-  // Indépendant des 5 strates (des totaux cumulés, pas des parts additives) : reconstruit
-  // ici à partir de leurs écarts, en 4 segments qui somment exactement à `loadedCost` —
-  //   loadedCost = strate1 + strate2 + strate3   (backend: SystemVariableAggregator)
-  //   employeeCharges = (strate1+strate2) - strate4   (brut → net imposable)
-  //   irpp            = strate4 - strate5             (net imposable → net à payer)
-  //   employerCharges = strate3                        (déjà agrégé isolément côté backend)
-  readonly costBreakdown = computed((): CostBreakdownSegment[] => {
+  readonly kpis = computed(() => {
     const r = this.result();
-    if (!r || !r.loadedCost) return [];
-
-    const gross            = (r.strate1 ?? 0) + (r.strate2 ?? 0);
-    const net               = r.strate5 ?? 0;
-    const irpp              = (r.strate4 ?? 0) - net;
-    const employeeCharges   = gross - (r.strate4 ?? 0);
-    const employerCharges   = r.strate3 ?? 0;
-    const total              = r.loadedCost;
-    const pct = (v: number) => (total ? (v / total) * 100 : 0);
-
-    return [
-      { key: 'NET',              label: this.t('PAYROLL.ENGINE_RUN.SEG_NET'),              amount: net,             pct: pct(net),             bar: 'bg-primary',   dot: 'bg-primary' },
-      { key: 'EMPLOYEE_CHARGES', label: this.t('PAYROLL.ENGINE_RUN.SEG_EMPLOYEE_CHARGES'), amount: employeeCharges, pct: pct(employeeCharges), bar: 'bg-secondary', dot: 'bg-secondary' },
-      { key: 'IRPP',             label: this.t('PAYROLL.ENGINE_RUN.STRATE_IRPP'),          amount: irpp,            pct: pct(irpp),            bar: 'bg-warning',   dot: 'bg-warning' },
-      { key: 'EMPLOYER_CHARGES', label: this.t('PAYROLL.ENGINE_RUN.STRATE_EMPLOYER_CHARGES'), amount: employerCharges, pct: pct(employerCharges), bar: 'bg-teal',    dot: 'bg-teal' },
-    ].filter(s => s.amount > 0.005);
+    if (!r) return null;
+    const gross = EngineRunComponent.gross(r);
+    const net   = r.strate5 ?? 0;
+    return {
+      gross,
+      employeeCharges: r.strate3 ?? 0,
+      irpp:            r.aggregateIrpp ?? r.strate4 ?? 0,
+      net,
+      netPct:          gross ? (net / gross) * 100 : null,
+    };
   });
 
-  // ── Détail des rubriques : catégories par nature réelle (aucune catégorie "Fiscalité /
-  //    PAS" n'existe dans les données — seules AVANTAGE/INDEMNITE/PRIME/RETENUE le sont). ──
+
+  readonly grossDelta  = computed(() => {
+    const r = this.result(), c = this.compareResult();
+    return this.delta(r ? EngineRunComponent.gross(r) : null, c ? EngineRunComponent.gross(c) : null);
+  });
+  readonly netPayDelta = computed(() => this.delta(this.result()?.strate5 ?? null, this.compareResult()?.strate5 ?? null));
+  /** Écarts N-1 des deux retenues — mêmes strates que `kpis` (S3 CNSS salariale, S4 IRPP). */
+  readonly employeeChargesDelta = computed(() =>
+    this.delta(this.result()?.strate3 ?? null, this.compareResult()?.strate3 ?? null));
+  readonly irppDelta = computed(() => {
+    const irpp = (r: RunPayrollResponse | null) => r ? (r.aggregateIrpp ?? r.strate4 ?? null) : null;
+    return this.delta(irpp(this.result()), irpp(this.compareResult()));
+  });
+
+  // ── Contexte du calcul affiché ───────────────────────────────────────────────
+  // Figé au lancement : le formulaire de gauche peut changer ensuite, le résultat de droite
+  // doit continuer à dire de QUI, de QUAND et avec QUEL contrat il est.
+
+  readonly runContext = signal<RunContext | null>(null);
+
+  /** « Bulletin de Ahmed Ben Ali · octobre 2026 · CDI · 22 j ». */
+  readonly resultTitle = computed(() => {
+    const c = this.runContext();
+    if (!c) return null;
+    return this.t('PAYROLL.ENGINE_RUN.RESULT_HEADING', {
+      name:     c.employeeName,
+      period:   this.periodText(c.periodYear, c.periodMonth),
+      contract: contractTypeLabel(c.contractTypeCode, this.translate),
+      days:     c.jours,
+    });
+  });
+
+  /** Le formulaire ne correspond plus au résultat affiché : bandeau « relancez ». */
+  readonly paramsChanged = computed(() => {
+    const c = this.runContext();
+    if (!c || !this.result()) return false;
+    return c.paysId !== this.paysId() || c.employeeId !== this.employeeId()
+      || c.periodYear !== this.periodYear() || c.periodMonth !== this.periodMonth()
+      || c.contractTypeCode !== this.contractTypeCode() || c.jours !== this.joursOuvresMois();
+  });
+
+  // ── Bulletin : composant partagé `app-payslip-bulletin` ─────────────────────────
+  // Même affichage que /payroll/engine-results/:id?result= : 4 indicateurs, Gains,
+  // Retenues, Net à payer, « Où va le brut ? ». La page ne garde que ce qui lui est propre
+  // (contexte du calcul, écarts N-1, exports, devise du lancement).
+
   readonly rubriqueSearch = signal('');
-  readonly rubriqueTab    = signal<RubriqueTab>('all');
+  private readonly bulletin = viewChild(PayslipBulletinComponent);
 
-  private readonly rubriqueTabCounts = computed(() => {
-    const details = this.result()?.rubriqueDetails ?? [];
-    const debit = details.filter(d => d.nature === 'RETENUE').length;
-    return { all: details.length, credit: details.length - debit, debit };
-  });
-
-  /** Catégorie dans le panneau de filtre de la barre (select de la lib), avec le nombre
-   *  de rubriques par catégorie ; vide = toutes les rubriques. */
-  readonly rubriqueFilterFields = computed<FilterField[]>(() => {
-    const c = this.rubriqueTabCounts();
-    return [{
-      name: 'category',
-      label: this.t('PAYROLL.ENGINE_RUN.FILTER_CATEGORY'),
-      type: 'select',
-      placeholder: `${this.t('PAYROLL.ENGINE_RUN.TAB_ALL')} (${c.all})`,
-      options: [
-        { value: 'credit', label: `${this.t('PAYROLL.ENGINE_RUN.TAB_CREDIT')} (${c.credit})` },
-        { value: 'debit',  label: `${this.t('PAYROLL.ENGINE_RUN.TAB_DEBIT')} (${c.debit})` },
-      ],
-    }];
-  });
-
-  readonly rubriqueFilterConfig = computed<SearchToolbarFilterConfig>(() => ({
-    title:        this.t('PAYROLL.ENGINE_RUN.FILTER_TITLE'),
-    applyLabel:   this.t('PAYROLL.ENGINE_RUN.FILTER_APPLY'),
-    cancelLabel:  this.t('PAYROLL.ENGINE_RUN.FILTER_CANCEL'),
-    resetLabel:   this.t('PAYROLL.ENGINE_RUN.FILTER_RESET'),
-    triggerLabel: this.t('PAYROLL.ENGINE_RUN.FILTER_TRIGGER'),
-    align: 'right',
+  /** Écarts N-1 des quatre tuiles, après « Comparer avec le même mois l'an dernier ». */
+  readonly kpiDeltas = computed<PayslipDeltas>(() => ({
+    gross:           this.grossDelta(),
+    employeeCharges: this.employeeChargesDelta(),
+    irpp:            this.irppDelta(),
+    net:             this.netPayDelta(),
   }));
-
-  applyRubriqueFilter(result: FilterResult): void {
-    const v = result['category'];
-    this.rubriqueTab.set(v === 'credit' || v === 'debit' ? v : 'all');
-  }
-
-  natureVariant(nature: string): BadgeVariant {
-    switch (nature) {
-      case 'RETENUE':   return 'danger';
-      case 'AVANTAGE':  return 'info';
-      case 'INDEMNITE': return 'secondary';
-      case 'PRIME':     return 'success';
-      default:          return 'neutral';
-    }
-  }
-
-  natureLabel(nature: string): string {
-    return this.t(`PAYROLL.ENGINE_RUN.NATURE.${nature}`);
-  }
-
-  readonly rubriqueColumns = computed<TableColumn[]>(() => [
-    { key: 'code',     label: this.t('PAYROLL.ENGINE_RUN.COL_CODE'), sortable: true },
-    { key: 'label',    label: this.t('PAYROLL.ENGINE_RUN.COL_LABEL'), sortable: true },
-    { key: 'strate',   label: this.t('PAYROLL.ENGINE_RUN.COL_STRATE'),   type: 'badge', sortable: true,
-      sortAccessor: row => row['_strate'] as number },
-    { key: 'nature',   label: this.t('PAYROLL.ENGINE_RUN.COL_NATURE'),   type: 'badge', sortable: true },
-    { key: 'assiette', label: this.t('PAYROLL.ENGINE_RUN.COL_ASSIETTE'), type: 'number', align: 'right', format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }, sortable: true },
-    { key: 'amount',   label: this.t('PAYROLL.ENGINE_RUN.COL_AMOUNT'),   type: 'number', align: 'right', format: { minimumFractionDigits: 2, maximumFractionDigits: 2 }, sortable: true },
-    { key: 'mode',     label: this.t('PAYROLL.ENGINE_RUN.COL_MODE'), sortable: true },
-  ]);
-
-  readonly rubriqueRows = computed<TableRow[]>(() => {
-    const tab = this.rubriqueTab();
-    const search = this.rubriqueSearch().trim().toLowerCase();
-    return (this.result()?.rubriqueDetails ?? [])
-      .filter(r => tab === 'all' || (tab === 'debit' ? r.nature === 'RETENUE' : r.nature !== 'RETENUE'))
-      .filter(r => !search || r.rubriqueCode.toLowerCase().includes(search) || r.labelFr.toLowerCase().includes(search))
-      .map(r => ({
-        id:       r.rubriqueCode,
-        code:     r.rubriqueCode,
-        label:    r.labelFr,
-        _strate:  r.strate,
-        strate:   { label: 'S' + r.strate, options: { variant: 'neutral' as BadgeVariant, size: 'sm' as const } },
-        nature:   { label: this.natureLabel(r.nature), options: { variant: this.natureVariant(r.nature), size: 'sm' as const } },
-        assiette: r.assiette,
-        amount:   r.amount,
-        mode:     r.modeCalcul,
-      }));
-  });
 
   /**
-   * Outils de tableau communs (`tableTools`), comme sur `/finance/affaires`. Tri local :
-   * les rubriques d'un calcul arrivent toutes ensemble et ne sont pas paginées.
+   * Devise du pays du calcul affiché (`PaysDto.devise`, comme /payroll/employee-config).
+   * `RunPayrollResponse` ne porte pas le pays : on garde celui du lancement (`runPaysId`),
+   * pas la sélection courante du formulaire. Seul un code ISO 4217 passe — `Intl` lève une
+   * RangeError sur une devise invalide.
    */
-  readonly rubriqueTableConfig = computed<TableConfig>(() => ({
-    emptyMessage: this.t('PAYROLL.ENGINE_RUN.EMPTY_RUBRIQUES'),
-    ...tableTools(this.translate),
-  }));
+  readonly resultCurrency = computed<string | null>(() => {
+    const id = this.runPaysId();
+    const devise = this.paysList().find(p => p.id === id)?.devise?.trim().toUpperCase();
+    return devise && /^[A-Z]{3}$/.test(devise) ? devise : null;
+  });
 
-  exportRubriquesCsv(): void {
-    const columns = this.rubriqueColumns();
-    const rows = this.rubriqueRows();
-    const escape = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const header = columns.map(c => escape(c.label)).join(';');
-    const body = rows.map(row => columns.map(c => {
-      const cell = row[c.key];
-      return escape((c.key === 'strate' || c.key === 'nature') ? (cell as { label?: string })?.label : cell);
-    }).join(';')).join('\n');
-    const csv = String.fromCharCode(0xFEFF) + header + '\n' + body;
+  // ── Actions du résultat : Excel, PDF, Imprimer, Voir dans Résultats de paie ─────────
+  // Mêmes exports serveur que la fiche /payroll/engine-results (le résultat est enregistré,
+  // on a son numéro) — remplacent l'ancien CSV construit dans le navigateur.
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `rubriques-${this.result()?.employeeId ?? 'export'}-${this.periodYear()}-${this.periodMonth()}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+  readonly exportingXlsx = signal(false);
+  readonly exportingPdf  = signal(false);
+
+  /** Lignes exportées : celles de la recherche en cours du bulletin, comme la fiche résultat. */
+  private exportCodes(): string[] {
+    return this.bulletin()?.searchedCodes()
+      ?? (this.result()?.rubriqueDetails ?? []).map(r => r.rubriqueCode);
+  }
+
+  private exportName(ext: string): string {
+    const r = this.result()!;
+    return `Bulletin_${r.employeeId}_${r.periodYear}-${String(r.periodMonth).padStart(2, '0')}.${ext}`;
+  }
+
+  exportXlsx(): void {
+    const r = this.result();
+    if (!r || this.exportingXlsx()) return;
+    this.exportingXlsx.set(true);
+    this.api.exportResultRubriquesXlsx(r.resultId, this.exportCodes(), this.translate.currentLang() || 'fr')
+      .subscribe({
+        next: blob => { this.exportingXlsx.set(false); saveBlob(blob, this.exportName('xlsx')); },
+        error: err => this.exportFailed(err, this.exportingXlsx),
+      });
+  }
+
+  exportPdf(): void {
+    const r = this.result();
+    if (!r || this.exportingPdf()) return;
+    this.exportingPdf.set(true);
+    this.api.exportResultRubriquesPdf(r.resultId, this.exportCodes(), this.translate.currentLang() || 'fr',
+      this.runContext()?.employeeName ?? '')
+      .subscribe({
+        next: blob => { this.exportingPdf.set(false); saveBlob(blob, this.exportName('pdf')); },
+        error: err => this.exportFailed(err, this.exportingPdf),
+      });
+  }
+
+  private exportFailed(err: unknown, busy: { set(v: boolean): void }): void {
+    busy.set(false);
+    readBlobError(err, this.t('PAYROLL.ENGINE_RUN.EXPORT_ERROR')).then(msg => this.notification.error(msg));
+  }
+
+  print(): void {
+    window.print();
+  }
+
+  /** Historique de paie du collaborateur, le résultat qui vient d'être calculé ouvert. */
+  openInResults(): void {
+    const r = this.result();
+    if (!r) return;
+    this.router.navigate(['/payroll/engine-results', r.employeeId], { queryParams: { result: r.resultId } });
   }
 }

@@ -20,13 +20,13 @@ import {
   PaginationComponent,
   RadialMenuComponent,
   SearchToolbarComponent,
-  type BreadcrumbItem,
   type RadialMenuConfig,
   type RadialMenuItem,
   type EntityCardOptions,
   type FilterField,
   type FilterResult,
   type MetricCardOptions,
+  type MetricDelta,
   type SearchToolbarFilterConfig,
   type TableColumn,
   type TableConfig,
@@ -84,11 +84,6 @@ export class EngineResultsListComponent implements OnInit {
     this.translate.currentLang();
     return this.translate.instant(key, params);
   }
-
-  readonly breadcrumbs = computed((): BreadcrumbItem[] => [
-    { label: this.t('PAYROLL.COMMON.BREADCRUMB_ROOT'), link: '/payroll' },
-    { label: this.t('PAYROLL.ENGINE_RESULTS.BREADCRUMB') },
-  ]);
 
   readonly employees     = signal<EmployeeListItem[]>([]);
   readonly totalElements = signal(0);
@@ -244,7 +239,7 @@ export class EngineResultsListComponent implements OnInit {
   /** Somme d'un montant sur tous les pays, chacun converti dans la devise d'affichage. Flags the
    *  result as approximate when any contributing country's currency (or the display target
    *  itself) needed CurrencyService's fallback rate rather than a live one. */
-  private total(field: 'totalGross' | 'totalLoadedCost'): TotalResult {
+  private total(field: 'totalGross' | 'totalNet' | 'totalLoadedCost'): TotalResult {
     const target = this.displayCurrency();
     let approximate = !!target && this.currency.needsFallbackRate(target);
     const value = (this.summaries() ?? []).reduce((acc, s) => {
@@ -272,19 +267,22 @@ export class EngineResultsListComponent implements OnInit {
     return target ? `${prefix}${n} ${target}` : `${prefix}${n}`;
   }
 
-  /** Dernier mois calculé ; une plage quand les pays n'en sont pas au même mois. */
+  /** Dernier mois calculé, en toutes lettres (« novembre 2026 ») ; une plage quand les pays
+   *  n'en sont pas au même mois. */
   private periodLabel(list: PayrollResultsSummaryDto[]): string {
     const keys = list
       .filter(s => s.periodYear && s.periodMonth)
       .map(s => s.periodYear! * 100 + s.periodMonth!)
       .sort((a, b) => a - b);
     if (keys.length === 0) return this.t('PAYROLL.ENGINE_RESULTS.KPI_NO_PERIOD');
-    const fmt = (k: number) => `${String(k % 100).padStart(2, '0')}/${Math.floor(k / 100)}`;
+    const locale = this.translate.getCurrentLang() === 'en' ? 'en-GB' : 'fr-FR';
+    const fmt = (k: number) => new Date(Math.floor(k / 100), (k % 100) - 1, 1)
+      .toLocaleDateString(locale, { month: 'long', year: 'numeric' });
     const first = keys[0], last = keys[keys.length - 1];
     return first === last ? fmt(last) : `${fmt(first)} – ${fmt(last)}`;
   }
 
-  /** Les quatre tuiles, prêtes pour le template — TOUJOURS affichées : « — » tant que
+  /** Les cinq tuiles, prêtes pour le template — TOUJOURS affichées : « — » tant que
    *  rien n'est chargé ou si le service est en échec. */
   readonly kpiTiles = computed(() => {
     const list = this.summaries();
@@ -293,69 +291,101 @@ export class EngineResultsListComponent implements OnInit {
       return {
         period: empty,
         tiles: [
-          { label: this.t('PAYROLL.ENGINE_RESULTS.KPI_GROSS_PAYROLL'),        value: empty, options: { icon: 'account_balance_wallet' } },
-          { label: this.t('PAYROLL.ENGINE_RESULTS.KPI_LOADED_COST'),          value: empty, options: { icon: 'account_balance' } },
-          { label: this.t('PAYROLL.ENGINE_RESULTS.KPI_COVERAGE'),             value: empty, options: { icon: 'fact_check' } },
-          { label: this.t('PAYROLL.ENGINE_RESULTS.KPI_CONVERGENCE_FAILURES'), value: empty, options: { icon: 'verified' } },
-        ] satisfies { label: string; value: string | number; options: MetricCardOptions }[],
+          { label: this.t('PAYROLL.ENGINE_RESULTS.KPI_GROSS_PAYROLL'), value: empty, delta: null, options: { icon: 'account_balance_wallet' } },
+          { label: this.t('PAYROLL.ENGINE_RESULTS.KPI_NET_TOTAL'),     value: empty, delta: null, options: { icon: 'payments' } },
+          { label: this.t('PAYROLL.ENGINE_RESULTS.KPI_WITHHELD'),      value: empty, delta: null, options: { icon: 'receipt_long' } },
+          { label: this.t('PAYROLL.ENGINE_RESULTS.KPI_EMPLOYER_COST'), value: empty, delta: null, options: { icon: 'account_balance' } },
+          { label: this.t('PAYROLL.ENGINE_RESULTS.KPI_COVERAGE'),      value: empty, delta: null, options: { icon: 'fact_check' } },
+        ] satisfies { label: string; value: string | number; delta: MetricDelta | null; options: MetricCardOptions }[],
       };
     }
-    const totalGross      = this.total('totalGross');
-    const totalLoadedCost = this.total('totalLoadedCost');
+    // Tuile « Coût employeur total » de retour : depuis la correction du moteur (26/10/2026),
+    // `totalLoadedCost` = brut + cotisations PATRONALES réelles (avant : brut + CNSS salariale).
+    // Un mois calculé avant cette date garde l'ancienne valeur tant qu'il n'est pas relancé —
+    // l'aide de la tuile le dit. Plus de tuile « Échecs de convergence » : toujours 0.
     const s = {
-      totalGross,
-      totalLoadedCost,
-      employeeCount:       list.reduce((acc, x) => acc + x.employeeCount, 0),
-      convergenceFailures: list.reduce((acc, x) => acc + x.convergenceFailures, 0),
+      totalGross:      this.total('totalGross'),
+      totalNet:        this.total('totalNet'),
+      totalLoadedCost: this.total('totalLoadedCost'),
+      employeeCount:   list.reduce((acc, x) => acc + x.employeeCount, 0),
     };
     const period = this.periodLabel(list);
     const headcount = this.headcount();
-    const failures = s.convergenceFailures;
+    // Collaborateurs en poste sans résultat sur la période. ⚠ `employeeCount` compte les
+    // RÉSULTATS (un recalcul du même mois compte deux fois) tant que le résumé serveur ne
+    // dédoublonne pas : le nombre est borné à 0 pour ne jamais devenir négatif.
+    const missing = headcount != null ? Math.max(0, headcount - s.employeeCount) : null;
+    // Retenues = ce qui sépare la masse brute de la masse nette (cotisations salariales + IRPP).
+    const withheld = Math.max(0, s.totalGross.value - s.totalNet.value);
+    const withheldPct = s.totalGross.value > 0
+      ? new Intl.NumberFormat(this.translate.currentLang() === 'en' ? 'en-US' : 'fr-FR', { maximumFractionDigits: 1 })
+          .format(withheld / s.totalGross.value * 100)
+      : null;
+    // Info-bulles sans titre : il redirait le libellé de la tuile, juste au-dessus.
     return {
       period,
       tiles: [
         {
           label: this.t('PAYROLL.ENGINE_RESULTS.KPI_GROSS_PAYROLL'),
           value: this.money(s.totalGross.value, s.totalGross.approximate),
+          delta: null,
           options: {
             icon: 'account_balance_wallet',
-            helpTitle: this.t('PAYROLL.ENGINE_RESULTS.KPI_GROSS_PAYROLL'),
             help: this.t('PAYROLL.ENGINE_RESULTS.KPI_GROSS_PAYROLL_HELP', { period }),
           },
         },
         {
-          label: this.t('PAYROLL.ENGINE_RESULTS.KPI_LOADED_COST'),
-          value: this.money(s.totalLoadedCost.value, s.totalLoadedCost.approximate),
+          label: this.t('PAYROLL.ENGINE_RESULTS.KPI_NET_TOTAL'),
+          value: this.money(s.totalNet.value, s.totalNet.approximate),
+          delta: null,
           options: {
-            valueColor: 'text-primary', icon: 'account_balance',
-            helpTitle: this.t('PAYROLL.ENGINE_RESULTS.KPI_LOADED_COST'),
-            help: this.t('PAYROLL.ENGINE_RESULTS.KPI_LOADED_COST_HELP', { period }),
+            valueColor: 'text-primary', icon: 'payments',
+            help: this.t('PAYROLL.ENGINE_RESULTS.KPI_NET_TOTAL_HELP', { period }),
           },
         },
         {
+          label: this.t('PAYROLL.ENGINE_RESULTS.KPI_WITHHELD'),
+          value: this.money(withheld),
+          delta: withheldPct != null
+            ? { value: this.t('PAYROLL.ENGINE_RESULTS.KPI_WITHHELD_PCT', { pct: withheldPct }), direction: 'neutral' as const }
+            : null,
+          options: {
+            icon: 'receipt_long',
+            help: this.t('PAYROLL.ENGINE_RESULTS.KPI_WITHHELD_HELP', { period }),
+          },
+        },
+        {
+          label: this.t('PAYROLL.ENGINE_RESULTS.KPI_EMPLOYER_COST'),
+          value: this.money(s.totalLoadedCost.value, s.totalLoadedCost.approximate),
+          delta: s.totalLoadedCost.value > s.totalGross.value
+            ? { value: this.t('PAYROLL.ENGINE_RESULTS.KPI_EMPLOYER_COST_SUB', { amount: this.money(s.totalLoadedCost.value - s.totalGross.value) }), direction: 'neutral' as const }
+            : null,
+          options: {
+            icon: 'account_balance', valueColor: 'text-primary',
+            help: this.t('PAYROLL.ENGINE_RESULTS.KPI_EMPLOYER_COST_HELP', { period }),
+          },
+        },
+        {
+          // Collaborateurs calculés « 12 / 15 », les non calculés dessous (une seule tuile).
           label: this.t('PAYROLL.ENGINE_RESULTS.KPI_COVERAGE'),
           value: headcount != null ? `${s.employeeCount} / ${headcount}` : String(s.employeeCount),
+          delta: missing == null ? null : {
+            value: missing > 0
+              ? this.t('PAYROLL.ENGINE_RESULTS.KPI_NOT_CALCULATED_SUB', { count: missing })
+              : this.t('PAYROLL.ENGINE_RESULTS.KPI_ALL_CALCULATED'),
+            direction: 'neutral' as const,
+          },
           options: {
-            icon: 'fact_check',
-            ...(headcount != null && s.employeeCount >= headcount && headcount > 0
-              ? { valueColor: 'text-success', iconColor: 'text-success', iconBg: 'bg-success/10' }
-              : {}),
-            helpTitle: this.t('PAYROLL.ENGINE_RESULTS.KPI_COVERAGE'),
+            ...(missing == null ? { icon: 'fact_check' }
+              : missing > 0
+                ? { valueColor: 'text-warning', icon: 'person_alert', iconColor: 'text-warning', iconBg: 'bg-warning/10' }
+                : { valueColor: 'text-success', icon: 'task_alt', iconColor: 'text-success', iconBg: 'bg-success/10' }),
             help: this.t('PAYROLL.ENGINE_RESULTS.KPI_COVERAGE_HELP', { period }),
+            // Dernière tuile de la rangée : l'aide s'ouvre vers le haut (pas de débordement).
+            helpPlacement: 'top',
           },
         },
-        {
-          label: this.t('PAYROLL.ENGINE_RESULTS.KPI_CONVERGENCE_FAILURES'),
-          value: failures,
-          options: failures > 0
-            ? { valueColor: 'text-danger', icon: 'error', iconColor: 'text-danger', iconBg: 'bg-danger/10',
-                helpTitle: this.t('PAYROLL.ENGINE_RESULTS.KPI_CONVERGENCE_FAILURES'),
-                help: this.t('PAYROLL.ENGINE_RESULTS.KPI_CONVERGENCE_FAILURES_HELP', { period }) }
-            : { valueColor: 'text-success', icon: 'verified', iconColor: 'text-success', iconBg: 'bg-success/10',
-                helpTitle: this.t('PAYROLL.ENGINE_RESULTS.KPI_CONVERGENCE_FAILURES'),
-                help: this.t('PAYROLL.ENGINE_RESULTS.KPI_CONVERGENCE_FAILURES_HELP', { period }) },
-        },
-      ] satisfies { label: string; value: string | number; options: MetricCardOptions }[],
+      ] satisfies { label: string; value: string | number; delta: MetricDelta | null; options: MetricCardOptions }[],
     };
   });
 
@@ -505,7 +535,8 @@ export class EngineResultsListComponent implements OnInit {
         image: { initials: this.initials(e.fullName) },
         metadata: {
           title: e.fullName,
-          subtitle: [e.department, e.contractType].filter(Boolean).join(' · '),
+          // Département et contrat sont désormais des métriques de la carte : plus de
+          // sous-titre, qui les aurait répétés.
           ...(e.lifecycleStatus
             ? { status: this.entityStatus(e.lifecycleStatus), statusLabel: this.lifecycleLabel(e.lifecycleStatus) }
             : {}),
@@ -514,6 +545,8 @@ export class EngineResultsListComponent implements OnInit {
         metrics: [
           { label: this.t('PAYROLL.ENGINE_RESULTS.COL_MATRICULE'), value: e.employeeId ?? '—' },
           { label: this.t('PAYROLL.ENGINE_RESULTS.COL_PAYS'),      value: e.paysLabel ?? '—' },
+          { label: this.t('PAYROLL.ENGINE_RESULTS.COL_DEPARTMENT'), value: e.department ?? '—' },
+          { label: this.t('PAYROLL.ENGINE_RESULTS.COL_CONTRACT'),   value: this.contractLabel(e.contractType) },
         ],
         viewLabel: this.t('PAYROLL.ENGINE_RESULTS.VIEW_HISTORY'),
       } satisfies EntityCardOptions,
@@ -570,10 +603,25 @@ export class EngineResultsListComponent implements OnInit {
       name:       e.fullName,
       matricule:  e.employeeId ?? '—',
       department: e.department ?? '—',
-      contract:   e.contractType ?? '—',
+      contract:   this.contractLabel(e.contractType),
       pays:       e.paysLabel ?? '—',
     })),
   );
+
+  /** Contrat en clair (« CDI » pour PERMANENT, « Stage » pour INTERN…), « — » sans contrat. */
+  private contractLabel(code: string | null): string {
+    return code ? contractTypeLabel(code, this.translate) : '—';
+  }
+
+  /** Nom de la devise d'affichage (« Dinar tunisien »), pour la ligne au-dessus des tuiles :
+   *  le bouton flottant de la lib n'affiche que le symbole. */
+  readonly displayCurrencyName = computed(() => {
+    const code = this.displayCurrency();
+    if (!code) return null;
+    const key = `PAYROLL.ENGINE_RESULTS.CURRENCY.${code}`;
+    const name = this.t(key);
+    return name === key ? code : name;
+  });
 
   /** `id: 'view'` → icône `visibility` de la lib ; le tableau n'affiche que l'icône. */
   readonly employeeActions = computed(() => [

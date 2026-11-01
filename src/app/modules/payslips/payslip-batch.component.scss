@@ -2,69 +2,151 @@ $muted:   var(--color-on-surface-variant, #6b7280);
 $outline: var(--color-outline-variant, #e5e7eb);
 $success: var(--color-success, #0f7b5f);
 
-/* ── Carte d'import ────────────────────────────────────────────────── */
-.import          { display: flex; flex-direction: column; gap: 1.5rem; }
+/* ══ FORMULAIRE — squelette de l'assistant « Nouvelle affaire » ══════════════
+   Mêmes valeurs que affaire-wizard.component.scss (facturation) et que le simulateur :
+   carte de formulaire, en-tête d'étape, messages de pied, barre d'actions flottante. */
+.wizard { display: flex; flex-direction: column; gap: 1rem; }
 
-.import__header  { display: flex; align-items: center; gap: 1rem; padding-bottom: 1.25rem;
-                   border-bottom: 1px solid $outline; }
-.import__icon    { flex: 0 0 auto; width: 3rem; height: 3rem; border-radius: .75rem;
-                   display: flex; align-items: center; justify-content: center;
-                   background: var(--color-primary-container, #e0ecff); color: var(--color-primary, #1e3a8a); }
-.import__heading { flex: 1 1 auto; min-width: 0; }
-.import__title   { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--color-on-surface, #111827); }
-.import__subtitle { margin: .125rem 0 0; font-size: .875rem; color: $muted; }
+.form-card {
+  overflow: hidden; background: #ffffff; border-radius: 16px;
+  border: 1px solid #f1f5f9; box-shadow: 0 2px 8px rgba(0,0,0,.07), 0 1px 3px rgba(0,0,0,.05);
+}
+.card-head {
+  display: flex; align-items: center; gap: 14px; padding: 24px 32px 20px;
+  border-bottom: 1px solid #f1f5f9; background: rgba(121, 215, 190, 0.04);
+}
+.card-head__icon {
+  width: 44px; height: 44px; border-radius: 12px; background: rgba(0, 107, 88, 0.1);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #006b58;
+  .material-symbols-outlined { font-size: 22px; }
+}
+.card-head__title { font-size: 1.1rem; font-weight: 700; color: #0b1c30; margin: 0 0 3px; line-height: 1.3; }
+.card-head__sub   { font-size: 0.8125rem; color: #64748b; margin: 0; line-height: 1.5; }
+.step-body        { padding: 28px 32px; }
+
+.validation-hint {
+  margin: 0 32px 12px; padding: 10px 14px; background: rgba(26, 107, 124, 0.06);
+  border: 1px solid rgba(26, 107, 124, 0.18); border-radius: 10px;
+  display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: #1a6b7c; line-height: 1.5;
+  .material-symbols-outlined { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+}
+.saving-hint {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 8px 0; font-size: 13px; color: #6b7280;
+}
+.saving-spin { animation: payslip-spin 0.8s linear infinite; font-size: 16px; }
+@keyframes payslip-spin { to { transform: rotate(360deg); } }
+
+/* Barre d'actions : sticky dans le flux (pas fixed) — voir le gabarit. */
+.action-bar {
+  display: block; position: sticky; bottom: 1rem; z-index: 40;
+  width: 100%; max-width: 820px; margin-inline: auto;
+}
+.action-bar__inner { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+.action-bar__side  { display: flex; flex: 0 0 auto; align-items: center; gap: 0.5rem; }
+/* Pas de rail entre les deux : l'action se cale seule à droite. */
+.action-bar__side--end { justify-content: flex-end; margin-left: auto; }
+.footer-action {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border: none;
+  background: none; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--color-on-surface-variant); cursor: pointer; transition: color 0.15s;
+  .material-symbols-outlined { font-size: 18px; }
+  &:hover:not(:disabled) { color: var(--color-teal); }
+  &:focus-visible { outline: 2px solid var(--color-teal); outline-offset: 2px; }
+  &:disabled { color: var(--color-outline); cursor: not-allowed; }
+}
+
+@media (max-width: 1100px) {
+  .step-body { padding: 20px 24px; }
+  .card-head { padding: 18px 24px 16px; }
+  .validation-hint { margin-left: 24px; margin-right: 24px; }
+}
+@media (max-width: 768px) {
+  .card-head { padding: 14px 16px 12px; gap: 10px; }
+  .card-head__icon { width: 36px; height: 36px; .material-symbols-outlined { font-size: 18px; } }
+  .card-head__title { font-size: 0.95rem; }
+  .step-body { padding: 16px; }
+  .validation-hint { margin-left: 16px; margin-right: 16px; }
+}
+@media (max-width: 480px) {
+  .step-body { padding: 12px; }
+  .card-head { padding: 12px 12px 10px; }
+}
+
+/* ── Contenu de la carte : deux blocs, chacun = `daf-section-title` + ses champs ── */
+.import          { display: flex; flex-direction: column; gap: 1.5rem; }
+.import__step    { display: flex; flex-direction: column; gap: 1rem; }
 
 .import__fields  { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; }
 @media (max-width: 900px) { .import__fields { grid-template-columns: 1fr; } }
 
-/* Note à gauche, boutons à droite en bas de la carte, sur UNE seule ligne : la note se
-   rétrécit (et passe sur deux lignes si besoin) au lieu de faire tomber les boutons sous
-   elle. Empilés seulement sur petit écran, boutons toujours calés à droite. */
-.import__footer  { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: nowrap; }
-.import__note    { display: flex; align-items: center; gap: .5rem; margin: 0;
-                   flex: 1 1 auto; min-width: 0; font-size: .875rem; color: $muted; }
-.import__note .material-symbols-outlined { font-size: 1.25rem; color: var(--color-teal, #0f766e); flex-shrink: 0; }
-.import__actions { display: flex; align-items: center; justify-content: flex-end; gap: .75rem; flex-shrink: 0; margin-left: auto; }
-@media (max-width: 640px) {
-  .import__footer { flex-wrap: wrap; }
-}
+/* Boutons du cas « lot introuvable » (rapport). */
+.import__actions { display: flex; align-items: center; justify-content: flex-end; gap: .75rem; }
 
 .hidden-input    { display: none; }
 
-/* ── Fiche du fichier sélectionné ───────────────────────────────────── */
-.file-card       { display: flex; align-items: center; gap: 1.25rem; padding: 1.5rem 2rem;
-                   border: 1px solid $outline; border-radius: 1rem;
+/* ── Fiche du fichier sélectionné — à l'échelle des champs du formulaire ── */
+.file-card       { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.25rem;
+                   border: 1px solid $outline; border-radius: 12px;
                    background: var(--color-surface-container-low, #f8fafc); flex-wrap: wrap; }
 .file-card--error { border-color: var(--color-danger, #dc2626); }
-.file-card__icon { flex: 0 0 auto; width: 4rem; height: 4rem; border-radius: .875rem;
+.file-card__icon { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px;
                    display: flex; align-items: center; justify-content: center;
                    background: var(--color-surface-container-lowest, #fff); border: 1px solid $outline;
                    color: var(--color-danger, #dc2626); }
-.file-card__icon .material-symbols-outlined { font-size: 2rem; }
-.file-card__body { flex: 1 1 18rem; min-width: 0; display: flex; flex-direction: column; gap: .375rem; }
+.file-card__icon .material-symbols-outlined { font-size: 22px; }
+.file-card__body { flex: 1 1 18rem; min-width: 0; display: flex; flex-direction: column; gap: .25rem; }
 .file-card__name-row { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; min-width: 0; }
-.file-card__name { font-size: 1.25rem; font-weight: 700; color: var(--color-on-surface, #111827);
+.file-card__name { font-size: .95rem; font-weight: 700; color: var(--color-on-surface, #111827);
                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .file-card__meta { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin: 0;
-                   font-size: .875rem; color: $muted; }
+                   font-size: .8125rem; color: $muted; }
 .file-card__meta .dot { opacity: .6; }
 .file-card__check { display: flex; align-items: center; gap: .375rem; margin: 0;
-                    font-size: .875rem; font-weight: 600; color: $success; }
+                    font-size: .8125rem; font-weight: 600; color: $success; }
 .file-card__check .material-symbols-outlined { font-size: 1.125rem; font-variation-settings: 'FILL' 1; }
 .file-card__actions { display: flex; gap: .75rem; flex-wrap: wrap; }
 
 /* ── Sections (rapport, historique) ─────────────────────────────────── */
 .section         { display: flex; flex-direction: column; gap: 1rem; }
-.section__head   { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-.section__title  { margin: 0; font-size: 1.375rem; font-weight: 700; color: var(--color-on-surface, #111827); }
-.section__subtitle { margin: .125rem 0 0; font-size: .875rem; color: $muted; }
-.section__tools  { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
 
-.kpi-grid        { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1.25rem; }
+/* ── Rapport : deux colonnes, mêmes règles que les fiches simulateur / candidat ──────── */
+.detail-split { display: flex; flex-wrap: wrap; gap: 2rem; align-items: flex-start; padding: 0 0 2rem; }
+.detail-aside { flex: 0 1 30%; min-width: 320px; max-width: 420px; }
+.detail-aside__sticky { position: sticky; top: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
+.detail-main  { flex: 1 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 1.5rem; }
 
-.sp-link         { display: inline-flex; align-items: center; gap: .25rem; font-weight: 600;
-                   color: var(--color-primary, #1e3a8a); }
-.sp-link .material-symbols-outlined { font-size: 1rem; }
+/* Rangée de tuiles du rapport — comme les fiches. */
+.kpi-row  { display: grid; gap: 1.5rem; align-items: stretch; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.kpi-cell { display: flex; flex-direction: column; min-width: 0; min-height: 118px; }
+
+@media (max-width: 1400px) {
+  .detail-split { gap: 1.5rem; }
+  .detail-aside { min-width: 300px; max-width: 360px; }
+}
+@media (max-width: 1150px) {
+  .detail-aside { flex: 1 1 100%; max-width: none; min-width: 0; }
+  .detail-aside__sticky { position: static; }
+}
+@media (max-width: 640px) {
+  .kpi-row { gap: 1rem; }
+}
+
+/* Carte « Détails » — mêmes styles que la fiche simulateur / candidat. */
+.dp-card  { display: flex; flex-direction: column; }
+.dp-block { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; }
+.dp-rule  { height: 1px; background: var(--color-outline-variant, #c5c6cd); opacity: .55; }
+.dp-label { margin: 0; font-size: 9px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+            color: var(--color-on-surface-variant, #44474c); }
+.dp-rows  { margin: 0; }
+.dp-row   { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 5px 0; }
+.dp-row:last-child { padding-bottom: 0; }
+.dp-row__key { margin: 0; font-size: 12px; color: var(--color-on-surface-variant, #44474c); flex: 0 0 auto; }
+/* Un nom de fichier long est coupé (texte complet au survol). */
+.dp-row__val { margin: 0; min-width: 0; font-size: 12.5px; font-weight: 600; text-align: right;
+               color: var(--color-on-surface, #191c1e); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+
 
 .history-file    { display: inline-flex; align-items: center; gap: .5rem; max-width: 18rem; }
 .history-file .material-symbols-outlined { font-size: 1.125rem; color: var(--color-danger, #dc2626); }
@@ -75,3 +157,26 @@ $success: var(--color-success, #0f7b5f);
 /* `daf-loading` réserve 50vh hors plein écran — trop haut pour un petit pop-up. */
 .processing-modal ::ng-deep daf-loading > div { min-height: 10rem; }
 .processing-modal__hint { margin: 0; font-size: .8125rem; color: $muted; }
+
+/* ── Bandeaux d'information — mêmes valeurs que /payroll/employee-config (la lib n'a pas
+   de composant d'alerte). ───────────────────────────────────────────── */
+.notice          { display: flex; align-items: flex-start; gap: .5rem; padding: .75rem 1rem; border-radius: .75rem; font-size: 13px; }
+.notice__icon    { font-size: 18px; flex: 0 0 auto; }
+.notice__body    { display: inline; }
+.notice__link    { margin-left: .25rem; padding: 0; border: 0; background: none; font: inherit;
+                   font-weight: 600; color: inherit; text-decoration: underline; cursor: pointer; }
+.notice--warning { color: var(--color-warning, #8a5a00);
+                   background: color-mix(in srgb, var(--color-warning, #b7791f) 10%, transparent); }
+.notice--info    { color: var(--color-on-surface-variant, #44474c);
+                   background: var(--color-surface-container, #eceef0); }
+
+/* Cellule sur deux lignes du détail : texte principal en gras, précision en petit dessous
+   (collaborateur / matricule, action / explication). */
+.cell-2l       { display: inline-flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cell-2l__main { font-weight: 600; color: var(--color-on-surface, #111827); }
+.cell-2l__sub  { font-size: 12px; color: $muted; white-space: normal; }
+
+/* Détail par page : le tableau de la lib sans son cadre (sa bordure arrondie). La lib
+   enveloppe ses lignes dans une div bordée — seule cette bordure est retirée, le reste
+   (fond, lignes, survol) est celui de la lib. */
+.no-frame ::ng-deep > div.border { border: 0; }

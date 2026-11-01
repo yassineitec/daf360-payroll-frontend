@@ -301,7 +301,8 @@ export class EmployeeConfigListComponent implements OnInit {
       name:       e.fullName,
       matricule:  e.employeeId ?? '—',
       department: e.department ?? '—',
-      contract:   e.contractType ?? '—',
+      // Contrat en clair (« CDI » pour PERMANENT…), comme /payroll/engine-results.
+      contract:   e.contractType ? contractTypeLabel(e.contractType, this.translate) : '—',
       pays:       e.paysLabel ?? '—',
       status:     e.lifecycleStatus
         ? {

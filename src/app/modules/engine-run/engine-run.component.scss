@@ -1,0 +1,100 @@
+/* ── Deux colonnes, même recette que /payroll/engine-results/:id (`.detail-split`) ──
+   Flex, jamais grid : `flex-wrap` + `min-width` donnent le repli sans dépendre d'une
+   classe Tailwind absente du CSS du remote. */
+.detail-split { display: flex; flex-wrap: wrap; gap: 2rem; align-items: flex-start; padding: 0 0 2rem; }
+/* Colonne gauche : titre de page puis carte de paramètres, collés ensemble au défilement. */
+.detail-aside { flex: 0 1 30%; min-width: 320px; max-width: 420px; position: sticky; top: 1.5rem;
+                display: flex; flex-direction: column; gap: 1.5rem; }
+.detail-main  { flex: 1 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 1.5rem; }
+
+@media (max-width: 1400px) {
+  .detail-split { gap: 1.5rem; }
+  .detail-aside { min-width: 300px; max-width: 360px; }
+}
+/* Plus de place pour deux colonnes : la carte passe pleine largeur au-dessus, sans sticky. */
+@media (max-width: 1150px) {
+  .detail-aside { flex: 1 1 100%; max-width: none; min-width: 0; position: static; }
+}
+
+/* ── Carte « Paramètres de calcul » — styles `.dp-*` de la carte « Détails »
+   de /payroll/engine-results ; la surface vient de `daf-section-card`. */
+.dp-card  { display: flex; flex-direction: column; }
+.dp-block { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; }
+
+.dp-head__top   { display: flex; align-items: center; gap: .5rem; }
+.dp-head__icon  { font-size: 1.25rem; color: var(--color-primary, #0b1f3a); }
+.dp-head__title { margin: 0; flex: 1 1 auto; font-size: 16px; font-weight: 600; color: var(--color-on-surface, #191c1e); }
+
+/* Le seul style de libellé de section du panneau. */
+.dp-label { margin: 0; font-size: 9px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+            color: var(--color-on-surface-variant, #44474c); }
+
+/* Seul filet de la carte : entre sections (Salarié → Période → Contrat). */
+.dp-rule        { height: 1px; background: var(--color-outline-variant, #c5c6cd); opacity: .55; }
+.dp-rule--major { height: 2px; opacity: .4; }
+
+
+.presets        { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.presets__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Même pastille que `.dp-chip` de engine-results, rendue cliquable. */
+.preset-chip    { border: none; border-radius: 999px; padding: .2rem .65rem; font-size: 11px; font-weight: 600;
+                  color: var(--color-on-surface-variant, #44474c);
+                  background: var(--color-surface-container-highest, #e2e3e5);
+                  cursor: pointer; transition: background .15s, color .15s; }
+.preset-chip:hover { background: var(--color-tertiary-container, #d7f7f2); color: var(--color-on-surface, #191c1e); }
+
+
+.employee-summary { display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+                    padding: .625rem .75rem; border-radius: .625rem;
+                    background: var(--color-surface-container-low, #f2f4f6); }
+.employee-summary__meta { font-size: .8125rem; color: var(--color-on-surface-variant, #44474c); }
+
+
+.dp-actions         { padding-top: 6px; }
+.dp-actions__status { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
+.last-run           { font-size: .75rem; color: var(--color-on-surface-variant, #6b7280); }
+
+/* Erreur aux couleurs du thème, comme /payroll/budget. */
+.alert-error { display: flex; align-items: center; gap: .5rem; padding: .625rem 1rem; border-radius: .75rem;
+               font-size: .875rem; color: var(--color-danger, #ba1a1a);
+               border: 1px solid color-mix(in srgb, var(--color-danger, #ba1a1a) 30%, transparent);
+               background: color-mix(in srgb, var(--color-danger, #ba1a1a) 5%, transparent); }
+
+@media (max-width: 640px) {
+  .dp-block { padding: 12px 14px; }
+}
+
+/* ── État vide : trois étapes numérotées ───────────────────────────────── */
+.empty-state       { display: flex; flex-direction: column; align-items: center; gap: .75rem; padding: 2rem 0; text-align: center; }
+.empty-state__icon { font-size: 2.5rem; color: var(--color-outline, #75777d); }
+.empty-state__title { margin: 0; font-size: 1rem; font-weight: 600; color: var(--color-on-surface, #191c1e); }
+.empty-steps       { display: flex; flex-direction: column; gap: .625rem; margin: .5rem 0 0; padding: 0; list-style: none; text-align: left; }
+.empty-steps li    { display: flex; align-items: center; gap: .75rem; font-size: .875rem; color: var(--color-on-surface-variant, #44474c); }
+.empty-steps__n    { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+                     width: 1.625rem; height: 1.625rem; border-radius: 999px; font-size: .75rem; font-weight: 700;
+                     color: var(--color-primary, #0b1f3a);
+                     background: color-mix(in srgb, var(--color-primary, #0b1f3a) 10%, transparent); }
+
+/* ── Titre du résultat : qui · quand · contrat · jours ─────────────────── */
+.result-head        { display: flex; align-items: center; gap: .625rem; }
+.result-head__icon  { font-size: 1.5rem; color: var(--color-primary, #0b1f3a); }
+.result-head__title { margin: 0; font-size: 1.125rem; font-weight: 700; color: var(--color-on-surface, #191c1e); }
+
+/* Bandeau d'avertissement — UN seul style pour toute la page : collaborateur sorti, mois
+   déjà calculé (colonne gauche) et paramètres changés (colonne droite). Mêmes valeurs que
+   le bandeau `bg-warning/10 … text-warning` de /payroll/simulator (la lib n'a pas de
+   composant d'alerte : `daf-field-message` ne sert qu'aux erreurs sous un champ). */
+.notice          { display: flex; align-items: flex-start; gap: .5rem; padding: .75rem 1rem; border-radius: .75rem; font-size: 13px; }
+.notice__icon    { font-size: 18px; flex: 0 0 auto; }
+.notice--warning { color: var(--color-warning, #8a5a00);
+                   background: color-mix(in srgb, var(--color-warning, #b7791f) 10%, transparent); }
+
+/* ── Actions du résultat ───────────────────────────────────────────────── */
+.result-actions         { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.result-actions__spacer { flex: 1 1 auto; }
+
+/* ── Impression : seul le bulletin (pas le formulaire, ni les boutons) ── */
+@media print {
+  .detail-aside, .result-actions, .notice { display: none !important; }
+  .detail-main { flex: 1 1 100%; }
+}

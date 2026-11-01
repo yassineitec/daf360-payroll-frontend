@@ -1,240 +1,321 @@
-<daf-page [loading]="loading()" [kpis]="0" [breadcrumbs]="true" headerSize="md">
-  <daf-page-header
-    [title]="'PAYROLL.PAYSLIPS.TITLE' | translate"
-    [subtitle]="'PAYROLL.PAYSLIPS.SUBTITLE' | translate"
-    [breadcrumbs]="breadcrumbs()"
-    size="md">
-  </daf-page-header>
-
-  <!-- ══════════════════════ IMPORT D'UN LOT ══════════════════════ -->
-  <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
-    <div class="import">
-
-      <div class="import__header">
-        <div class="import__icon">
-          <span class="material-symbols-outlined" aria-hidden="true">upload_file</span>
-        </div>
-        <div class="import__heading">
-          <h2 class="import__title">{{ 'PAYROLL.PAYSLIPS.FORM.TITLE' | translate }}</h2>
-          <p class="import__subtitle">{{ 'PAYROLL.PAYSLIPS.FORM.SUBTITLE' | translate }}</p>
-        </div>
-      </div>
-
-      <div class="import__fields">
-        <daf-select
-          [options]="paysOptions()"
-          [selected]="paysId() ? ['' + paysId()] : []"
-          [config]="{ label: 'PAYROLL.PAYSLIPS.FORM.PAYS' | translate, placeholder: 'PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate, searchable: true, fullWidth: true, required: true, disabled: processing() }"
-          (selectedChange)="paysId.set($event[0] ? +$event[0] : null)">
-        </daf-select>
-
-        <daf-select
-          [options]="monthOptions()"
-          [selected]="['' + periodMonth()]"
-          [config]="{ label: 'PAYROLL.PAYSLIPS.FORM.MONTH' | translate, fullWidth: true, required: true, disabled: processing() }"
-          (selectedChange)="periodMonth.set(+$event[0])">
-        </daf-select>
-
-        <daf-select
-          [options]="yearOptions()"
-          [selected]="['' + periodYear()]"
-          [config]="{ label: 'PAYROLL.PAYSLIPS.FORM.YEAR' | translate, fullWidth: true, required: true, disabled: processing() }"
-          (selectedChange)="periodYear.set(+$event[0])">
-        </daf-select>
-      </div>
-
-      <!-- Fichier : zone de dépôt tant qu'aucun fichier n'est choisi, puis la fiche du fichier. -->
-      <input #replaceInput type="file" accept=".pdf,application/pdf" class="hidden-input"
-             (change)="onReplacePicked($event)" />
-
-      @if (selectedFile(); as f) {
-        <div class="file-card" [class.file-card--error]="!!f.error">
-          <div class="file-card__icon">
-            <span class="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>
-          </div>
-
-          <div class="file-card__body">
-            <div class="file-card__name-row">
-              <span class="file-card__name" [title]="f.name">{{ f.name }}</span>
-              @if (f.error) {
-                <daf-badge [label]="f.error" [options]="{ variant: 'danger', size: 'sm' }" />
-              } @else if (paysId()) {
-                <daf-badge [label]="'PAYROLL.PAYSLIPS.FILE.READY' | translate" [options]="{ variant: 'success', size: 'sm' }" />
-              } @else {
-                <daf-badge [label]="'PAYROLL.PAYSLIPS.FILE.PICK_PAYS' | translate" [options]="{ variant: 'warning', size: 'sm' }" />
-              }
-            </div>
-            <p class="file-card__meta">
-              <span>{{ formatSize(f.size) }}</span>
-              @if (detectedPages(); as n) {
-                <span class="dot">•</span>
-                <span>{{ 'PAYROLL.PAYSLIPS.FILE.PAGES' | translate: { count: n } }}</span>
-              }
-              <span class="dot">•</span>
-              <span>PDF</span>
-            </p>
-            @if (!f.error && detectedPages()) {
-              <p class="file-card__check">
-                <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
-                {{ 'PAYROLL.PAYSLIPS.FILE.ONE_PER_PAGE' | translate }}
-              </p>
-            }
-          </div>
-
-          <div class="file-card__actions">
-            <daf-button
-              [label]="'PAYROLL.PAYSLIPS.FILE.REPLACE' | translate"
-              variant="secondary"
-              [options]="{ iconStart: 'sync', disabled: processing() }"
-              (onClick)="replaceInput.click()">
-            </daf-button>
-            <daf-button
-              [label]="'PAYROLL.PAYSLIPS.FILE.REMOVE' | translate"
-              variant="ghost"
-              [options]="{ iconStart: 'close', disabled: processing() }"
-              (onClick)="clearFile()">
-            </daf-button>
-          </div>
-        </div>
-      } @else {
-        <daf-file-upload
-          [config]="{
-            accept: '.pdf,application/pdf',
-            maxSizeMb: maxSizeMb,
-            hint: 'PAYROLL.PAYSLIPS.FORM.FILE_HINT' | translate,
-            disabled: processing()
-          }"
-          [files]="uploadedFiles()"
-          (filesChange)="onFilesChange($event)">
-        </daf-file-upload>
-      }
-
-      <!-- Note SharePoint à gauche, boutons à droite en bas de la carte (`space-between`). -->
-      <div class="import__footer">
-        <p class="import__note">
-          <span class="material-symbols-outlined" aria-hidden="true">lock</span>
-          {{ 'PAYROLL.PAYSLIPS.FORM.SHAREPOINT_NOTE' | translate }}
-        </p>
-        <div class="import__actions">
-          @if (result()) {
-            <daf-button
-              [label]="'PAYROLL.PAYSLIPS.FILE.NEW_BATCH' | translate"
-              variant="secondary"
-              [options]="{ iconStart: 'note_add', size: 'lg', disabled: processing() }"
-              (onClick)="startNewBatch()">
-            </daf-button>
-          }
-          <daf-button
-            [label]="submitLabel()"
-            variant="teal"
-            [options]="{ loading: processing(), disabled: !canSubmit(), iconStart: 'cloud_upload', size: 'lg' }"
-            (onClick)="submit()">
-          </daf-button>
-        </div>
-      </div>
-    </div>
-  </daf-card>
-
-  <!-- ══════════════════════ RAPPORT DU LOT TRAITÉ ══════════════════════ -->
-  @if (result(); as r) {
-    <section id="payslip-report" class="section">
-      <div class="section__head">
-        <div>
-          <h2 class="section__title">{{ 'PAYROLL.PAYSLIPS.SUMMARY.TITLE' | translate }}</h2>
-          @if (resultFileName()) {
-            <p class="section__subtitle">{{ resultFileName() }}</p>
-          }
-        </div>
-        <daf-badge
-          [label]="(needsAttention() ? 'PAYROLL.PAYSLIPS.SUMMARY.NEEDS_ATTENTION' : 'PAYROLL.PAYSLIPS.SUMMARY.ALL_CLEAR') | translate"
-          [options]="{ variant: needsAttention() ? 'warning' : 'success', size: 'md' }">
-        </daf-badge>
-      </div>
-
-      <div class="kpi-grid">
-        <daf-metric-card
-          [label]="'PAYROLL.PAYSLIPS.SUMMARY.TOTAL' | translate"
-          [value]="'' + r.totalPages"
-          [options]="{ icon: 'description', iconBg: 'bg-primary/10', iconColor: 'text-primary' }">
-        </daf-metric-card>
-        <daf-metric-card
-          [label]="'PAYROLL.PAYSLIPS.SUMMARY.SUCCESS' | translate"
-          [value]="'' + r.successCount"
-          [options]="{ valueColor: 'text-secondary', icon: 'check_circle', iconBg: 'bg-secondary/10', iconColor: 'text-secondary' }">
-        </daf-metric-card>
-        <daf-metric-card
-          [label]="'PAYROLL.PAYSLIPS.SUMMARY.ERROR' | translate"
-          [value]="'' + r.errorCount"
-          [options]="{ valueColor: 'text-danger', icon: 'error', iconBg: 'bg-danger/10', iconColor: 'text-danger' }">
-        </daf-metric-card>
-        <daf-metric-card
-          [label]="'PAYROLL.PAYSLIPS.SUMMARY.UNIDENTIFIED' | translate"
-          [value]="'' + r.unidentifiedCount"
-          [options]="{ valueColor: 'text-tertiary', icon: 'help', iconBg: 'bg-tertiary/10', iconColor: 'text-tertiary' }">
-        </daf-metric-card>
-      </div>
-
-      <daf-search-toolbar
-        [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
-        [value]="detailSearch()" [debounce]="200" (valueChange)="detailSearch.set($event)"
-        [table]="detailTable" />
-
-      <daf-card [options]="{ variant: 'outlined', padding: 'none', radius: 'xl' }">
-        <daf-data-table
-          #detailTable
-          [columns]="detailColumns()"
-          [rows]="filteredDetailRows()"
-          [config]="detailConfig()">
-          <ng-template [dafCell]="'sharePointUrl'" let-row>
-            @if (row['sharePointUrl']) {
-              <a [href]="row['sharePointUrl']" target="_blank" rel="noopener" class="sp-link">
-                <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>
-                {{ 'PAYROLL.PAYSLIPS.TABLE.OPEN' | translate }}
-              </a>
-            } @else {
-              <span>—</span>
-            }
-          </ng-template>
-        </daf-data-table>
-      </daf-card>
-    </section>
+<!--
+  /payroll/payslips/new — import en UNE vue (① pays et mois, ② fichier) puis
+  confirmation, sur le squelette de /finance/affaires/new et du simulateur : carte de
+  formulaire (en-tête de carte) + barre d'actions flottante, sans rail d'étapes.
+  /payroll/payslips/:id — rapport d'un lot du journal.
+  Bandeaux : mêmes `.notice` que /payroll/employee-config (la lib n'a pas de composant
+  d'alerte — `daf-field-message` ne porte pas de lien).
+-->
+<!-- En-tête `hero` sur le formulaire (comme les autres assistants), `md` sur le rapport. -->
+<daf-page [loading]="loading()" [kpis]="0" [breadcrumbs]="true" [headerSize]="isNew() ? 'hero' : 'md'">
+  <!-- Rapport : l'en-tête est dans la colonne gauche (deux colonnes, comme les autres
+       fiches) ; ici seulement pour le formulaire et le lot introuvable. -->
+  @if (isNew() || !result()) {
+    <daf-page-header
+      [title]="title()"
+      [subtitle]="subtitle()"
+      [badges]="headerBadges()"
+      [breadcrumbs]="breadcrumbs()"
+      [size]="isNew() ? 'hero' : 'md'" />
   }
 
-  <!-- ══════════════════════ HISTORIQUE DES IMPORTATIONS ══════════════════════ -->
-  <section class="section">
-    <div class="section__head">
-      <div>
-        <h2 class="section__title">{{ 'PAYROLL.PAYSLIPS.HISTORY.TITLE' | translate }}</h2>
-        <p class="section__subtitle">{{ 'PAYROLL.PAYSLIPS.HISTORY.SUBTITLE' | translate }}</p>
+  @if (isNew()) {
+    <!-- ══════════════════════ IMPORT D'UN FICHIER ══════════════════════ -->
+    <div class="wizard">
+      <div class="form-card">
+
+        <!-- En-tête de carte : la note SharePoint dit où partent les fiches. -->
+        <div class="card-head">
+          <div class="card-head__icon">
+            <span class="material-symbols-outlined">cloud_upload</span>
+          </div>
+          <div>
+            <h2 class="card-head__title">{{ 'PAYROLL.PAYSLIPS.FORM.BREADCRUMB' | translate }}</h2>
+            <p class="card-head__sub">{{ 'PAYROLL.PAYSLIPS.FORM.SHAREPOINT_NOTE' | translate }}</p>
+          </div>
+        </div>
+
+        <div class="step-body">
+        <div class="import">
+        <!-- ① Pays et mois -->
+        <section class="import__step">
+          <daf-section-title [title]="'PAYROLL.PAYSLIPS.FORM.STEP_PERIOD' | translate" />
+          <div class="import__fields">
+            <daf-select
+              [options]="paysOptions()"
+              [selected]="paysId() ? ['' + paysId()] : []"
+              [config]="{ label: 'PAYROLL.PAYSLIPS.FORM.PAYS' | translate, placeholder: 'PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate, searchable: true, fullWidth: true, required: true, disabled: processing() }"
+              (selectedChange)="paysId.set($event[0] ? +$event[0] : null)">
+            </daf-select>
+
+            <daf-select
+              [options]="monthOptions()"
+              [selected]="['' + periodMonth()]"
+              [config]="{ label: 'PAYROLL.PAYSLIPS.FORM.MONTH' | translate, fullWidth: true, required: true, disabled: processing() }"
+              (selectedChange)="periodMonth.set(+$event[0])">
+            </daf-select>
+
+            <daf-select
+              [options]="yearOptions()"
+              [selected]="['' + periodYear()]"
+              [config]="{ label: 'PAYROLL.PAYSLIPS.FORM.YEAR' | translate, fullWidth: true, required: true, disabled: processing() }"
+              (selectedChange)="periodYear.set(+$event[0])">
+            </daf-select>
+          </div>
+
+          <!-- Mois déjà distribué depuis ce navigateur : le dépôt remplacera les fiches. -->
+          @if (existingForPeriod(); as ex) {
+            <div class="notice notice--warning" role="status">
+              <span class="material-symbols-outlined notice__icon" aria-hidden="true">warning</span>
+              <span class="notice__body">
+                {{ 'PAYROLL.PAYSLIPS.FORM.ALREADY_DONE' | translate: { date: existingDate() } }}
+                <button type="button" class="notice__link" (click)="openExisting()">
+                  {{ 'PAYROLL.PAYSLIPS.FORM.ALREADY_DONE_LINK' | translate }}
+                </button>
+              </span>
+            </div>
+          }
+        </section>
+
+        <!-- ② Fichier : zone de dépôt tant qu'aucun fichier n'est choisi, puis la fiche du fichier. -->
+        <section class="import__step">
+          <daf-section-title [title]="'PAYROLL.PAYSLIPS.FORM.STEP_FILE' | translate" />
+          <input #replaceInput type="file" accept=".pdf,application/pdf" class="hidden-input"
+                 (change)="onReplacePicked($event)" />
+
+          @if (selectedFile(); as f) {
+            <div class="file-card" [class.file-card--error]="!!f.error">
+              <div class="file-card__icon">
+                <span class="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>
+              </div>
+
+              <div class="file-card__body">
+                <div class="file-card__name-row">
+                  <span class="file-card__name" [title]="f.name">{{ f.name }}</span>
+                  @if (f.error) {
+                    <daf-badge [label]="f.error" [options]="{ variant: 'danger', size: 'sm' }" />
+                  } @else if (paysId()) {
+                    <daf-badge [label]="'PAYROLL.PAYSLIPS.FILE.READY' | translate" [options]="{ variant: 'success', size: 'sm' }" />
+                  } @else {
+                    <daf-badge [label]="'PAYROLL.PAYSLIPS.FILE.PICK_PAYS' | translate" [options]="{ variant: 'warning', size: 'sm' }" />
+                  }
+                </div>
+                <p class="file-card__meta">
+                  <span>{{ formatSize(f.size) }}</span>
+                  @if (detectedPages(); as n) {
+                    <span class="dot">•</span>
+                    <span>{{ 'PAYROLL.PAYSLIPS.FILE.PAGES' | translate: { count: n } }}</span>
+                  }
+                  <span class="dot">•</span>
+                  <span>PDF</span>
+                </p>
+                @if (!f.error && detectedPages()) {
+                  <p class="file-card__check">
+                    <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+                    {{ 'PAYROLL.PAYSLIPS.FILE.ONE_PER_PAGE' | translate }}
+                  </p>
+                }
+              </div>
+
+              <div class="file-card__actions">
+                <daf-button
+                  [label]="'PAYROLL.PAYSLIPS.FILE.REPLACE' | translate"
+                  variant="secondary"
+                  [options]="{ iconStart: 'sync', disabled: processing() }"
+                  (onClick)="replaceInput.click()">
+                </daf-button>
+                <daf-button
+                  [label]="'PAYROLL.PAYSLIPS.FILE.REMOVE' | translate"
+                  variant="ghost"
+                  [options]="{ iconStart: 'close', disabled: processing() }"
+                  (onClick)="clearFile()">
+                </daf-button>
+              </div>
+            </div>
+          } @else {
+            <daf-file-upload
+              [config]="{
+                accept: '.pdf,application/pdf',
+                maxSizeMb: maxSizeMb,
+                hint: 'PAYROLL.PAYSLIPS.FORM.FILE_HINT' | translate,
+                disabled: processing()
+              }"
+              [files]="uploadedFiles()"
+              (filesChange)="onFilesChange($event)">
+            </daf-file-upload>
+          }
+        </section>
+        </div>
+        </div><!-- /step-body -->
+
+        <!-- Ce qui manque pour déposer : le fichier est là mais pas le pays. -->
+        @if (selectedFile() && !paysId() && !processing()) {
+          <div class="validation-hint">
+            <span class="material-symbols-outlined">info</span>
+            <span>{{ 'PAYROLL.PAYSLIPS.FILE.PICK_PAYS' | translate }}</span>
+          </div>
+        }
+        @if (processing()) {
+          <div class="saving-hint">
+            <span class="material-symbols-outlined saving-spin">progress_activity</span>
+            <span>{{ 'PAYROLL.PAYSLIPS.FORM.PROCESSING' | translate }}</span>
+          </div>
+        }
+      </div><!-- /form-card -->
+
+      <!-- ══ BARRE D'ACTIONS ════════════════════════════════════════════════════
+           Copie de celle de /finance/affaires/new et du simulateur, sans le rail :
+           `daf-card` `floating`, collée en bas (`sticky`, dans le flux). Annuler en action
+           de texte à gauche, une seule action dessinée à droite (teal, pilule), qui ouvre
+           la confirmation (`confirmSubmit()`). -->
+      <daf-card class="action-bar" [options]="{ variant: 'floating', radius: 'lg', padding: 'sm' }">
+        <div class="action-bar__inner">
+          <div class="action-bar__side">
+            <button type="button" class="footer-action" [disabled]="processing()" (click)="cancel()">
+              <span class="material-symbols-outlined">close</span>
+              {{ 'PAYROLL.PAYSLIPS.FORM.CANCEL' | translate }}
+            </button>
+          </div>
+
+          <div class="action-bar__side action-bar__side--end">
+            <daf-button [options]="submitButtonOptions()" (onClick)="confirmSubmit()" />
+          </div>
+        </div>
+      </daf-card>
+    </div>
+
+  } @else if (result(); as r) {
+    <!-- ══════════════════════ RAPPORT DU LOT ══════════════════════
+         Deux colonnes, comme /payroll/simulator/:id et /finance/affaires/:id : GAUCHE (30 %,
+         collante) l'en-tête, la carte « Détails » et les actions rapides ; DROITE les
+         4 indicateurs puis le détail par page. -->
+    <div class="detail-split">
+
+      <div class="detail-aside">
+        <div class="detail-aside__sticky">
+          <daf-page-header
+            size="md"
+            [title]="title()"
+            [titleWrap]="true"
+            [badges]="headerBadges()"
+            [breadcrumbs]="breadcrumbs()" />
+
+          <daf-section-card>
+            <div class="dp-card">
+              @for (block of reportDetails(); track block.id; let first = $first) {
+                @if (!first) { <div class="dp-rule"></div> }
+                <section class="dp-block" [attr.aria-labelledby]="'dp-h-' + block.id">
+                  <h3 class="dp-label" [id]="'dp-h-' + block.id">{{ block.title }}</h3>
+                  <dl class="dp-rows">
+                    @for (row of block.rows; track row.key) {
+                      <div class="dp-row">
+                        <dt class="dp-row__key">{{ row.key }}</dt>
+                        <dd class="dp-row__val" [title]="row.value">{{ row.value }}</dd>
+                      </div>
+                    }
+                  </dl>
+                </section>
+              }
+            </div>
+          </daf-section-card>
+
+          <!-- Actions rapides — même carte que la fiche simulateur : action principale
+               pleine largeur, deux actions secondaires côte à côte. -->
+          <daf-section-card>
+            <div class="flex flex-col gap-3 bg-surface-container p-6">
+              <daf-section-title [title]="'PAYROLL.PAYSLIPS.REPORT.QUICK_TITLE' | translate" />
+              <daf-button
+                [options]="{ variant: 'primary', size: 'lg', fullWidth: true, iconStart: 'add',
+                             label: ('PAYROLL.PAYSLIPS.LIST.NEW_BTN' | translate) }"
+                (onClick)="newBatch()" />
+              <div class="grid grid-cols-2 gap-2">
+                <daf-button
+                  [options]="{ variant: 'secondary', size: 'sm', fullWidth: true, iconStart: 'download',
+                               label: ('PAYROLL.PAYSLIPS.REPORT.EXPORT' | translate) }"
+                  (onClick)="exportReport()" />
+                <daf-button
+                  [options]="{ variant: 'secondary', size: 'sm', fullWidth: true, iconStart: 'print',
+                               label: ('PAYROLL.PAYSLIPS.REPORT.PRINT' | translate) }"
+                  (onClick)="print()" />
+              </div>
+            </div>
+          </daf-section-card>
+        </div>
+      </div>
+
+      <div class="detail-main">
+        <div class="kpi-row">
+          @for (k of kpis(); track k.label) {
+            <daf-metric-card class="kpi-cell" [label]="k.label" [value]="k.value" [delta]="k.delta" [options]="k.options" />
+          }
+        </div>
+
+        <section class="section">
+          <daf-section-title [title]="'PAYROLL.PAYSLIPS.TABLE.TITLE' | translate" />
+
+          <!-- Même barre que les listes : recherche, panneau Filtres (pages à corriger, statut)
+               et, à droite, réinitialiser + choix des colonnes du tableau ([table]). -->
+          <daf-search-toolbar
+            [placeholder]="'PAYROLL.PAYSLIPS.TABLE.SEARCH' | translate"
+            [value]="detailSearch()" [debounce]="200" (valueChange)="onDetailSearch($event)"
+            [filterFields]="detailFilterFields()"
+            [filterConfig]="detailFilterConfig()"
+            (filterApply)="applyDetailFilter($event)"
+            (filterReset)="resetDetailFilter()"
+            [table]="detailTable" />
+
+          <!-- Tableau de la lib, SANS son cadre (bordure retirée, voir .no-frame dans le .scss).
+               Seule la colonne « Que faire » est en cellule projetée. -->
+          <daf-data-table
+            class="no-frame"
+            #detailTable
+            [columns]="detailColumns()"
+            [rows]="pagedDetailRows()"
+            [config]="detailConfig()">
+            <ng-template [dafCell]="'action'" let-row>
+              @if (row['actionDetail']) {
+                <span class="cell-2l">
+                  <span class="cell-2l__main">{{ row['actionLabel'] }}</span>
+                  <span class="cell-2l__sub">{{ row['actionDetail'] }}</span>
+                </span>
+              } @else {
+                <span class="cell-2l__sub">{{ row['actionLabel'] }}</span>
+              }
+            </ng-template>
+          </daf-data-table>
+
+          @if (filteredDetailRows().length > detailPageSize()) {
+            <daf-pagination
+              [currentPage]="detailPage()"
+              [totalPages]="detailTotalPages()"
+              [totalElements]="filteredDetailRows().length"
+              [pageSize]="detailPageSize()"
+              [pageSizeOptions]="[20, 50, 100]"
+              [perPageLabel]="'PAYROLL.COMMON.PAGINATION.PER_PAGE' | translate"
+              [summaryLabel]="'PAYROLL.COMMON.PAGINATION.SUMMARY' | translate"
+              [firstPageLabel]="'PAYROLL.COMMON.PAGINATION.FIRST' | translate"
+              [lastPageLabel]="'PAYROLL.COMMON.PAGINATION.LAST' | translate"
+              [config]="{ showFirstLast: true }"
+              (pageChange)="detailPage.set($event)"
+              (pageSizeChange)="onDetailPageSize($event)" />
+          }
+        </section>
       </div>
     </div>
 
-    <!-- Recherche + filtre de la lib (l'ancien `daf-filter` de l'en-tête, mêmes champs et
-         libellés) + outils du tableau (réinitialiser, colonnes) sur une seule ligne. -->
-    <daf-search-toolbar
-      [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
-      [value]="historySearch()" [debounce]="200" (valueChange)="historySearch.set($event)"
-      [filterFields]="historyFilterFields()"
-      [filterConfig]="historyFilterConfig()"
-      (filterApply)="applyHistoryFilter($event)"
-      (filterReset)="historyFilter.set('ALL')"
-      [table]="historyTable" />
-
-    <daf-card [options]="{ variant: 'outlined', padding: 'none', radius: 'xl' }">
-      <daf-data-table
-        #historyTable
-        [columns]="historyColumns()"
-        [rows]="filteredHistoryRows()"
-        [config]="historyConfig()">
-        <ng-template [dafCell]="'fileName'" let-row>
-          <span class="history-file" [title]="row['fileName']">
-            <span class="material-symbols-outlined" aria-hidden="true">picture_as_pdf</span>
-            <span class="history-file__name">{{ row['fileName'] }}</span>
-          </span>
-        </ng-template>
-      </daf-data-table>
-    </daf-card>
-  </section>
+  } @else {
+    <!-- Lot absent du journal de ce navigateur (autre poste, journal vidé, lien partagé). -->
+    <daf-card [options]="{
+      variant: 'outlined', padding: 'lg', radius: 'xl', icon: 'history',
+      title: ('PAYROLL.PAYSLIPS.REPORT.NOT_FOUND_TITLE' | translate),
+      description: ('PAYROLL.PAYSLIPS.REPORT.NOT_FOUND' | translate)
+    }" />
+    <div class="import__actions">
+      <daf-button
+        [options]="{ variant: 'secondary', label: ('PAYROLL.PAYSLIPS.REPORT.BACK' | translate), iconStart: 'arrow_back' }"
+        (onClick)="cancel()" />
+    </div>
+  }
 </daf-page>
 
 <!-- Corps du pop-up d'attente (`ModalService`, voir `openProcessingModal()`) : le

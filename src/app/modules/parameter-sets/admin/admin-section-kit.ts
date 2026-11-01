@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal, type Signal } from '@angular/core';
 import { ButtonComponent, PaginationComponent, type TableColumn, type TableRow } from '@khalilrebhiitec/daf360';
 import { TableSort, sortTableRows, toTableSort } from '../../../shared/table-tools';
+import { TranslatePipe } from '@ngx-translate/core';
 
 /**
  * Pièces communes aux sections de l'administration paie, reprises des sections de
@@ -21,7 +22,8 @@ export const ADMIN_PAGE_SIZE = 5;
   selector: 'app-admin-spinner',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<span class="spinner" role="status" aria-label="Chargement…"></span>`,
+  imports: [TranslatePipe],
+  template: `<span class="spinner" role="status" [attr.aria-label]="'PAYROLL.COMMON.LOADING' | translate"></span>`,
   styles: [`
     :host { display: flex; justify-content: center; padding: 24px; }
     .spinner {

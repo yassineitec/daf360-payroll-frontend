@@ -1,0 +1,124 @@
+<!-- Bulletin de paie partagé — /payroll/engine-run et /payroll/engine-results/:id?result=.
+     Voir payslip-bulletin.component.ts pour l'ordre et les règles de lecture. -->
+
+<!-- ── Indicateurs : Brut → CNSS → IRPP → Net, à lire comme un bulletin. Les écarts N-1
+     (`deltas`) ne sont passés que par /payroll/engine-run. ── -->
+<section class="kpi-section kpi-grid">
+  <daf-metric-card
+    [label]="'PAYROLL.ENGINE_RUN.KPI_GROSS' | translate"
+    [value]="money(totals().gross)"
+    [delta]="deltas().gross ?? null"
+    [options]="{ icon: 'account_balance_wallet', iconBg: 'bg-secondary/10', iconColor: 'text-secondary',
+                 help: 'PAYROLL.ENGINE_RUN.KPI_GROSS_HELP' | translate }">
+  </daf-metric-card>
+  <daf-metric-card
+    [label]="'PAYROLL.ENGINE_RUN.KPI_DEDUCTIONS_EMPLOYEE' | translate"
+    [value]="money(totals().employeeCharges)"
+    [delta]="deltas().employeeCharges ?? null"
+    [options]="{ icon: 'shield', iconBg: 'bg-warning/10', iconColor: 'text-warning',
+                 help: 'PAYROLL.ENGINE_RUN.KPI_CNSS_HELP' | translate }">
+  </daf-metric-card>
+  <daf-metric-card
+    [label]="'PAYROLL.ENGINE_RUN.KPI_DEDUCTIONS_IRPP' | translate"
+    [value]="money(totals().irpp)"
+    [delta]="deltas().irpp ?? null"
+    [options]="{ icon: 'request_quote', iconBg: 'bg-warning/10', iconColor: 'text-warning',
+                 help: 'PAYROLL.ENGINE_RUN.KPI_IRPP_HELP' | translate }">
+  </daf-metric-card>
+  <daf-metric-card
+    [label]="'PAYROLL.ENGINE_RUN.KPI_NET_PAY' | translate"
+    [value]="money(totals().net)"
+    [delta]="deltas().net ?? null"
+    [options]="{ valueColor: 'text-primary', icon: 'payments', iconBg: 'bg-primary/10', iconColor: 'text-primary',
+                 help: 'PAYROLL.ENGINE_RUN.KPI_NET_HELP' | translate, helpPlacement: 'top' }">
+  </daf-metric-card>
+</section>
+
+<!-- Actions propres à la page (projetées) : exports, impression… -->
+<ng-content />
+
+<!-- ── Recherche commune aux deux blocs (code compris), avec les actions du parent ── -->
+<daf-search-toolbar
+  [placeholder]="'PAYROLL.ENGINE_RUN.SEARCH_PLACEHOLDER' | translate"
+  [(value)]="search"
+  [debounce]="200"
+  [actions]="toolbarActions()"
+  (action)="toolbarAction.emit($event)">
+</daf-search-toolbar>
+
+<section class="bulletin">
+  <daf-section-title [title]="'PAYROLL.ENGINE_RUN.SECTION_GAINS' | translate" />
+  <daf-data-table [columns]="columns()" [rows]="gainRows()" [config]="tableConfig()" />
+  <div class="bulletin__total">
+    <span>{{ 'PAYROLL.ENGINE_RUN.TOTAL_GROSS' | translate }}</span>
+    <span class="bulletin__amount">{{ money(subtotals().gains) }}</span>
+  </div>
+</section>
+
+<section class="bulletin">
+  <daf-section-title [title]="'PAYROLL.ENGINE_RUN.SECTION_DEDUCTIONS' | translate" />
+  <daf-data-table [columns]="columns()" [rows]="deductionRows()" [config]="tableConfig()" />
+  <div class="bulletin__total">
+    <span>{{ 'PAYROLL.ENGINE_RUN.TOTAL_DEDUCTIONS' | translate }}</span>
+    <span class="bulletin__amount bulletin__amount--debit">− {{ money(subtotals().deductions) }}</span>
+  </div>
+</section>
+
+<div class="bulletin__net">
+  <span>{{ 'PAYROLL.ENGINE_RUN.KPI_NET_PAY' | translate }}</span>
+  <span class="bulletin__amount">{{ money(totals().net) }}</span>
+</div>
+
+<!-- ── Coût pour l'entreprise : ce que l'employeur paie EN PLUS du brut (cotisations
+     patronales des Règles de paie actives) et le coût employeur, mois et an. Calcul ancien
+     (charges patronales fausses avant la correction du moteur) : un message à la place. ── -->
+@if (employerCost(); as c) {
+  <section class="bulletin">
+    <daf-section-title [title]="'PAYROLL.ENGINE_RUN.SECTION_EMPLOYER' | translate" />
+    @if (c.legacy) {
+      <p class="bulletin__legacy">{{ 'PAYROLL.ENGINE_RUN.EMPLOYER_LEGACY' | translate }}</p>
+    } @else {
+      <div class="bulletin__line">
+        <span>{{ 'PAYROLL.ENGINE_RUN.KPI_GROSS' | translate }}</span>
+        <span class="bulletin__amount">{{ money(c.gross) }}</span>
+      </div>
+      <div class="bulletin__line">
+        <span>+ {{ 'PAYROLL.ENGINE_RUN.EMPLOYER_CHARGES' | translate }}</span>
+        <span class="bulletin__amount">{{ money(c.charges) }}</span>
+      </div>
+      <div class="bulletin__total">
+        <span>= {{ 'PAYROLL.ENGINE_RUN.KPI_EMPLOYER_COST' | translate }}</span>
+        <span class="bulletin__amount">{{ money(c.loadedCost) }}</span>
+      </div>
+      <p class="bulletin__hint">{{ employerCostAnnual() }}</p>
+    }
+  </section>
+}
+
+<!-- ── « Où va le brut ? » — une barre en trois parts, légende dessous. La légende ne
+     donne que les parts (%) : les montants sont dans les indicateurs et le bulletin (ils
+     restent dans l'infobulle de chaque part). Info-bulle sans titre : le titre de la
+     section le porte déjà. ── -->
+@if (grossSplit().length) {
+  <daf-section-card helpTrigger="hover"
+    [help]="'PAYROLL.ENGINE_RUN.SPLIT_HELP' | translate">
+    <div class="split">
+      <daf-section-title [title]="'PAYROLL.ENGINE_RUN.SPLIT_TITLE' | translate" />
+      <div class="split__bar" role="img" [attr.aria-label]="'PAYROLL.ENGINE_RUN.SPLIT_TITLE' | translate">
+        @for (s of grossSplit(); track s.key) {
+          <span class="split__seg" [class]="'split__seg ' + s.cls" [style.width.%]="s.pct"
+                [attr.title]="s.label + ' · ' + s.amountText + ' · ' + s.pctText"></span>
+        }
+      </div>
+      <ul class="split__legend">
+        @for (s of grossSplit(); track s.key) {
+          <li>
+            <span class="split__dot" [class]="'split__dot ' + s.cls"></span>
+            <span class="split__label">{{ s.label }}</span>
+            <span class="split__pct">{{ s.pctText }}</span>
+          </li>
+        }
+      </ul>
+    </div>
+  </daf-section-card>
+}

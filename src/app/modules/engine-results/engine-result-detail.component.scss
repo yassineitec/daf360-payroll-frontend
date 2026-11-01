@@ -1,0 +1,20 @@
+/* En-tête, bandeau éventuel, puis le bulletin partagé (`app-payslip-bulletin`). */
+:host { display: flex; flex-direction: column; gap: 1.5rem; scroll-margin-top: 1.5rem; }
+
+.empty-state { text-align: center; color: var(--color-on-surface-variant, #6b7280); margin: 0; }
+.not-found   { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+
+/* ── En-tête : même titre que /payroll/engine-run, date de calcul à droite ── */
+.result-head        { display: flex; align-items: center; gap: .625rem; min-width: 0; }
+.result-head__icon  { font-size: 1.5rem; color: var(--color-primary, #0b1f3a); }
+.result-head__title { margin: 0; flex: 1 1 auto; min-width: 0; font-size: 1.125rem; font-weight: 700;
+                      color: var(--color-on-surface, #191c1e); }
+.result-head__date  { flex-shrink: 0; font-size: 12px; color: var(--color-on-surface-variant, #44474c); white-space: nowrap; }
+
+/* ── Bandeau d'avertissement — mêmes valeurs que celui de /payroll/engine-run (la lib n'a
+   pas de composant d'alerte). ── */
+.notice          { display: flex; align-items: center; gap: .5rem; padding: .75rem 1rem; border-radius: .75rem; font-size: 13px; }
+.notice__icon    { font-size: 18px; flex: 0 0 auto; }
+.notice__text    { flex: 1 1 auto; }
+.notice--warning { color: var(--color-warning, #8a5a00);
+                   background: color-mix(in srgb, var(--color-warning, #b7791f) 10%, transparent); }

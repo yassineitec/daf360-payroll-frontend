@@ -1,0 +1,123 @@
+<!--
+  /payroll/simulator — liste des simulations individuelles.
+
+  Même squelette que les listes de la facturation (/finance/clients) : en-tête avec l'action
+  « Nouvelle simulation » (teal), bandeau de 4 KPI en grille, barre de recherche + filtres,
+  tableau nu (pas de carte autour, il porte son propre cadre), pagination de la lib.
+  Recherche, filtres, tri et pages côté serveur.
+-->
+<daf-page
+  [loading]="firstLoad()"
+  [loadingLabel]="'PAYROLL.SIMULATOR.LIST.LOADING' | translate"
+  [kpis]="4">
+
+  <daf-page-header
+    [title]="'PAYROLL.SIMULATOR.LIST.TITLE' | translate"
+    [subtitle]="'PAYROLL.SIMULATOR.LIST.SUBTITLE' | translate">
+    @if (canCreate()) {
+      <daf-button pageActions
+        [options]="{ variant: 'teal', label: ('PAYROLL.SIMULATOR.LIST.NEW_BTN' | translate), iconStart: 'add' }"
+        (onClick)="newSimulation()" />
+    }
+  </daf-page-header>
+
+  <!-- KPI — une rangée de RÉSULTATS, sur tout le périmètre filtré (pas seulement la page
+       affichée), aucune tuile cliquable : le filtrage passe par le panneau Filtres. Ordre
+       de lecture d'un financier : coefficient de charge, fourchette du coût employeur,
+       volume du mois (avec la répartition candidats / collaborateurs), fiabilité. -->
+  <section class="grid grid-cols-4 gap-2 sm:gap-6 transition-opacity" [class.opacity-60]="loading()">
+    <daf-metric-card
+      [label]="'PAYROLL.SIMULATOR.LIST.KPI.AVG_RATIO' | translate"
+      [value]="kpiAvgRatio()"
+      [delta]="kpiRatioDelta()"
+      [options]="kpiRatioOptions()" />
+    <daf-metric-card
+      [label]="'PAYROLL.SIMULATOR.LIST.KPI.COST' | translate"
+      [value]="kpiCostRange()"
+      [delta]="kpiCostAvg()"
+      [options]="kpiCostOptions()" />
+    <daf-metric-card
+      [label]="'PAYROLL.SIMULATOR.LIST.KPI.MONTH' | translate"
+      [value]="kpiMonth()"
+      [delta]="kpiMonthDelta()"
+      [options]="kpiMonthOptions()" />
+    <daf-metric-card
+      [label]="'PAYROLL.SIMULATOR.LIST.KPI.PARTIAL' | translate"
+      [value]="kpiPartial()"
+      [delta]="kpiPartialDelta()"
+      [options]="kpiPartialOptions()" />
+  </section>
+
+  <daf-search-toolbar
+    [placeholder]="'PAYROLL.SIMULATOR.LIST.SEARCH' | translate"
+    [value]="searchText()"
+    [debounce]="300"
+    (valueChange)="onSearchTextChange($event)"
+    [filterFields]="filterFields()"
+    [filterConfig]="filterConfig()"
+    (filterApply)="applyFilters($event)"
+    [views]="viewOptions()"
+    [view]="viewMode()"
+    (viewChange)="setViewMode($event)"
+    [table]="viewMode() === 'list' ? (table() ?? null) : null" />
+
+  @if (error(); as err) {
+    <daf-field-message [error]="err" />
+  }
+
+  <!-- Page suivante / nouveau filtre en vol : le contenu reste affiché, estompé. -->
+  <div class="transition-opacity" [class.opacity-60]="loading() && rows().length > 0">
+    @if (viewMode() === 'grid') {
+      <!-- Vue cartes — même grille que /finance/affaires (`affaires-cards-section`) :
+           3 colonnes fixes, `gap-5`, cartes `glass` sans avatar, squelettes de 248 px au
+           chargement, état vide en pointillés. Un clic sur la carte (ou « Ouvrir le
+           résultat ») ouvre la fiche ; Dupliquer et Excel sont les actions de la carte. -->
+      <div class="grid grid-cols-3 gap-5">
+        @if (loading() && !cards().length) {
+          @for (i of skeletonSlots(); track i) {
+            <daf-skeleton variant="block" radius="xl" width="100%" height="248px" />
+          }
+        } @else {
+          @for (card of cards(); track card.id) {
+            <daf-entity-card
+              [options]="card.options"
+              (cardClick)="open(card.id)"
+              (viewClick)="open(card.id)" />
+          } @empty {
+            <div class="col-span-full flex flex-col items-center gap-2 rounded-xl
+                        border border-dashed border-outline-variant/50 px-6 py-14
+                        text-center text-on-surface-variant">
+              <span class="material-symbols-outlined text-[40px] text-outline-variant">search_off</span>
+              <p class="text-body-md">
+                {{ (paysFilter() == null ? 'PAYROLL.SIMULATOR.LIST.EMPTY_NO_PAYS' : 'PAYROLL.SIMULATOR.LIST.EMPTY') | translate }}
+              </p>
+            </div>
+          }
+        }
+      </div>
+    } @else {
+      <daf-data-table
+        [columns]="columns()"
+        [rows]="rows()"
+        [config]="tableConfig()"
+        (rowClick)="open($any($event['id']))"
+        (sortChange)="onSort($event)"
+        (resetClick)="onSort(null)" />
+    }
+  </div>
+
+  <daf-pagination
+    [currentPage]="page()"
+    [totalPages]="totalPages()"
+    [totalElements]="totalElements()"
+    [pageSize]="pageSize()"
+    [pageSizeOptions]="[10, 20, 50, 100]"
+    [perPageLabel]="'PAYROLL.COMMON.PAGINATION.PER_PAGE' | translate"
+    [summaryLabel]="'PAYROLL.COMMON.PAGINATION.SUMMARY' | translate"
+    [firstPageLabel]="'PAYROLL.COMMON.PAGINATION.FIRST' | translate"
+    [lastPageLabel]="'PAYROLL.COMMON.PAGINATION.LAST' | translate"
+    [config]="{ showFirstLast: true }"
+    (pageChange)="goToPage($event)"
+    (pageSizeChange)="onPageSize($event)" />
+
+</daf-page>

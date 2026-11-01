@@ -3,7 +3,15 @@
 
   <daf-page-header
     [title]="'PAYROLL.SALARY_ADVANCES.TITLE' | translate"
-    [subtitle]="'PAYROLL.SALARY_ADVANCES.SUBTITLE' | translate" />
+    [subtitle]="'PAYROLL.SALARY_ADVANCES.SUBTITLE' | translate">
+    <!-- Les règles des avances se modifient dans l'administration (carte « Avances sur
+         salaire ») : un seul endroit. Lien seulement pour qui peut l'ouvrir. -->
+    @if (canOpenRules()) {
+      <daf-button pageActions
+        [options]="{ variant: 'secondary', iconStart: 'tune', label: ('PAYROLL.SALARY_ADVANCES.RULES_LINK' | translate) }"
+        (onClick)="openRules()" />
+    }
+  </daf-page-header>
 
   <section class="grid grid-cols-2 gap-2 sm:gap-6 lg:grid-cols-4">
     <daf-metric-card [label]="'PAYROLL.SALARY_ADVANCES.KPI.TO_PAY' | translate" [value]="stats().toPay" [options]="kpiPayout" />
@@ -174,34 +182,6 @@
           </ng-template>
         </daf-data-table>
       }
-
-      <!-- ── Règles ────────────────────────────────────────────────────────── -->
-      @case ('rules') {
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <p class="text-body-sm text-on-surface-variant">{{ 'PAYROLL.SALARY_ADVANCES.RULES.HINT' | translate }}</p>
-          @if (paysOptions().length) {
-            <daf-button
-              [options]="{ variant: 'teal', iconStart: 'add', label: ('PAYROLL.SALARY_ADVANCES.RULES.ADD' | translate) }"
-              (onClick)="openPolicy(null)" />
-          }
-        </div>
-        <daf-search-toolbar
-          [placeholder]="'PAYROLL.SALARY_ADVANCES.SEARCH_RULES' | translate"
-          [value]="search()" [debounce]="200" (valueChange)="search.set($event ?? '')"
-          [filterFields]="filterFields().rules"
-          [filterConfig]="filterConfigs().rules"
-          (filterApply)="onFilter('rules', $event)"
-          [table]="ruleTable" />
-        <daf-data-table #ruleTable [columns]="ruleColumns()" [rows]="ruleRows()" [config]="ruleConfig()">
-          <ng-template dafCell="_actions" let-row>
-            <div class="flex items-center justify-end">
-              <daf-button
-                [options]="{ variant: 'ghost', size: 'sm', iconStart: 'edit', label: ('PAYROLL.SALARY_ADVANCES.RULES.EDIT' | translate) }"
-                (onClick)="openPolicy(row['_source'])" />
-            </div>
-          </ng-template>
-        </daf-data-table>
-      }
     }
   </div>
 
@@ -316,55 +296,6 @@
       [value]="note()"
       (valueChange)="note.set($any($event) || '')"
       [options]="{ type: 'textarea', rows: 3, fullWidth: true, maxLength: 500, required: true, label: ('PAYROLL.SALARY_ADVANCES.REASON' | translate) }" />
-    @if (modalError()) {
-      <div class="flex items-center gap-2 rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">
-        <span class="material-symbols-outlined text-[18px]">error</span>
-        {{ modalError() }}
-      </div>
-    }
-  </div>
-</ng-template>
-
-<ng-template #policyTpl>
-  <div class="flex flex-col gap-5">
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      @if (policyIsNew()) {
-        <daf-select
-          [options]="paysOptions()"
-          [config]="{ label: ('PAYROLL.SALARY_ADVANCES.RULES.PAYS' | translate), required: true }"
-          [selected]="policyForm().paysId ? ['' + policyForm().paysId] : []"
-          (selectedChange)="patchPolicy({ paysId: toNumber($event[0]) })" />
-      }
-      <daf-select
-        [options]="currencyOptions"
-        [config]="{ label: ('PAYROLL.SALARY_ADVANCES.RULES.CURRENCY' | translate), required: true }"
-        [selected]="[policyForm().currency]"
-        (selectedChange)="patchPolicy({ currency: $event[0] || policyForm().currency })" />
-      <daf-form-field
-        [value]="policyForm().maxInstallments"
-        (valueChange)="patchPolicy({ maxInstallments: toNumber($event) })"
-        [options]="{
-          type: 'number', fullWidth: true, align: 'end', required: true,
-          label: ('PAYROLL.SALARY_ADVANCES.RULES.MAX_MONTHS' | translate),
-          hint: ('PAYROLL.SALARY_ADVANCES.RULES.MAX_MONTHS_HINT' | translate)
-        }" />
-      <daf-form-field
-        [value]="policyForm().minSeniorityMonths"
-        (valueChange)="patchPolicy({ minSeniorityMonths: toNumber($event) })"
-        [options]="{
-          type: 'number', fullWidth: true, align: 'end', required: true,
-          label: ('PAYROLL.SALARY_ADVANCES.RULES.SENIORITY' | translate),
-          hint: ('PAYROLL.SALARY_ADVANCES.RULES.SENIORITY_HINT' | translate)
-        }" />
-      <daf-select
-        [options]="[
-          { value: 'yes', label: ('PAYROLL.SALARY_ADVANCES.RULES.OPEN' | translate) },
-          { value: 'no', label: ('PAYROLL.SALARY_ADVANCES.RULES.CLOSED' | translate) }
-        ]"
-        [config]="{ label: ('PAYROLL.SALARY_ADVANCES.RULES.STATE' | translate), required: true }"
-        [selected]="[policyForm().isActive ? 'yes' : 'no']"
-        (selectedChange)="patchPolicy({ isActive: $event[0] === 'yes' })" />
-    </div>
     @if (modalError()) {
       <div class="flex items-center gap-2 rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">
         <span class="material-symbols-outlined text-[18px]">error</span>

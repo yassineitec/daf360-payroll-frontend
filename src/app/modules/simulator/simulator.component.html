@@ -38,105 +38,115 @@
 
 <!--
   `daf-page` comme toutes les autres pages payroll : il porte le squelette du premier
-  chargement (`firstLoad`) et l'animation d'entrée. Le tiroir historique reste HORS de
-  `daf-page` (tout en bas) : l'animation `slide` pose un `transform`, qui piégerait son
-  `position: fixed` comme le ferait une carte vitrée.
+  chargement (`firstLoad`, puis la lecture d'une simulation par son URL) et l'animation
+  d'entrée.
+
+  Une page, deux routes (voir `simulator.routes.ts`) :
+    /payroll/simulator/new  → le formulaire en 3 étapes ;
+    /payroll/simulator/:id  → la fiche résultat.
+  La liste des simulations est un composant à part (`simulator-list`).
 -->
+<!-- `headerSize` suit l'en-tête rendu : `md` sur la fiche, où il vit dans la colonne de
+     gauche (comme /finance/affaires/:id — les deux doivent concorder), `hero` sur le
+     formulaire. -->
 <daf-page
-  [loading]="firstLoad()"
+  [loading]="firstLoad() || resultLoading()"
   [loadingLabel]="'PAYROLL.COMMON.LOADING' | translate"
   [kpis]="0"
   [breadcrumbs]="true"
+  [headerSize]="resultView() ? 'md' : 'hero'"
 >
-<!-- ══ En-tête de page ═══════════════════════════════════════════════════════ -->
-<daf-page-header
-  [title]="'PAYROLL.SIMULATOR.TITLE' | translate"
-  [subtitle]="'PAYROLL.SIMULATOR.SUBTITLE' | translate"
-  [breadcrumbs]="breadcrumbs()"
-  [badges]="headerBadges()"
->
-  <div pageActions class="flex items-center gap-2">
-    <daf-button
-      [label]="'PAYROLL.SIMULATOR.ACTIONS.VIEW_RESULT' | translate"
-      variant="ghost"
-      [options]="{
-        size: 'sm',
-        iconStart: 'calculate',
-        disabled: !result() || resultView(),
-      }"
-      (onClick)="showResult()"
-    />
-    <daf-button
-      [label]="'PAYROLL.SIMULATOR.ACTIONS.HISTORY' | translate"
-      variant="ghost"
-      [options]="{
-        size: 'sm',
-        iconStart: 'history',
-        disabled: !canViewHistory(),
-      }"
-      (onClick)="openHistory()"
-    />
-    <daf-button
-      [label]="'PAYROLL.SIMULATOR.ACTIONS.RESET' | translate"
-      variant="ghost"
-      [options]="{ size: 'sm', iconStart: 'refresh' }"
-      (onClick)="reset()"
-    />
-  </div>
-</daf-page-header>
+<!-- ══ En-tête du formulaire ═════════════════════════════════════════════════
+     Sur la fiche résultat, l'en-tête est dans la colonne de gauche (#resultTemplate). -->
+@if (!resultView()) {
+  <!-- Comme /finance/affaires/new : le résumé de la saisie vit dans les pastilles du
+       titre (pays · sujet · contrat · montant et sens), à mesure qu'elle avance. Le retour
+       à la liste est « Annuler » dans la barre d'actions du bas. Pas de bouton dans
+       l'en-tête (l'ancien « Réinitialiser » a été retiré). -->
+  <daf-page-header
+    [title]="pageTitle()"
+    [subtitle]="pageSubtitle()"
+    [badges]="formBadges()"
+    [breadcrumbs]="breadcrumbs()"
+  />
+}
+
+<!-- Simulation introuvable ou hors périmètre (lien, favori) : la ligne de message de la lib. -->
+@if (loadError(); as err) {
+  <daf-field-message [error]="err" />
+}
 
 <!-- ══ Zone de travail ═══════════════════════════════════════════════════════
-     Soit le parcours (formulaire), soit le résultat — jamais les deux : un
-     `submit()` réussi bascule `resultView` à true et le résultat prend la place du
-     formulaire sur cette même page. « Modifier la simulation » (`backToForm()`)
+     Soit le parcours (formulaire, `/new`), soit le résultat (`/:id`) — jamais les deux.
+     Un `submit()` réussi ouvre la fiche ; « Modifier la simulation » (`backToForm()`)
      ramène le formulaire, valeurs intactes. -->
   <div class="flex flex-col gap-8">
     @if (resultView()) {
     <!-- ── Le résultat — une pile de cartes séparées, voir `#resultTemplate` ── -->
     <ng-container [ngTemplateOutlet]="resultTemplate" />
     } @else {
-    <!-- ── Le parcours ──────────────────────────────────────────────────────── -->
-    <daf-card
-      class="w-full min-w-0"
-      [options]="{ variant: 'glass', padding: 'none', radius: 'xl' }"
-    >
-      <!-- Une SEULE carte pour toute la colonne : le rail, le panneau de l'étape et la
-           navigation partagent désormais la même surface vitrée, au lieu d'un rail nu
-           posé sur le fond de page au-dessus d'une seconde carte. -->
-      <div class="flex flex-col gap-8 p-6 sm:p-8" [formGroup]="form">
-        <!-- Rail horizontal. `chrome: 'header-only'` : la lib ne dessine que le rail, le
-         panneau et la navigation restent à la page. AUCUNE étape n'est `disabled` :
-         les trois sont cliquables dans n'importe quel ordre. -->
-        <daf-stepper
-        [steps]="steps()"
-        [currentStep]="currentStep()"
-        orientation="horizontal"
-        [config]="{
-          chrome: 'header-only',
-          clickableSteps: true,
-          stepperLabel: 'PAYROLL.SIMULATOR.STEPPER.ARIA' | translate,
-        }"
-        (stepClick)="goToStep($event)"
-      />
+    <!-- ── Le parcours — même squelette que l'assistant « Nouvelle affaire »
+         (/finance/affaires/new) : UNE carte de formulaire (en-tête d'étape : icône, titre,
+         « Étape n sur 3 »), les messages en pied de carte, puis la barre d'actions
+         flottante qui porte la progression (Annuler / Précédent · rail · Suivant / Simuler).
+         Le résumé de la saisie est dans les pastilles de l'en-tête de page. ───────── -->
+    <div class="sim-wizard" [formGroup]="form">
+      <div class="form-card">
 
-        <!-- Panneau de l'étape courante — plus de carte imbriquée ici : la colonne entière
-             en est déjà une, une seconde surface vitrée par-dessus se voyait. -->
-        <div class="flex flex-col gap-8 border-t border-outline-variant/40 pt-8">
+        <!-- Titre de l'étape courante -->
+        <div class="card-head">
+          <div class="card-head__icon">
+            <span class="material-symbols-outlined">{{ cardIcon() }}</span>
+          </div>
+          <div>
+            <h2 class="card-head__title">{{ cardTitle() }}</h2>
+            <p class="card-head__sub">{{ cardSub() }}</p>
+          </div>
+          <!-- État de l'étape, à droite du titre : la carte affaire n'a pas de ligne
+               d'état dans son corps, le simulateur non plus. -->
+          <div class="card-head__aside">
+            @switch (currentStep()) {
+              @case (0) {
+                <daf-badge
+                  [label]="referentialBadge().label"
+                  [options]="referentialBadge().options"
+                />
+              }
+              @case (1) {
+                <daf-badge
+                  [label]="calcBadge().label"
+                  [options]="calcBadge().options"
+                />
+              }
+              @case (2) {
+                @if (availableBenefits().length) {
+                  <daf-button
+                    [label]="
+                      (allBenefitsSelected()
+                        ? 'PAYROLL.SIMULATOR.STEP3.UNCHECK_ALL'
+                        : 'PAYROLL.SIMULATOR.STEP3.CHECK_ALL'
+                      ) | translate
+                    "
+                    variant="ghost"
+                    [options]="{ size: 'sm' }"
+                    (onClick)="toggleAllBenefits()"
+                  />
+                }
+                <daf-badge
+                  [label]="benefitsBadge().label"
+                  [options]="benefitsBadge().options"
+                />
+              }
+            }
+          </div>
+        </div>
+
+        <!-- Corps de l'étape -->
+        <div class="step-body">
+        <div class="flex flex-col gap-8">
           @switch (currentStep()) {
             <!-- ═ 01 · Référentiel & sujet ═ -->
             @case (0) {
-              <div class="flex flex-wrap items-center gap-3">
-                <daf-section-title
-                  [title]="'PAYROLL.SIMULATOR.STEP1.TITLE' | translate"
-                />
-                <span class="ml-auto">
-                  <daf-badge
-                    [label]="referentialBadge().label"
-                    [options]="referentialBadge().options"
-                  />
-                </span>
-              </div>
-
               <!-- Pile : chaque enfant direct occupe toute la largeur. -->
               <div class="flex flex-col gap-6">
                 <daf-select
@@ -150,24 +160,13 @@
                     searchable: true,
                     required: true,
                     disabled: !paysOptions().length,
-                    hint:
-                      psState() === 'READY' && activePs()
-                        ? ('PAYROLL.SIMULATOR.STEP1.PAYS_HINT'
-                          | translate
-                            : {
-                                contracts: availableContractTypes().length,
-                                brackets: irppBrackets().length,
-                                benefits: availableBenefits().length,
-                              })
-                        : '',
                   }"
                   [selected]="paysSelection()"
                   (selectedChange)="setPaysSelection($event)"
                 />
 
-                <!-- Le nom de table `pays_ref` fait partie du message traduit : un `<code>`
-                   au milieu obligerait à couper la phrase en deux clés, dont l'ordre ne
-                   tient pas d'une langue à l'autre. -->
+                <!-- Référentiel pays vide : message pour l'utilisateur (qui prévenir), sans le
+                     détail technique de la synchronisation avec le service RH. -->
                 @if (!paysOptions().length) {
                   <p
                     class="flex items-start gap-2 rounded-xl bg-danger/10 px-4 py-3 text-[13px] text-danger"
@@ -205,19 +204,28 @@
                 />
 
                 @if (subject() === "EMPLOYEE") {
-                  <div class="flex flex-col gap-2">
-                    <label class="text-sm font-medium text-on-surface">
-                      {{ "PAYROLL.SIMULATOR.STEP1.EMPLOYEE_LABEL" | translate }}
-                      <span class="text-danger">*</span>
-                    </label>
-                    <app-employee-select
-                      formControlName="profileUserId"
-                      [paysId]="selectedPaysId()"
-                    />
-                    <p class="text-[13px] text-on-surface-variant">
-                      {{ "PAYROLL.SIMULATOR.STEP1.EMPLOYEE_HINT" | translate }}
-                    </p>
-                  </div>
+                  <!-- `daf-select` de la lib, comme les autres listes du formulaire, avec sa
+                       recherche intégrée : les collaborateurs du pays sont chargés en une
+                       fois (`loadEmployees`), la lib filtre ensuite en local. -->
+                  <daf-select
+                    [options]="employeeOptions()"
+                    [config]="{
+                      label: 'PAYROLL.SIMULATOR.STEP1.EMPLOYEE_LABEL' | translate,
+                      placeholder: employeesLoading()
+                        ? ('PAYROLL.COMMON.LOADING' | translate)
+                        : employeeOptions().length
+                          ? ('PAYROLL.SELECT.EMPLOYEE_PLACEHOLDER' | translate)
+                          : ('PAYROLL.SELECT.EMPLOYEE_EMPTY' | translate),
+                      searchable: true,
+                      required: true,
+                      fullWidth: true,
+                      triggerIcon: 'badge',
+                      disabled: !selectedPaysId() || employeesLoading() || !employeeOptions().length,
+                      hint: 'PAYROLL.SIMULATOR.STEP1.EMPLOYEE_HINT' | translate,
+                    }"
+                    [selected]="employeeSelection()"
+                    (selectedChange)="setEmployeeSelection($event)"
+                  />
                 } @else {
                   <!-- Paires : deux rangées flex de deux champs. Chaque champ est enveloppé
                      dans un `flex-1 min-w-0` — en flex, un élément custom (`daf-*`) ne
@@ -287,18 +295,6 @@
 
             <!-- ═ 02 · Rémunération ═ -->
             @case (1) {
-              <div class="flex flex-wrap items-center gap-3">
-                <daf-section-title
-                  [title]="'PAYROLL.SIMULATOR.STEP2.TITLE' | translate"
-                />
-                <span class="ml-auto">
-                  <daf-badge
-                    [label]="calcBadge().label"
-                    [options]="calcBadge().options"
-                  />
-                </span>
-              </div>
-
               <div class="flex flex-col gap-6">
                 <div class="flex flex-col sm:flex-row gap-6">
                   <div class="flex-1 min-w-0">
@@ -327,82 +323,58 @@
                   </div>
                 </div>
 
-                <!-- Montant : pleine largeur, donc enfant direct de la pile. Le libellé est
-                   un gabarit à paramètre (`{{period}}`) et non une concaténation : en
-                   anglais l'adjectif passe devant le nom. -->
-                @if (mode() === "NET_TO_BRUT") {
-                  <daf-form-field
-                    [options]="{
-                      label:
-                        'PAYROLL.SIMULATOR.STEP2.NET_LABEL'
-                        | translate: { period: periodAdjective() },
-                      type: 'number',
-                      required: true,
-                      align: 'end',
-                      placeholder:
-                        'PAYROLL.SIMULATOR.STEP2.NET_PLACEHOLDER' | translate,
-                      suffixText: currency(),
-                      hint:
-                        period() === 'YEARLY'
-                          ? ('PAYROLL.SIMULATOR.STEP2.AMOUNT_HINT_YEARLY'
-                            | translate)
-                          : ('PAYROLL.SIMULATOR.STEP2.AMOUNT_HINT_MONTHLY'
-                            | translate),
-                    }"
-                    [value]="fieldValue('inputNet')"
-                    (valueChange)="setFieldValue('inputNet', $event)"
-                  />
-                } @else {
-                  <daf-form-field
-                    [options]="{
-                      label:
-                        'PAYROLL.SIMULATOR.STEP2.GROSS_LABEL'
-                        | translate: { period: periodAdjective() },
-                      type: 'number',
-                      required: true,
-                      align: 'end',
-                      placeholder:
-                        'PAYROLL.SIMULATOR.STEP2.GROSS_PLACEHOLDER' | translate,
-                      suffixText: currency(),
-                      hint:
-                        period() === 'YEARLY'
-                          ? ('PAYROLL.SIMULATOR.STEP2.AMOUNT_HINT_YEARLY'
-                            | translate)
-                          : ('PAYROLL.SIMULATOR.STEP2.AMOUNT_HINT_MONTHLY'
-                            | translate),
-                    }"
-                    [value]="fieldValue('inputGross')"
-                    (valueChange)="setFieldValue('inputGross', $event)"
-                  />
-                }
-
+                <!-- Montant + jours ouvrés sur UNE ligne : deux `daf-form-field`, donc le même
+                     style de libellé — les cases tombent d'elles-mêmes à la même hauteur.
+                     Chaque champ est enveloppé d'un `flex-1 min-w-0` (voir l'encadré en tête).
+                     Le libellé du montant est un gabarit à paramètre (`{{period}}`) et non une
+                     concaténation : en anglais l'adjectif passe devant le nom. -->
                 <div class="flex flex-col sm:flex-row gap-6">
                   <div class="flex-1 min-w-0">
-                    <daf-select
-                      [options]="contractOptions()"
-                      [config]="{
-                        label:
-                          'PAYROLL.SIMULATOR.STEP2.CONTRACT_LABEL' | translate,
-                        required: subject() === 'CANDIDATE',
-                        placeholder:
-                          psState() !== 'READY'
-                            ? ('PAYROLL.SIMULATOR.STEP2.CONTRACT_PLACEHOLDER_NO_PAYS'
-                              | translate)
-                            : subject() === 'EMPLOYEE'
-                              ? ('PAYROLL.SIMULATOR.STEP2.CONTRACT_PLACEHOLDER_EMPLOYEE'
+                    @if (mode() === "NET_TO_BRUT") {
+                      <daf-form-field
+                        [options]="{
+                          label:
+                            'PAYROLL.SIMULATOR.STEP2.NET_LABEL'
+                            | translate: { period: periodAdjective() },
+                          type: 'number',
+                          required: true,
+                          align: 'end',
+                          placeholder:
+                            'PAYROLL.SIMULATOR.STEP2.NET_PLACEHOLDER' | translate,
+                          suffixText: currency(),
+                          hint:
+                            period() === 'YEARLY'
+                              ? ('PAYROLL.SIMULATOR.STEP2.AMOUNT_HINT_YEARLY'
                                 | translate)
-                              : ('PAYROLL.SIMULATOR.STEP2.CONTRACT_PLACEHOLDER_CANDIDATE'
+                              : ('PAYROLL.SIMULATOR.STEP2.AMOUNT_HINT_MONTHLY'
                                 | translate),
-                        disabled: psState() !== 'READY',
-                        hint:
-                          subject() === 'EMPLOYEE'
-                            ? ('PAYROLL.SIMULATOR.STEP2.CONTRACT_HINT_EMPLOYEE'
-                              | translate)
-                            : '',
-                      }"
-                      [selected]="contractSelection()"
-                      (selectedChange)="setSelection('contractType', $event)"
-                    />
+                        }"
+                        [value]="fieldValue('inputNet')"
+                        (valueChange)="setFieldValue('inputNet', $event)"
+                      />
+                    } @else {
+                      <daf-form-field
+                        [options]="{
+                          label:
+                            'PAYROLL.SIMULATOR.STEP2.GROSS_LABEL'
+                            | translate: { period: periodAdjective() },
+                          type: 'number',
+                          required: true,
+                          align: 'end',
+                          placeholder:
+                            'PAYROLL.SIMULATOR.STEP2.GROSS_PLACEHOLDER' | translate,
+                          suffixText: currency(),
+                          hint:
+                            period() === 'YEARLY'
+                              ? ('PAYROLL.SIMULATOR.STEP2.AMOUNT_HINT_YEARLY'
+                                | translate)
+                              : ('PAYROLL.SIMULATOR.STEP2.AMOUNT_HINT_MONTHLY'
+                                | translate),
+                        }"
+                        [value]="fieldValue('inputGross')"
+                        (valueChange)="setFieldValue('inputGross', $event)"
+                      />
+                    }
                   </div>
                   <div class="flex-1 min-w-0">
                     <daf-form-field
@@ -420,36 +392,40 @@
                     />
                   </div>
                 </div>
+
+                <!-- Type de contrat : seul sur sa ligne, pleine largeur, donc enfant direct
+                     de la pile. -->
+                <daf-select
+                  [options]="contractOptions()"
+                  [config]="{
+                    label:
+                      'PAYROLL.SIMULATOR.STEP2.CONTRACT_LABEL' | translate,
+                    required: subject() === 'CANDIDATE',
+                    placeholder:
+                      psState() !== 'READY'
+                        ? ('PAYROLL.SIMULATOR.STEP2.CONTRACT_PLACEHOLDER_NO_PAYS'
+                          | translate)
+                        : subject() === 'EMPLOYEE'
+                          ? ('PAYROLL.SIMULATOR.STEP2.CONTRACT_PLACEHOLDER_EMPLOYEE'
+                            | translate)
+                          : ('PAYROLL.SIMULATOR.STEP2.CONTRACT_PLACEHOLDER_CANDIDATE'
+                            | translate),
+                    disabled: psState() !== 'READY',
+                    fullWidth: true,
+                    hint:
+                      subject() === 'EMPLOYEE'
+                        ? ('PAYROLL.SIMULATOR.STEP2.CONTRACT_HINT_EMPLOYEE'
+                          | translate)
+                        : '',
+                  }"
+                  [selected]="contractSelection()"
+                  (selectedChange)="setSelection('contractType', $event)"
+                />
               </div>
             }
 
             <!-- ═ 03 · Avantages ═ -->
             @case (2) {
-              <div class="flex flex-wrap items-center gap-3">
-                <daf-section-title
-                  [title]="'PAYROLL.SIMULATOR.STEP3.TITLE' | translate"
-                />
-                <span class="ml-auto flex items-center gap-3">
-                  @if (availableBenefits().length) {
-                    <daf-button
-                      [label]="
-                        (allBenefitsSelected()
-                          ? 'PAYROLL.SIMULATOR.STEP3.UNCHECK_ALL'
-                          : 'PAYROLL.SIMULATOR.STEP3.CHECK_ALL'
-                        ) | translate
-                      "
-                      variant="ghost"
-                      [options]="{ size: 'sm' }"
-                      (onClick)="toggleAllBenefits()"
-                    />
-                  }
-                  <daf-badge
-                    [label]="benefitsBadge().label"
-                    [options]="benefitsBadge().options"
-                  />
-                </span>
-              </div>
-
               @if (availableBenefits().length) {
                 <div class="flex flex-col gap-3">
                   @for (
@@ -515,661 +491,340 @@
             }
           }
 
-          <!-- Messages de blocage / erreur du formulaire, à l'étape 3 (celle du bouton
-               « Simuler ») — `error` / `blockingReason` / `amountError` sont déjà
-               traduits par le composant. -->
-          @if (currentStep() === steps().length - 1) {
-            @if (error()) {
-              <p
-                class="flex items-start gap-2 rounded-xl bg-danger/10 px-4 py-3 text-[13px] text-danger"
-              >
-                <span class="material-symbols-outlined text-[18px] shrink-0"
-                  >error</span
-                >
-                {{ error() }}
-              </p>
-            } @else if (blockingReason(); as reason) {
-              <p class="text-[13px] text-on-surface-variant">{{ reason }}</p>
-            } @else if (amountError(); as amountMsg) {
-              <p class="text-[13px] text-on-surface-variant">{{ amountMsg }}</p>
-            }
-          }
+        </div>
+        </div><!-- /step-body -->
 
-          <!-- Navigation du parcours — la lib ne la dessine pas sous `header-only`. -->
-          <div
-            class="flex items-center justify-between gap-4 border-t border-outline-variant/40 pt-6"
-          >
-            <daf-button
-              [label]="'PAYROLL.SIMULATOR.STEPPER.PREV' | translate"
-              variant="ghost"
-              [options]="{
-                size: 'sm',
-                iconStart: 'arrow_back',
-                disabled: currentStep() === 0,
-              }"
-              (onClick)="prevStep()"
-            />
-            <!-- Dernière étape : « Suivant » devient « Simuler » — lance `submit()`,
-                 qui affiche le résultat à la place de ce formulaire. -->
-            @if (currentStep() === steps().length - 1) {
-              <daf-button
-                [label]="'PAYROLL.SIMULATOR.RESULT.SIMULATE' | translate"
-                variant="primary"
-                [options]="{
-                  size: 'sm',
-                  iconStart: 'calculate',
-                  loading: loading(),
-                  disabled: !canSimulate(),
-                }"
-                (onClick)="submit()"
-              />
-            } @else {
-              <daf-button
-                [label]="'PAYROLL.SIMULATOR.STEPPER.NEXT' | translate"
-                variant="ghost"
-                [options]="{
-                  size: 'sm',
-                  iconEnd: 'arrow_forward',
-                }"
-                (onClick)="nextStep()"
-              />
+        <!-- Messages de pied de carte, aux emplacements et dans les styles de l'assistant
+             affaire. Ce qui manque pour simuler ne s'affiche qu'à la dernière étape, celle
+             du bouton « Simuler » : les étapes sont libres, un rappel à chaque étape
+             signalerait des champs que l'utilisateur n'a pas encore atteints. -->
+        @if (currentStep() === steps().length - 1 && !loading() && !error()) {
+          @if (blockingReason() ?? amountError(); as missing) {
+            <div class="validation-hint">
+              <span class="material-symbols-outlined">info</span>
+              <span>{{ missing }}</span>
+            </div>
+          }
+        }
+        @if (error()) {
+          <div class="error-banner" role="alert">
+            <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">error</span>
+            <span>{{ error() }}</span>
+          </div>
+        }
+        @if (loading()) {
+          <div class="saving-hint">
+            <span class="material-symbols-outlined saving-spin">progress_activity</span>
+            <span>{{ 'PAYROLL.SIMULATOR.STEPPER.CALCULATING' | translate }}</span>
+          </div>
+        }
+      </div><!-- /form-card -->
+
+      <!-- ══ BARRE D'ACTIONS — progression + navigation ═════════════════════════
+           Copie de celle de /finance/affaires/new : `daf-card` `floating`, collée en bas
+           (`sticky`, dans le flux — elle prend la largeur de la colonne et ne recouvre
+           jamais le dernier champ). Annuler / Précédent en action de texte à gauche, le
+           rail AU CENTRE, une seule action dessinée à droite (teal, pilule). Toutes les
+           étapes restent cliquables, dans n'importe quel ordre. -->
+      <daf-card class="action-bar" [options]="{ variant: 'floating', radius: 'lg', padding: 'sm' }">
+        <div class="action-bar__inner">
+          <div class="action-bar__side">
+            @if (currentStep() > 0) {
+              <button type="button" class="footer-action" (click)="prevStep()">
+                <span class="material-symbols-outlined">arrow_back</span>
+                {{ 'PAYROLL.SIMULATOR.STEPPER.PREV' | translate }}
+              </button>
+            } @else if (canViewList()) {
+              <button type="button" class="footer-action" (click)="backToList()">
+                <span class="material-symbols-outlined">close</span>
+                {{ 'PAYROLL.SIMULATOR.STEPPER.CANCEL' | translate }}
+              </button>
             }
           </div>
-        </div>
-      </div>
-    </daf-card>
 
+          <div class="action-bar__rail">
+            <daf-stepper
+              orientation="horizontal"
+              [steps]="steps()"
+              [currentStep]="currentStep()"
+              [config]="stepperConfig()"
+              (stepClick)="goToStep($event)" />
+          </div>
+
+          <div class="action-bar__side action-bar__side--end">
+            <!-- Dernière étape : « Suivant » devient « Simuler » — lance `submit()`, qui
+                 ouvre la fiche du résultat. -->
+            <daf-button [options]="nextButtonOptions()"
+              (onClick)="currentStep() === steps().length - 1 ? submit() : nextStep()" />
+          </div>
+        </div>
+      </daf-card>
+    </div>
     }
   </div>
 </daf-page>
 
 <!--
-  Contenu de la vue résultat (voir la zone de travail, `resultView`). Une pile de
-  surfaces SÉPARÉES plutôt qu'une grande carte qui englobe tout : carte titre, tuiles
-  KPI posées directement sur le fond de page (pas de carte blanche derrière — ce sont
-  déjà des tuiles vitrées), carte décomposition, cartes repliables, carte d'actions.
+  Fiche résultat (`/payroll/simulator/:id`) — même mise en page que la fiche affaire
+  (/finance/affaires/:id?tab=overview) :
+
+    COLONNE GAUCHE (30 %, sticky) : l'en-tête de page (size="md"), la carte « Détails »
+      (Sujet · Contexte · Entrées, en blocs clé / valeur) et la carte « Actions rapides »
+      (Modifier en action principale, Excel · PDF, puis Imprimer · Retour à la liste).
+    COLONNE DROITE (70 %) : les 4 indicateurs, les onglets (`daf-tabs` underline) et le
+      contenu de l'onglet — Vue générale (3 tuiles + cascade S1 → S5), Rubriques, Charges
+      sociales, Barème IRPP, Devises.
+
+  Le squelette (colonnes, rangées de tuiles, panneau de détails) est en styles de
+  composant — voir `styles` dans simulator.component.ts.
 -->
 <ng-template #resultTemplate>
- <div class="flex flex-col gap-6">
-  <!-- ── Titre + retour au formulaire ─────────────────────────────────────── -->
-  <daf-card
-    class="w-full min-w-0"
-    [options]="{ variant: 'glass', padding: 'none', radius: 'xl' }"
-  >
-    <div class="flex flex-wrap items-center gap-3 px-6 py-5 sm:px-8">
-      <div
-        class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center shrink-0"
-      >
-        <span class="material-symbols-outlined text-primary text-[20px]"
-          >calculate</span
-        >
-      </div>
-      <div class="flex flex-col min-w-0">
-        <h2 class="text-headline-lg text-on-surface leading-snug m-0 p-0">
-          {{ "PAYROLL.SIMULATOR.RESULT.TITLE" | translate }}
-        </h2>
-        <p class="text-[11px] text-outline m-0">
-          @if (result(); as r) {
-            {{
-              "PAYROLL.SIMULATOR.RESULT.META"
-                | translate
-                  : {
-                      contract: r.contractType,
-                      parameterSetId: r.parameterSetId,
-                      date: (r.simulatedAt | date: "dd/MM/yy HH:mm"),
+ @if (result(); as r) {
+  <div class="detail-split">
+
+    <!-- ══ COLONNE GAUCHE ═══════════════════════════════════════════════════ -->
+    <div class="detail-aside">
+      <div class="detail-aside__sticky">
+
+        <!-- Ni sous-titre (sujet · contrat · date) ni pastilles : le sens du calcul et la
+             fiabilité sont dans la carte Détails juste en dessous, et un résultat
+             approximatif a son bandeau au-dessus des indicateurs. -->
+        <daf-page-header
+          size="md"
+          [title]="pageTitle()"
+          [titleWrap]="true"
+          [breadcrumbs]="breadcrumbs()" />
+
+        <aside class="dp" [attr.aria-label]="'PAYROLL.SIMULATOR.DETAIL.PANEL_ARIA' | translate">
+
+          <!-- ── Carte 1 : Détails ─────────────────────────────────────────── -->
+          <daf-section-card>
+            <div class="dp-card">
+              <!-- Le nom du sujet n'est plus répété ici : il est dans le titre de la page. -->
+              @for (block of detailBlocks(); track block.id; let first = $first) {
+                @if (!first) { <div class="dp-rule"></div> }
+                <section class="dp-block" [attr.aria-labelledby]="'dp-h-' + block.id">
+                  <h3 class="dp-label" [id]="'dp-h-' + block.id">{{ block.title }}</h3>
+                  <dl class="dp-rows">
+                    @for (row of block.rows; track row.key) {
+                      <div class="dp-row">
+                        <dt class="dp-row__key">{{ row.key }}</dt>
+                        <dd class="dp-row__val">
+                          @if (row.ok !== undefined) {
+                            <span class="dp-flag" [class.dp-flag--ok]="row.ok">
+                              <span class="dp-flag__dot" aria-hidden="true"></span>{{ row.value }}
+                            </span>
+                          } @else {
+                            {{ row.value }}
+                          }
+                        </dd>
+                      </div>
                     }
-            }}
-          } @else {
-            {{ "PAYROLL.SIMULATOR.RESULT.PENDING" | translate }}
-          }
-        </p>
-      </div>
-      <span class="ml-auto">
-        <daf-button
-          [label]="'PAYROLL.SIMULATOR.ACTIONS.BACK_TO_FORM' | translate"
-          variant="ghost"
-          [options]="{ size: 'sm', iconStart: 'arrow_back' }"
-          (onClick)="backToForm()"
-        />
-      </span>
-    </div>
-  </daf-card>
-
-  <!-- Chiffres clés — 3 `daf-metric-card` directement sur le fond de page, même
-     convention que budget/cohort (`[value]="money(...) "`, icône + couleur par tuile). -->
-  <div class="flex flex-col sm:flex-row gap-3">
-    <div class="flex-1 min-w-0">
-      <daf-metric-card
-        [label]="'PAYROLL.SIMULATOR.RESULT.LOADED_COST' | translate"
-        [value]="result() ? money(result()!.loadedCost, currency(), 2) : '—'"
-        [delta]="
-          result()
-            ? {
-                value:
-                  'PAYROLL.SIMULATOR.RESULT.PER_YEAR'
-                  | translate
-                    : {
-                        amount: money(result()!.loadedCost * 12, currency(), 0),
-                      },
-                direction: 'neutral',
-              }
-            : null
-        "
-        [options]="{
-          icon: 'account_balance_wallet',
-          iconColor: 'text-primary',
-          iconBg: 'bg-primary/10',
-        }"
-      />
-    </div>
-    <div class="flex-1 min-w-0">
-      <daf-metric-card
-        [label]="'PAYROLL.SIMULATOR.RESULT.GROSS_MONTHLY' | translate"
-        [value]="result() ? money(result()!.gross, currency(), 2) : '—'"
-        [delta]="
-          result()
-            ? {
-                value:
-                  'PAYROLL.SIMULATOR.RESULT.PER_YEAR'
-                  | translate: { amount: money(result()!.gross * 12, currency(), 0) },
-                direction: 'neutral',
-              }
-            : null
-        "
-        [options]="{
-          icon: 'payments',
-          iconColor: 'text-secondary',
-          iconBg: 'bg-secondary/10',
-        }"
-      />
-    </div>
-    <div class="flex-1 min-w-0">
-      <daf-metric-card
-        [label]="'PAYROLL.SIMULATOR.RESULT.NET_MONTHLY' | translate"
-        [value]="netMonthly() != null ? money(netMonthly(), currency(), 2) : '—'"
-        [delta]="
-          netMonthly() != null
-            ? {
-                value:
-                  'PAYROLL.SIMULATOR.RESULT.PER_YEAR'
-                  | translate: { amount: money(netMonthly()! * 12, currency(), 0) },
-                direction: 'neutral',
-              }
-            : null
-        "
-        [options]="{
-          icon: 'savings',
-          iconColor: 'text-tertiary',
-          iconBg: 'bg-tertiary/10',
-        }"
-      />
-    </div>
-  </div>
-
-  <p class="text-[13px] text-on-surface-variant px-1 -mt-2">
-    @if (result(); as r) {
-      @if (r.costNetRatio != null) {
-        {{
-          "PAYROLL.SIMULATOR.RESULT.COST_NET_RATIO"
-            | translate: { ratio: (r.costNetRatio | number: "1.2-2") }
-        }}
-      }
-    } @else {
-      {{ "PAYROLL.SIMULATOR.RESULT.EMPTY_HINT" | translate }}
-    }
-  </p>
-
-  <!-- ── Décomposition : barre empilée + relevé — sa propre carte ─────────── -->
-  @if (breakdown().length) {
-    <daf-card
-      class="w-full min-w-0"
-      [options]="{ variant: 'glass', padding: 'none', radius: 'xl' }"
-    >
-    <div class="flex flex-col gap-3 px-6 py-5 sm:px-8">
-      <daf-section-title
-        [title]="'PAYROLL.SIMULATOR.RESULT.BREAKDOWN_TITLE' | translate"
-      />
-
-      <div
-        class="flex h-2.5 w-full overflow-hidden rounded-full bg-surface-container"
-        role="img"
-        [attr.aria-label]="
-          'PAYROLL.SIMULATOR.RESULT.BREAKDOWN_ARIA' | translate
-        "
-      >
-        @for (seg of breakdown(); track seg.key) {
-          <span
-            class="block h-full"
-            [class]="seg.bar"
-            [style.width.%]="seg.pct"
-          ></span>
-        }
-      </div>
-
-      <div class="flex flex-col">
-        @for (seg of breakdown(); track seg.key) {
-          <div
-            class="flex items-center gap-3 border-b border-outline-variant/40 py-2 last:border-0 text-[12px] tabular-nums"
-          >
-            <span
-              class="h-2 w-2 shrink-0 rounded-full"
-              [class]="seg.dot"
-            ></span>
-            <span
-              class="flex-1 min-w-0 truncate text-on-surface-variant"
-              >{{ seg.label }}</span
-            >
-            <span class="w-14 text-right text-outline"
-              >{{ seg.pct | number: "1.0-1" }} %</span
-            >
-            <span
-              class="w-24 text-right font-semibold text-on-surface"
-              >{{ seg.amount | number: "1.2-2" }}</span
-            >
-          </div>
-        }
-      </div>
-    </div>
-    </daf-card>
-  }
-
-  @if (convergenceWarning()) {
-    <p
-      class="flex items-center gap-2 rounded-xl bg-warning/10 px-4 py-3 text-[13px] text-warning"
-    >
-      <span class="material-symbols-outlined text-[18px]">warning</span>
-      {{
-        "PAYROLL.SIMULATOR.RESULT.CONVERGENCE_WARNING"
-          | translate: { iterations: result()!.iterationsUsed }
-      }}
-    </p>
-  }
-
-  <!-- ── Détails repliables ─────────────────────────────────────────────── -->
-  @if (result(); as r) {
-    <daf-accordion-card
-      [options]="{
-        title: 'PAYROLL.SIMULATOR.CASCADE.TITLE' | translate,
-        subtitle: 'PAYROLL.SIMULATOR.CASCADE.SUBTITLE' | translate,
-        icon: 'stacked_line_chart',
-        state: 'done',
-        radius: 'xl',
-      }"
-    >
-      <div class="flex flex-col gap-5">
-        <div class="flex flex-col text-[12px] tabular-nums">
-          <div
-            class="flex items-center justify-between border-b border-outline-variant/40 py-2"
-          >
-            <span class="text-on-surface">{{
-              "PAYROLL.SIMULATOR.CASCADE.S1" | translate
-            }}</span>
-            <span class="font-semibold text-on-surface">{{
-              r.inputNet | number: "1.2-2"
-            }}</span>
-          </div>
-          <p class="py-1 pl-3 text-[11px] text-outline">
-            {{
-              "PAYROLL.SIMULATOR.CASCADE.ADD_EMPLOYEE_CHARGES" | translate
-            }}
-            {{ r.netTaxable - r.inputNet | number: "1.2-2" }}
-          </p>
-          <div
-            class="flex items-center justify-between border-b border-outline-variant/40 py-2"
-          >
-            <span class="text-on-surface">{{
-              "PAYROLL.SIMULATOR.CASCADE.S2" | translate
-            }}</span>
-            <span class="font-semibold text-on-surface">{{
-              r.netTaxable | number: "1.2-2"
-            }}</span>
-          </div>
-          <p class="py-1 pl-3 text-[11px] text-outline">
-            {{ "PAYROLL.SIMULATOR.CASCADE.ADD_IRPP" | translate }}
-            {{ r.irppAmount | number: "1.2-2" }}
-          </p>
-          <div
-            class="flex items-center justify-between border-b border-outline-variant/40 py-2"
-          >
-            <span class="text-on-surface">{{
-              "PAYROLL.SIMULATOR.CASCADE.S3" | translate
-            }}</span>
-            <span class="font-semibold text-on-surface">{{
-              r.gross | number: "1.2-2"
-            }}</span>
-          </div>
-          @if (
-            r.grossWithBenefits != null && r.grossWithBenefits !== r.gross
-          ) {
-            <p class="py-1 pl-3 text-[11px] text-outline">
-              {{
-                "PAYROLL.SIMULATOR.CASCADE.ADD_EXEMPT_BENEFITS" | translate
-              }}
-              {{ r.grossWithBenefits - r.gross | number: "1.2-2" }}
-            </p>
-          }
-          <div
-            class="flex items-center justify-between border-b border-outline-variant/40 py-2"
-          >
-            <span class="text-on-surface">{{
-              "PAYROLL.SIMULATOR.CASCADE.S4" | translate
-            }}</span>
-            <span class="font-semibold text-on-surface">
-              {{ r.grossWithBenefits ?? r.gross | number: "1.2-2" }}
-            </span>
-          </div>
-          <p class="py-1 pl-3 text-[11px] text-outline">
-            {{
-              "PAYROLL.SIMULATOR.CASCADE.ADD_EMPLOYER_CHARGES" | translate
-            }}
-            {{ r.employerCharges | number: "1.2-2" }}
-          </p>
-          <div class="flex items-center justify-between py-2">
-            <span class="font-bold text-on-surface">{{
-              "PAYROLL.SIMULATOR.CASCADE.S5" | translate
-            }}</span>
-            <span class="font-bold text-on-surface">{{
-              r.loadedCost | number: "1.2-2"
-            }}</span>
-          </div>
-        </div>
-
-        @if (
-          r.loadedCostEur != null ||
-          r.loadedCostChf != null ||
-          r.loadedCostUsd != null
-        ) {
-          <div class="flex flex-col gap-2">
-            <daf-section-title
-              [title]="'PAYROLL.SIMULATOR.CASCADE.FX_TITLE' | translate"
-            />
-            <div class="flex flex-col text-[12px] tabular-nums">
-              @if (r.loadedCostEur != null) {
-                <div
-                  class="flex items-center justify-between gap-3 border-b border-outline-variant/40 py-2 last:border-0"
-                >
-                  <span class="text-on-surface"
-                    >EUR
-                    <span class="ml-1 text-[11px] text-outline">
-                      {{
-                        "PAYROLL.SIMULATOR.CASCADE.FX_RATE"
-                          | translate
-                            : {
-                                currency: r.localCurrency,
-                                rate: (r.fxRateEur | number: "1.4-4"),
-                              }
-                      }}
-                    </span>
-                  </span>
-                  <span class="font-semibold text-on-surface">{{
-                    r.loadedCostEur | number: "1.2-2"
-                  }}</span>
-                </div>
-              }
-              @if (r.loadedCostChf != null) {
-                <div
-                  class="flex items-center justify-between gap-3 border-b border-outline-variant/40 py-2 last:border-0"
-                >
-                  <span class="text-on-surface"
-                    >CHF
-                    <span class="ml-1 text-[11px] text-outline">
-                      {{
-                        "PAYROLL.SIMULATOR.CASCADE.FX_RATE"
-                          | translate
-                            : {
-                                currency: r.localCurrency,
-                                rate: (r.fxRateChf | number: "1.4-4"),
-                              }
-                      }}
-                    </span>
-                  </span>
-                  <span class="font-semibold text-on-surface">{{
-                    r.loadedCostChf | number: "1.2-2"
-                  }}</span>
-                </div>
-              }
-              @if (r.loadedCostUsd != null) {
-                <div
-                  class="flex items-center justify-between gap-3 border-b border-outline-variant/40 py-2 last:border-0"
-                >
-                  <span class="text-on-surface"
-                    >USD
-                    <span class="ml-1 text-[11px] text-outline">
-                      {{
-                        "PAYROLL.SIMULATOR.CASCADE.FX_RATE"
-                          | translate
-                            : {
-                                currency: r.localCurrency,
-                                rate: (r.fxRateUsd | number: "1.4-4"),
-                              }
-                      }}
-                    </span>
-                  </span>
-                  <span class="font-semibold text-on-surface">{{
-                    r.loadedCostUsd | number: "1.2-2"
-                  }}</span>
-                </div>
+                  </dl>
+                </section>
               }
             </div>
-          </div>
+          </daf-section-card>
+
+          <!-- ── Carte 2 : Actions rapides — même hiérarchie que la fiche affaire :
+               action principale `lg` pleine largeur, deux actions `sm` côte à côte,
+               puis une rangée de pied sous un filet. ──────────────────────────── -->
+          <daf-section-card>
+            <div class="flex flex-col gap-3 bg-surface-container p-6">
+              <p class="text-label-caps font-extrabold uppercase tracking-widest text-on-surface-variant">
+                {{ 'PAYROLL.SIMULATOR.DETAIL.QUICK_TITLE' | translate }}
+              </p>
+
+              <daf-button
+                [options]="{ variant: 'primary', size: 'lg', fullWidth: true, iconStart: 'edit',
+                             label: ('PAYROLL.SIMULATOR.ACTIONS.BACK_TO_FORM' | translate) }"
+                (onClick)="backToForm()" />
+
+              <div class="grid grid-cols-2 gap-2">
+                <daf-button
+                  [options]="{ variant: 'secondary', size: 'sm', fullWidth: true, iconStart: 'description',
+                               disabled: xlsxGenerating(),
+                               label: ((xlsxGenerating() ? 'PAYROLL.SIMULATOR.RESULT.EXPORTING_XLSX' : 'PAYROLL.SIMULATOR.DETAIL.EXCEL') | translate) }"
+                  (onClick)="exportXlsx()" />
+                <daf-button
+                  [options]="{ variant: 'secondary', size: 'sm', fullWidth: true, iconStart: 'picture_as_pdf',
+                               disabled: pdfGenerating(),
+                               label: ((pdfGenerating() ? 'PAYROLL.SIMULATOR.RESULT.EXPORTING_PDF' : 'PAYROLL.SIMULATOR.DETAIL.PDF') | translate) }"
+                  (onClick)="exportPdf()" />
+              </div>
+
+              <!-- Seule action de pied (Imprimer) : centrée sous les boutons. -->
+              <div class="mt-1 flex flex-wrap items-center justify-center gap-2 border-t border-outline-variant/30 pt-3">
+                <button type="button"
+                        class="flex items-center gap-1.5 rounded-lg px-2 py-2 text-body-sm font-semibold
+                               text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+                        (click)="print()">
+                  <span class="material-symbols-outlined text-base">print</span>
+                  {{ 'PAYROLL.SIMULATOR.RESULT.PRINT' | translate }}
+                </button>
+                <!-- Pas de « Retour à la liste » : le fil d'Ariane de l'en-tête y ramène. -->
+              </div>
+            </div>
+          </daf-section-card>
+        </aside>
+      </div>
+    </div>
+
+    <!-- ══ COLONNE DROITE ═══════════════════════════════════════════════════ -->
+    <div class="detail-main">
+
+      @if (convergenceWarning()) {
+        <div class="flex items-center gap-2 rounded-xl bg-warning/10 px-4 py-3 text-body-md text-warning" role="status">
+          <span class="material-symbols-outlined text-[18px]">warning</span>
+          {{ 'PAYROLL.SIMULATOR.RESULT.CONVERGENCE_WARNING' | translate: { iterations: r.iterationsUsed } }}
+        </div>
+      }
+
+      <div class="kpi-row">
+        @for (k of resultKpis(); track k.label) {
+          <daf-metric-card class="kpi-cell" [label]="k.label" [value]="k.value" [delta]="k.delta" [options]="k.options" />
         }
       </div>
-    </daf-accordion-card>
 
-    @if (parsedRubriques().length) {
-      <daf-accordion-card
-        [options]="{
-          title: 'PAYROLL.SIMULATOR.RUBRIQUES.TITLE' | translate,
-          subtitle:
-            'PAYROLL.SIMULATOR.RUBRIQUES.SUBTITLE'
-            | translate: { count: parsedRubriques().length },
-          icon: 'list_alt',
-          state: 'active',
-          statusLabel: parsedRubriques().length + '',
-          radius: 'xl',
-        }"
-      >
-        <!-- Barre de recherche : porte réinitialiser + choix des colonnes du tableau
-             (`[table]`) et filtre les rubriques. `[card]="false"` : déjà dans une carte. -->
-        <div class="flex flex-col gap-3">
+      <!-- Onglets : seulement ceux qui ont du contenu (voir `resultTabs`) ; la barre est
+           masquée quand il ne reste que « Vue générale ». -->
+      @if (showResultTabs()) {
+        <daf-tabs
+          variant="underline"
+          [tabs]="resultTabs()"
+          [active]="currentTab()"
+          (activeChange)="activeTab.set($event)"
+          [tabsLabel]="'PAYROLL.SIMULATOR.DETAIL.TABS_ARIA' | translate"
+          idPrefix="simulation-detail" />
+      }
+
+      <div class="flex flex-col gap-6">
+
+        <!-- ── Vue générale ─────────────────────────────────────────────────── -->
+        @if (currentTab() === 'overview') {
+          <!-- « Qui reçoit quoi ? » — le coût chargé par destinataire et par poste, en
+               `daf-data-table` : destinataire (pastille, sur la 1re ligne du groupe), poste,
+               mensuel, annuel, part du coût, puis une ligne Total (= coût chargé).
+               Tableau NU, sans carte autour — comme les tableaux des listes Finance : il
+               porte déjà son propre cadre. -->
+          <section class="flex flex-col gap-3">
+            <p class="text-label-caps font-extrabold uppercase tracking-widest text-on-surface-variant m-0">
+              {{ 'PAYROLL.SIMULATOR.DETAIL.GROUPS_TITLE' | translate }}
+            </p>
+            <!-- Même barre que les autres tableaux : recherche, et à droite réinitialiser +
+                 choix des colonnes (`[table]`). Dans sa carte blanche (mode par défaut de la
+                 lib), comme sur les listes. -->
+            <daf-search-toolbar
+              [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
+              [(value)]="costSearch"
+              [table]="costTable" />
+            <daf-data-table #costTable
+              [columns]="costTableColumns()"
+              [rows]="filteredCostRows()"
+              [config]="costTableConfig()" />
+            <!-- Total hors du tableau : le tri l'y aurait déplacé. Toujours le coût chargé
+                 complet, même quand la recherche masque des lignes. -->
+            @if (costTotal(); as tot) {
+              <div class="flex flex-wrap items-baseline justify-between gap-3 rounded-xl bg-surface-container px-5 py-3">
+                <span class="text-body-md font-bold text-on-surface">
+                  {{ 'PAYROLL.SIMULATOR.DETAIL.TOTAL' | translate }} · {{ 'PAYROLL.SIMULATOR.RESULT.LOADED_COST' | translate }}
+                </span>
+                <span class="flex items-baseline gap-4 tabular-nums">
+                  <span class="text-body-md font-extrabold text-on-surface">{{ tot.monthly }}</span>
+                  <span class="text-body-sm text-on-surface-variant">{{ tot.yearly }} / {{ 'PAYROLL.SIMULATOR.DETAIL.COL_YEARLY' | translate | lowercase }}</span>
+                </span>
+              </div>
+            }
+          </section>
+
+          <!-- Répartition du coût — les trois destinataires du tableau en anneau (SVG : la lib
+               n'a pas de graphique circulaire), mêmes couleurs que les pastilles, légende à
+               côté. Ni montant au centre ni montants dans la légende : le coût total et les
+               montants par destinataire sont déjà dans le tableau juste au-dessus ; l'anneau
+               ne donne que les parts (%). -->
+          @if (costDonut().length) {
+            <section class="flex flex-col gap-3">
+              <p class="text-label-caps font-extrabold uppercase tracking-widest text-on-surface-variant m-0">
+                {{ 'PAYROLL.SIMULATOR.DETAIL.DONUT_TITLE' | translate }}
+              </p>
+              <div class="flex flex-wrap items-center gap-8 rounded-xl border border-outline-variant bg-surface-container-lowest p-6">
+                <svg viewBox="0 0 120 120" width="200" height="200" role="img"
+                     class="shrink-0" [attr.aria-label]="costDonutAria()">
+                  <!-- Fond de l'anneau, puis une part par destinataire (départ à midi). -->
+                  <circle cx="60" cy="60" [attr.r]="donutRadius" fill="none"
+                          stroke="var(--color-surface-container)" stroke-width="16" />
+                  <g transform="rotate(-90 60 60)">
+                    @for (s of costDonut(); track s.key) {
+                      <circle cx="60" cy="60" [attr.r]="donutRadius" fill="none"
+                              [attr.stroke]="s.color" stroke-width="16"
+                              [attr.stroke-dasharray]="s.dash" [attr.stroke-dashoffset]="s.offset">
+                        <title>{{ s.label }} · {{ s.amountText }} · {{ s.pct }}</title>
+                      </circle>
+                    }
+                  </g>
+                </svg>
+
+                <ul class="flex flex-1 flex-col gap-3 m-0 p-0 list-none min-w-[220px]">
+                  @for (s of costDonut(); track s.key) {
+                    <li class="flex items-center gap-3">
+                      <span class="h-3 w-3 shrink-0 rounded-full" [style.background]="s.color"></span>
+                      <span class="flex-1 min-w-0 truncate text-body-md text-on-surface">{{ s.label }}</span>
+                      <span class="w-16 text-right text-body-md font-semibold tabular-nums text-on-surface">{{ s.pct }}</span>
+                    </li>
+                  }
+                </ul>
+              </div>
+            </section>
+          }
+          <!-- Plus de graphique « Cascade S1 → S5 » : ses montants (net, brut, coût chargé,
+               IRPP, charges) sont déjà dans les KPI et le tableau « Qui reçoit quoi ? ». -->
+        }
+
+        <!-- ── Rubriques (onglet présent seulement s'il y en a) ──────────────── -->
+        @if (currentTab() === 'rubriques') {
           <daf-search-toolbar
             [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
             [(value)]="rubriquesSearch"
-            [card]="false"
-            [table]="rubriquesTable"
-          />
-          <daf-data-table
-            #rubriquesTable
+            [table]="rubriquesTable" />
+          <daf-data-table #rubriquesTable
             [columns]="rubriquesColumns()"
             [rows]="filteredRubriquesRows()"
-            [config]="resultTableConfig()"
-          />
-        </div>
-      </daf-accordion-card>
-    }
-  }
+            [config]="resultTableConfig()" />
+        }
 
-  @if (psState() === "READY") {
-    <daf-accordion-card
-      [options]="{
-        title: 'PAYROLL.SIMULATOR.REFERENTIAL.TITLE' | translate,
-        subtitle: 'PAYROLL.SIMULATOR.REFERENTIAL.SUBTITLE' | translate,
-        icon: 'rule_settings',
-        state: 'pending',
-        radius: 'xl',
-      }"
-    >
-      <div class="flex flex-col gap-6">
-        <div class="flex flex-col gap-2">
-          <daf-section-title
-            [title]="'PAYROLL.SIMULATOR.REFERENTIAL.IRPP_TITLE' | translate"
-          />
-          @if (irppBrackets().length) {
-            <daf-search-toolbar
-              [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
-              [(value)]="irppSearch"
-              [card]="false"
-              [table]="irppTable"
-            />
-            <daf-data-table
-              #irppTable
-              [columns]="irppColumns()"
-              [rows]="filteredIrppRows()"
-              [config]="resultTableConfig()"
-            />
-          } @else {
-            <p class="text-[13px] text-on-surface-variant">
-              {{ "PAYROLL.SIMULATOR.REFERENTIAL.IRPP_EMPTY" | translate }}
-            </p>
-          }
-        </div>
+        <!-- ── Charges appliquées — jeu UTILISÉ par le calcul (#parameterSetId), pour
+             son contrat, avec le montant de chaque cotisation quand il se recalcule
+             exactement (voir `chargeAmounts`). ──────────────────────────────────── -->
+        @if (currentTab() === 'charges') {
+          <p class="text-body-sm text-on-surface-variant m-0">
+            {{ 'PAYROLL.SIMULATOR.DETAIL.USED_SET_NOTE' | translate: { id: r.parameterSetId, contract: r.contractType } }}
+          </p>
+          <daf-search-toolbar
+            [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
+            [(value)]="chargesSearch"
+            [table]="chargesTable" />
+          <daf-data-table #chargesTable
+            [columns]="chargesColumns()"
+            [rows]="filteredChargesRows()"
+            [config]="resultTableConfig()" />
+        }
 
-        <div class="flex flex-col gap-2">
-          <daf-section-title
-            [title]="
-              ('PAYROLL.SIMULATOR.REFERENTIAL.CHARGES_TITLE' | translate) +
-              (contractSelection().length ? ' · ' + contractSelection()[0] : '')
-            "
-          />
-          @if (applicableCharges().length) {
-            <daf-search-toolbar
-              [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
-              [(value)]="chargesSearch"
-              [card]="false"
-              [table]="chargesTable"
-            />
-            <daf-data-table
-              #chargesTable
-              [columns]="chargesColumns()"
-              [rows]="filteredChargesRows()"
-              [config]="resultTableConfig()"
-            />
-          } @else {
-            <p class="text-[13px] text-on-surface-variant">
-              {{
-                "PAYROLL.SIMULATOR.REFERENTIAL.CHARGES_EMPTY" | translate
-              }}
-            </p>
-          }
-        </div>
+        <!-- ── Barème IRPP appliqué — jeu UTILISÉ par le calcul ─────────────── -->
+        @if (currentTab() === 'irpp') {
+          <p class="text-body-sm text-on-surface-variant m-0">
+            {{ 'PAYROLL.SIMULATOR.DETAIL.USED_SCALE_NOTE' | translate: { id: r.parameterSetId } }}
+          </p>
+          <daf-search-toolbar
+            [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
+            [(value)]="irppSearch"
+            [table]="irppTable" />
+          <daf-data-table #irppTable
+            [columns]="irppColumns()"
+            [rows]="filteredIrppRows()"
+            [config]="resultTableConfig()" />
+        }
       </div>
-    </daf-accordion-card>
-  }
-
-  <!-- ── Actions — seules dans leur carte ─────────────────────────────────── -->
-  <daf-card
-    class="w-full min-w-0"
-    [options]="{ variant: 'glass', padding: 'none', radius: 'xl' }"
-  >
-  <div class="flex flex-col sm:flex-row gap-3 px-6 py-5 sm:px-8">
-    <div class="flex-1 min-w-0">
-      <daf-button
-        [label]="'PAYROLL.SIMULATOR.RESULT.EXPORT_PDF' | translate"
-        variant="ghost"
-        [options]="{
-          size: 'sm',
-          iconStart: 'picture_as_pdf',
-          loading: pdfGenerating(),
-          disabled: !result(),
-          fullWidth: true,
-        }"
-        (onClick)="exportPdf()"
-      />
-    </div>
-    <div class="flex-1 min-w-0">
-      <daf-button
-        [label]="'PAYROLL.SIMULATOR.RESULT.PRINT' | translate"
-        variant="ghost"
-        [options]="{
-          size: 'sm',
-          iconStart: 'print',
-          disabled: !result(),
-          fullWidth: true,
-        }"
-        (onClick)="print()"
-      />
     </div>
   </div>
-  </daf-card>
- </div>
-</ng-template>
-
-<!--
-  Simulations récentes — corps du pop-up de la lib (`ModalService`, voir `openHistory()`),
-  ouvert par l'action « Simulations récentes » de l'en-tête. Le bouton « Fermer » est
-  celui du pop-up ; un clic sur une entrée ferme le pop-up et affiche le résultat.
--->
-<ng-template #historyTpl>
- <div class="flex flex-col gap-4">
-  @if (!canViewHistory()) {
-    <p class="text-[13px] text-on-surface-variant">
-      {{ "PAYROLL.SIMULATOR.HISTORY.NO_PERMISSION" | translate }}
-    </p>
-  } @else if (!selectedPaysId()) {
-    <p class="text-[13px] text-on-surface-variant">
-      {{ "PAYROLL.SIMULATOR.HISTORY.NO_PAYS" | translate }}
-    </p>
-  } @else if (!history().length) {
-    <p class="text-[13px] text-on-surface-variant">
-      {{
-        "PAYROLL.SIMULATOR.HISTORY.EMPTY"
-          | translate: { pays: selectedPays()?.frenchLabel }
-      }}
-    </p>
-  } @else {
-    <p class="text-[13px] text-on-surface-variant">
-      {{
-        "PAYROLL.SIMULATOR.HISTORY.INTRO"
-          | translate
-            : { count: history().length, pays: selectedPays()?.frenchLabel }
-      }}
-    </p>
-
-    <div class="flex flex-col gap-3">
-      @for (h of history(); track h.id) {
-        <button
-          type="button"
-          class="flex flex-col gap-2 rounded-xl border px-4 py-3 text-left transition-colors"
-          [class]="
-            result()?.id === h.id
-              ? 'border-tertiary bg-tertiary-container/40'
-              : 'border-outline-variant bg-surface-container-low hover:border-tertiary'
-          "
-          (click)="openHistoryEntry(h)"
-        >
-          <span class="flex items-center gap-2">
-            <span
-              class="flex-1 min-w-0 truncate text-sm font-semibold text-on-surface"
-            >
-              @if (h.candidateLabel) {
-                {{ h.candidateLabel }}
-              } @else if (h.profileUserId) {
-                {{
-                  "PAYROLL.SIMULATOR.HISTORY.EMPLOYEE_ENTRY"
-                    | translate: { id: h.profileUserId }
-                }}
-              } @else {
-                {{ "PAYROLL.SIMULATOR.HISTORY.UNLABELLED" | translate }}
-              }
-            </span>
-            <daf-badge
-              [label]="h.contractType"
-              [options]="{ variant: 'neutral', size: 'sm' }"
-            />
-          </span>
-          <span
-            class="flex items-center gap-2 text-[12px] text-on-surface-variant"
-          >
-            <span class="font-semibold tabular-nums text-on-surface">
-              {{ h.loadedCost | number: "1.0-0" }} {{ h.localCurrency }}
-            </span>
-            <span class="ml-auto text-[11px] text-outline">{{
-              h.simulatedAt | date: "dd/MM/yy HH:mm"
-            }}</span>
-          </span>
-        </button>
-      }
-    </div>
-  }
- </div>
+ }
 </ng-template>

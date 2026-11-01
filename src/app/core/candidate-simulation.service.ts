@@ -13,11 +13,19 @@ export interface CandidateSimulationSummaryDto {
   simulationCount: number;
   latestSubmittedAt: string;
   latestStatus: 'PENDING' | 'APPROVED' | 'REJECTED';
+  /** Net évalué par la RH, tel qu'il figure sur la fiche candidat. */
+  salaireNetRh?: number | null;
+  /** Net demandé par le candidat. */
+  salaireNetCandidat?: number | null;
 }
 
 export interface CandidateCostApprovalDto {
   id: number;
   candidateId: number;
+  /** Round d'offre que cette décision conditionne ; null = pré-validation budgétaire. */
+  jobOfferId?: number | null;
+  /** Salaire proposé sur ce round — null sur une pré-validation. */
+  proposedSalary?: number | null;
   candidateFirstName?: string;
   candidateLastName?: string;
   appliedPosition?: string;
@@ -28,6 +36,7 @@ export interface CandidateCostApprovalDto {
   salaireNetCandidat?: number;
   contrePropSalaire?: number;
   contractTypeCode: string;
+  contractTypeLabel?: string | null;
   simulationSnapshot: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   submittedBy: number;
@@ -37,14 +46,27 @@ export interface CandidateCostApprovalDto {
   approvalNotes?: string;
 }
 
+/** Le `PayrollSimulationResult` complet que RH a sérialisé à la soumission. */
 export interface SimSnapshot {
+  /** Id de la simulation payroll d'origine — ouvrable sur `/payroll/simulator/:id`. */
+  id?: number;
+  parameterSetId?: number;
   inputNet?: number;
+  netTaxable?: number;
   gross?: number;
   loadedCost?: number;
+  loadedCostEur?: number;
+  loadedCostUsd?: number;
   employeeCharges?: number;
   employerCharges?: number;
   irppAmount?: number;
   localCurrency?: string;
+  /** JSON : `[{ code, … }]`. */
+  benefitsApplied?: string;
+  /** JSON : `RubriqueAppliedItem[]`. */
+  rubriquesApplied?: string;
+  iterationsUsed?: number;
+  convergenceOk?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })

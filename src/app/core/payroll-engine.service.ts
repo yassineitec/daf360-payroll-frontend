@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 // DTOs
@@ -65,12 +65,26 @@ export interface RunPayrollRequest {
 export interface RubriqueResultItem {
   rubriqueCode: string;
   labelFr: string;
+  /** Absent des résultats calculés avant son ajout. */
+  labelEn?: string | null;
   nature: string;
   strate: number;
   assiette: number | null;
   amount: number;
   modeCalcul: string;
   prorataApplied: boolean;
+}
+
+/** `rubriqueDetails` arrive en texte JSON depuis `GET /results/{employeeId}`. */
+function parseRubriqueDetails(raw: unknown): RubriqueResultItem[] {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw !== 'string' || !raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 /** `GET /engine/results/summary` — période/dates à `null` tant que le pays n'a aucun résultat. */
@@ -107,6 +121,9 @@ export interface RunPayrollResponse {
   iterationsUsed: number | null;
   calculatedAt: string;
   rubriqueDetails: RubriqueResultItem[];
+  /** Pays du calcul — présent dans `GET /results/{employeeId}` (entité brute), absent de la
+   *  réponse de `POST /run`. Sert à la devise de l'historique. */
+  paysId?: number | null;
 }
 
 export interface EngineCalibrationDto {
@@ -215,8 +232,33 @@ export class PayrollEngineService {
     return this.http.post<RunPayrollResponse>(`${this.base}/run`, req);
   }
 
+  /** L'API renvoie l'entité `PayrollResult` brute, pas `RunPayrollResponse` : l'id
+   *  s'appelle `id` et `rubriqueDetails` est le JSON stocké en texte. On remet la forme
+   *  attendue ici, sinon `resultId` manque et le détail d'une ligne ne s'ouvre pas. */
   getResults(employeeId: number): Observable<RunPayrollResponse[]> {
-    return this.http.get<RunPayrollResponse[]>(`${this.base}/results/${employeeId}`);
+    return this.http.get<(RunPayrollResponse & { id?: number })[]>(`${this.base}/results/${employeeId}`).pipe(
+      map(list => list.map(r => ({
+        ...r,
+        resultId: r.resultId ?? r.id!,
+        rubriqueDetails: parseRubriqueDetails(r.rubriqueDetails),
+      }))),
+    );
+  }
+
+  /**
+   * Détail par rubrique d'un résultat en Excel, généré par le backend — même contrat que les
+   * exports de la facturation : `codes` = rubriques affichées, dans l'ordre du tableau
+   * (recherche, filtres et tri appliqués) ; libellés selon `lang`.
+   */
+  exportResultRubriquesXlsx(resultId: number, codes: string[], lang: string): Observable<Blob> {
+    return this.http.post(`${this.base}/results/${resultId}/rubriques/export.xlsx`, { ids: codes },
+      { params: { lang }, responseType: 'blob' });
+  }
+
+  /** Même sélection en PDF (pdf-service) ; `employee` = nom affiché dans l'en-tête. */
+  exportResultRubriquesPdf(resultId: number, codes: string[], lang: string, employee: string): Observable<Blob> {
+    return this.http.post(`${this.base}/results/${resultId}/rubriques/export.pdf`, { ids: codes },
+      { params: { lang, employee }, responseType: 'blob' });
   }
 
   /** Totaux du dernier mois calculé pour un pays (KPI de `/payroll/engine-results`). */

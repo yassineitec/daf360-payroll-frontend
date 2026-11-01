@@ -1,0 +1,50 @@
+@if (result(); as r) {
+  <!-- En-tête du bulletin : titre à gauche, date de calcul à droite — même titre que
+       celui de /payroll/engine-run (icône + titre). Le retour à la liste passe par le fil
+       d'Ariane de la page (nom du collaborateur, cliquable quand un bulletin est ouvert). -->
+  <header class="result-head">
+    <span class="material-symbols-outlined result-head__icon" style="font-variation-settings:'FILL' 1">receipt_long</span>
+    <h2 class="result-head__title">{{ title() }}</h2>
+    @if (calculatedOn(); as c) {
+      <span class="result-head__date">{{ c }}</span>
+    }
+  </header>
+
+  <!-- Ancien calcul : le mois a été relancé depuis — le dire, et ouvrir le dernier. -->
+  @if (newerResult(); as n) {
+    <div class="notice notice--warning" role="status">
+      <span class="material-symbols-outlined notice__icon">history</span>
+      <span class="notice__text">{{ 'PAYROLL.ENGINE_RESULTS.NEWER_EXISTS' | translate: { id: n.resultId } }}</span>
+      <daf-button
+        [label]="'PAYROLL.ENGINE_RESULTS.OPEN_LATEST' | translate"
+        variant="secondary"
+        [options]="{ size: 'sm', iconEnd: 'arrow_forward' }"
+        (onClick)="openResult.emit(n.resultId)">
+      </daf-button>
+    </div>
+  }
+
+  <!-- Le bulletin partagé avec /payroll/engine-run ; exports dans sa barre de recherche. -->
+  @if (totals(); as k) {
+    <app-payslip-bulletin
+      [details]="r.rubriqueDetails"
+      [totals]="k"
+      [currency]="currency()"
+      [employerCost]="employerCost()"
+      [toolbarActions]="toolbarActions()"
+      (toolbarAction)="onToolbarAction($event)"
+      [(search)]="rubriqueSearch" />
+  }
+} @else {
+  <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+    <div class="not-found">
+      <p class="empty-state">{{ 'PAYROLL.ENGINE_RESULTS.RESULT_NOT_FOUND' | translate }}</p>
+      <daf-button
+        [label]="'PAYROLL.ENGINE_RESULTS.BACK_TO_LIST' | translate"
+        variant="secondary"
+        [options]="{ size: 'sm', iconStart: 'arrow_back' }"
+        (onClick)="closed.emit()">
+      </daf-button>
+    </div>
+  </daf-card>
+}

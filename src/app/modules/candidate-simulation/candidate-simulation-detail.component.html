@@ -1,0 +1,218 @@
+<!--
+  Fiche candidat `/payroll/candidate-simulation/:candidateId`.
+
+  Même squelette que la fiche simulateur (`/payroll/simulator/:id`) : colonne gauche
+  collante (en-tête + « Détails » + actions), colonne droite (KPI de la négociation, historique).
+  Le détail de la simulation choisie (+ répartition du coût, rubriques) s'ouvre dans une
+  pop-up (`ModalService` de la lib) au clic sur une ligne du tableau.
+
+  Composants de la lib uniquement (`daf-*`) ; ce qu'elle ne fournit pas (alertes, état
+  vide, répartition du coût) reprend à l'identique les classes de la fiche simulateur et
+  de la liste. Seul le squelette deux colonnes et le panneau `.dp-*` sont en styles de
+  composant, comme sur la fiche simulateur.
+-->
+<daf-page
+  [loading]="loading()"
+  [loadingLabel]="'PAYROLL.COMMON.LOADING' | translate"
+  [kpis]="0"
+  [breadcrumbs]="true"
+  headerSize="md">
+
+  <div class="detail-split">
+
+    <!-- ══ COLONNE GAUCHE ═══════════════════════════════════════════════════ -->
+    <div class="detail-aside">
+      <div class="detail-aside__sticky">
+        <daf-page-header
+          size="md"
+          [title]="candidateName()"
+          [titleWrap]="true"
+          [badges]="headerBadges()"
+          [breadcrumbs]="breadcrumbs()" />
+
+        <daf-section-card>
+          <div class="dp-card">
+            <section class="dp-block">
+              <daf-section-title [title]="'PAYROLL.CANDIDATE_SIMULATION.DETAIL.CANDIDATE_BLOCK' | translate" />
+              <dl class="dp-rows">
+                @for (row of identityRows(); track row.key) {
+                  <div class="dp-row">
+                    <dt class="dp-row__key">{{ row.key }}</dt>
+                    <dd class="dp-row__val">{{ row.value }}</dd>
+                  </div>
+                }
+              </dl>
+            </section>
+          </div>
+        </daf-section-card>
+
+        <!-- Actions rapides — même carte que la fiche simulateur. Le retour à la liste passe
+             par le fil d'Ariane. Chaque action selon ses droits ; sans aucune, pas de carte. -->
+        @if ((canOpenSimulator && latest()?.snap?.id) || canOpenRhCandidate) {
+          <daf-section-card>
+            <div class="flex flex-col gap-3 bg-surface-container p-6">
+              <daf-section-title [title]="'PAYROLL.CANDIDATE_SIMULATION.DETAIL.QUICK_TITLE' | translate" />
+              @if (canOpenSimulator && latest()?.snap?.id) {
+                <daf-button
+                  [options]="{ variant: 'primary', size: 'lg', fullWidth: true, iconStart: 'content_copy',
+                               label: ('PAYROLL.CANDIDATE_SIMULATION.DETAIL.DUPLICATE_LATEST' | translate) }"
+                  (onClick)="duplicateInSimulator(latest())" />
+              }
+              <!-- Fiche du candidat dans le recrutement (module RH). -->
+              @if (canOpenRhCandidate) {
+                <daf-button
+                  [options]="{ variant: 'secondary', size: 'sm', fullWidth: true, iconStart: 'person_search',
+                               label: ('PAYROLL.CANDIDATE_SIMULATION.DETAIL.OPEN_RH_CANDIDATE' | translate) }"
+                  (onClick)="openRhCandidate()" />
+              }
+            </div>
+          </daf-section-card>
+        }
+      </div>
+    </div>
+
+    <!-- ══ COLONNE DROITE ═══════════════════════════════════════════════════ -->
+    <div class="detail-main">
+
+      <!-- Erreur : même bandeau que les autres pages paie (la lib n'a pas d'alerte) ;
+           état vide : `daf-card` de la lib (icône + titre + description), comme la liste. -->
+      @if (error()) {
+        <div class="pd-banner pd-banner--danger" role="alert">
+          <span class="material-symbols-outlined pd-banner__icon">error</span>
+          <span class="pd-banner__body">{{ error() }}</span>
+          <daf-button
+            [options]="{ variant: 'ghost', size: 'sm', iconStart: 'refresh',
+                         label: ('PAYROLL.CANDIDATE_SIMULATION.DETAIL.RETRY' | translate) }"
+            (onClick)="load()" />
+        </div>
+      } @else if (!rounds().length) {
+        <daf-card [options]="{
+          variant: 'outlined', padding: 'lg', radius: 'xl', icon: 'history',
+          title: ('PAYROLL.CANDIDATE_SIMULATION.EMPTY_HISTORY_TITLE' | translate),
+          description: ('PAYROLL.CANDIDATE_SIMULATION.EMPTY_HISTORY' | translate)
+        }" />
+      } @else {
+
+        <!-- ── KPI de la dernière soumission — en haut ───────────────────── -->
+        <div class="kpi-row">
+          @for (k of kpis(); track k.label) {
+            <daf-metric-card class="kpi-cell" [label]="k.label" [value]="k.value" [delta]="k.delta" [options]="k.options" />
+          }
+        </div>
+
+        <!-- ── Fil de la négociation — une étape par proposition, la plus ancienne d'abord :
+             ce que la RH a proposé, ce que le candidat demandait, la réponse de la DAF. Un clic
+             ouvre le même détail que le tableau. Pastilles `daf-badge` de la lib. ── -->
+        <section class="timeline">
+          <daf-section-title [title]="'PAYROLL.CANDIDATE_SIMULATION.DETAIL.TIMELINE_TITLE' | translate" />
+          <ol class="timeline__list">
+            @for (step of negotiation(); track step.id; let last = $last) {
+              <li class="timeline__item" [class.timeline__item--last]="last">
+                <span class="timeline__dot" [class]="'timeline__dot timeline__dot--' + step.status.variant" aria-hidden="true"></span>
+                <button type="button" class="timeline__card" (click)="selectById(step.id)">
+                  <span class="timeline__head">
+                    <span class="timeline__title">{{ step.title }}</span>
+                    <span class="timeline__kind">{{ step.kind }}</span>
+                    <daf-badge [label]="step.status.label" [options]="{ variant: step.status.variant, size: 'sm', dot: true }" />
+                  </span>
+                  <span class="timeline__line">
+                    <span class="material-symbols-outlined timeline__icon">north_east</span>{{ step.proposed }}
+                    @if (step.asked) { <span class="timeline__muted">· {{ step.asked }}</span> }
+                  </span>
+                  <span class="timeline__line">
+                    <span class="material-symbols-outlined timeline__icon">south_west</span>{{ step.answer }}
+                  </span>
+                  @if (step.note) {
+                    <span class="timeline__note">« {{ step.note }} »</span>
+                  }
+                </button>
+              </li>
+            }
+          </ol>
+        </section>
+      }
+    </div>
+  </div>
+
+  <!-- ══ Corps de la pop-up de détail (`ModalService`, voir `selectById()`) ═══
+       De haut en bas : navigation ‹ précédente / suivante ›, décision de la DAF (bandeau
+       coloré), trois chiffres clés, décomposition en bulletin (salaire du mois, puis coût
+       pour l'entreprise), avantages et éléments du bulletin. Titres : `daf-section-title`. -->
+  <ng-template #detailTpl>
+    @if (selected(); as r) {
+      <div class="pd">
+
+        <!-- Navigation entre propositions, sans fermer la pop-up. -->
+        @if (selectedPrev() || selectedNext()) {
+          <div class="pd-nav">
+            <!-- Flèches seules ; le nom de la proposition voisine reste en infobulle et pour
+                 les lecteurs d'écran (même usage que les boutons-icônes de l'administration). -->
+            <daf-button
+              variant="ghost"
+              [attr.title]="selectedPrev() ? roundLabel(selectedPrev()!.index) : null"
+              [attr.aria-label]="selectedPrev() ? roundLabel(selectedPrev()!.index) : null"
+              [options]="{ size: 'sm', iconStart: 'arrow_back', disabled: !selectedPrev() }"
+              (onClick)="goToRound(selectedPrev())" />
+            <daf-button
+              variant="ghost"
+              [attr.title]="selectedNext() ? roundLabel(selectedNext()!.index) : null"
+              [attr.aria-label]="selectedNext() ? roundLabel(selectedNext()!.index) : null"
+              [options]="{ size: 'sm', iconStart: 'arrow_forward', disabled: !selectedNext() }"
+              (onClick)="goToRound(selectedNext())" />
+          </div>
+        }
+
+        @if (r.snap.convergenceOk === false) {
+          <div class="pd-banner pd-banner--warning" role="status">
+            <span class="material-symbols-outlined pd-banner__icon">warning</span>
+            <span>{{ 'PAYROLL.CANDIDATE_SIMULATION.DETAIL.CONVERGENCE_WARNING' | translate }}</span>
+          </div>
+        }
+
+        <!-- 1. Décision de la DAF sur UNE ligne (icône et titre colorés, date à droite), la
+             note en italique dessous si elle existe. -->
+        @if (decision(); as d) {
+          <div class="pd-decision" [class]="'pd-decision pd-decision--' + d.tone" role="status">
+            <span class="material-symbols-outlined pd-decision__icon">{{ d.icon }}</span>
+            <span class="pd-decision__title">{{ d.title }}</span>
+            @if (d.date) { <span class="pd-decision__date">{{ d.date }}</span> }
+          </div>
+          @if (d.note) { <p class="pd-decision__note">« {{ d.note }} »</p> }
+        }
+
+        <!-- 2. L'essentiel : trois chiffres clés — `daf-metric-card` de la lib. -->
+        <div class="pd-figures">
+          @for (c of figureCards(); track c.label) {
+            <daf-metric-card [label]="c.label" [value]="c.value" [delta]="c.delta" [options]="c.options" />
+          }
+        </div>
+
+        <!-- 3. Détail du calcul — `daf-accordion-card` de la lib, REPLIÉ à l'ouverture (le coût
+             employeur mensuel reste lisible dans son sous-titre). Une fois ouvert : UN seul
+             tableau, comme un bulletin, sans doublon. -->
+        @if (breakdown(); as b) {
+          <daf-accordion-card
+            [options]="{
+              title: ('PAYROLL.CANDIDATE_SIMULATION.DETAIL.CALC_TITLE' | translate),
+              subtitle: ('PAYROLL.CANDIDATE_SIMULATION.DETAIL.CALC_SUB' | translate: { amount: b.costMonthly }),
+              icon: 'receipt_long',
+              variant: 'outlined',
+              radius: 'lg'
+            }"
+            [(open)]="calcOpen">
+            <div class="pd-block">
+              @for (line of b.rows; track $index) {
+                <div class="pd-line" [class]="'pd-line pd-line--' + line.kind">
+                  <span class="pd-line__key">{{ line.key }}</span>
+                  <span class="pd-line__val">{{ line.value }}</span>
+                </div>
+              }
+              <span class="pd-hint">{{ b.costAnnual }}</span>
+              @if (b.rules) { <span class="pd-hint">{{ b.rules }}</span> }
+            </div>
+          </daf-accordion-card>
+        }
+      </div>
+    }
+  </ng-template>
+</daf-page>

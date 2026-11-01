@@ -2,16 +2,31 @@
      entité, puis une carte par section ; une carte ouvre sa section dans `daf-page`, sous le
      seul fil d'Ariane "Administration › <section>", qui ramène à l'accueil. -->
 @if (activeTab() === null) {
+  <!-- Titre + entité à gauche ; à droite « Changer de pays » (`daf-select` de la lib), comme
+       /rh/admin — administrateurs seulement, et seulement s'il y a plus d'un pays. -->
   <div class="ps-home-header">
-    <h2 class="ps-home-title">{{ 'PAYROLL.ADMIN_HOME.TITLE' | translate }}</h2>
-    <p class="ps-home-sub">{{ 'PAYROLL.ADMIN_HOME.ENTITY' | translate: { pays: currentPays() } }}</p>
+    <div class="ps-home-header__text">
+      <h2 class="ps-home-title">{{ 'PAYROLL.ADMIN_HOME.TITLE' | translate }}</h2>
+      <p class="ps-home-sub">{{ 'PAYROLL.ADMIN_HOME.ENTITY' | translate: { pays: currentPays() } }}</p>
+    </div>
+    @if (canSwitchPays()) {
+      <div class="ps-home-pays">
+        <daf-select
+          [options]="paysOptions()"
+          [selected]="listPaysId() ? ['' + listPaysId()] : []"
+          [config]="{ label: 'PAYROLL.ADMIN_HOME.SWITCH_PAYS' | translate, searchable: true, fullWidth: true }"
+          (selectedChange)="onHomePays($event)">
+        </daf-select>
+      </div>
+    }
   </div>
 
   <!-- Même recette de cartes de module que /rh/admin : `daf-card` glass cliquables, icône
        pleine colorée par ton, titre seul. -->
   <!-- Aide au survol : `daf-help-popover` de la bibliothèque, révélé par toute la carte
        (souris ou focus clavier, Échap pour fermer) comme `daf-metric-card` — pas de glyphe,
-       la tuile est petite et entièrement cliquable. Titre + description + exemple. -->
+       la tuile est petite et entièrement cliquable. Description seule : pas de titre, il
+       redirait celui de la carte juste au-dessus. -->
   <section class="ps-home-cards">
     @for (card of cards(); track card.key) {
       <div
@@ -35,7 +50,6 @@
           [attr.id]="'admin-help-' + card.key"
           [anchor]="cardAnchor"
           [open]="helpOpen() === card.key"
-          [heading]="card.labelKey | translate"
           [text]="('PAYROLL.ADMIN_HOME.HELP.' + card.helpKey) | translate"
           placement="bottom"
           align="start" />
@@ -58,17 +72,30 @@
   } @else {
     <daf-page-header
       class="ps-breadcrumb-header"
+      [class.ps-breadcrumb-header--actions]="!!headerPaysSection()"
       [title]="currentSectionLabelKey() | translate"
       [breadcrumbs]="breadcrumbs()"
-      (breadcrumbNavigate)="onBreadcrumb($event)" />
+      (breadcrumbNavigate)="onBreadcrumb($event)">
+      <!-- Taux et barèmes, Éléments du bulletin : le choix du pays en haut à droite de la page,
+           sur la ligne du fil d'Ariane ; il pilote la section ouverte (son pays, sa mémoire). -->
+      @if (headerPaysSection(); as sec) {
+        <div pageActions class="ps-header-pays">
+          <daf-select
+            [options]="sec.paysOptions()"
+            [selected]="sec.paysId() ? ['' + sec.paysId()] : []"
+            [config]="{ placeholder: ('PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate), searchable: true, fullWidth: true }"
+            (selectedChange)="sec.selectPays($event[0])" />
+        </div>
+      }
+    </daf-page-header>
   }
 
   @switch (activeTab()) {
 
     <!-- ══════════ Sections d'administration (composants autonomes, dossier admin/) ══════════ -->
     @case ('countries')     { <app-payroll-countries-admin /> }
-    @case ('engine-params') { <app-engine-params-admin /> }
-    @case ('rubriques')     { <app-engine-rubriques-admin /> }
+    @case ('engine-params') { <app-engine-params-admin #engineParamsSection /> }
+    @case ('rubriques')     { <app-engine-rubriques-admin #rubriquesSection /> }
     @case ('benefits')      { <app-benefits-catalogue-admin /> }
     @case ('advance-rules') { <app-advance-rules-admin /> }
     @case ('audit')         { <app-payroll-audit-admin /> }
@@ -76,11 +103,12 @@
     <!-- ══════════════════════════ Onglet "Nouveau jeu" ══════════════════════════ -->
     @case ('create') {
       <div class="ps-create-layout">
-        <!-- En-tête de section comme /rh/admin (titre + aide) ; puis le formulaire en deux
-             daf-card `default` empilées — paramètres généraux, puis charges sociales — et, sous
-             les deux, la note du circuit de validation et le bouton de création. -->
+        <!-- En-tête de section comme /rh/admin (titre + aide) ; puis, dans l'ordre : pays, année
+             et « Partir des règles en vigueur » + barème IRPP ; charges sociales ; motif ;
+             paramètres avancés (repliés) ; circuit de validation et bouton « Enregistrer le
+             brouillon », qui ouvre ensuite la fiche du brouillon. -->
         <app-admin-section-header
-          [title]="'PAYROLL.ADMIN_HOME.CARDS.CREATE' | translate"
+          [title]="'PAYROLL.ADMIN_HOME.NEW_RULES' | translate"
           [subtitle]="'PAYROLL.ADMIN.SUBTITLE' | translate" />
         <daf-card [options]="{ variant: 'default', padding: 'lg', radius: 'xl' }" [formGroup]="newSetForm">
          <div class="ps-form">
@@ -99,59 +127,88 @@
             </daf-form-field>
           </div>
 
-          <div class="field-row">
-            <daf-form-field
-              [options]="{ label: 'PAYROLL.ADMIN.TOLERANCE' | translate, type: 'number', required: true, error: newSetFieldError('convergenceTolerance') }"
-              [value]="newSetForm.get('convergenceTolerance')!.value"
-              (valueChange)="setNewSetValue('convergenceTolerance', num($event))">
-            </daf-form-field>
-            <daf-form-field
-              [options]="{ label: 'PAYROLL.ADMIN.MAX_ITERATIONS' | translate, type: 'number', required: true, error: newSetFieldError('maxConvergenceIterations') }"
-              [value]="newSetForm.get('maxConvergenceIterations')!.value"
-              (valueChange)="setNewSetValue('maxConvergenceIterations', num($event))">
-            </daf-form-field>
-            <daf-form-field
-              [options]="{ label: 'PAYROLL.ADMIN.CALIBRATION_THRESHOLD' | translate, type: 'number', required: true, error: newSetFieldError('calibrationThresholdPct') }"
-              [value]="newSetForm.get('calibrationThresholdPct')!.value"
-              (valueChange)="setNewSetValue('calibrationThresholdPct', num($event))">
-            </daf-form-field>
-          </div>
+          <!-- « Partir des règles en vigueur » : `daf-checkbox` de la lib, coché par défaut —
+               barème et charges du jeu actif recopiés ; décoché, on repart de zéro. -->
+          <daf-checkbox
+            [checked]="copyFromActive()"
+            [options]="{
+              label: newSetActive()
+                ? ('PAYROLL.ADMIN.COPY_ACTIVE' | translate: { version: newSetActive()!.version, year: newSetActive()!.fiscalYear })
+                : ('PAYROLL.ADMIN.COPY_ACTIVE_NONE_LABEL' | translate),
+              hint: newSetActiveLoading()
+                ? ('PAYROLL.COMMON.LOADING' | translate)
+                : newSetActive()
+                  ? ('PAYROLL.ADMIN.COPY_ACTIVE_HINT' | translate)
+                  : ('PAYROLL.ADMIN.COPY_ACTIVE_NONE' | translate),
+              disabled: !newSetActive()
+            }"
+            (checkedChange)="setCopyFromActive($event)" />
 
-          <!-- Barème IRPP : un `daf-form-field` textarea tel quel (plus de console maison),
-               avec sous le champ le badge de validité et le bouton "Reformater". -->
+          <!-- Barème IRPP en tableau : une ligne par tranche — début (calculé : fin de la
+               précédente), « Jusqu'à » (vide = « et plus » pour la dernière) et taux en %.
+               Le JSON envoyé au serveur est reconstruit à chaque saisie (`writeIrppRows`). -->
           <div class="ps-field-block">
-            <daf-form-field
-              [options]="{
-                label: 'PAYROLL.ADMIN.IRPP_BRACKETS' | translate,
-                type: 'textarea',
-                rows: 6,
-                required: true,
-                hint: 'PAYROLL.ADMIN.IRPP_HINT' | translate,
-                placeholder: irppPlaceholder,
-                error: newSetFieldError('irppBrackets')
-              }"
-              [value]="newSetForm.get('irppBrackets')!.value"
-              (valueChange)="setNewSetValue('irppBrackets', ($event ?? '').toString())">
-            </daf-form-field>
-            <div class="ps-inline-actions">
-              <daf-badge
-                [label]="(newSetForm.get('irppBrackets')!.valid ? 'PAYROLL.ADMIN.JSON_VALID' : 'PAYROLL.ADMIN.JSON_INVALID') | translate"
-                [options]="{ variant: newSetForm.get('irppBrackets')!.valid ? 'success' : 'danger', size: 'sm', icon: newSetForm.get('irppBrackets')!.valid ? 'check_circle' : 'error' }">
-              </daf-badge>
+            <div class="ps-section-head">
+              <div class="ps-charges-heading">
+                <daf-section-title [title]="'PAYROLL.ADMIN.IRPP_BRACKETS' | translate" />
+                <p class="editor-hint">{{ 'PAYROLL.ADMIN.IRPP_HINT' | translate }}</p>
+              </div>
               <daf-button
-                [label]="'PAYROLL.ADMIN.REFORMAT' | translate"
-                variant="ghost"
-                [options]="{ size: 'sm', iconStart: 'code', disabled: !isJsonValid(newSetForm.get('irppBrackets')!.value) }"
-                (onClick)="formatIrppJson()">
+                [label]="'PAYROLL.ADMIN.IRPP_ADD' | translate"
+                variant="teal"
+                [options]="{ size: 'sm', iconStart: 'add' }"
+                (onClick)="addIrppRow()">
               </daf-button>
             </div>
+
+            <div class="irpp-table" role="table" [attr.aria-label]="'PAYROLL.ADMIN.IRPP_BRACKETS' | translate">
+              <div class="irpp-row irpp-row--head" role="row">
+                <span role="columnheader">{{ 'PAYROLL.ADMIN.IRPP_COL_FROM' | translate }}</span>
+                <span role="columnheader">{{ 'PAYROLL.ADMIN.IRPP_COL_TO' | translate }}</span>
+                <span role="columnheader">{{ 'PAYROLL.ADMIN.IRPP_COL_RATE' | translate }}</span>
+                <span role="columnheader"></span>
+              </div>
+              @for (row of irppRows(); track $index; let i = $index) {
+                <div class="irpp-row" role="row">
+                  <span class="irpp-from" role="cell">{{ irppLowerText(i) }} {{ newSetDevise() }}</span>
+                  <div role="cell">
+                    @if (isLastIrppRow(i)) {
+                      <span class="irpp-open">{{ 'PAYROLL.ADMIN.IRPP_AND_MORE' | translate }}</span>
+                    } @else {
+                      <daf-form-field
+                        [options]="{ type: 'number', placeholder: '20000', suffixText: newSetDevise(), error: irppCellError(i, 'upper') }"
+                        [value]="row.upper"
+                        (valueChange)="setIrppUpper(i, $event)">
+                      </daf-form-field>
+                    }
+                  </div>
+                  <div role="cell">
+                    <daf-form-field
+                      [options]="{ type: 'number', placeholder: '26', suffixText: '%', error: irppCellError(i, 'rate') }"
+                      [value]="row.ratePct"
+                      (valueChange)="setIrppRate(i, $event)">
+                    </daf-form-field>
+                  </div>
+                  <div role="cell" class="irpp-actions">
+                    @if (irppRows().length > 1) {
+                      <daf-button
+                        variant="ghost"
+                        [attr.title]="'PAYROLL.ADMIN.IRPP_REMOVE' | translate"
+                        [attr.aria-label]="'PAYROLL.ADMIN.IRPP_REMOVE' | translate"
+                        [options]="{ size: 'sm', iconStart: 'delete' }"
+                        (onClick)="removeIrppRow(i)">
+                      </daf-button>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+            <!-- Erreur d'ensemble du barème (vide, tranches incohérentes) — en clair. -->
+            @if (newSetFieldError('irppBrackets'); as err) {
+              <p class="irpp-error" role="alert">{{ err }}</p>
+            }
           </div>
 
-          <daf-form-field
-            [options]="{ label: 'PAYROLL.ADMIN.RATIONALE' | translate, placeholder: 'PAYROLL.ADMIN.RATIONALE_PLACEHOLDER' | translate }"
-            [value]="newSetForm.get('changeRationale')!.value"
-            (valueChange)="setNewSetValue('changeRationale', ($event ?? '').toString())">
-          </daf-form-field>
          </div>
         </daf-card>
 
@@ -254,6 +311,52 @@
          </div>
         </daf-card>
 
+        <!-- Pourquoi ces nouvelles règles : une carte à part, après les charges. -->
+        <daf-card [options]="{ variant: 'default', padding: 'lg', radius: 'xl' }">
+         <div class="ps-form">
+          <daf-form-field
+            [options]="{ label: 'PAYROLL.ADMIN.RATIONALE' | translate, placeholder: 'PAYROLL.ADMIN.RATIONALE_PLACEHOLDER' | translate,
+                         hint: 'PAYROLL.ADMIN.RATIONALE_HINT' | translate }"
+            [value]="newSetForm.get('changeRationale')!.value"
+            (valueChange)="setNewSetValue('changeRationale', ($event ?? '').toString())">
+          </daf-form-field>
+         </div>
+        </daf-card>
+
+        <!-- Paramètres techniques du moteur — repliés (`daf-accordion-card` de la lib) : valeurs
+             par défaut, ou celles des règles en vigueur quand on les recopie. Ouverts d'office
+             si l'un d'eux est en erreur après une tentative de création. -->
+        <daf-accordion-card
+          [options]="{
+            title: ('PAYROLL.ADMIN.ADVANCED_TITLE' | translate),
+            subtitle: ('PAYROLL.ADMIN.ADVANCED_SUBTITLE' | translate),
+            icon: 'settings',
+            variant: 'outlined',
+            radius: 'lg'
+          }"
+          [open]="advancedOpen() || !!newSetFieldError('convergenceTolerance') || !!newSetFieldError('maxConvergenceIterations') || !!newSetFieldError('calibrationThresholdPct')"
+          (openChange)="advancedOpen.set($event)">
+          <div class="ps-form ps-advanced">
+            <div class="field-row">
+              <daf-form-field
+                [options]="{ label: 'PAYROLL.ADMIN.TOLERANCE' | translate, type: 'number', required: true, error: newSetFieldError('convergenceTolerance') }"
+                [value]="newSetForm.get('convergenceTolerance')!.value"
+                (valueChange)="setNewSetValue('convergenceTolerance', num($event))">
+              </daf-form-field>
+              <daf-form-field
+                [options]="{ label: 'PAYROLL.ADMIN.MAX_ITERATIONS' | translate, type: 'number', required: true, error: newSetFieldError('maxConvergenceIterations') }"
+                [value]="newSetForm.get('maxConvergenceIterations')!.value"
+                (valueChange)="setNewSetValue('maxConvergenceIterations', num($event))">
+              </daf-form-field>
+              <daf-form-field
+                [options]="{ label: 'PAYROLL.ADMIN.CALIBRATION_THRESHOLD' | translate, type: 'number', required: true, error: newSetFieldError('calibrationThresholdPct') }"
+                [value]="newSetForm.get('calibrationThresholdPct')!.value"
+                (valueChange)="setNewSetValue('calibrationThresholdPct', num($event))">
+              </daf-form-field>
+            </div>
+          </div>
+        </daf-accordion-card>
+
         <!-- Note sur le circuit de validation : une `daf-card` de la bibliothèque (icône +
              titre + description) au lieu de l'encadré maison. -->
         <daf-card [options]="{
@@ -268,6 +371,12 @@
           <div class="admin-error-banner" role="alert">{{ newSetError() }}</div>
         }
         <div class="form-actions">
+          <daf-button
+            [label]="'PAYROLL.ADMIN_HOME.CANCEL' | translate"
+            variant="secondary"
+            [options]="{ disabled: savingNewSet() }"
+            (onClick)="openRulesList()">
+          </daf-button>
           <daf-button
             [label]="(savingNewSet() ? 'PAYROLL.ADMIN.SUBMITTING' : 'PAYROLL.ADMIN.SUBMIT') | translate"
             variant="teal"
@@ -380,8 +489,10 @@
                sur toute la largeur dans un bandeau blanc, la recherche + le bouton filtre (PAYS et
                statut) — toujours affichés, même vides : c'est ici que le pays se choisit. -->
           <app-admin-section-header
-            [title]="'PAYROLL.ADMIN_HOME.CARDS.LIST_COUNT' | translate: { count: filteredParamSets().length }"
+            [title]="'PAYROLL.ADMIN_HOME.CARDS.RULES_COUNT' | translate: { count: filteredParamSets().length }"
             [subtitle]="'PAYROLL.PARAMETER_SETS.SUBTITLE' | translate" />
+          <!-- « + Nouvelles règles » projeté DANS la barre, à droite, comme le bouton
+               « Nouveau » des sections de /rh/admin. -->
           <div class="ps-toolbar">
             <daf-search-toolbar
               [card]="false"
@@ -393,6 +504,13 @@
               [filterConfig]="filterConfig()"
               (filterApply)="applyFilters($event)"
               [table]="setTable() ?? null">
+              @if (canCreate()) {
+                <daf-button
+                  [label]="'PAYROLL.ADMIN_HOME.NEW_RULES_BTN' | translate"
+                  variant="teal"
+                  [options]="{ iconStart: 'add' }"
+                  (onClick)="openCreate()" />
+              }
             </daf-search-toolbar>
           </div>
 

@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } 
 import { ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { contractTypeLabel } from '../../core/hr-profile.service';
 import {
   CohortAggregateResponse,
   PayrollApiService,
@@ -15,9 +16,9 @@ import {
   PageHeaderComponent,
   FormFieldComponent,
   SelectComponent,
+  type BreadcrumbItem,
   type SelectOption,
   type MetricDelta,
-  type BreadcrumbItem,
 } from '@khalilrebhiitec/daf360';
 
 @Component({
@@ -37,6 +38,12 @@ export class CohortComponent implements OnInit {
   private readonly translate = inject(TranslateService);
 
   /** Même pattern que `simulator`/`admin`/`calibration`. */
+  /** Code de contrat → libellé dans la langue courante. */
+  contractLabel(code: string): string {
+    this.translate.currentLang();
+    return contractTypeLabel(code, this.translate);
+  }
+
   private t(key: string, params?: Record<string, unknown>): string {
     this.translate.currentLang();
     return this.translate.instant(key, params);
@@ -73,8 +80,8 @@ export class CohortComponent implements OnInit {
 
   readonly contractTypeOptions = computed<SelectOption[]>(() => [
     { value: '',    label: this.t('PAYROLL.COHORT.CONTRACT_ALL') },
-    { value: 'CDI', label: 'CDI' },
-    { value: 'CDD', label: 'CDD' },
+    { value: 'CDI', label: this.contractLabel('CDI') },
+    { value: 'CDD', label: this.contractLabel('CDD') },
   ]);
 
   readonly modifierTypeOptions = computed<SelectOption[]>(() => [

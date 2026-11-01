@@ -25,6 +25,18 @@ export interface UpsertEmployeePayrollConfigRequest {
   reason: string;
 }
 
+/** Une version enregistrée de la configuration (`GET …/{id}/history`, plus récente d'abord). */
+export interface EmployeePayrollConfigHistoryDto {
+  paysId: number | null;
+  contractType: string;
+  selectedBenefitCodes: string[];
+  currentGrossSalary: number | null;
+  currentNetSalary: number | null;
+  reason: string | null;
+  changedBy: number | null;
+  changedAt: string;
+}
+
 export interface CalculateNetResponse {
   netInHand: number;
 }
@@ -62,6 +74,11 @@ export class EmployeeConfigService {
 
   upsert(profileUserId: number, req: UpsertEmployeePayrollConfigRequest): Observable<EmployeePayrollConfigDto> {
     return this.http.put<EmployeePayrollConfigDto>(`${this.base}/${profileUserId}`, req);
+  }
+
+  /** Versions enregistrées de la configuration, la plus récente d'abord. */
+  getHistory(profileUserId: number): Observable<EmployeePayrollConfigHistoryDto[]> {
+    return this.http.get<EmployeePayrollConfigHistoryDto[]>(`${this.base}/${profileUserId}/history`);
   }
 
   calculateNet(profileUserId: number, grossSalary: number): Observable<CalculateNetResponse> {

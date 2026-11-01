@@ -17,6 +17,7 @@ import {
 import { rememberAdminState } from './admin-section-state';
 import { PaysNamesService } from '../../../core/pays-names.service';
 
+import { flagDataUri } from '../../../shared/country-flags';
 const CURRENCIES = ['TND', 'EGP', 'EUR', 'USD'];
 
 /**
@@ -203,7 +204,7 @@ export class AdvanceRulesAdminComponent implements OnInit {
   /** Pays sans règle encore — les seuls proposés à l'ajout. */
   readonly freePaysOptions = computed<SelectOption[]>(() => {
     const taken = new Set(this.policies().map(p => p.paysId));
-    return this.pays().filter(p => !taken.has(p.id)).map(p => ({ value: String(p.id), label: this.paysNames.name(p.id, p.frenchLabel) }));
+    return this.pays().filter(p => !taken.has(p.id)).map(p => ({ value: String(p.id), label: this.paysNames.name(p.id, p.frenchLabel), imageUrl: flagDataUri(p.isoCode) }));
   });
 
   readonly stateOptions = computed<SelectOption[]>(() => [

@@ -15,7 +15,7 @@ import {
   PageComponent,
   PageHeaderComponent,
   SelectComponent,
-  StatusBadgeComponent,
+  StatusBadgeComponent,
   type BreadcrumbItem,
   type SelectOption,
 } from '@khalilrebhiitec/daf360';

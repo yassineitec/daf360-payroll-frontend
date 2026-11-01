@@ -43,6 +43,7 @@ import {
   SocialChargeRateDto,
   SavePayrollRubriqueRequest,
   PayrollRubriqueDto,
+  BenefitCatalogueDto,
 } from '../../core/payroll-api.service';
 import { HrProfileService, HrContractType } from '../../core/hr-profile.service';
 import { NotificationService } from '../../core/notification.service';
@@ -68,10 +69,15 @@ import { PayrollCountriesAdminComponent } from './admin/payroll-countries-admin.
 import { dayRange, distinctSorted, inDayRange, pickValue, rangeSeed } from '../../shared/filter-utils';
 import { PaysNamesService } from '../../core/pays-names.service';
 
+import { flagDataUri } from '../../shared/country-flags';
 /** Pastille de statut d'un jeu dans le tableau. */
 const SET_STATUS_VARIANT: Record<string, BadgeVariant> = {
   DRAFT: 'warning', PENDING_FINANCE: 'info', ACTIVE: 'success', ARCHIVED: 'neutral',
 };
+
+/** Une tranche du barème IRPP telle que saisie : sa limite haute (`null` = « et plus », la
+ *  dernière) et son taux en %. Le début d'une tranche est la fin de la précédente. */
+interface IrppRow { upper: number | null; ratePct: number | null; }
 
 /** Étapes du circuit de validation : soumission, approbation Directeur Pays, approbation DAF. */
 type WorkflowStep = 'submit' | 'hr' | 'finance';
@@ -105,12 +111,16 @@ interface AdminCard {
  * « Historique et contrôle ». Leurs sections restent dans le code ; sans carte, un lien
  * `?tab=…` vers l'une d'elles ramène à l'accueil. Décommenter la ligne pour la réafficher.
  */
+/**
+ * « Créer » et « Valider » les règles de paie ne font plus qu'UNE carte, « Règles de paie »
+ * (comme /rh/admin : une carte par sujet, la création se fait dans la section). La création
+ * reste la section `create`, ouverte par « + Nouvelles règles » de la liste — sans carte.
+ */
 const CARDS: AdminCard[] = [
-  { key: 'create',          labelKey: 'PAYROLL.ADMIN_HOME.CARDS.CREATE',           icon: 'add_circle',      tone: 'teal',      permissions: PAYROLL_CREATE_PARAMSET_PERMISSIONS, helpKey: 'CREATE' },
-  { key: 'list',            labelKey: 'PAYROLL.ADMIN_HOME.CARDS.LIST',             icon: 'list_alt',        tone: 'secondary', permissions: [], helpKey: 'LIST' },
-  // { key: 'countries',       labelKey: 'PAYROLL.ADMIN_HOME.CARDS.COUNTRIES',        icon: 'public',          tone: 'primary',   permissions: PAYROLL_COUNTRIES_PERMISSIONS, helpKey: 'COUNTRIES' },
-  // { key: 'engine-params',   labelKey: 'PAYROLL.ADMIN_HOME.CARDS.ENGINE_PARAMS',    icon: 'tune',            tone: 'warning',   permissions: PAYROLL_ENGINE_PARAMS_PERMISSIONS, helpKey: 'ENGINE_PARAMS' },
-  // { key: 'rubriques',       labelKey: 'PAYROLL.ADMIN_HOME.CARDS.RUBRIQUES',        icon: 'receipt_long',    tone: 'primary',   permissions: PAYROLL_ENGINE_RUBRIQUES_PERMISSIONS, helpKey: 'RUBRIQUES' },
+  { key: 'list',            labelKey: 'PAYROLL.ADMIN_HOME.CARDS.RULES',            icon: 'gavel',           tone: 'secondary', permissions: [], helpKey: 'RULES' },
+  { key: 'countries',       labelKey: 'PAYROLL.ADMIN_HOME.CARDS.COUNTRIES',        icon: 'public',          tone: 'primary',   permissions: PAYROLL_COUNTRIES_PERMISSIONS, helpKey: 'COUNTRIES' },
+  { key: 'engine-params',   labelKey: 'PAYROLL.ADMIN_HOME.CARDS.ENGINE_PARAMS',    icon: 'tune',            tone: 'warning',   permissions: PAYROLL_ENGINE_PARAMS_PERMISSIONS, helpKey: 'ENGINE_PARAMS' },
+  { key: 'rubriques',       labelKey: 'PAYROLL.ADMIN_HOME.CARDS.RUBRIQUES',        icon: 'receipt_long',    tone: 'primary',   permissions: PAYROLL_ENGINE_RUBRIQUES_PERMISSIONS, helpKey: 'RUBRIQUES' },
   // { key: 'benefits',        labelKey: 'PAYROLL.ADMIN_HOME.CARDS.BENEFITS',         icon: 'redeem',          tone: 'teal',      permissions: PAYROLL_BENEFITS_PERMISSIONS, helpKey: 'BENEFITS' },
   { key: 'advance-rules',   labelKey: 'PAYROLL.ADMIN_HOME.CARDS.ADVANCE_RULES',    icon: 'request_quote',   tone: 'warning',   permissions: PAYROLL_SALARY_ADVANCES_PERMISSIONS, helpKey: 'ADVANCE_RULES' },
   { key: 'employee-config', labelKey: 'PAYROLL.ADMIN_HOME.CARDS.EMPLOYEE_CONFIG',  icon: 'manage_accounts', tone: 'teal',      permissions: PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS, route: '/payroll/employee-config', helpKey: 'EMPLOYEE_CONFIG' },
@@ -172,6 +182,13 @@ export class ParameterSetsComponent implements OnInit {
   /** Liste des jeux de paramètres — passée au `[table]` de sa barre : réinitialiser + choix des
    *  colonnes à droite de Filtres. Les tableaux du détail / de l'édition n'ont pas de barre. */
   readonly setTable = viewChild<DataTableComponent>('setTable');
+  /** Sections dont le choix du pays est rendu dans l'en-tête de la page, sur la ligne du fil d'Ariane. */
+  readonly rubriquesSection    = viewChild<EngineRubriquesAdminComponent>('rubriquesSection');
+  readonly engineParamsSection = viewChild<EngineParamsAdminComponent>('engineParamsSection');
+  readonly headerPaysSection = computed<EngineRubriquesAdminComponent | EngineParamsAdminComponent | null>(() =>
+    this.activeTab() === 'rubriques' ? this.rubriquesSection() ?? null
+      : this.activeTab() === 'engine-params' ? this.engineParamsSection() ?? null
+      : null);
 
   private readonly api          = inject(PayrollApiService);
   private readonly hr           = inject(HrProfileService);
@@ -204,24 +221,46 @@ export class ParameterSetsComponent implements OnInit {
   readonly cards = computed(() =>
     CARDS.filter(c => !c.permissions.length || c.permissions.some(code => this.userStore.hasPermission(code))));
 
-  readonly activeTab = sectionParam(() =>
-    this.cards().filter(c => !c.route).map(c => c.key as ParamSetsSection));
+  /** Sections ouvrables : celles des cartes, plus `create` (sans carte) pour qui peut créer. */
+  readonly activeTab = sectionParam(() => [
+    ...this.cards().filter(c => !c.route).map(c => c.key as ParamSetsSection),
+    ...(this.canCreate() ? ['create' as const] : []),
+  ]);
 
   readonly toneIcon = (tone: keyof typeof TONE_ICON) => TONE_ICON[tone];
 
   /** Carte dont l'aide est ouverte (survol ou focus), une seule à la fois. */
   readonly helpOpen = signal<string | null>(null);
 
-  /** Entité de l'utilisateur, sous le titre de l'accueil — même règle que /rh/admin : le
-   *  libellé de son pays, sinon son code ISO. */
+  /** Entité affichée sous le titre de l'accueil — même règle que /rh/admin : le pays choisi
+   *  (sinon celui de l'utilisateur), en libellé, sinon son code ISO. */
   readonly currentPays = computed(() => {
     const user = this.userStore.currentUser();
-    const pays = this.paysList().find(p => p.id === user?.paysId);
+    const id = this.listPaysId() ?? user?.paysId;
+    const pays = this.paysList().find(p => p.id === id);
     return pays ? this.paysNames.name(pays.id, pays.frenchLabel) : (user?.isoCode ?? '—');
   });
 
+  /** « Changer de pays » de l'accueil, comme /rh/admin : réservé aux administrateurs (qui
+   *  gèrent plusieurs pays), et seulement s'il y a plus d'un pays. */
+  readonly canSwitchPays = computed(() =>
+    this.paysList().length > 1
+    && (this.userStore.isAdmin() || this.userStore.hasPermission('PAYROLL_SUPER_ADMIN')));
+
+  /** Pays choisi sur l'accueil : il vaut pour toute l'administration (liste des règles,
+   *  formulaire de création) et reste dans l'adresse (`?pays=`). */
+  onHomePays(selected: string[]): void {
+    const id = selected[0] ? +selected[0] : null;
+    if (!id || id === this.listPaysId()) return;
+    this.setListPays(id);
+    this.load();
+    this.newSetForm.get('paysId')!.setValue(id);
+  }
+
   readonly currentSectionLabelKey = computed(() =>
-    CARDS.find(c => c.key === this.activeTab())?.labelKey ?? '');
+    this.activeTab() === 'create'
+      ? 'PAYROLL.ADMIN_HOME.NEW_RULES'
+      : CARDS.find(c => c.key === this.activeTab())?.labelKey ?? '');
   openCard(card: AdminCard): void {
     if (card.route) this.router.navigateByUrl(card.route);
     else this.activeTab.set(card.key as ParamSetsSection);
@@ -238,7 +277,7 @@ export class ParameterSetsComponent implements OnInit {
   //    engine-run/engine-results — liste chargée une fois.
   private readonly paysList = signal<PaysDto[]>([]);
   readonly paysOptions = computed<SelectOption[]>(() =>
-    this.paysList().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})` })),
+    this.paysList().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})`, imageUrl: flagDataUri(p.isoCode) })),
   );
 
   ngOnInit(): void {
@@ -254,7 +293,10 @@ export class ParameterSetsComponent implements OnInit {
     // Types de contrat du formulaire de création : chargés pour le pays choisi dans CE
     // formulaire, à chaque changement (auparavant seulement via « Valider les règles »).
     this.newSetForm.get('paysId')!.valueChanges.pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(paysId => this.loadNewSetContractTypes(paysId ?? null));
+      .subscribe(paysId => {
+        this.loadNewSetContractTypes(paysId ?? null);
+        this.loadNewSetActive(paysId ?? null);
+      });
 
     // `?set=` = jeu ouvert en détail. Suivi en continu, pour que le bouton Précédent du
     // navigateur ramène de la page détail à la grille de cartes.
@@ -267,6 +309,10 @@ export class ParameterSetsComponent implements OnInit {
     if (initialPays) {
       this.setListPays(initialPays);
       this.load();
+      // Formulaire de création pré-rempli avec le même pays (avant : vide, alors que
+      // l'adresse le portait déjà) — déclenche le chargement de ses contrats et des règles
+      // en vigueur à copier.
+      this.newSetForm.get('paysId')!.setValue(initialPays);
     }
   }
 
@@ -361,6 +407,14 @@ export class ParameterSetsComponent implements OnInit {
    *  `onBreadcrumb` (le dernier maillon, la page courante, n'est jamais cliquable). */
   readonly breadcrumbs = computed((): BreadcrumbItem[] => {
     const ps = this.detailSet();
+    // Création : « Administration › Règles de paie › Nouvelles règles ».
+    if (this.activeTab() === 'create') {
+      return [
+        { label: this.t('PAYROLL.ADMIN_HOME.TITLE') },
+        { label: this.t('PAYROLL.ADMIN_HOME.CARDS.RULES') },
+        { label: this.t('PAYROLL.ADMIN_HOME.NEW_RULES') },
+      ];
+    }
     return [
       { label: this.t('PAYROLL.ADMIN_HOME.TITLE') },
       { label: this.t(this.currentSectionLabelKey()) },
@@ -368,11 +422,24 @@ export class ParameterSetsComponent implements OnInit {
     ];
   });
 
-  /** 1er maillon → accueil en cartes ; 2e (sur la page détail) → grille des jeux. */
+  /** 1er maillon → accueil en cartes ; 2e → liste des règles (depuis la page détail d'un jeu
+   *  ou depuis la création). */
   onBreadcrumb(crumb: BreadcrumbItem): void {
     const index = this.breadcrumbs().findIndex(c => c.label === crumb.label);
     if (index === 0) this.goHome();
-    else if (index === 1) this.closeSet();
+    else if (index === 1) this.activeTab() === 'create' ? this.openRulesList() : this.closeSet();
+  }
+
+  /** « + Nouvelles règles » de la liste → la section de création. */
+  openCreate(): void {
+    this.activeTab.set('create');
+  }
+
+  /** Retour à la liste des règles (bouton « Annuler » de la création, fil d'Ariane). */
+  openRulesList(): void {
+    this.router.navigate([], {
+      relativeTo: this.route, queryParams: { tab: 'list', set: null }, queryParamsHandling: 'merge',
+    });
   }
 
   /** Même pattern que les autres pages payroll. */
@@ -650,8 +717,13 @@ export class ParameterSetsComponent implements OnInit {
   /** Types de contrat du pays choisi DANS CE FORMULAIRE (et non celui de « Valider les
    *  règles de paie ») — rechargés à chaque changement de pays. */
   readonly newSetContractTypes = signal<HrContractType[]>([]);
-  readonly newSetContractTypeOptions = computed<SelectOption[]>(() =>
-    this.newSetContractTypes().map(ct => ({ value: ct.code, label: ct.code })));
+  /** Contrats RH du pays, plus ceux des charges des règles en vigueur (copiées) — un contrat
+   *  tarifé par le jeu actif reste sélectionnable même si le référentiel RH l'écrit autrement. */
+  readonly newSetContractTypeOptions = computed<SelectOption[]>(() => {
+    const codes = new Set(this.newSetContractTypes().map(ct => ct.code));
+    for (const r of this.newSetActive()?.socialChargeRates ?? []) codes.add(r.contractType);
+    return [...codes].map(code => ({ value: code, label: code }));
+  });
 
   private loadNewSetContractTypes(paysId: number | null): void {
     this.newSetContractTypes.set([]);
@@ -659,25 +731,193 @@ export class ParameterSetsComponent implements OnInit {
     this.hr.getContractTypes(paysId).subscribe(types => {
       if (this.newSetForm.get('paysId')?.value !== paysId) return;   // réponse dépassée
       this.newSetContractTypes.set(types);
-      // Une ligne dont le type n'existe pas dans ce pays prend le premier type proposé.
+      // Une ligne dont le type n'existe pas dans ce pays prend le premier type proposé —
+      // sauf un contrat des règles en vigueur (charge copiée) : il est valable pour ce pays.
       const codes = types.map(t => t.code);
+      const fromActive = new Set((this.newSetActive()?.socialChargeRates ?? []).map(r => r.contractType));
       for (const group of this.newSetRates.controls) {
         const ctrl = group.get('contractType')!;
-        if (codes.length && !codes.includes(ctrl.value)) ctrl.setValue(codes[0]);
+        if (codes.length && !codes.includes(ctrl.value) && !fromActive.has(ctrl.value)) ctrl.setValue(codes[0]);
       }
     });
   }
 
-  addNewSetRate(): void {
+  addNewSetRate(from?: SocialChargeRateDto): void {
     this.newSetRates.push(this.fb.group({
-      contractType:    [this.newSetContractTypes()[0]?.code ?? 'CDI', Validators.required],
-      chargeCode:      ['', Validators.required],
-      chargeLabel:     ['', Validators.required],
-      employeeRate:    [0 as number | null, [Validators.required, Validators.min(0), Validators.max(1)]],
-      employerRate:    [0 as number | null, [Validators.required, Validators.min(0), Validators.max(1)]],
-      baseCalculation: ['GROSS'],
-      capAmount:       [null as number | null, Validators.min(0)],
+      contractType:    [from?.contractType ?? this.newSetContractTypes()[0]?.code ?? 'CDI', Validators.required],
+      chargeCode:      [from?.chargeCode ?? '', Validators.required],
+      chargeLabel:     [from?.chargeLabel ?? '', Validators.required],
+      employeeRate:    [(from?.employeeRate ?? 0) as number | null, [Validators.required, Validators.min(0), Validators.max(1)]],
+      employerRate:    [(from?.employerRate ?? 0) as number | null, [Validators.required, Validators.min(0), Validators.max(1)]],
+      baseCalculation: [from?.baseCalculation ?? 'GROSS'],
+      capAmount:       [(from?.capAmount ?? null) as number | null, Validators.min(0)],
+      // Sans champ à l'écran : gardés tels quels pour une charge copiée des règles en
+      // vigueur (base « Formule »), qui perdrait sinon sa formule à l'enregistrement.
+      formulaEe:       [from?.formulaEe ?? null],
+      formulaEr:       [from?.formulaEr ?? null],
+      evalOrder:       [from?.evalOrder ?? null],
     }));
+  }
+
+  // ── « Partir des règles en vigueur » ────────────────────────────────────────
+  // Coché par défaut : le barème IRPP et les charges sociales du jeu ACTIF du pays sont
+  // recopiés dans le formulaire — on ne modifie que ce qui change d'une année à l'autre.
+  // Décoché : le formulaire repart de zéro. Les paramètres avancés (tolérance, itérations,
+  // seuil) suivent aussi le jeu actif quand on le copie.
+
+  readonly copyFromActive  = signal(true);
+  /** Jeu actif du pays choisi dans le formulaire ; `null` si le pays n'en a pas. */
+  readonly newSetActive    = signal<ParameterSetDto | null>(null);
+  readonly newSetActiveLoading = signal(false);
+  /** Paramètres avancés (tolérance, itérations, seuil) — repliés par défaut. */
+  readonly advancedOpen    = signal(false);
+
+  private activeSeq = 0;
+  private loadNewSetActive(paysId: number | null): void {
+    const seq = ++this.activeSeq;
+    this.newSetActive.set(null);
+    if (!paysId) { this.newSetActiveLoading.set(false); return; }
+    this.newSetActiveLoading.set(true);
+    this.api.getActiveParameterSet(paysId).subscribe({
+      next: ps => {
+        if (seq !== this.activeSeq) return;   // réponse dépassée (pays changé entre-temps)
+        this.newSetActive.set(ps ?? null);
+        this.newSetActiveLoading.set(false);
+        if (ps && this.copyFromActive()) this.applyActiveToNewSet(ps);
+        else if (!ps) this.clearNewSetRules();
+      },
+      error: () => {
+        if (seq !== this.activeSeq) return;
+        // 404 = aucun jeu actif : rien à copier, le formulaire part de zéro.
+        this.newSetActive.set(null);
+        this.newSetActiveLoading.set(false);
+        this.clearNewSetRules();
+      },
+    });
+  }
+
+  setCopyFromActive(checked: boolean): void {
+    this.copyFromActive.set(checked);
+    const ps = this.newSetActive();
+    if (checked && ps) this.applyActiveToNewSet(ps);
+    else if (!checked) this.clearNewSetRules();
+  }
+
+  /** Recopie barème, charges et paramètres avancés du jeu actif ; l'année proposée est la
+   *  suivante, sauf si l'utilisateur l'a déjà saisie. */
+  private applyActiveToNewSet(ps: ParameterSetDto): void {
+    let brackets = ps.irppBrackets ?? '';
+    try { brackets = JSON.stringify(JSON.parse(brackets), null, 2); } catch { /* gardé tel quel */ }
+    const year = this.newSetForm.get('fiscalYear')!;
+    this.newSetForm.patchValue({
+      irppBrackets:             brackets,
+      convergenceTolerance:     ps.convergenceTolerance,
+      maxConvergenceIterations: ps.maxConvergenceIterations,
+      calibrationThresholdPct:  ps.calibrationThresholdPct,
+      ...(year.dirty ? {} : { fiscalYear: ps.fiscalYear + 1 }),
+    });
+    while (this.newSetRates.length) this.newSetRates.removeAt(0);
+    for (const rate of ps.socialChargeRates ?? []) this.addNewSetRate(rate);
+    this.irppRows.set(this.parseIrppRows(brackets));
+  }
+
+  /** Repartir de zéro : barème et charges vidés (paramètres avancés laissés tels quels). */
+  private clearNewSetRules(): void {
+    this.newSetForm.patchValue({ irppBrackets: '' });
+    while (this.newSetRates.length) this.newSetRates.removeAt(0);
+    this.irppRows.set([{ upper: null, ratePct: null }]);
+  }
+
+  // ── Barème IRPP en tableau (De / Jusqu'à / Taux) ────────────────────────────────
+  // Remplace la saisie JSON. Le contrôle `irppBrackets` reste la source envoyée au serveur
+  // (même JSON qu'avant, même validateur) : chaque saisie dans le tableau le réécrit. Le
+  // début d'une tranche n'est pas saisi — c'est la fin de la précédente (0 pour la
+  // première) —, la dernière tranche n'a pas de limite (« et plus »).
+
+  readonly irppRows = signal<IrppRow[]>([{ upper: null, ratePct: null }]);
+
+  /** JSON du serveur (`lower`/`upper`/`rate`, ou `min`/`max`) → lignes du tableau. */
+  private parseIrppRows(raw: string): IrppRow[] {
+    try {
+      const list = JSON.parse(raw) as Record<string, unknown>[];
+      if (!Array.isArray(list) || !list.length) return [{ upper: null, ratePct: null }];
+      const rows = [...list]
+        .sort((a, b) => Number(a?.['lower'] ?? a?.['min'] ?? 0) - Number(b?.['lower'] ?? b?.['min'] ?? 0))
+        .map(b => {
+          const upper = b && 'upper' in b ? b['upper'] : b?.['max'];
+          const rate = b?.['rate'];
+          return {
+            upper: typeof upper === 'number' ? upper : null,
+            ratePct: typeof rate === 'number' ? Math.round(rate * 1e6) / 1e4 : null,
+          };
+        });
+      rows[rows.length - 1] = { ...rows[rows.length - 1], upper: null };
+      return rows;
+    } catch {
+      return [{ upper: null, ratePct: null }];
+    }
+  }
+
+  /** Début de la tranche `i` : fin de la précédente, 0 pour la première. */
+  irppLower(i: number): number {
+    return i === 0 ? 0 : (this.irppRows()[i - 1]?.upper ?? 0);
+  }
+
+  isLastIrppRow(i: number): boolean {
+    return i === this.irppRows().length - 1;
+  }
+
+  /** Montant de début de tranche, formaté (« 5 000 »). */
+  irppLowerText(i: number): string {
+    const locale = this.translate.currentLang() === 'en' ? 'en-GB' : 'fr-FR';
+    return new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(this.irppLower(i));
+  }
+
+  /** Lignes → JSON du contrôle, au format lu par le moteur. */
+  private writeIrppRows(rows: IrppRow[]): void {
+    this.irppRows.set(rows);
+    const brackets = rows.map((r, i) => ({
+      lower: i === 0 ? 0 : rows[i - 1].upper,
+      upper: i === rows.length - 1 ? null : r.upper,
+      rate:  r.ratePct == null ? null : Math.round(r.ratePct * 1e4) / 1e6,
+    }));
+    this.setNewSetValue('irppBrackets', JSON.stringify(brackets, null, 2));
+  }
+
+  setIrppUpper(i: number, value: unknown): void {
+    this.writeIrppRows(this.irppRows().map((r, j) => (j === i ? { ...r, upper: this.num(value) } : r)));
+  }
+
+  setIrppRate(i: number, value: unknown): void {
+    this.writeIrppRows(this.irppRows().map((r, j) => (j === i ? { ...r, ratePct: this.num(value) } : r)));
+  }
+
+  /** Nouvelle tranche, insérée AVANT la dernière (qui reste « et plus »). */
+  addIrppRow(): void {
+    const rows = [...this.irppRows()];
+    rows.splice(Math.max(0, rows.length - 1), 0, { upper: null, ratePct: null });
+    this.writeIrppRows(rows);
+  }
+
+  removeIrppRow(i: number): void {
+    const rows = this.irppRows().filter((_, j) => j !== i);
+    this.writeIrppRows(rows.length ? rows : [{ upper: null, ratePct: null }]);
+  }
+
+  /** Erreur d'un champ du tableau — après une saisie dans le barème ou une tentative. */
+  irppCellError(i: number, field: 'upper' | 'rate'): string | undefined {
+    const ctrl = this.newSetForm.get('irppBrackets')!;
+    if (!(ctrl.dirty || this.newSetSubmitted())) return undefined;
+    const r = this.irppRows()[i];
+    if (field === 'rate') {
+      if (r.ratePct == null) return this.t('PAYROLL.ADMIN.ERR.REQUIRED');
+      if (r.ratePct < 0) return this.t('PAYROLL.ADMIN.ERR.IRPP.NEGATIVE');
+      return undefined;
+    }
+    if (this.isLastIrppRow(i)) return undefined;
+    if (r.upper == null) return this.t('PAYROLL.ADMIN.ERR.REQUIRED');
+    if (r.upper <= this.irppLower(i)) return this.t('PAYROLL.ADMIN.ERR.IRPP.UPPER_ROW', { lower: this.irppLowerText(i) });
+    return undefined;
   }
 
   removeNewSetRate(i: number): void { this.newSetRates.removeAt(i); }
@@ -736,6 +976,18 @@ export class ParameterSetsComponent implements OnInit {
     this.savingNewSet.set(true);
 
     const raw = this.newSetForm.getRawValue();
+    // Les champs de formule vides ne sont pas envoyés (charges saisies à la main).
+    const rates = (raw.socialChargeRates as Record<string, unknown>[]).map(r => Object.fromEntries(
+      Object.entries(r).filter(([k, v]) => !(['formulaEe', 'formulaEr', 'evalOrder'].includes(k) && v == null))));
+    // « Partir des règles en vigueur » : avantages en nature et rubriques du jeu actif repris
+    // aussi (sans écran ici) — le serveur ne les recopie pas lui-même, et un nouveau jeu sans
+    // eux ferait disparaître les avantages du simulateur une fois activé. Ids retirés : ce
+    // sont de nouvelles lignes du nouveau jeu.
+    const active = this.copyFromActive() ? this.newSetActive() : null;
+    const benefits = (active?.benefits ?? []).map(({ id: _id, ...b }) => b);
+    const rubriques = active
+      ? active.rubriques.map(({ id: _id, createdAt: _c, ...r }) => r as SavePayrollRubriqueRequest)
+      : undefined;
 
     this.api.createParameterSet({
       paysId:                   raw.paysId!,
@@ -745,8 +997,9 @@ export class ParameterSetsComponent implements OnInit {
       maxConvergenceIterations: raw.maxConvergenceIterations!,
       calibrationThresholdPct:  raw.calibrationThresholdPct!,
       changeRationale:          raw.changeRationale!,
-      socialChargeRates:        raw.socialChargeRates as any,
-      benefits:                 [],
+      socialChargeRates:        rates as unknown as SocialChargeRateDto[],
+      benefits:                 benefits as BenefitCatalogueDto[],
+      ...(rubriques ? { rubriques: rubriques as unknown as PayrollRubriqueDto[] } : {}),
     } as Partial<ParameterSetDto>).subscribe({
       next: ps => {
         const n = ps.socialChargeRates?.length ?? 0;
@@ -757,17 +1010,29 @@ export class ParameterSetsComponent implements OnInit {
         );
         this.savingNewSet.set(false);
         this.newSetSubmitted.set(false);
+        this.copyFromActive.set(true);
+        this.irppRows.set([{ upper: null, ratePct: null }]);
         this.newSetForm.reset({
           paysId: null, fiscalYear: new Date().getFullYear(), irppBrackets: '',
           convergenceTolerance: 0.01, maxConvergenceIterations: 50, calibrationThresholdPct: 1.00,
         });
         while (this.newSetRates.length) this.newSetRates.removeAt(0);
 
-        // Bascule vers l'onglet liste, filtrée sur le pays du jeu qu'on vient de créer —
-        // même confort que l'ancien panneau, qui l'ajoutait directement à la liste affichée.
-        this.setListPays(ps.paysId);
-        this.activeTab.set('list');
+        // Ouvre directement la fiche du brouillon créé (avec son « Soumettre pour
+        // validation »), au lieu de laisser un formulaire vidé. La liste est rechargée AVANT
+        // la navigation : `loading` reste vrai jusqu'à son arrivée, sinon le `?set=` encore
+        // inconnu de la liste ramènerait à la grille (`syncSelected`).
+        this.listPaysId.set(ps.paysId);
+        this.filterForm.get('paysId')!.setValue(ps.paysId);
         this.load();
+        this.detailTab.set('charges');
+        this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { tab: 'list', set: ps.id, pays: ps.paysId },
+          queryParamsHandling: 'merge',
+        });
+        // Formulaire prêt pour une prochaine création, sur le même pays.
+        this.newSetForm.get('paysId')!.setValue(ps.paysId);
       },
       error: err => {
         // Le serveur renvoie un ProblemDetail : la cause lisible est dans `detail`.

@@ -15,6 +15,7 @@ import { rememberAdminState } from './admin-section-state';
 import { UserStore } from '../../../core/user.store';
 import { PaysNamesService } from '../../../core/pays-names.service';
 
+import { flagDataUri } from '../../../shared/country-flags';
 /**
  * Section « Journal des modifications » de l'administration paie : qui a changé la
  * configuration de paie d'un collaborateur, et chaque changement de statut d'une avance,
@@ -114,7 +115,7 @@ export class PayrollAuditAdminComponent implements OnInit {
   }
 
   readonly paysOptions = computed<SelectOption[]>(() =>
-    this.pays().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})` })));
+    this.pays().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})`, imageUrl: flagDataUri(p.isoCode) })));
 
   selectPays(raw: string | undefined): void {
     const id = raw ? Number(raw) : null;
