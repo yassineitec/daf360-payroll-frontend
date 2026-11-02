@@ -511,6 +511,10 @@ export class SalaryAdvancesComponent implements OnInit {
         icon: 'payments',
         body: this.detailTpl,
         size: 'md',
+        minWidth: '360px',
+        minHeight: '260px',
+        resizable: true,
+        maximizable: true,
         buttons: [{ label: this.translate.instant('PAYROLL.SALARY_ADVANCES.CLOSE'), variant: 'secondary', action: r => r.close() }],
       });
     });
@@ -529,6 +533,10 @@ export class SalaryAdvancesComponent implements OnInit {
       icon: 'account_balance',
       body: this.payoutTpl,
       size: 'md',
+      minWidth: '360px',
+      minHeight: '260px',
+      resizable: true,
+      maximizable: true,
       closeOnBackdrop: false,
       buttons: [
         { label: t('PAYROLL.SALARY_ADVANCES.CANCEL'), variant: 'secondary', action: r => r.close() },
@@ -597,6 +605,10 @@ export class SalaryAdvancesComponent implements OnInit {
       title: t(kind === 'skip' ? 'PAYROLL.SALARY_ADVANCES.ACTIONS.SKIP' : 'PAYROLL.SALARY_ADVANCES.ACTIONS.WAIVE'),
       body: this.noteTpl,
       size: 'md',
+      minWidth: '360px',
+      minHeight: '260px',
+      resizable: true,
+      maximizable: true,
       closeOnBackdrop: false,
       buttons: [
         { label: t('PAYROLL.SALARY_ADVANCES.CANCEL'), variant: 'secondary', action: r => r.close() },

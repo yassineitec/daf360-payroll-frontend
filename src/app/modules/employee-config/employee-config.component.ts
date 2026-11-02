@@ -723,6 +723,10 @@ export class EmployeeConfigComponent implements OnInit {
       title: this.t('PAYROLL.EMPLOYEE_CONFIG.ADD_BONUS'),
       icon: 'redeem',
       size: 'md',
+      minWidth: '360px',
+      minHeight: '260px',
+      resizable: true,
+      maximizable: true,
       closeOnBackdrop: false,
       body: tpl,
       buttons: [
