@@ -104,7 +104,10 @@
           }
         },
         "test": {
-          "builder": "@angular/build:unit-test"
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "buildTarget": "daf360-payroll-frontend:esbuild:development"
+          }
         }
       }
     }

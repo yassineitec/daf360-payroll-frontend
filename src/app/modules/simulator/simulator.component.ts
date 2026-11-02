@@ -22,7 +22,7 @@ import {
   PayrollRubriqueDto,
   parseRubriquesApplied,
 } from '../../core/payroll-api.service';
-import { HrRefApiService, ConfigurableListValueDto } from '../../core/hr-ref-api.service';
+import { HrRefApiService, RefDataItemDto } from '../../core/hr-ref-api.service';
 import { UserStore } from '../../core/user.store';
 import { NotificationService } from '../../core/notification.service';
 import { readBlobError, saveBlob } from '../../shared/blob-download';
@@ -328,9 +328,9 @@ export class SimulatorComponent implements OnDestroy {
   /** `GET /api/payroll/ref/pays` — the payroll service's synced country reference. */
   readonly paysList    = signal<PaysDto[]>([]);
   /** `GET /api/hr/lists/GRADE` — RH's configurable list, global + country values. */
-  readonly grades      = signal<ConfigurableListValueDto[]>([]);
+  readonly grades      = signal<RefDataItemDto[]>([]);
   /** `GET /api/hr/lists/DISCIPLINE` — same list mechanism. */
-  readonly disciplines = signal<ConfigurableListValueDto[]>([]);
+  readonly disciplines = signal<RefDataItemDto[]>([]);
   /** `GET /api/payroll/parameter-sets/active` — rates, benefits and the IRPP scale. */
   readonly activePs    = signal<ParameterSetDto | null>(null);
   readonly psState     = signal<ParameterSetState>('IDLE');
@@ -1525,8 +1525,8 @@ export class SimulatorComponent implements OnDestroy {
   private loadInitialReferences(): void {
     forkJoin({
       pays:        this.api.listPays().pipe(catchError(() => of([] as PaysDto[]))),
-      grades:      this.hrRef.listGrades().pipe(catchError(() => of([] as ConfigurableListValueDto[]))),
-      disciplines: this.hrRef.listDisciplines().pipe(catchError(() => of([] as ConfigurableListValueDto[]))),
+      grades:      this.hrRef.listGrades().pipe(catchError(() => of([] as RefDataItemDto[]))),
+      disciplines: this.hrRef.listDisciplines().pipe(catchError(() => of([] as RefDataItemDto[]))),
     }).pipe(takeUntil(this.destroy$))
       .subscribe(({ pays, grades, disciplines }) => {
         this.paysList.set(pays);
@@ -1539,9 +1539,9 @@ export class SimulatorComponent implements OnDestroy {
   private loadGradesAndDisciplines(paysId?: number): void {
     forkJoin({
       grades:      this.hrRef.listGrades(paysId)
-                       .pipe(catchError(() => of([] as ConfigurableListValueDto[]))),
+                       .pipe(catchError(() => of([] as RefDataItemDto[]))),
       disciplines: this.hrRef.listDisciplines(paysId)
-                       .pipe(catchError(() => of([] as ConfigurableListValueDto[]))),
+                       .pipe(catchError(() => of([] as RefDataItemDto[]))),
     }).pipe(takeUntil(this.destroy$))
       .subscribe(({ grades, disciplines }) => {
         this.grades.set(grades);
@@ -1563,9 +1563,9 @@ export class SimulatorComponent implements OnDestroy {
     forkJoin({
       ps: this.api.getActiveParameterSet(paysId).pipe(catchError(() => of(null))),
       grades: this.hrRef.listGrades(paysId)
-                  .pipe(catchError(() => of([] as ConfigurableListValueDto[]))),
+                  .pipe(catchError(() => of([] as RefDataItemDto[]))),
       disciplines: this.hrRef.listDisciplines(paysId)
-                  .pipe(catchError(() => of([] as ConfigurableListValueDto[]))),
+                  .pipe(catchError(() => of([] as RefDataItemDto[]))),
     }).pipe(takeUntil(this.destroy$))
       .subscribe(({ ps, grades, disciplines }) => {
         this.activePs.set(ps);

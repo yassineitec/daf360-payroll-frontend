@@ -333,6 +333,9 @@ export interface PayrollCountryDto {
   forexApiSources: string | null;
   active: boolean;
   createdAt: string;
+  eurRate: number | null;
+  usdRate: number | null;
+  chfRate: number | null;
 }
 
 /** Corps de `POST /admin/countries` et `PUT /admin/countries/{id}` (`paysId` ignoré au PUT). */
@@ -342,6 +345,9 @@ export interface SavePayrollCountryRequest {
   fiscalYearStartMonth: number;
   forexApiSources: string | null;
   active: boolean;
+  eurRate: number | null;
+  usdRate: number | null;
+  chfRate: number | null;
 }
 
 /** Une ligne du journal des modifications de la paie (`GET /admin/audit`). */

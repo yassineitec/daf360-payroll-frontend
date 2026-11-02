@@ -103,12 +103,42 @@ import { flagDataUri } from '../../../shared/country-flags';
               [config]="{ label: ('PAYROLL.ADMIN_HOME.COUNTRIES.COL_PAYS' | translate), required: true, searchable: true, fullWidth: true }"
               (selectedChange)="pickPays($event[0])" />
           }
+          @if (editing() === null) {
+            <daf-form-field
+              [value]="form().currencyCode"
+              (valueChange)="patch({ currencyCode: text($event).toUpperCase() })"
+              [options]="{
+                label: ('PAYROLL.ADMIN_HOME.COUNTRIES.COL_CURRENCY' | translate), placeholder: 'TND', required: true, fullWidth: true,
+                hint: ('PAYROLL.ADMIN_HOME.COUNTRIES.CURRENCY_HINT' | translate)
+              }" />
+          } @else {
+            <daf-form-field
+              [value]="form().currencyCode"
+              [options]="{
+                label: ('PAYROLL.ADMIN_HOME.COUNTRIES.COL_CURRENCY' | translate), type: 'text', readonly: true, fullWidth: true,
+                hint: ('PAYROLL.ADMIN_HOME.COUNTRIES.CURRENCY_MANAGED_ELSEWHERE' | translate)
+              }" />
+          }
           <daf-form-field
-            [value]="form().currencyCode"
-            (valueChange)="patch({ currencyCode: text($event).toUpperCase() })"
+            [value]="form().eurRate"
+            (valueChange)="patch({ eurRate: numOrNull($event) })"
             [options]="{
-              label: ('PAYROLL.ADMIN_HOME.COUNTRIES.COL_CURRENCY' | translate), placeholder: 'TND', required: true, fullWidth: true,
-              hint: ('PAYROLL.ADMIN_HOME.COUNTRIES.CURRENCY_HINT' | translate)
+              label: ('PAYROLL.ADMIN_HOME.COUNTRIES.COL_EUR_RATE' | translate), type: 'number', align: 'end', fullWidth: true,
+              hint: ('PAYROLL.ADMIN_HOME.COUNTRIES.EUR_RATE_HINT' | translate)
+            }" />
+          <daf-form-field
+            [value]="form().usdRate"
+            (valueChange)="patch({ usdRate: numOrNull($event) })"
+            [options]="{
+              label: ('PAYROLL.ADMIN_HOME.COUNTRIES.COL_USD_RATE' | translate), type: 'number', align: 'end', fullWidth: true,
+              hint: ('PAYROLL.ADMIN_HOME.COUNTRIES.USD_RATE_HINT' | translate)
+            }" />
+          <daf-form-field
+            [value]="form().chfRate"
+            (valueChange)="patch({ chfRate: numOrNull($event) })"
+            [options]="{
+              label: ('PAYROLL.ADMIN_HOME.COUNTRIES.COL_CHF_RATE' | translate), type: 'number', align: 'end', fullWidth: true,
+              hint: ('PAYROLL.ADMIN_HOME.COUNTRIES.CHF_RATE_HINT' | translate)
             }" />
           <daf-select
             [options]="monthOptions()"
@@ -312,6 +342,13 @@ export class PayrollCountriesAdminComponent implements OnInit {
     return (value ?? '').toString().trim();
   }
 
+  numOrNull(value: unknown): number | null {
+    const s = this.text(value);
+    if (!s) return null;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  }
+
   patch(change: Partial<SavePayrollCountryRequest>): void {
     this.form.update(f => ({ ...f, ...change }));
   }
@@ -327,7 +364,8 @@ export class PayrollCountriesAdminComponent implements OnInit {
     this.editing.set(c);
     this.form.set(c
       ? { paysId: c.paysId, currencyCode: c.currencyCode, fiscalYearStartMonth: c.fiscalYearStartMonth,
-          forexApiSources: c.forexApiSources, active: c.active }
+          forexApiSources: c.forexApiSources, active: c.active,
+          eurRate: c.eurRate, usdRate: c.usdRate, chfRate: c.chfRate }
       : blankCountry());
     this.error.set(null);
     this.modalRef = this.modal.open({
@@ -347,8 +385,12 @@ export class PayrollCountriesAdminComponent implements OnInit {
 
   /** Contrôles du serveur repris ici, pour un message avant l'envoi. */
   private validate(f: SavePayrollCountryRequest): string | null {
-    if (this.editing() === null && !f.paysId) return this.t('PAYROLL.ADMIN_HOME.COUNTRIES.ERR_PAYS');
-    if (!/^[A-Z]{3}$/.test(f.currencyCode)) return this.t('PAYROLL.ADMIN_HOME.COUNTRIES.ERR_CURRENCY');
+    const isCreate = this.editing() === null;
+    if (isCreate && !f.paysId) return this.t('PAYROLL.ADMIN_HOME.COUNTRIES.ERR_PAYS');
+    if (isCreate && !/^[A-Z]{3}$/.test(f.currencyCode)) return this.t('PAYROLL.ADMIN_HOME.COUNTRIES.ERR_CURRENCY');
+    if (f.eurRate != null && f.eurRate <= 0) return this.t('PAYROLL.ADMIN_HOME.COUNTRIES.ERR_EUR_RATE');
+    if (f.usdRate != null && f.usdRate <= 0) return this.t('PAYROLL.ADMIN_HOME.COUNTRIES.ERR_USD_RATE');
+    if (f.chfRate != null && f.chfRate <= 0) return this.t('PAYROLL.ADMIN_HOME.COUNTRIES.ERR_CHF_RATE');
     if (f.forexApiSources) {
       try {
         const parsed = JSON.parse(f.forexApiSources);
@@ -392,7 +434,10 @@ function seedSelect(applied: FilterResult, name: string): string[] {
 }
 
 function blankCountry(): SavePayrollCountryRequest {
-  return { paysId: null, currencyCode: '', fiscalYearStartMonth: 1, forexApiSources: null, active: true };
+  return {
+    paysId: null, currencyCode: '', fiscalYearStartMonth: 1, forexApiSources: null, active: true,
+    eurRate: null, usdRate: null, chfRate: null,
+  };
 }
 
 /** Nombre de sources de change déclarées : `forex_api_sources` est un JSON libre — un

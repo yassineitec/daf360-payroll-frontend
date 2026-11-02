@@ -41,6 +41,9 @@ import { PaysNamesService } from '../../core/pays-names.service';
 
 interface PaysItem { id: number; iso_code: string; french_label: string; }
 
+/** Return shape of `total()` — the summed amount plus whether it relied on a fallback rate. */
+interface TotalResult { value: number; approximate: boolean; }
+
 /**
  * `/payroll/engine-results` — annuaire des collaborateurs (cartes ou tableau). Un clic
  * ouvre `/payroll/engine-results/:employeeId`, l'historique de paie de ce collaborateur
@@ -233,26 +236,35 @@ export class EngineResultsListComponent implements OnInit {
     this.currency.setDisplay(item.id);
   }
 
-  /** Somme d'un montant sur tous les pays, chacun converti dans la devise d'affichage. */
-  private total(field: 'totalGross' | 'totalNet' | 'totalLoadedCost'): number {
+  /** Somme d'un montant sur tous les pays, chacun converti dans la devise d'affichage. Flags the
+   *  result as approximate when any contributing country's currency (or the display target
+   *  itself) needed CurrencyService's fallback rate rather than a live one. */
+  private total(field: 'totalGross' | 'totalNet' | 'totalLoadedCost'): TotalResult {
     const target = this.displayCurrency();
-    return (this.summaries() ?? []).reduce((acc, s) => {
+    let approximate = !!target && this.currency.needsFallbackRate(target);
+    const value = (this.summaries() ?? []).reduce((acc, s) => {
       const v = s[field] ?? 0;
-      return acc + (s.currencyCode && target ? this.currency.convert(v, s.currencyCode, target) : v);
+      if (!s.currencyCode || !target) return acc + v;
+      if (s.currencyCode !== target && this.currency.needsFallbackRate(s.currencyCode)) {
+        approximate = true;
+      }
+      return acc + this.currency.convert(v, s.currencyCode, target);
     }, 0);
+    return { value, approximate };
   }
 
-  private money(amount: number): string {
+  private money(amount: number, approximate = false): string {
     const target = this.displayCurrency();
     const locale = this.translate.getCurrentLang() === 'en' ? 'en-US' : 'fr-FR';
+    const prefix = approximate ? '≈ ' : '';
     if (target) {
       try {
-        return new Intl.NumberFormat(locale, { style: 'currency', currency: target, maximumFractionDigits: 0 })
+        return prefix + new Intl.NumberFormat(locale, { style: 'currency', currency: target, maximumFractionDigits: 0 })
           .format(amount);
       } catch { /* code ISO inconnu d'Intl — repli ci-dessous */ }
     }
     const n = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(amount);
-    return target ? `${n} ${target}` : n;
+    return target ? `${prefix}${n} ${target}` : `${prefix}${n}`;
   }
 
   /** Dernier mois calculé, en toutes lettres (« novembre 2026 ») ; une plage quand les pays
@@ -292,10 +304,10 @@ export class EngineResultsListComponent implements OnInit {
     // Un mois calculé avant cette date garde l'ancienne valeur tant qu'il n'est pas relancé —
     // l'aide de la tuile le dit. Plus de tuile « Échecs de convergence » : toujours 0.
     const s = {
-      totalGross:    this.total('totalGross'),
-      totalNet:      this.total('totalNet'),
+      totalGross:      this.total('totalGross'),
+      totalNet:        this.total('totalNet'),
       totalLoadedCost: this.total('totalLoadedCost'),
-      employeeCount: list.reduce((acc, x) => acc + x.employeeCount, 0),
+      employeeCount:   list.reduce((acc, x) => acc + x.employeeCount, 0),
     };
     const period = this.periodLabel(list);
     const headcount = this.headcount();
@@ -304,10 +316,10 @@ export class EngineResultsListComponent implements OnInit {
     // dédoublonne pas : le nombre est borné à 0 pour ne jamais devenir négatif.
     const missing = headcount != null ? Math.max(0, headcount - s.employeeCount) : null;
     // Retenues = ce qui sépare la masse brute de la masse nette (cotisations salariales + IRPP).
-    const withheld = Math.max(0, s.totalGross - s.totalNet);
-    const withheldPct = s.totalGross > 0
+    const withheld = Math.max(0, s.totalGross.value - s.totalNet.value);
+    const withheldPct = s.totalGross.value > 0
       ? new Intl.NumberFormat(this.translate.currentLang() === 'en' ? 'en-US' : 'fr-FR', { maximumFractionDigits: 1 })
-          .format(withheld / s.totalGross * 100)
+          .format(withheld / s.totalGross.value * 100)
       : null;
     // Info-bulles sans titre : il redirait le libellé de la tuile, juste au-dessus.
     return {
@@ -315,7 +327,7 @@ export class EngineResultsListComponent implements OnInit {
       tiles: [
         {
           label: this.t('PAYROLL.ENGINE_RESULTS.KPI_GROSS_PAYROLL'),
-          value: this.money(s.totalGross),
+          value: this.money(s.totalGross.value, s.totalGross.approximate),
           delta: null,
           options: {
             icon: 'account_balance_wallet',
@@ -324,7 +336,7 @@ export class EngineResultsListComponent implements OnInit {
         },
         {
           label: this.t('PAYROLL.ENGINE_RESULTS.KPI_NET_TOTAL'),
-          value: this.money(s.totalNet),
+          value: this.money(s.totalNet.value, s.totalNet.approximate),
           delta: null,
           options: {
             valueColor: 'text-primary', icon: 'payments',
@@ -344,9 +356,9 @@ export class EngineResultsListComponent implements OnInit {
         },
         {
           label: this.t('PAYROLL.ENGINE_RESULTS.KPI_EMPLOYER_COST'),
-          value: this.money(s.totalLoadedCost),
-          delta: s.totalLoadedCost > s.totalGross
-            ? { value: this.t('PAYROLL.ENGINE_RESULTS.KPI_EMPLOYER_COST_SUB', { amount: this.money(s.totalLoadedCost - s.totalGross) }), direction: 'neutral' as const }
+          value: this.money(s.totalLoadedCost.value, s.totalLoadedCost.approximate),
+          delta: s.totalLoadedCost.value > s.totalGross.value
+            ? { value: this.t('PAYROLL.ENGINE_RESULTS.KPI_EMPLOYER_COST_SUB', { amount: this.money(s.totalLoadedCost.value - s.totalGross.value) }), direction: 'neutral' as const }
             : null,
           options: {
             icon: 'account_balance', valueColor: 'text-primary',
