@@ -107,9 +107,9 @@ interface AdminCard {
 
 /**
  * Cartes de l'accueil. Masquées pour l'instant (lignes commentées, code conservé) : « Pays et
- * devises », « Taux et barèmes », « Éléments du bulletin », « Avantages en nature » et
- * « Historique et contrôle ». Leurs sections restent dans le code ; sans carte, un lien
- * `?tab=…` vers l'une d'elles ramène à l'accueil. Décommenter la ligne pour la réafficher.
+ * devises », « Taux et barèmes », « Éléments du bulletin » et « Avantages en nature ».
+ * Leurs sections restent dans le code ; sans carte, un lien `?tab=…` vers l'une d'elles
+ * ramène à l'accueil. Décommenter la ligne pour la réafficher.
  */
 /**
  * « Créer » et « Valider » les règles de paie ne font plus qu'UNE carte, « Règles de paie »
@@ -124,7 +124,7 @@ const CARDS: AdminCard[] = [
   // { key: 'benefits',        labelKey: 'PAYROLL.ADMIN_HOME.CARDS.BENEFITS',         icon: 'redeem',          tone: 'teal',      permissions: PAYROLL_BENEFITS_PERMISSIONS, helpKey: 'BENEFITS' },
   { key: 'advance-rules',   labelKey: 'PAYROLL.ADMIN_HOME.CARDS.ADVANCE_RULES',    icon: 'request_quote',   tone: 'warning',   permissions: PAYROLL_SALARY_ADVANCES_PERMISSIONS, helpKey: 'ADVANCE_RULES' },
   { key: 'employee-config', labelKey: 'PAYROLL.ADMIN_HOME.CARDS.EMPLOYEE_CONFIG',  icon: 'manage_accounts', tone: 'teal',      permissions: PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS, route: '/payroll/employee-config', helpKey: 'EMPLOYEE_CONFIG' },
-  // { key: 'audit',           labelKey: 'PAYROLL.ADMIN_HOME.CARDS.AUDIT',            icon: 'history',         tone: 'secondary', permissions: PAYROLL_AUDIT_PERMISSIONS, helpKey: 'AUDIT' },
+  { key: 'audit',           labelKey: 'PAYROLL.ADMIN_HOME.CARDS.AUDIT',            icon: 'history',         tone: 'secondary', permissions: PAYROLL_AUDIT_PERMISSIONS, helpKey: 'AUDIT' },
 ];
 
 /**
