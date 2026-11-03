@@ -366,6 +366,9 @@ export interface AuditEntryDto {
   /** Avance : le statut quitté (null à la création). */
   fromStatus: string | null;
   detail: string | null;
+  /** GENERIC uniquement : état précédent/nouveau de la ligne, en JSON brut. */
+  oldValue: string | null;
+  newValue: string | null;
 }
 
 export interface CalibrationCycleDto {

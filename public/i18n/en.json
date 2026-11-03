@@ -1788,6 +1788,7 @@
         "FILTER_TITLE": "Filter the log",
         "FILTER_PERIOD": "Period",
         "COL_DATE": "Date",
+        "COL_DOMAIN": "Domain",
         "COL_TYPE": "Type",
         "COL_SUBJECT": "Employee",
         "COL_ACTION": "Action",
@@ -1800,7 +1801,21 @@
         },
         "CREATED": "Created — {{status}}",
         "NO_PAYS": "Choose a country to show its log.",
-        "EMPTY": "No change recorded for this country."
+        "EMPTY": "No change recorded for this country.",
+        "ACTOR_SYSTEM": "Scheduled job",
+        "GROUP_LABEL": "{{count}} grouped changes",
+        "GROUP_MODAL_TITLE": "Grouped changes",
+        "GROUP_MODAL_HINT": "Click a row to see that change's detail.",
+        "DETAIL_TITLE": "Change detail",
+        "DETAIL_FIELD": "Field",
+        "DETAIL_BEFORE": "Before",
+        "DETAIL_AFTER": "After",
+        "DETAIL_NO_FIELDS": "No data available for this change.",
+        "GENERIC_ACTION": {
+          "INSERT": "Created",
+          "UPDATE": "Updated",
+          "DELETE": "Deleted"
+        }
       },
       "PAYS": "Country",
       "YES": "Yes",
