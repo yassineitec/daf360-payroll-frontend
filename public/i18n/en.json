@@ -1795,7 +1795,8 @@
         "COL_ACTOR": "By",
         "SOURCE": {
           "EMPLOYEE_CONFIG": "Configuration",
-          "SALARY_ADVANCE": "Advance"
+          "SALARY_ADVANCE": "Advance",
+          "GENERIC": "Technical change"
         },
         "CREATED": "Created — {{status}}",
         "NO_PAYS": "Choose a country to show its log.",

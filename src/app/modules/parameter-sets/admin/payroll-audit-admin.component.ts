@@ -143,7 +143,7 @@ export class PayrollAuditAdminComponent implements OnInit {
   }
 
   private actionLabel(e: AuditEntryDto): string {
-    if (e.source === 'EMPLOYEE_CONFIG') return e.action;
+    if (e.source === 'EMPLOYEE_CONFIG' || e.source === 'GENERIC') return e.action;
     return e.fromStatus
       ? `${this.statusLabel(e.fromStatus)} → ${this.statusLabel(e.action)}`
       : this.t('PAYROLL.ADMIN_HOME.AUDIT.CREATED', { status: this.statusLabel(e.action) });
@@ -209,7 +209,7 @@ export class PayrollAuditAdminComponent implements OnInit {
         at: e.at,
         type: {
           label: this.sourceLabel(e.source),
-          options: { variant: e.source === 'EMPLOYEE_CONFIG' ? 'info' : 'warning', size: 'sm' },
+          options: { variant: e.source === 'EMPLOYEE_CONFIG' ? 'info' : e.source === 'SALARY_ADVANCE' ? 'warning' : 'neutral', size: 'sm' },
         } satisfies BadgeCell,
         subject: this.subjectLabel(e),
         action: this.actionLabel(e),

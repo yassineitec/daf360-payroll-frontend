@@ -352,7 +352,7 @@ export interface SavePayrollCountryRequest {
 
 /** Une ligne du journal des modifications de la paie (`GET /admin/audit`). */
 export interface AuditEntryDto {
-  source: 'EMPLOYEE_CONFIG' | 'SALARY_ADVANCE';
+  source: 'EMPLOYEE_CONFIG' | 'SALARY_ADVANCE' | 'GENERIC';
   id: number;
   at: string;
   paysId: number;

@@ -1795,7 +1795,8 @@
         "COL_ACTOR": "Par",
         "SOURCE": {
           "EMPLOYEE_CONFIG": "Configuration",
-          "SALARY_ADVANCE": "Avance"
+          "SALARY_ADVANCE": "Avance",
+          "GENERIC": "Modification technique"
         },
         "CREATED": "Créée — {{status}}",
         "NO_PAYS": "Choisissez un pays pour afficher son journal.",
