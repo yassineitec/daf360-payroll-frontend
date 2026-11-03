@@ -375,6 +375,10 @@ export class PayrollCountriesAdminComponent implements OnInit {
       icon: 'public',
       body: this.countryTpl(),
       size: 'md',
+      minWidth: '360px',
+      minHeight: '260px',
+      resizable: true,
+      maximizable: true,
       closeOnBackdrop: false,
     });
   }

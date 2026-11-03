@@ -754,6 +754,10 @@ export class EngineRubriquesAdminComponent implements OnInit {
       icon: 'receipt_long',
       body: this.rubriqueTpl(),
       size: 'lg',
+      minWidth: '360px',
+      minHeight: '260px',
+      resizable: true,
+      maximizable: true,
       closeOnBackdrop: this.readOnly(),
     });
   }

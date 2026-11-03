@@ -613,11 +613,15 @@ export class CandidateSimulationDetailComponent {
     }
     // La personne en titre ; « Proposition n° · date · type · contrat » en sous-titre.
     this.detailModalRef = this.modalService.open({
-      title:    this.candidateName(),
-      subtitle: this.modalSubtitle(r),
-      icon:     'request_quote',
-      size:     'lg',
-      body:     tpl,
+      title:       this.candidateName(),
+      subtitle:    this.modalSubtitle(r),
+      icon:        'request_quote',
+      size:        'lg',
+      minWidth:    '360px',
+      minHeight:   '260px',
+      resizable:   true,
+      maximizable: true,
+      body:        tpl,
       buttons,
     });
   }

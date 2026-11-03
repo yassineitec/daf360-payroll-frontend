@@ -313,6 +313,10 @@ export class AdvanceRulesAdminComponent implements OnInit {
       icon: 'tune',
       body: this.policyTpl(),
       size: 'md',
+      minWidth: '360px',
+      minHeight: '260px',
+      resizable: true,
+      maximizable: true,
       closeOnBackdrop: false,
     });
   }
