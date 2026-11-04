@@ -352,7 +352,7 @@ export interface SavePayrollCountryRequest {
 
 /** Une ligne du journal des modifications de la paie (`GET /admin/audit`). */
 export interface AuditEntryDto {
-  source: 'EMPLOYEE_CONFIG' | 'SALARY_ADVANCE';
+  source: 'EMPLOYEE_CONFIG' | 'SALARY_ADVANCE' | 'GENERIC';
   id: number;
   at: string;
   paysId: number;
@@ -366,6 +366,9 @@ export interface AuditEntryDto {
   /** Avance : le statut quitté (null à la création). */
   fromStatus: string | null;
   detail: string | null;
+  /** GENERIC uniquement : état précédent/nouveau de la ligne, en JSON brut. */
+  oldValue: string | null;
+  newValue: string | null;
 }
 
 export interface CalibrationCycleDto {

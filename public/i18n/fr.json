@@ -1788,6 +1788,7 @@
         "FILTER_TITLE": "Filtrer le journal",
         "FILTER_PERIOD": "Période",
         "COL_DATE": "Date",
+        "COL_DOMAIN": "Domaine",
         "COL_TYPE": "Type",
         "COL_SUBJECT": "Collaborateur",
         "COL_ACTION": "Action",
@@ -1795,11 +1796,26 @@
         "COL_ACTOR": "Par",
         "SOURCE": {
           "EMPLOYEE_CONFIG": "Configuration",
-          "SALARY_ADVANCE": "Avance"
+          "SALARY_ADVANCE": "Avance",
+          "GENERIC": "Modification technique"
         },
         "CREATED": "Créée — {{status}}",
         "NO_PAYS": "Choisissez un pays pour afficher son journal.",
-        "EMPTY": "Aucune modification enregistrée pour ce pays."
+        "EMPTY": "Aucune modification enregistrée pour ce pays.",
+        "ACTOR_SYSTEM": "Tâche planifiée",
+        "GROUP_LABEL": "{{count}} modifications groupées",
+        "GROUP_MODAL_TITLE": "Modifications groupées",
+        "GROUP_MODAL_HINT": "Cliquez sur une ligne pour voir le détail de cette modification.",
+        "DETAIL_TITLE": "Détail de la modification",
+        "DETAIL_FIELD": "Champ",
+        "DETAIL_BEFORE": "Avant",
+        "DETAIL_AFTER": "Après",
+        "DETAIL_NO_FIELDS": "Aucune donnée disponible pour cette modification.",
+        "GENERIC_ACTION": {
+          "INSERT": "Création",
+          "UPDATE": "Modification",
+          "DELETE": "Suppression"
+        }
       },
       "PAYS": "Pays",
       "YES": "Oui",
