@@ -1038,17 +1038,21 @@ export class SimulatorComponent implements OnDestroy {
     };
   });
 
-  /** Net actually in hand — the engine stores it in `inputNet` whatever the direction. */
+  /** Net actually in hand — the engine stores it in `inputNet` whatever the direction. Read
+   *  it directly rather than recomputing from gross/charges/IRPP: that recomputation omits
+   *  rubrique credits and debits (e.g. a meal voucher), understating net by their amount. */
   readonly netMonthly = computed((): number | null => {
     const r = this.result();
-    return r ? r.gross - r.employeeCharges - r.irppAmount : null;
+    return r ? r.inputNet : null;
   });
 
   /**
-   * The loaded cost split into what it is made of. Identity the engine guarantees:
-   * `loadedCost = net + chargesSalariales + IRPP + avantages exonérés + chargesPatronales`
-   * (S5 = S4 + patronales, S4 = S3 + exonérés, S3 = net + salariales + IRPP), so the
-   * segments always total 100 % and the bar needs no normalisation.
+   * The loaded cost split into what it is made of. The identity the engine guarantees —
+   * `loadedCost = net + chargesSalariales + IRPP + avantages exonérés + chargesPatronales` —
+   * only holds when `net` excludes rubrique credits/debits funded outside gross (e.g. a meal
+   * voucher with no employer share: real value to the employee, zero cost in `loadedCost`).
+   * `total` is therefore the sum of the segments actually shown, not `loadedCost` itself, so
+   * percentages always add up to 100 % of what's on screen even when such a rubrique exists.
    */
   readonly breakdown = computed((): BreakdownSegment[] => {
     const r = this.result();
@@ -1056,7 +1060,7 @@ export class SimulatorComponent implements OnDestroy {
 
     const net     = this.netMonthly() ?? 0;
     const exempt  = (r.grossWithBenefits ?? r.gross) - r.gross;
-    const total   = r.loadedCost;
+    const total   = net + r.employeeCharges + r.irppAmount + exempt + r.employerCharges;
     const pct     = (v: number) => (total ? (v / total) * 100 : 0);
 
     // `key` reste stable d'une langue à l'autre : c'est lui qui sert de `track` au gabarit,
@@ -1254,9 +1258,12 @@ export class SimulatorComponent implements OnDestroy {
   readonly costTableRows = computed((): TableRow[] => {
     const r = this.result();
     if (!r || !r.loadedCost) return [];
-    const total = r.loadedCost;
     const net = this.netMonthly() ?? 0;
     const exempt = Math.max(0, (r.grossWithBenefits ?? r.gross) - r.gross);
+    // Sum of the rows below, not `loadedCost`: a rubrique funded outside gross (e.g. a meal
+    // voucher with no employer share) reaches `net` without ever adding to `loadedCost`, so
+    // using `loadedCost` as the denominator would push shares past 100 %.
+    const total = net + exempt + r.irppAmount + r.employeeCharges + r.employerCharges;
 
     const badge = (key: string, variant: BadgeVariant): BadgeCell =>
       ({ label: this.t(`PAYROLL.SIMULATOR.DETAIL.${key}`), options: { variant, size: 'sm', dot: true } });
@@ -1310,9 +1317,10 @@ export class SimulatorComponent implements OnDestroy {
     const r = this.result();
     if (!r || !r.loadedCost) return [];
     const cur = this.currency();
-    const total = r.loadedCost;
     const net = this.netMonthly() ?? 0;
     const exempt = Math.max(0, (r.grossWithBenefits ?? r.gross) - r.gross);
+    // Same reasoning as `costTableRows`: sum of the parts shown, not `loadedCost`.
+    const total = net + exempt + r.irppAmount + r.employeeCharges + r.employerCharges;
     const parts = [
       { key: 'EMPLOYEE', label: this.t('PAYROLL.SIMULATOR.DETAIL.GROUP_EMPLOYEE'), amount: net + exempt,
         color: 'var(--color-tertiary)' },
