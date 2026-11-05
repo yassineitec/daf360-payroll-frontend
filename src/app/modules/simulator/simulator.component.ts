@@ -350,6 +350,8 @@ export class SimulatorComponent implements OnDestroy {
     inputGross:     [null as number | null],  // used when mode = BRUT_TO_NET
     contractType:   ['CDI'],
     joursTravailes: [22, [Validators.min(1), Validators.max(31)]],
+    isMarried:      [false],
+    children:       [0, [Validators.min(0)]],
     candidateLabel: [''],
     poste:          [''],
     grade:          [''],
@@ -1732,6 +1734,15 @@ export class SimulatorComponent implements OnDestroy {
     this.form.get(name)?.setValue(value === '' ? null : value);
   }
 
+  /** Current value of a boolean control, for `daf-checkbox [checked]`. */
+  boolFieldValue(name: string): boolean {
+    return !!this.form.get(name)?.value;
+  }
+
+  setBoolField(name: string, value: boolean): void {
+    this.form.get(name)?.setValue(value);
+  }
+
   /** Same for a text control that must stay a string (never null). */
   setTextValue(name: string, value: string | number | null): void {
     this.form.get(name)?.setValue(value == null ? '' : String(value));
@@ -1800,6 +1811,8 @@ export class SimulatorComponent implements OnDestroy {
       // `||`, not `??`: the control holds '' (not null) when nothing is picked.
       contractType:   v.contractType || undefined,
       joursTravailes: v.joursTravailes ?? 22,
+      isMarried:      v.isMarried ?? false,
+      children:       v.children ?? 0,
       // The engine treats `null` as "all benefits"; an explicit list is always sent so
       // unticking every box means none rather than all.
       selectedBenefitCodes: Array.from(this.selectedCodes()),

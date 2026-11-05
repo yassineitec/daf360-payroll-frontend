@@ -208,9 +208,11 @@ export class ParameterSetsComponent implements OnInit {
   // partagé unique (celui du jeu en cours d'édition), pas un état par ligne.
   private readonly chargesEditorTpl   = viewChild<TemplateRef<unknown>>('chargesEditorTpl');
   private readonly rubriquesEditorTpl = viewChild<TemplateRef<unknown>>('rubriquesEditorTpl');
+  private readonly fieldsEditorTpl    = viewChild<TemplateRef<unknown>>('fieldsEditorTpl');
   private readonly workflowConfirmTpl = viewChild<TemplateRef<unknown>>('workflowConfirmTpl');
   private chargesModalRef:   ModalRef | null = null;
   private rubriquesModalRef: ModalRef | null = null;
+  private fieldsModalRef:    ModalRef | null = null;
 
   // ── Sections, sur le modèle de /rh/admin : sans `?tab=`, un accueil en cartes (une par
   //    section) ; une carte ouvre sa section — paramétrage, suivi des jeux, pays de paie,
@@ -648,15 +650,33 @@ export class ParameterSetsComponent implements OnInit {
 
   readonly contractTypes   = signal<HrContractType[]>([]);
   readonly baseCalcOptions = computed(() => [
-    { value: 'GROSS',        label: this.t('PAYROLL.PARAMETER_SETS.BASE_GROSS') },
-    { value: 'CAPPED_GROSS', label: this.t('PAYROLL.PARAMETER_SETS.BASE_CAPPED_GROSS') },
-    { value: 'FIXED',        label: this.t('PAYROLL.PARAMETER_SETS.BASE_FIXED') },
-    { value: 'FORMULE',      label: this.t('PAYROLL.PARAMETER_SETS.BASE_FORMULA') },
+    { value: 'GROSS',         label: this.t('PAYROLL.PARAMETER_SETS.BASE_GROSS') },
+    { value: 'CAPPED_GROSS',  label: this.t('PAYROLL.PARAMETER_SETS.BASE_CAPPED_GROSS') },
+    { value: 'FIXED',         label: this.t('PAYROLL.PARAMETER_SETS.BASE_FIXED') },
+    { value: 'FORMULE',       label: this.t('PAYROLL.PARAMETER_SETS.BASE_FORMULA') },
+    { value: 'TAXABLE_BASE2', label: this.t('PAYROLL.PARAMETER_SETS.BASE_TAXABLE_BASE2') },
   ]);
 
   readonly chargesForm = this.fb.group({ rates: this.fb.array([]) });
   get editRates(): FormArray { return this.chargesForm.get('rates') as FormArray; }
   editRateGroup(i: number): FormGroup { return this.editRates.at(i) as FormGroup; }
+
+  // ── Barème IRPP & déductions editor (abattement, situation familiale) ───────
+  readonly editingFieldsId = signal<number | null>(null);
+  readonly savingFields    = signal(false);
+  readonly fieldsError     = signal<string | null>(null);
+
+  readonly fieldsForm = this.fb.group({
+    irppBrackets:                   ['', [Validators.required, irppBracketsValidator]],
+    convergenceTolerance:            [0.01 as number | null, [Validators.required, positive]],
+    maxConvergenceIterations:        [50 as number | null, [Validators.required, Validators.min(1), integer]],
+    calibrationThresholdPct:         [1.00 as number | null, [Validators.required, Validators.min(0)]],
+    abattementRatePercent:           [0 as number | null, [Validators.min(0)]],
+    abattementAnnualCap:             [null as number | null, [Validators.min(0)]],
+    familyDeductionMarriedAmount:    [0 as number | null, [Validators.min(0)]],
+    familyDeductionPerChildAmount:   [0 as number | null, [Validators.min(0)]],
+    familyDeductionMaxChildren:      [0 as number | null, [Validators.min(0), integer]],
+  });
 
   // ── Rubriques de paie editor ──────────────────────────────────────────────
   readonly editingRubriquesId = signal<number | null>(null);
@@ -707,6 +727,11 @@ export class ParameterSetsComponent implements OnInit {
     convergenceTolerance:     [0.01 as number | null, [Validators.required, positive]],
     maxConvergenceIterations: [50 as number | null, [Validators.required, Validators.min(1), integer]],
     calibrationThresholdPct:  [1.00 as number | null, [Validators.required, Validators.min(0)]],
+    abattementRatePercent:         [0 as number | null, [Validators.min(0)]],
+    abattementAnnualCap:           [null as number | null, [Validators.min(0)]],
+    familyDeductionMarriedAmount:  [0 as number | null, [Validators.min(0)]],
+    familyDeductionPerChildAmount: [0 as number | null, [Validators.min(0)]],
+    familyDeductionMaxChildren:    [0 as number | null, [Validators.min(0), integer]],
     changeRationale:          [''],
     socialChargeRates:        this.fb.array([]),
   });
@@ -814,6 +839,11 @@ export class ParameterSetsComponent implements OnInit {
       convergenceTolerance:     ps.convergenceTolerance,
       maxConvergenceIterations: ps.maxConvergenceIterations,
       calibrationThresholdPct:  ps.calibrationThresholdPct,
+      abattementRatePercent:         +(((ps.abattementRatePct ?? 0) * 100).toFixed(4)),
+      abattementAnnualCap:           ps.abattementAnnualCap,
+      familyDeductionMarriedAmount:  ps.familyDeductionMarriedAmount ?? 0,
+      familyDeductionPerChildAmount: ps.familyDeductionPerChildAmount ?? 0,
+      familyDeductionMaxChildren:    ps.familyDeductionMaxChildren ?? 0,
       ...(year.dirty ? {} : { fiscalYear: ps.fiscalYear + 1 }),
     });
     while (this.newSetRates.length) this.newSetRates.removeAt(0);
@@ -996,6 +1026,11 @@ export class ParameterSetsComponent implements OnInit {
       convergenceTolerance:     raw.convergenceTolerance!,
       maxConvergenceIterations: raw.maxConvergenceIterations!,
       calibrationThresholdPct:  raw.calibrationThresholdPct!,
+      abattementRatePct:             (raw.abattementRatePercent ?? 0) / 100,
+      abattementAnnualCap:           raw.abattementAnnualCap,
+      familyDeductionMarriedAmount:  raw.familyDeductionMarriedAmount ?? 0,
+      familyDeductionPerChildAmount: raw.familyDeductionPerChildAmount ?? 0,
+      familyDeductionMaxChildren:    raw.familyDeductionMaxChildren ?? 0,
       changeRationale:          raw.changeRationale!,
       socialChargeRates:        rates as unknown as SocialChargeRateDto[],
       benefits:                 benefits as BenefitCatalogueDto[],
@@ -1107,6 +1142,78 @@ export class ParameterSetsComponent implements OnInit {
     while (this.editRates.length) this.editRates.removeAt(0);
     this.chargesModalRef?.close();
     this.chargesModalRef = null;
+  }
+
+  // ── Barème IRPP & déductions editor ──────────────────────────────────────
+  openFieldsEditor(ps: ParameterSetDto): void {
+    this.closeChargesEditor();
+    this.closeRubriquesEditor();
+    this.fieldsForm.reset({
+      irppBrackets: (() => {
+        try { return JSON.stringify(JSON.parse(ps.irppBrackets), null, 2); }
+        catch { return ps.irppBrackets; }
+      })(),
+      convergenceTolerance:          ps.convergenceTolerance,
+      maxConvergenceIterations:      ps.maxConvergenceIterations,
+      calibrationThresholdPct:       ps.calibrationThresholdPct,
+      abattementRatePercent:         +(((ps.abattementRatePct ?? 0) * 100).toFixed(4)),
+      abattementAnnualCap:           ps.abattementAnnualCap,
+      familyDeductionMarriedAmount:  ps.familyDeductionMarriedAmount ?? 0,
+      familyDeductionPerChildAmount: ps.familyDeductionPerChildAmount ?? 0,
+      familyDeductionMaxChildren:    ps.familyDeductionMaxChildren ?? 0,
+    });
+    this.editingFieldsId.set(ps.id);
+    this.fieldsError.set(null);
+    const tpl = this.fieldsEditorTpl();
+    if (!tpl) return;
+    this.fieldsModalRef = this.modalService.open({
+      title: this.t('PAYROLL.PARAMETER_SETS.FIELDS_EDITOR_MODAL_TITLE'),
+      subtitle: this.itemTitle(ps),
+      icon: 'calculate',
+      size: 'md',
+      body: tpl,
+    });
+  }
+
+  closeFieldsEditor(): void {
+    this.editingFieldsId.set(null);
+    this.fieldsModalRef?.close();
+    this.fieldsModalRef = null;
+  }
+
+  fieldsControlError(name: string): string | undefined {
+    return this.controlError(this.fieldsForm.get(name));
+  }
+
+  saveFields(psId: number): void {
+    if (this.savingFields()) return;
+    this.fieldsForm.markAllAsTouched();
+    if (this.fieldsForm.invalid) return;
+    this.fieldsError.set(null);
+    this.savingFields.set(true);
+    const v = this.fieldsForm.getRawValue();
+    this.api.updateParameterSetFields(psId, {
+      irppBrackets: v.irppBrackets!,
+      convergenceTolerance: v.convergenceTolerance!,
+      maxConvergenceIterations: v.maxConvergenceIterations!,
+      calibrationThresholdPct: v.calibrationThresholdPct!,
+      abattementRatePct: (v.abattementRatePercent ?? 0) / 100,
+      abattementAnnualCap: v.abattementAnnualCap,
+      familyDeductionMarriedAmount: v.familyDeductionMarriedAmount ?? 0,
+      familyDeductionPerChildAmount: v.familyDeductionPerChildAmount ?? 0,
+      familyDeductionMaxChildren: v.familyDeductionMaxChildren ?? 0,
+    } as Partial<ParameterSetDto>).subscribe({
+      next: updated => {
+        this.paramSets.update(ps => ps.map(p => p.id === updated.id ? updated : p));
+        this.selected.update(s => s?.id === updated.id ? updated : s);
+        this.closeFieldsEditor();
+        this.savingFields.set(false);
+      },
+      error: err => {
+        this.fieldsError.set(err?.error?.detail ?? err?.error?.message ?? this.t('PAYROLL.PARAMETER_SETS.ERROR_SAVE_FIELDS'));
+        this.savingFields.set(false);
+      },
+    });
   }
 
   addEditRate(): void {

@@ -424,7 +424,9 @@
         "CONTRACT_PLACEHOLDER_CANDIDATE": "— Select —",
         "CONTRACT_HINT_EMPLOYEE": "Leave empty to keep the employee's current contract",
         "WORKING_DAYS": "Days worked / month",
-        "WORKING_DAYS_SUFFIX": "d"
+        "WORKING_DAYS_SUFFIX": "d",
+        "IS_MARRIED": "Married",
+        "CHILDREN_COUNT": "Number of dependent children"
       },
 
       "STEP3": {
@@ -597,6 +599,9 @@
       "SELECT_COUNTRY": "Select a country…",
       "COUNTRY": "Country",
       "CONTRACT_TYPE": "Contract Type",
+      "FAMILY_SECTION": "Family situation",
+      "IS_MARRIED": "Married",
+      "CHILDREN_COUNT": "Number of dependent children",
       "BENEFITS": "Benefits in Kind",
       "CURRENT_SALARY": "Net salary (calculated)",
       "REASON": "Why this change?",
@@ -1616,6 +1621,7 @@
       "BASE_CAPPED_GROSS": "Capped gross",
       "BASE_FIXED": "Fixed",
       "BASE_FORMULA": "Custom formula",
+      "BASE_TAXABLE_BASE2": "Taxable base after deductions",
       "EVAL_ORDER_TITLE": "Evaluation order (0 = first)",
       "REMOVE": "Remove",
       "FORMULA_EE_LABEL": "Employee-share formula (EE) *",
@@ -1702,6 +1708,19 @@
       "ERROR_GENERIC": "Error",
       "ERROR_SAVE_CHARGES": "Error saving charges",
       "ERROR_SAVE_RUBRIQUES": "Error saving line items",
+      "ERROR_SAVE_FIELDS": "Error saving brackets and deductions",
+      "EDIT_FIELDS": "Brackets & deductions",
+      "FIELDS_EDITOR_MODAL_TITLE": "Edit IRPP brackets and deductions",
+      "IRPP_BRACKETS_JSON": "IRPP brackets (JSON)",
+      "IRPP_BRACKETS_HINT": "Brackets {\"lower\", \"upper\", \"rate\"} — the last bracket has upper: null.",
+      "SECTION_ABATTEMENT": "Flat-rate deduction",
+      "ABATTEMENT_RATE": "Deduction rate",
+      "ABATTEMENT_CAP": "Annual cap",
+      "UNCAPPED": "No cap",
+      "SECTION_FAMILY_DEDUCTION": "Family deductions (annual IRPP base)",
+      "FAMILY_MARRIED_AMOUNT": "Amount if married",
+      "FAMILY_PER_CHILD_AMOUNT": "Amount per child",
+      "FAMILY_MAX_CHILDREN": "Maximum number of children",
       "STATUS": {
         "DRAFT": "Draft",
         "PENDING_FINANCE": "Pending approval",

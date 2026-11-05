@@ -108,6 +108,8 @@
 .workflow-confirm { display: flex; flex-direction: column; gap: 10px; }
 .workflow-confirm p { margin: 0; font-size: 13px; }
 
+.fields-editor { display: flex; flex-direction: column; gap: 16px; }
+
 /* ── Blocs communs ────────────────────────────────────────────────────────── */
 /* Titre de section + bouton sur une ligne (création) ; bouton seul aligné à droite
    (détail, où l'onglet fait déjà office de titre). */

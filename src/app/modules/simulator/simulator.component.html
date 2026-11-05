@@ -421,6 +421,30 @@
                   [selected]="contractSelection()"
                   (selectedChange)="setSelection('contractType', $event)"
                 />
+
+                <!-- Situation familiale : alimente la déduction IRPP « marié »/« par enfant »
+                     configurée sur le jeu de paramètres actif du pays (sans effet si le pays
+                     n'en configure pas). -->
+                <div class="flex flex-col sm:flex-row gap-6">
+                  <div class="flex-1 min-w-0 flex items-end">
+                    <daf-checkbox
+                      [options]="{ label: 'PAYROLL.SIMULATOR.STEP2.IS_MARRIED' | translate }"
+                      [checked]="boolFieldValue('isMarried')"
+                      (checkedChange)="setBoolField('isMarried', $event)"
+                    />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <daf-form-field
+                      [options]="{
+                        label: 'PAYROLL.SIMULATOR.STEP2.CHILDREN_COUNT' | translate,
+                        type: 'number',
+                        align: 'end',
+                      }"
+                      [value]="fieldValue('children')"
+                      (valueChange)="setFieldValue('children', $event)"
+                    />
+                  </div>
+                </div>
               </div>
             }
 

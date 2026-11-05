@@ -126,7 +126,25 @@
               </div>
             </div>
 
-            <!-- 3. Avantages en nature — issus des règles de paie en vigueur du pays. -->
+            <!-- 3. Situation familiale — alimente la déduction IRPP « marié »/« par enfant »
+                 configurée sur le jeu de paramètres actif du pays (0 par défaut = aucun effet). -->
+            <div class="ec-block">
+              <daf-section-title [title]="'PAYROLL.EMPLOYEE_CONFIG.FAMILY_SECTION' | translate" />
+              <div class="field-row">
+                <daf-checkbox
+                  [options]="{ label: 'PAYROLL.EMPLOYEE_CONFIG.IS_MARRIED' | translate }"
+                  [checked]="cfg.isMarried"
+                  (checkedChange)="onMarriedChange($event)">
+                </daf-checkbox>
+                <daf-form-field
+                  [options]="{ label: 'PAYROLL.EMPLOYEE_CONFIG.CHILDREN_COUNT' | translate, type: 'number', align: 'end', placeholder: '0', fullWidth: true }"
+                  [value]="cfg.childrenCount"
+                  (valueChange)="onChildrenCountChange(toNumber($event))">
+                </daf-form-field>
+              </div>
+            </div>
+
+            <!-- 4. Avantages en nature — issus des règles de paie en vigueur du pays. -->
             <div class="ec-block">
               <daf-section-title [title]="('PAYROLL.EMPLOYEE_CONFIG.BENEFITS' | translate) + (benefits().length ? ' · ' + selectedBenefitCount() + ' / ' + benefits().length : '')" />
               @if (benefits().length) {
@@ -146,7 +164,7 @@
               }
             </div>
 
-            <!-- 4. Motif — obligatoire, conservé dans l'historique ; l'erreur s'affiche au clic
+            <!-- 5. Motif — obligatoire, conservé dans l'historique ; l'erreur s'affiche au clic
                  sur « Enregistrer » (le bouton n'est plus grisé sans explication). -->
             <div class="ec-block">
               <daf-section-title [title]="'PAYROLL.EMPLOYEE_CONFIG.SECTION_REASON' | translate" />

@@ -3,6 +3,12 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 
+export interface UsersRefDto {
+  id: number;
+  fullName: string;
+  email: string | null;
+}
+
 export interface ParameterSetDto {
   id: number;
   paysId: number;
@@ -13,6 +19,16 @@ export interface ParameterSetDto {
   convergenceTolerance: number;
   maxConvergenceIterations: number;
   calibrationThresholdPct: number;
+  /** Professional-expense deduction applied to the annual IRPP base, e.g. 0.10 = 10%. 0 = none. */
+  abattementRatePct: number;
+  /** Annual cap on the abattement amount; null = uncapped. */
+  abattementAnnualCap: number | null;
+  /** Annual IRPP-base deduction when the employee is married. 0 = none. */
+  familyDeductionMarriedAmount: number;
+  /** Annual IRPP-base deduction per dependent child, up to familyDeductionMaxChildren. */
+  familyDeductionPerChildAmount: number;
+  /** Maximum children counted toward the per-child deduction. 0 = none counted. */
+  familyDeductionMaxChildren: number;
   approvedByHr: number | null;
   approvedByFinance: number | null;
   approvedAt: string | null;
@@ -73,7 +89,8 @@ export interface SocialChargeRateDto {
   chargeLabel: string;
   employeeRate: number;
   employerRate: number;
-  /** GROSS | CAPPED_GROSS | FIXED | FORMULE */
+  /** GROSS | CAPPED_GROSS | FIXED | FORMULE | TAXABLE_BASE2 (computed on the post-abattement
+   *  base, after IRPP, excluded from the IRPP-base reduction — e.g. Tunisia's CSS). */
   baseCalculation: string;
   capAmount: number | null;
   /** Formula override for the employee-side amount; null = use employeeRate × base. */
@@ -110,6 +127,8 @@ export interface SimulationRequest {
   contractType?: string;
   joursTravailes?: number;            // working days for FIXE_JOURNALIER rubriques (default 22)
   selectedBenefitCodes?: string[];    // null = apply all; empty = none
+  isMarried?: boolean;                // family IRPP-base deduction; omitted = not married
+  children?: number;                  // dependent children count; omitted = 0
   candidateLabel?: string;            // free-text for PDF
   poste?: string;
   grade?: string;
@@ -398,6 +417,12 @@ export class PayrollApiService {
     return this.http.get<PaysDto[]>(`${this.base}/ref/pays`);
   }
 
+  /** One user by id, unfiltered -- resolves a raw `*_by` reference found inside a GENERIC audit
+   *  row's field diff (see payroll-audit-display.util.ts `extractActorRefIds`). */
+  getUser(id: number): Observable<UsersRefDto> {
+    return this.http.get<UsersRefDto>(`${this.base}/ref/users/${id}`);
+  }
+
   // ── Administration ───────────────────────────────────────────────────────
 
   /** Pays configurés dans le moteur de paie, dans le périmètre de l'appelant. */
@@ -446,6 +471,12 @@ export class PayrollApiService {
 
   createParameterSet(req: Partial<ParameterSetDto>): Observable<ParameterSetDto> {
     return this.http.post<ParameterSetDto>(`${this.base}/parameter-sets`, req);
+  }
+
+  /** Modifie le barème IRPP, la convergence et les déductions (abattement, situation
+   *  familiale) d'un jeu en brouillon, sans toucher ses taux/avantages/rubriques (409 sinon). */
+  updateParameterSetFields(id: number, req: Partial<ParameterSetDto>): Observable<ParameterSetDto> {
+    return this.http.put<ParameterSetDto>(`${this.base}/parameter-sets/${id}/fields`, req);
   }
 
   submitParameterSet(id: number): Observable<ParameterSetDto> {

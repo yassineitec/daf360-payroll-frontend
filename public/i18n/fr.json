@@ -424,7 +424,9 @@
         "CONTRACT_PLACEHOLDER_CANDIDATE": "— Sélectionner —",
         "CONTRACT_HINT_EMPLOYEE": "Laissez vide pour garder le contrat actuel du collaborateur",
         "WORKING_DAYS": "Jours travaillés / mois",
-        "WORKING_DAYS_SUFFIX": "j"
+        "WORKING_DAYS_SUFFIX": "j",
+        "IS_MARRIED": "Marié(e)",
+        "CHILDREN_COUNT": "Nombre d'enfants à charge"
       },
 
       "STEP3": {
@@ -597,6 +599,9 @@
       "SELECT_COUNTRY": "Sélectionner un pays…",
       "COUNTRY": "Pays",
       "CONTRACT_TYPE": "Type de contrat",
+      "FAMILY_SECTION": "Situation familiale",
+      "IS_MARRIED": "Marié(e)",
+      "CHILDREN_COUNT": "Nombre d'enfants à charge",
       "BENEFITS": "Avantages en nature",
       "CURRENT_SALARY": "Salaire net (calculé)",
       "REASON": "Pourquoi ce changement ?",
@@ -1616,6 +1621,7 @@
       "BASE_CAPPED_GROSS": "Brut plafonné",
       "BASE_FIXED": "Fixe",
       "BASE_FORMULA": "Formule personnalisée",
+      "BASE_TAXABLE_BASE2": "Base imposable après déductions",
       "EVAL_ORDER_TITLE": "Ordre d'évaluation (0 = premier)",
       "REMOVE": "Supprimer",
       "FORMULA_EE_LABEL": "Formule part salariale (EE) *",
@@ -1702,6 +1708,19 @@
       "ERROR_GENERIC": "Erreur",
       "ERROR_SAVE_CHARGES": "Erreur sauvegarde charges",
       "ERROR_SAVE_RUBRIQUES": "Erreur sauvegarde rubriques",
+      "ERROR_SAVE_FIELDS": "Erreur sauvegarde barème et déductions",
+      "EDIT_FIELDS": "Barème & déductions",
+      "FIELDS_EDITOR_MODAL_TITLE": "Modifier le barème IRPP et les déductions",
+      "IRPP_BRACKETS_JSON": "Barème IRPP (JSON)",
+      "IRPP_BRACKETS_HINT": "Tranches {\"lower\", \"upper\", \"rate\"} — la dernière tranche a upper: null.",
+      "SECTION_ABATTEMENT": "Abattement forfaitaire",
+      "ABATTEMENT_RATE": "Taux d'abattement",
+      "ABATTEMENT_CAP": "Plafond annuel",
+      "UNCAPPED": "Aucun plafond",
+      "SECTION_FAMILY_DEDUCTION": "Déductions familiales (base IRPP annuelle)",
+      "FAMILY_MARRIED_AMOUNT": "Montant si marié(e)",
+      "FAMILY_PER_CHILD_AMOUNT": "Montant par enfant",
+      "FAMILY_MAX_CHILDREN": "Nombre d'enfants maximum",
       "STATUS": {
         "DRAFT": "Brouillon",
         "PENDING_FINANCE": "En attente d'approbation",

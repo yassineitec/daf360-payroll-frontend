@@ -354,6 +354,35 @@
                 (valueChange)="setNewSetValue('calibrationThresholdPct', num($event))">
               </daf-form-field>
             </div>
+            <div class="field-row">
+              <daf-form-field
+                [options]="{ label: 'PAYROLL.PARAMETER_SETS.ABATTEMENT_RATE' | translate, type: 'number', align: 'end', suffixText: '%' }"
+                [value]="newSetForm.get('abattementRatePercent')!.value"
+                (valueChange)="setNewSetValue('abattementRatePercent', num($event))">
+              </daf-form-field>
+              <daf-form-field
+                [options]="{ label: 'PAYROLL.PARAMETER_SETS.ABATTEMENT_CAP' | translate, type: 'number', align: 'end', placeholder: 'PAYROLL.PARAMETER_SETS.UNCAPPED' | translate }"
+                [value]="newSetForm.get('abattementAnnualCap')!.value"
+                (valueChange)="setNewSetValue('abattementAnnualCap', $event === '' || $event == null ? null : num($event))">
+              </daf-form-field>
+            </div>
+            <div class="field-row">
+              <daf-form-field
+                [options]="{ label: 'PAYROLL.PARAMETER_SETS.FAMILY_MARRIED_AMOUNT' | translate, type: 'number', align: 'end' }"
+                [value]="newSetForm.get('familyDeductionMarriedAmount')!.value"
+                (valueChange)="setNewSetValue('familyDeductionMarriedAmount', num($event))">
+              </daf-form-field>
+              <daf-form-field
+                [options]="{ label: 'PAYROLL.PARAMETER_SETS.FAMILY_PER_CHILD_AMOUNT' | translate, type: 'number', align: 'end' }"
+                [value]="newSetForm.get('familyDeductionPerChildAmount')!.value"
+                (valueChange)="setNewSetValue('familyDeductionPerChildAmount', num($event))">
+              </daf-form-field>
+              <daf-form-field
+                [options]="{ label: 'PAYROLL.PARAMETER_SETS.FAMILY_MAX_CHILDREN' | translate, type: 'number', align: 'end' }"
+                [value]="newSetForm.get('familyDeductionMaxChildren')!.value"
+                (valueChange)="setNewSetValue('familyDeductionMaxChildren', num($event))">
+              </daf-form-field>
+            </div>
           </div>
         </daf-accordion-card>
 
@@ -401,6 +430,13 @@
             <daf-badge
               [label]="statusLabel(ps)"
               [options]="{ variant: setStatusVariant(ps), size: 'sm', dot: true }" />
+            @if (ps.status === 'DRAFT') {
+              <daf-button
+                [label]="'PAYROLL.PARAMETER_SETS.EDIT_FIELDS' | translate"
+                variant="secondary"
+                [options]="{ iconStart: 'calculate' }"
+                (onClick)="openFieldsEditor(ps)" />
+            }
             @for (step of workflowSteps(ps); track step) {
               <daf-button
                 [label]="workflowLabel(step) | translate"
@@ -672,6 +708,83 @@
             [saving]="savingCharges()"
             (save)="saveCharges(editingChargesId()!)"
             (cancel)="closeChargesEditor()" />
+        </div>
+      </ng-template>
+
+      <ng-template #fieldsEditorTpl>
+        <div class="fields-editor">
+          <daf-form-field
+            [options]="{
+              label: 'PAYROLL.PARAMETER_SETS.IRPP_BRACKETS_JSON' | translate,
+              type: 'textarea', rows: 8, fullWidth: true, required: true,
+              hint: 'PAYROLL.PARAMETER_SETS.IRPP_BRACKETS_HINT' | translate,
+              error: fieldsControlError('irppBrackets')
+            }"
+            [value]="fieldsForm.get('irppBrackets')!.value"
+            (valueChange)="fieldsForm.get('irppBrackets')!.setValue($event + '')">
+          </daf-form-field>
+
+          <app-admin-section-header [title]="'PAYROLL.PARAMETER_SETS.SECTION_ABATTEMENT' | translate" />
+          <div class="field-row">
+            <daf-form-field
+              [options]="{ label: 'PAYROLL.PARAMETER_SETS.ABATTEMENT_RATE' | translate, type: 'number', align: 'end', suffixText: '%', fullWidth: true }"
+              [value]="fieldsForm.get('abattementRatePercent')!.value"
+              (valueChange)="fieldsForm.get('abattementRatePercent')!.setValue(+($event ?? 0))">
+            </daf-form-field>
+            <daf-form-field
+              [options]="{ label: 'PAYROLL.PARAMETER_SETS.ABATTEMENT_CAP' | translate, type: 'number', align: 'end', placeholder: 'PAYROLL.PARAMETER_SETS.UNCAPPED' | translate, fullWidth: true }"
+              [value]="fieldsForm.get('abattementAnnualCap')!.value"
+              (valueChange)="fieldsForm.get('abattementAnnualCap')!.setValue($event === '' || $event == null ? null : +$event)">
+            </daf-form-field>
+          </div>
+
+          <app-admin-section-header [title]="'PAYROLL.PARAMETER_SETS.SECTION_FAMILY_DEDUCTION' | translate" />
+          <div class="field-row">
+            <daf-form-field
+              [options]="{ label: 'PAYROLL.PARAMETER_SETS.FAMILY_MARRIED_AMOUNT' | translate, type: 'number', align: 'end', fullWidth: true }"
+              [value]="fieldsForm.get('familyDeductionMarriedAmount')!.value"
+              (valueChange)="fieldsForm.get('familyDeductionMarriedAmount')!.setValue(+($event ?? 0))">
+            </daf-form-field>
+            <daf-form-field
+              [options]="{ label: 'PAYROLL.PARAMETER_SETS.FAMILY_PER_CHILD_AMOUNT' | translate, type: 'number', align: 'end', fullWidth: true }"
+              [value]="fieldsForm.get('familyDeductionPerChildAmount')!.value"
+              (valueChange)="fieldsForm.get('familyDeductionPerChildAmount')!.setValue(+($event ?? 0))">
+            </daf-form-field>
+            <daf-form-field
+              [options]="{ label: 'PAYROLL.PARAMETER_SETS.FAMILY_MAX_CHILDREN' | translate, type: 'number', align: 'end', fullWidth: true }"
+              [value]="fieldsForm.get('familyDeductionMaxChildren')!.value"
+              (valueChange)="fieldsForm.get('familyDeductionMaxChildren')!.setValue(+($event ?? 0))">
+            </daf-form-field>
+          </div>
+
+          <app-admin-section-header [title]="'PAYROLL.ADMIN.ADVANCED_TITLE' | translate" />
+          <div class="field-row">
+            <daf-form-field
+              [options]="{ label: 'PAYROLL.ADMIN.TOLERANCE' | translate, type: 'number', align: 'end', fullWidth: true }"
+              [value]="fieldsForm.get('convergenceTolerance')!.value"
+              (valueChange)="fieldsForm.get('convergenceTolerance')!.setValue(+($event ?? 0.01))">
+            </daf-form-field>
+            <daf-form-field
+              [options]="{ label: 'PAYROLL.ADMIN.MAX_ITERATIONS' | translate, type: 'number', align: 'end', fullWidth: true }"
+              [value]="fieldsForm.get('maxConvergenceIterations')!.value"
+              (valueChange)="fieldsForm.get('maxConvergenceIterations')!.setValue(+($event ?? 50))">
+            </daf-form-field>
+            <daf-form-field
+              [options]="{ label: 'PAYROLL.ADMIN.CALIBRATION_THRESHOLD' | translate, type: 'number', align: 'end', suffixText: '%', fullWidth: true }"
+              [value]="fieldsForm.get('calibrationThresholdPct')!.value"
+              (valueChange)="fieldsForm.get('calibrationThresholdPct')!.setValue(+($event ?? 1))">
+            </daf-form-field>
+          </div>
+
+          @if (fieldsError()) {
+            <div class="admin-error-banner" role="alert">{{ fieldsError() }}</div>
+          }
+          <app-admin-modal-footer
+            [saveLabel]="'PAYROLL.PARAMETER_SETS.SAVE' | translate"
+            [cancelLabel]="'PAYROLL.ADMIN_HOME.CANCEL' | translate"
+            [saving]="savingFields()"
+            (save)="saveFields(editingFieldsId()!)"
+            (cancel)="closeFieldsEditor()" />
         </div>
       </ng-template>
 

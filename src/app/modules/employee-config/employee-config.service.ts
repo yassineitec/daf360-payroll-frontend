@@ -12,6 +12,9 @@ export interface EmployeePayrollConfigDto {
   selectedBenefitCodes: string[];
   currentGrossSalary: number | null;
   currentNetSalary: number | null;
+  /** Family IRPP-base deduction inputs — see ParameterSetDto's familyDeduction* fields. */
+  isMarried: boolean;
+  childrenCount: number;
   updatedBy: number | null;
   updatedAt: string | null;
 }
@@ -22,6 +25,8 @@ export interface UpsertEmployeePayrollConfigRequest {
   selectedBenefitCodes: string[];
   currentGrossSalary: number | null;
   currentNetSalary: number | null;
+  isMarried: boolean;
+  childrenCount: number;
   reason: string;
 }
 

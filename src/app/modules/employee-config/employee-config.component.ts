@@ -213,11 +213,13 @@ export class EmployeeConfigComponent implements OnInit {
     return [...c.selectedBenefitCodes].sort().join(',');
   }
 
-  /** Pays, contrat ou avantages modifiés — ce qui change le calcul du net côté serveur. */
+  /** Pays, contrat, avantages ou situation familiale modifiés — ce qui change le calcul du
+   *  net côté serveur. */
   private readonly calcInputsChanged = computed(() => {
     const a = this.config(), b = this.savedConfig();
     if (!a || !b) return false;
     return a.paysId !== b.paysId || a.contractType !== b.contractType
+      || a.isMarried !== b.isMarried || a.childrenCount !== b.childrenCount
       || EmployeeConfigComponent.benefitKey(a) !== EmployeeConfigComponent.benefitKey(b);
   });
 
@@ -548,6 +550,16 @@ export class EmployeeConfigComponent implements OnInit {
     if (cfg) this.config.set({ ...cfg, contractType });
   }
 
+  onMarriedChange(isMarried: boolean): void {
+    const cfg = this.config();
+    if (cfg) this.config.set({ ...cfg, isMarried });
+  }
+
+  onChildrenCountChange(childrenCount: number | null): void {
+    const cfg = this.config();
+    if (cfg) this.config.set({ ...cfg, childrenCount: childrenCount ?? 0 });
+  }
+
   /** Brut saisi → net recalculé automatiquement après une courte pause de frappe. */
   onGrossSalaryChange(currentGrossSalary: number | null): void {
     const cfg = this.config();
@@ -655,6 +667,8 @@ export class EmployeeConfigComponent implements OnInit {
       selectedBenefitCodes: cfg.selectedBenefitCodes,
       currentGrossSalary: cfg.currentGrossSalary,
       currentNetSalary: cfg.currentNetSalary,
+      isMarried: cfg.isMarried,
+      childrenCount: cfg.childrenCount,
       reason,
     }).subscribe({
       next: updated => {
