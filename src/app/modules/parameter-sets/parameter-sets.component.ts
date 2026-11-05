@@ -1098,10 +1098,6 @@ export class ParameterSetsComponent implements OnInit {
       subtitle: this.itemTitle(ps),
       icon: 'payments',
       size: 'xl',
-      minWidth: '360px',
-      minHeight: '260px',
-      resizable: true,
-      maximizable: true,
       body: tpl,
     });
   }
@@ -1165,10 +1161,6 @@ export class ParameterSetsComponent implements OnInit {
       subtitle: this.itemTitle(ps),
       icon: 'receipt_long',
       size: 'xl',
-      minWidth: '360px',
-      minHeight: '260px',
-      resizable: true,
-      maximizable: true,
       body: tpl,
     });
   }
@@ -1307,10 +1299,6 @@ export class ParameterSetsComponent implements OnInit {
       icon: step === 'submit' ? 'send' : 'verified',
       body: tpl,
       size: 'sm',
-      minWidth: '360px',
-      minHeight: '260px',
-      resizable: true,
-      maximizable: true,
       closeOnBackdrop: false,
     });
   }

@@ -430,10 +430,6 @@ export class BenefitsCatalogueAdminComponent implements OnInit {
       icon: 'redeem',
       body: this.benefitTpl(),
       size: 'md',
-      minWidth: '360px',
-      minHeight: '260px',
-      resizable: true,
-      maximizable: true,
       closeOnBackdrop: false,
     });
   }
