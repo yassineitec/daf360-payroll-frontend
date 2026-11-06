@@ -21,6 +21,7 @@ import {
   SocialChargeRateDto,
   PayrollRubriqueDto,
   parseRubriquesApplied,
+  FxRateDto,
 } from '../../core/payroll-api.service';
 import { HrRefApiService, RefDataItemDto } from '../../core/hr-ref-api.service';
 import { UserStore } from '../../core/user.store';
@@ -327,6 +328,9 @@ export class SimulatorComponent implements OnDestroy {
   // ── Reference data, all straight from the DB ───────────────────────────────
   /** `GET /api/payroll/ref/pays` — the payroll service's synced country reference. */
   readonly paysList    = signal<PaysDto[]>([]);
+  /** `GET /api/payroll/ref/fx-rates` — currencies the amount field's picker can offer, besides
+   *  the country's own working currency (always offered, never needs a fetched rate). */
+  readonly fxRates = signal<FxRateDto[]>([]);
   /** `GET /api/hr/lists/GRADE` — RH's configurable list, global + country values. */
   readonly grades      = signal<RefDataItemDto[]>([]);
   /** `GET /api/hr/lists/DISCIPLINE` — same list mechanism. */
@@ -348,6 +352,7 @@ export class SimulatorComponent implements OnDestroy {
     profileUserId:  [null as number | null],
     inputNet:       [null as number | null, [Validators.required, Validators.min(1)]],
     inputGross:     [null as number | null],  // used when mode = BRUT_TO_NET
+    inputCurrency:  [null as string | null],  // null = the country's working currency
     contractType:   ['CDI'],
     joursTravailes: [22, [Validators.min(1), Validators.max(31)]],
     isMarried:      [false],
@@ -378,6 +383,33 @@ export class SimulatorComponent implements OnDestroy {
   readonly currency = computed(() =>
     this.result()?.localCurrency ?? this.selectedPays()?.devise ?? '',
   );
+
+  /** The field's current currency: what's explicitly selected, or the country's working
+   *  currency when nothing has been chosen yet (today's default, unchanged). */
+  readonly currentCurrency = computed(() =>
+    this.formValue().inputCurrency ?? this.currency());
+
+  /** Working currency first (it's always valid, even before fxRates has loaded), then every
+   *  other currency payroll has a cached rate for, alphabetically. */
+  readonly currencyOptions = computed((): SelectOption[] => {
+    const working = this.currency();
+    const others = this.fxRates()
+      .map(r => r.currencyCode)
+      .filter(c => c !== working)
+      .sort();
+    return [working, ...others]
+      .filter((c): c is string => !!c)
+      .map(c => ({ value: c, label: c }));
+  });
+
+  setCurrency(selected: string[]): void {
+    const picked = selected[0];
+    // Treat "picked back the working currency" as null, not as an explicit match: it's the
+    // same thing submit()/IndividualSimulationService already treat as "no conversion".
+    this.form.get('inputCurrency')!.setValue(picked && picked !== this.currency() ? picked : null);
+  }
+
+  readonly currencySelection = computed((): string[] => [this.currentCurrency()].filter(Boolean) as string[]);
 
   // ── Parameter set ──────────────────────────────────────────────────────────
 
@@ -1537,11 +1569,13 @@ export class SimulatorComponent implements OnDestroy {
       pays:        this.api.listPays().pipe(catchError(() => of([] as PaysDto[]))),
       grades:      this.hrRef.listGrades().pipe(catchError(() => of([] as RefDataItemDto[]))),
       disciplines: this.hrRef.listDisciplines().pipe(catchError(() => of([] as RefDataItemDto[]))),
+      fxRates:     this.api.getFxRates().pipe(catchError(() => of([] as FxRateDto[]))),
     }).pipe(takeUntil(this.destroy$))
-      .subscribe(({ pays, grades, disciplines }) => {
+      .subscribe(({ pays, grades, disciplines, fxRates }) => {
         this.paysList.set(pays);
         this.grades.set(grades);
         this.disciplines.set(disciplines);
+        this.fxRates.set(fxRates);
         this.firstLoad.set(false);
       });
   }

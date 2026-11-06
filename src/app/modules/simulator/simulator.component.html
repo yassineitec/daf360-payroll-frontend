@@ -341,7 +341,6 @@
                           align: 'end',
                           placeholder:
                             'PAYROLL.SIMULATOR.STEP2.NET_PLACEHOLDER' | translate,
-                          suffixText: currency(),
                           hint:
                             period() === 'YEARLY'
                               ? ('PAYROLL.SIMULATOR.STEP2.AMOUNT_HINT_YEARLY'
@@ -363,7 +362,6 @@
                           align: 'end',
                           placeholder:
                             'PAYROLL.SIMULATOR.STEP2.GROSS_PLACEHOLDER' | translate,
-                          suffixText: currency(),
                           hint:
                             period() === 'YEARLY'
                               ? ('PAYROLL.SIMULATOR.STEP2.AMOUNT_HINT_YEARLY'
@@ -375,6 +373,16 @@
                         (valueChange)="setFieldValue('inputGross', $event)"
                       />
                     }
+                    <daf-select
+                      class="mt-2 block"
+                      [options]="currencyOptions()"
+                      [config]="{
+                        label: 'PAYROLL.SIMULATOR.STEP2.CURRENCY_LABEL' | translate,
+                        hint: 'PAYROLL.SIMULATOR.STEP2.CURRENCY_HINT' | translate: { working: currency() },
+                      }"
+                      [selected]="currencySelection()"
+                      (selectedChange)="setCurrency($event)"
+                    />
                   </div>
                   <div class="flex-1 min-w-0">
                     <daf-form-field
