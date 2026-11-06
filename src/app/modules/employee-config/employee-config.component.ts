@@ -195,7 +195,7 @@ export class EmployeeConfigComponent implements OnInit {
   /** Sous le libellé de l'avantage : valeur mensuelle et régime fiscal, comme l'étape
    *  « Avantages » du simulateur. */
   benefitHint(b: BenefitCatalogueDto): string {
-    const value = this.money(b.monthlyValue, this.salaryCurrency());
+    const value = this.money(b.monthlyValue, this.salaryRealCurrency());
     const tax = this.t(b.isTaxable ? 'PAYROLL.SIMULATOR.STEP3.TAXABLE' : 'PAYROLL.SIMULATOR.STEP3.EXEMPT');
     return value ? `${this.t('PAYROLL.EMPLOYEE_CONFIG.BENEFIT_PER_MONTH', { amount: value })} · ${tax}` : tax;
   }
@@ -213,17 +213,17 @@ export class EmployeeConfigComponent implements OnInit {
    *  fetched rate) — same source the Simulator's own currency picker uses. */
   readonly fxRates = signal<FxRateDto[]>([]);
 
-  /** The field's current currency: what's explicitly selected on the in-progress config,
-   *  or the working currency when nothing has been chosen yet. */
+  /** The field's current currency: what's explicitly selected on the in-progress config, or
+   *  `salaryRealCurrency` when nothing has been chosen yet. */
   readonly currentCurrency = computed(() =>
-    this.config()?.inputCurrency ?? this.salaryCurrency());
+    this.config()?.inputCurrency ?? this.salaryRealCurrency());
 
-  /** Working currency first (always valid, even before fxRates has loaded), then every
+  /** Native/working currency first (always valid, even before fxRates has loaded), then every
    *  other currency payroll has a cached rate for, alphabetically — same ordering as the
    *  Simulator's own picker. Named distinctly from `currencyOptions` below (the bonus-form
    *  currency list), which already owns that name on this component. */
   readonly salaryCurrencyOptions = computed((): SelectOption[] => {
-    const working = this.salaryCurrency();
+    const working = this.salaryRealCurrency();
     const others = this.fxRates()
       .map(r => r.currencyCode)
       .filter(c => c !== working)
@@ -247,35 +247,44 @@ export class EmployeeConfigComponent implements OnInit {
   /** Mirrors the backend's FxEntryConversionService.NATIVE_CURRENCY_BY_PAYS_ID: countries
    *  whose platform "working currency" is a deliberate accounting label for a different real
    *  currency, not that currency itself (Tunisia's "EUR" stands for real TND, Egypt's "USD"
-   *  for real EGP). Picking that real currency must be a no-op, not a rate conversion. */
+   *  for real EGP — a convention shared with, and only meaningful to, the separate
+   *  affaire/invoicing side, which legitimately bills in that label's real currency; payroll
+   *  just reuses the same per-country `devise` field). Picking that real currency, or the
+   *  default before anything is picked, must be a no-op relabel, not a rate conversion. */
   private static readonly NATIVE_CURRENCY_BY_PAYS_ID: Record<number, string> = {
     179: 'TND', // Tunisie
     53: 'EGP',  // Egypte
   };
 
-  private isNativeCurrencyForCurrentPays(currencyCode: string): boolean {
-    const paysId = this.config()?.paysId;
-    return paysId != null
-      && EmployeeConfigComponent.NATIVE_CURRENCY_BY_PAYS_ID[paysId] === currencyCode;
+  /** The REAL currency a `paysId`'s salary figures are actually in: its native currency when
+   *  it has one (Tunisia's salaries are always entered in TND even though the platform's
+   *  working-currency label is "EUR"), its raw working-currency label (`devise`) otherwise. */
+  private static realCurrencyFor(paysId: number | null | undefined, devise: string): string {
+    return (paysId != null ? EmployeeConfigComponent.NATIVE_CURRENCY_BY_PAYS_ID[paysId] : undefined) ?? devise;
   }
 
-  /** `currentNetSalary` is always computed/stored in the working currency — this
-   *  reformats it for display in whatever currency "Devise saisie" currently shows,
-   *  using the SAME payroll_fx_rates-sourced `fxRates` the picker already loaded (never
-   *  a different rate source: mixing sources is exactly what caused a real round-trip
-   *  bug in the Simulator earlier). Falls back to the raw working-currency value when a
-   *  rate is missing, rather than guessing. When `target` is the country's own native
-   *  currency (see `isNativeCurrencyForCurrentPays`), the stored amount already IS that
-   *  real figure (the backend's entry conversion is itself a no-op for it) — relabel only.
+  /** `realCurrencyFor` of the config currently being edited. Public so the "Devise saisie"
+   *  hint can explain what the default means. */
+  readonly salaryRealCurrency = computed(() =>
+    EmployeeConfigComponent.realCurrencyFor(this.config()?.paysId, this.salaryCurrency()));
+
+  /** `currentNetSalary` is always computed/stored in the working currency label, but that
+   *  label isn't always `salaryRealCurrency`, the REAL currency the number is in. This
+   *  reformats it for display in whatever currency "Devise saisie" currently shows, converting
+   *  FROM the real currency (never from the raw working-currency label, which would silently
+   *  apply a conversion to a number that's already real), using the SAME
+   *  payroll_fx_rates-sourced `fxRates` the picker already loaded (never a different rate
+   *  source: mixing sources is exactly what caused a real round-trip bug in the Simulator
+   *  earlier). Falls back to the raw value when a rate is missing, rather than guessing.
    *  Rounded to a whole number for display — the stored value itself keeps full precision. */
   readonly netInCurrentCurrency = computed((): number | null => {
     const net = this.config()?.currentNetSalary;
     if (net == null) return null;
-    const working = this.salaryCurrency();
+    const trueCurrency = this.salaryRealCurrency();
     const target = this.currentCurrency();
     let value = net;
-    if (working && target && target !== working && !this.isNativeCurrencyForCurrentPays(target)) {
-      const fromRate = this.rateToEur(working);
+    if (trueCurrency && target && target !== trueCurrency) {
+      const fromRate = this.rateToEur(trueCurrency);
       const toRate = this.rateToEur(target);
       if (fromRate != null && toRate != null) value = net * fromRate / toRate;
     }
@@ -286,9 +295,10 @@ export class EmployeeConfigComponent implements OnInit {
     const cfg = this.config();
     if (!cfg) return;
     const picked = selected[0];
-    // Picking back the working currency is treated as null, not an explicit match — same
-    // "no conversion" convention the backend already uses.
-    this.config.set({ ...cfg, inputCurrency: picked && picked !== this.salaryCurrency() ? picked : null });
+    const working = this.salaryRealCurrency();
+    // Picking back the native/working currency is treated as null, not an explicit match —
+    // same "no conversion" convention the backend already uses.
+    this.config.set({ ...cfg, inputCurrency: picked && picked !== working ? picked : null });
   }
 
   // ── État ───────────────────────────────────────────────────────────────
@@ -406,7 +416,8 @@ export class EmployeeConfigComponent implements OnInit {
 
   readonly historyRows = computed<TableRow[]>(() =>
     this.history().map((h, i) => {
-      const cur = this.paysList().find(p => p.id === h.paysId)?.devise ?? '';
+      const cur = EmployeeConfigComponent.realCurrencyFor(
+        h.paysId, this.paysList().find(p => p.id === h.paysId)?.devise ?? '');
       return {
         id:       `${h.changedAt}-${i}`,
         _at:      h.changedAt,
