@@ -333,6 +333,9 @@ export class SimulatorComponent implements OnDestroy {
   /** `GET /api/payroll/ref/fx-rates` — currencies the amount field's picker can offer, besides
    *  the country's own working currency (always offered, never needs a fetched rate). */
   readonly fxRates = signal<FxRateDto[]>([]);
+  /** `GET /api/payroll/ref/pays/payroll` — the countries active in the engine (« Pays de
+   *  paie » in /payroll/admin), the only ones offered in the country picker. */
+  readonly payrollPays = signal<PaysDto[]>([]);
   /** `GET /api/hr/lists/GRADE` — RH's configurable list, global + country values. */
   readonly grades      = signal<RefDataItemDto[]>([]);
   /** `GET /api/hr/lists/DISCIPLINE` — same list mechanism. */
@@ -785,9 +788,14 @@ export class SimulatorComponent implements OnDestroy {
   // Built in computeds, not inline in the template: an inline `.map()` rebuilds the
   // array on every change-detection cycle and re-renders the panel with it.
 
-  readonly paysOptions = computed((): SelectOption[] =>
-    this.paysList().map(p => ({ value: String(p.id), label: `${p.frenchLabel} (${p.isoCode})` })),
-  );
+  // Payroll countries only; a reopened simulation keeps its own country even if it has
+  // since been deactivated, so the picker never shows an empty value.
+  readonly paysOptions = computed((): SelectOption[] => {
+    const list = this.payrollPays();
+    const current = this.selectedPays();
+    return (current && !list.some(p => p.id === current.id) ? [...list, current] : list)
+      .map(p => ({ value: String(p.id), label: `${p.frenchLabel} (${p.isoCode})` }));
+  });
 
   readonly gradeOptions = computed((): SelectOption[] =>
     this.grades().map(g => ({ value: g.labelFr, label: g.labelFr })),
@@ -1598,12 +1606,14 @@ export class SimulatorComponent implements OnDestroy {
   private loadInitialReferences(): void {
     forkJoin({
       pays:        this.api.listPays().pipe(catchError(() => of([] as PaysDto[]))),
+      payrollPays: this.api.listPayrollPays().pipe(catchError(() => of([] as PaysDto[]))),
       grades:      this.hrRef.listGrades().pipe(catchError(() => of([] as RefDataItemDto[]))),
       disciplines: this.hrRef.listDisciplines().pipe(catchError(() => of([] as RefDataItemDto[]))),
       fxRates:     this.api.getFxRates().pipe(catchError(() => of([] as FxRateDto[]))),
     }).pipe(takeUntil(this.destroy$))
-      .subscribe(({ pays, grades, disciplines, fxRates }) => {
+      .subscribe(({ pays, payrollPays, grades, disciplines, fxRates }) => {
         this.paysList.set(pays);
+        this.payrollPays.set(payrollPays);
         this.grades.set(grades);
         this.disciplines.set(disciplines);
         this.fxRates.set(fxRates);

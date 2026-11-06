@@ -115,7 +115,7 @@
 
           <div class="field-row">
             <daf-select
-              [options]="paysOptions()"
+              [options]="payrollPaysOptions()"
               [selected]="newSetForm.get('paysId')!.value ? ['' + newSetForm.get('paysId')!.value] : []"
               [config]="{ label: 'PAYROLL.ADMIN.PAYS' | translate, placeholder: 'PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate, searchable: true, fullWidth: true, required: true, error: newSetFieldError('paysId') }"
               (selectedChange)="setNewSetValue('paysId', $event[0] ? +$event[0] : null)">

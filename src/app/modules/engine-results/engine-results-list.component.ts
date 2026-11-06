@@ -1,6 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { catchError, forkJoin, map, of } from 'rxjs';
@@ -30,13 +29,11 @@ import {
   type TableRow,
   type ToolbarToggleOption,
 } from '@khalilrebhiitec/daf360';
-import { environment } from '../../../environments/environment';
+import { PayrollApiService, type PaysDto } from '../../core/payroll-api.service';
 import { rememberEmployee } from './engine-results-employee';
 import { TableSort, delegatedSort, tableTools, toTableSort } from '../../shared/table-tools';
 import { EngineResultsListStateService } from './engine-results-list-state.service';
 import { PaysNamesService } from '../../core/pays-names.service';
-
-interface PaysItem { id: number; iso_code: string; french_label: string; }
 
 /** Return shape of `total()` — the summed amount plus whether it relied on a fallback rate. */
 interface TotalResult { value: number; approximate: boolean; }
@@ -71,7 +68,7 @@ export class EngineResultsListComponent implements OnInit {
   private readonly hrService = inject(HrProfileService);
   private readonly engineApi = inject(PayrollEngineService);
   private readonly currency  = inject(CurrencyService);
-  private readonly http      = inject(HttpClient);
+  private readonly payrollApi = inject(PayrollApiService);
   private readonly router    = inject(Router);
   private readonly route     = inject(ActivatedRoute);
   private readonly translate = inject(TranslateService);
@@ -98,7 +95,8 @@ export class EngineResultsListComponent implements OnInit {
   readonly page     = signal(0);
   readonly pageSize = signal(20);
 
-  private readonly paysList = signal<PaysItem[]>([]);
+  /** Pays actifs de « Pays de paie » (/payroll/admin) — choix du filtre « Pays ». */
+  private readonly paysList = signal<PaysDto[]>([]);
   private readonly filterOptions = signal<EmployeeFilterOptions | null>(null);
 
   // ── Mémoire de la liste ────────────────────────────────────────────────────
@@ -144,8 +142,8 @@ export class EngineResultsListComponent implements OnInit {
 
   ngOnInit(): void {
     this.restoreState();
-    this.http.get<PaysItem[]>(`${environment.hrApiUrl}/api/hr/config/hs/pays-list`)
-      .pipe(catchError(() => of([] as PaysItem[])))
+    this.payrollApi.listPayrollPays()
+      .pipe(catchError(() => of([] as PaysDto[])))
       .subscribe(list => this.paysList.set(list));
     // Aucun filtre pays par défaut : la liste affiche tout le personnel et le bandeau KPI
     // les totaux de tous les pays ; choisir un pays recharge ces mêmes tuiles pour lui.
@@ -433,7 +431,7 @@ export class EngineResultsListComponent implements OnInit {
     type: 'select',
     searchable: true,
     placeholder: this.t('PAYROLL.ENGINE_RESULTS.FILTER_ALL'),
-    options: this.paysList().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.french_label)} (${p.iso_code})` })),
+    options: this.paysList().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})` })),
   }, {
     name: 'status',
     label: this.t('PAYROLL.ENGINE_RESULTS.FILTER_STATUS'),

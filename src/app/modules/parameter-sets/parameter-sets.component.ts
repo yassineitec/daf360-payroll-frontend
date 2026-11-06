@@ -277,13 +277,17 @@ export class ParameterSetsComponent implements OnInit {
 
   // ── Pays : `daf-select`, même besoin déjà couvert par la bibliothèque dans
   //    engine-run/engine-results — liste chargée une fois.
+  //    `paysList` = tout le référentiel (« Changer de pays » de l'accueil, comme /rh/admin ;
+  //    libellés, devises des jeux existants) ; `payrollPays` = pays actifs de « Pays de
+  //    paie », les seuls proposés dans « Nouveau jeu » et le filtre de la liste.
   private readonly paysList = signal<PaysDto[]>([]);
-  readonly paysOptions = computed<SelectOption[]>(() =>
-    this.paysList().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})`, imageUrl: flagDataUri(p.isoCode) })),
-  );
+  private readonly payrollPays = signal<PaysDto[]>([]);
+  readonly paysOptions = computed<SelectOption[]>(() => toPaysOptions(this.paysList(), this.paysNames));
+  readonly payrollPaysOptions = computed<SelectOption[]>(() => toPaysOptions(this.payrollPays(), this.paysNames));
 
   ngOnInit(): void {
     this.api.listPays().subscribe(list => this.paysList.set(list));
+    this.api.listPayrollPays().subscribe(list => this.payrollPays.set(list));
 
     // Pays pré-sélectionné : celui de `?pays=` s'il y en a un (lien partagé, rafraîchissement
     // d'un jeu ouvert), sinon celui du profil de l'utilisateur connecté (comme sur
@@ -508,7 +512,7 @@ export class ParameterSetsComponent implements OnInit {
     type: 'select',
     searchable: true,
     placeholder: this.t('PAYROLL.SELECT.PAYS_PLACEHOLDER'),
-    options: this.paysOptions(),
+    options: this.payrollPaysOptions(),
   }, {
     name: 'status',
     label: this.t('PAYROLL.PARAMETER_SETS.STATUS_FILTER_LABEL'),
@@ -2007,6 +2011,11 @@ export class ParameterSetsComponent implements OnInit {
       options: { variant: value ? 'success' : 'neutral', size: 'sm' },
     };
   }
+}
+
+/** Options d'un `daf-select` de pays : libellé traduit, code ISO et drapeau. */
+function toPaysOptions(list: PaysDto[], names: PaysNamesService): SelectOption[] {
+  return list.map(p => ({ value: String(p.id), label: `${names.name(p.id, p.frenchLabel)} (${p.isoCode})`, imageUrl: flagDataUri(p.isoCode) }));
 }
 
 /** Arrondi à 2 décimales d'un taux en pourcentage (0.0918 × 100 = 9.180000000000001). */

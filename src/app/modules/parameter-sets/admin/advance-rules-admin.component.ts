@@ -166,6 +166,8 @@ export class AdvanceRulesAdminComponent implements OnInit {
 
   readonly policies = signal<AdvancePolicy[]>([]);
   readonly pays     = signal<PaysDto[]>([]);
+  /** Pays actifs de « Pays de paie » — `pays` garde tout le référentiel pour les libellés. */
+  readonly payrollPays = signal<PaysDto[]>([]);
   readonly loading  = signal(true);
   /** Échec du chargement des règles : bandeau d'erreur plutôt qu'une liste vide trompeuse. */
   readonly loadError = signal(false);
@@ -191,6 +193,7 @@ export class AdvanceRulesAdminComponent implements OnInit {
 
   ngOnInit(): void {
     this.payrollApi.listPays().pipe(catchError(() => of([] as PaysDto[]))).subscribe(p => this.pays.set(p));
+    this.payrollApi.listPayrollPays().pipe(catchError(() => of([] as PaysDto[]))).subscribe(p => this.payrollPays.set(p));
     this.svc.policies().subscribe({
       next: list => { this.policies.set(list); this.loading.set(false); },
       error: () => { this.loadError.set(true); this.loading.set(false); },
@@ -201,10 +204,10 @@ export class AdvanceRulesAdminComponent implements OnInit {
     return this.paysNames.name(id, this.pays().find(p => p.id === id)?.frenchLabel ?? `#${id}`);
   }
 
-  /** Pays sans règle encore — les seuls proposés à l'ajout. */
+  /** Pays de paie actifs sans règle encore — les seuls proposés à l'ajout. */
   readonly freePaysOptions = computed<SelectOption[]>(() => {
     const taken = new Set(this.policies().map(p => p.paysId));
-    return this.pays().filter(p => !taken.has(p.id)).map(p => ({ value: String(p.id), label: this.paysNames.name(p.id, p.frenchLabel), imageUrl: flagDataUri(p.isoCode) }));
+    return this.payrollPays().filter(p => !taken.has(p.id)).map(p => ({ value: String(p.id), label: this.paysNames.name(p.id, p.frenchLabel), imageUrl: flagDataUri(p.isoCode) }));
   });
 
   readonly stateOptions = computed<SelectOption[]>(() => [
