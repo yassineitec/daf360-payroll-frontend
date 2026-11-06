@@ -235,6 +235,33 @@ export class EmployeeConfigComponent implements OnInit {
 
   readonly currencySelection = computed((): string[] => [this.currentCurrency()].filter(Boolean) as string[]);
 
+  /** 1 `currency` = `rateToEur` EUR. EUR itself is hardcoded to 1 (it's never a row in
+   *  `fxRates` — same convention as the backend's FxEntryConversionService). Null when
+   *  no cached rate exists for a non-EUR currency, so callers can fall back rather than
+   *  guess. */
+  private rateToEur(currency: string): number | null {
+    if (currency === 'EUR') return 1;
+    return this.fxRates().find(r => r.currencyCode === currency)?.rateToEur ?? null;
+  }
+
+  /** `currentNetSalary` is always computed/stored in the working currency — this
+   *  reformats it for display in whatever currency "Devise saisie" currently shows,
+   *  using the SAME payroll_fx_rates-sourced `fxRates` the picker already loaded (never
+   *  a different rate source: mixing sources is exactly what caused a real round-trip
+   *  bug in the Simulator earlier). Falls back to the raw working-currency value when a
+   *  rate is missing, rather than guessing. */
+  readonly netInCurrentCurrency = computed((): number | null => {
+    const net = this.config()?.currentNetSalary;
+    if (net == null) return null;
+    const working = this.salaryCurrency();
+    const target = this.currentCurrency();
+    if (!working || !target || target === working) return net;
+    const fromRate = this.rateToEur(working);
+    const toRate = this.rateToEur(target);
+    if (fromRate == null || toRate == null) return net;
+    return net * fromRate / toRate;
+  });
+
   setCurrency(selected: string[]): void {
     const cfg = this.config();
     if (!cfg) return;

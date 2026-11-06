@@ -130,10 +130,10 @@
                 <daf-form-field
                   [options]="{
                     label: 'PAYROLL.EMPLOYEE_CONFIG.CURRENT_SALARY' | translate, type: 'number', align: 'end',
-                    suffixText: salaryCurrency(), placeholder: '—', fullWidth: true, readonly: true,
+                    suffixText: currentCurrency(), placeholder: '—', fullWidth: true, readonly: true,
                     hint: calculatingNet() ? ('PAYROLL.EMPLOYEE_CONFIG.NET_CALCULATING' | translate) : netHint()
                   }"
-                  [value]="cfg.currentNetSalary">
+                  [value]="netInCurrentCurrency()">
                 </daf-form-field>
               </div>
               @if (cfg.inputCurrency && cfg.inputAmountOriginal != null) {
