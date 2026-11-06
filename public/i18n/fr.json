@@ -45,7 +45,7 @@
         "SALARY_ADVANCES": "Avances sur salaire",
         "COHORT": "Simulation cohorte",
         "ENGINE_RUN": "Calcul de paie",
-        "ENGINE_RESULTS": "Résultats de paie",
+        "ENGINE_RESULTS": "Charge salariale",
         "CANDIDATE_SIMULATION": "Simulations candidats",
         "CALIBRATION": "Calibration",
         "PARAMETER_SETS": "Paramètres",
@@ -1033,10 +1033,10 @@
       "EXIT_WARNING": "Ce collaborateur est {{status}} : vérifiez que ce calcul est bien voulu.",
       "EXISTING_WARNING": "Un calcul existe déjà pour {{period}} (résultat n° {{id}}). Le relancer enregistrera un nouveau résultat, en plus de l'existant.",
       "EXISTING_CONFIRM_TITLE": "Relancer le calcul ?",
-      "EXISTING_CONFIRM_BODY": "Un calcul existe déjà pour {{name}} en {{period}} (résultat n° {{id}}). Un nouveau résultat sera enregistré à côté de l'existant : les deux apparaîtront dans « Résultats de paie ».",
+      "EXISTING_CONFIRM_BODY": "Un calcul existe déjà pour {{name}} en {{period}} (résultat n° {{id}}). Un nouveau résultat sera enregistré à côté de l'existant : les deux apparaîtront dans « Charge salariale ».",
       "EXISTING_CONFIRM_OK": "Relancer quand même",
       "EXISTING_CONFIRM_CANCEL": "Annuler",
-      "SAVE_NOTE": "Le calcul est enregistré dans « Résultats de paie ».",
+      "SAVE_NOTE": "Le calcul est enregistré dans « Charge salariale ».",
       "RUNNING": "Calcul en cours...",
       "RUN_BUTTON": "Lancer le calcul",
       "RESULT_TITLE": "Résultat — Employé {{employeeId}} — {{month}}/{{year}}",
@@ -1090,7 +1090,7 @@
       "EXPORTING": "Export…",
       "EXPORT_ERROR": "L'export a échoué. Réessayez ou contactez le support.",
       "PRINT": "Imprimer",
-      "OPEN_IN_RESULTS": "Voir dans Résultats de paie",
+      "OPEN_IN_RESULTS": "Voir dans « Charge salariale »",
 
       "EMPTY_TITLE": "Calculez un bulletin en trois étapes",
       "EMPTY_STEP_1": "Choisissez le pays et le collaborateur",
@@ -1154,8 +1154,31 @@
     },
 
     "ENGINE_RESULTS": {
-      "TITLE": "Résultats de paie",
-      "BREADCRUMB": "Résultats de paie",
+      "TITLE": "Charge salariale",
+      "BREADCRUMB": "Charge salariale",
+      "ACTIONS_TITLE": "Actions",
+      "CALC_BUTTON": "Calculer la paie",
+      "CALC_TITLE": "Calculer la paie",
+      "CALC_INCOMPLETE": "Choisissez le pays et le contrat, et indiquez au moins 1 jour travaillé.",
+      "CALC_SUCCESS": "Paie de {{period}} calculée et enregistrée (résultat n° {{id}}).",
+      "BATCH_BUTTON": "Calculer la paie du pays",
+      "BATCH_TITLE": "Calculer la paie du pays",
+      "BATCH_SUBTITLE": "Tous les collaborateurs en poste du pays, pour un mois",
+      "BATCH_WORKDAYS": "Jours travaillés",
+      "BATCH_SKIP_DONE": "Ne pas recalculer les collaborateurs déjà calculés ce mois-ci",
+      "BATCH_TARGETS": "{{count}} collaborateur(s) à calculer pour {{period}}",
+      "BATCH_STAFF": "{{count}} collaborateur(s) en poste dans ce pays.",
+      "BATCH_ALREADY_DONE": "{{count}} déjà calculé(s) ce mois-ci : laissé(s) de côté.",
+      "BATCH_RERUN_WARNING": "{{count}} collaborateur(s) déjà calculé(s) ce mois-ci : un nouveau résultat sera enregistré en plus de l'existant.",
+      "BATCH_UNPRICED_COUNT": "{{count}} collaborateur(s) avec un contrat sans règles de paie dans ce pays : non calculé(s).",
+      "BATCH_UNPRICED": "Contrat {{contract}} sans règles de paie dans ce pays",
+      "BATCH_PROGRESS": "{{done}} / {{total}} calculé(s)",
+      "BATCH_OK": "{{count}} réussi(s)",
+      "BATCH_FAILED": "{{count}} non calculé(s)",
+      "BATCH_STOP": "Arrêter",
+      "BATCH_CLOSE": "Fermer",
+      "BATCH_RUN": "Lancer le calcul ({{count}})",
+      "BATCH_DONE": "{{ok}} bulletin(s) calculé(s) et enregistré(s) pour {{period}}.",
       "EMPLOYEE_LABEL": "Employé",
       "SEARCHING": "Chargement...",
       "SEARCH_BUTTON": "Rechercher",
@@ -1188,7 +1211,7 @@
       "DETAIL_COL_NATURE": "Nature",
       "DETAIL_COL_ASSIETTE": "Assiette",
       "DETAIL_COL_AMOUNT": "Montant",
-      "EMPTY_EMPLOYEE_RESULTS": "Aucun bulletin calculé pour ce collaborateur. Lancez son calcul depuis « Calcul de paie ».",
+      "EMPTY_EMPLOYEE_RESULTS": "Aucun bulletin calculé pour ce collaborateur. Lancez son calcul avec « Calculer la paie », sous la carte Détails.",
       "DETAIL_LINK": "Voir le bulletin",
       "KPI_YEAR_GROSS": "Brut cumulé {{year}}",
       "KPI_YEAR_DEDUCTIONS": "Retenues cumulées {{year}} (cotisations + impôt)",
@@ -1216,6 +1239,8 @@
         "EUR": "Euro",
         "USD": "Dollar américain",
         "EGP": "Livre égyptienne",
+        "SAR": "Riyal saoudien",
+        "AED": "Dirham des Émirats",
         "CONVERTED_NOTE": "montants convertis de {{from}} en {{to}} au taux du jour"
       },
       "KPI_PERIOD": "Indicateurs de paie — dernier mois calculé : {{period}}",
@@ -1229,14 +1254,14 @@
       "KPI_EMPLOYER_COST_HELP": "Ce que la paie de {{period}} coûte à l'entreprise : masse salariale brute + cotisations patronales (Règles de paie actives). Un mois calculé avant le 26/10/2026 garde l'ancienne valeur, fausse, tant qu'il n'est pas relancé.",
       "KPI_NET_TOTAL_HELP": "Somme des nets à payer de tous les collaborateurs calculés sur {{period}} : ce qui sera versé sur les comptes, dans la devise d'affichage choisie.",
       "KPI_COVERAGE": "Collaborateurs calculés",
-      "KPI_COVERAGE_HELP": "Collaborateurs ayant un résultat de paie sur {{period}}, rapportés à l'effectif en poste du pays. La ligne dessous donne ceux qui restent à calculer, depuis « Calcul de paie ».",
+      "KPI_COVERAGE_HELP": "Collaborateurs ayant un résultat de paie sur {{period}}, rapportés à l'effectif en poste du pays. La ligne dessous donne ceux qui restent à calculer, avec « Calculer la paie du pays ».",
       "KPI_NOT_CALCULATED_SUB": "{{count}} non calculé(s)",
       "KPI_ALL_CALCULATED": "tous calculés",
       "KPI_WITHHELD": "Retenues (cotisations + impôt)",
       "KPI_WITHHELD_PCT": "{{pct}} % de la masse brute",
       "KPI_WITHHELD_HELP": "Ce qui sépare la masse brute de la masse nette sur {{period}} : cotisations salariales et impôt sur le revenu retenus sur les salaires.",
       "AMOUNTS_IN": "montants en {{currency}}",
-      "LIST_SUBTITLE": "Choisissez un collaborateur pour consulter ses résultats de paie",
+      "LIST_SUBTITLE": "Choisissez un collaborateur pour consulter sa charge salariale",
       "SEARCH_EMPLOYEE_PLACEHOLDER": "Rechercher par nom ou matricule...",
       "FILTER_EMPLOYEES_TITLE": "Filtrer les collaborateurs",
       "FILTER_PAYS": "Pays",
@@ -1244,6 +1269,10 @@
       "FILTER_IN_POST": "En poste",
       "FILTER_DEPARTMENT": "Département",
       "FILTER_CONTRACT": "Type de contrat",
+      "FILTER_PERIOD": "Période",
+      "FILTER_PERIOD_HINT": "Collaborateurs ayant un résultat de paie sur ces mois ; les indicateurs additionnent les mois de la période.",
+      "FILTER_EMPLOYEES": "Collaborateurs",
+      "KPI_PERIOD_RANGE": "Indicateurs de paie — période : {{period}}",
       "FILTER_YEAR": "Année",
       "FILTER_MONTH": "Mois",
       "COL_EMPLOYEE": "Collaborateur",
@@ -1787,9 +1816,6 @@
         "FILTER_NO_FOREX": "Sans source de change uniquement",
         "COL_PAYS": "Pays",
         "COL_CURRENCY": "Devise",
-        "COL_EUR_RATE": "Taux EUR",
-        "COL_USD_RATE": "Taux USD",
-        "COL_CHF_RATE": "Taux CHF",
         "COL_FISCAL_START": "Début de l'exercice",
         "COL_FOREX": "Sources de change",
         "COL_STATE": "État",
@@ -1801,18 +1827,11 @@
         "EMPTY": "Aucun pays configuré dans le moteur de paie.",
         "ADD": "Ajouter un pays",
         "EDIT_TITLE": "Modifier le pays de paie — {{pays}}",
-        "CURRENCY_HINT": "Code ISO de 3 lettres (TND, EGP, EUR…).",
-        "CURRENCY_MANAGED_ELSEWHERE": "Géré depuis l'écran d'administration des devises d'entité, côté Facturation.",
+        "CURRENCY_HINT": "Code ISO de 3 lettres (TND, EGP, EUR…). Les équivalents EUR, USD et CHF utilisent le taux du jour.",
         "FOREX_HINT": "Facultatif. JSON : un tableau (une entrée par source) ou un objet.",
         "DEACTIVATE_WARNING": "Un pays inactif n'a plus de rubriques moteur ni de calcul de paie.",
         "ERR_PAYS": "Choisissez un pays.",
         "ERR_CURRENCY": "Devise invalide : code ISO de 3 lettres attendu.",
-        "ERR_EUR_RATE": "Taux EUR invalide : doit être strictement positif.",
-        "ERR_USD_RATE": "Taux USD invalide : doit être strictement positif.",
-        "ERR_CHF_RATE": "Taux CHF invalide : doit être strictement positif.",
-        "EUR_RATE_HINT": "Remplace le taux de change EUR par défaut pour ce pays — laisser vide pour utiliser le défaut. Jusqu'à 6 décimales.",
-        "USD_RATE_HINT": "Remplace le taux de change USD par défaut pour ce pays — laisser vide pour utiliser le défaut. Jusqu'à 6 décimales.",
-        "CHF_RATE_HINT": "Remplace le taux de change CHF par défaut pour ce pays — laisser vide pour utiliser le défaut. Jusqu'à 6 décimales.",
         "ERR_FOREX": "Sources de change : JSON invalide (tableau ou objet attendu)."
       },
       "AUDIT": {
@@ -2100,7 +2119,7 @@
       "HELP": {
         "RULES": "Crée les règles de paie d'un pays pour une année (barème de l'impôt, cotisations) et les fait valider par le Directeur Pays et la DAF. Utilisées par le simulateur, les simulations candidats et le net des salaires.",
         "COUNTRIES": "Pays gérés par la paie, avec leur devise, leur exercice fiscal et leur activation.",
-        "ENGINE_PARAMS": "Taux, montants et barèmes du calcul de paie réel (Calcul de paie, Résultats), par version approuvée.",
+        "ENGINE_PARAMS": "Taux, montants et barèmes du calcul de paie réel (Charge salariale), par version approuvée.",
         "RUBRIQUES": "Lignes du bulletin du calcul de paie réel et la façon dont chacune est calculée.",
         "BENEFITS": "Avantages accordés aux collaborateurs (repas, transport, logement) et leur valeur.",
         "ADVANCE_RULES": "Conditions d'accès aux avances sur salaire, par pays.",
@@ -2138,6 +2157,145 @@
       "EMPLOYEE_EMPTY": "Aucun collaborateur trouvé",
       "PAYS_PLACEHOLDER": "Rechercher un pays…",
       "PAYS_EMPTY": "Aucun pays trouvé"
+    }
+  },
+  "GUIDE": {
+    "HELP_CENTER": "Aide & guides",
+    "CLOSE": "Fermer le guide",
+    "STEP_OF": "{{current}} / {{total}}",
+    "PREV": "Précédent",
+    "NEXT": "Suivant",
+    "DONE": "Terminer",
+    "MENU": {
+      "TITLE": "Aide sur : {{page}}",
+      "NO_PAGE": "Choisissez le type d'aide",
+      "NONE": "Cette page n'a pas encore de guide.",
+      "GUIDE": "Guide pas à pas",
+      "GUIDE_HINT": "Une visite guidée de cette page, élément par élément",
+      "VIDEOS": "Vidéos",
+      "VIDEOS_HINT": "{{count}} vidéo(s) de démonstration",
+      "BACK": "Retour",
+      "ALL": "Tout le centre d'aide",
+      "CHAT": "Assistant",
+      "CHAT_HINT": "Posez votre question avec vos propres mots"
+    },
+    "HINT": {
+      "TITLE": "Première visite ?",
+      "TEXT": "Suivez le guide de cette page (1 min).",
+      "START": "Lancer",
+      "LATER": "Plus tard"
+    },
+    "VOICE": {
+      "LISTEN": "Écouter",
+      "STOP": "Arrêter",
+      "ON": "Activer la lecture vocale",
+      "OFF": "Couper la lecture vocale"
+    },
+    "START": "Lancer",
+    "SEARCH": {
+      "SECTION": "Section",
+      "FAQ": "Rechercher une question…",
+      "DOCS": "Rechercher dans la documentation…",
+      "NO_MATCH": "Aucun résultat pour « {{query}} ». Essayez d'autres mots ou posez la question à l'assistant."
+    },
+    "CENTER": {
+      "SUBTITLE": "Guides, questions fréquentes, documentation et contact du support.",
+      "PAGE_HELP": "Aide de la page",
+      "FAQ_TITLE": "Questions fréquentes",
+      "DOCS_TITLE": "Documentation",
+      "GUIDES": "Guides interactifs",
+      "OPEN_PAGE": "Ouvrir",
+      "NEEDS_RECORD": "Ce guide se lance depuis une fiche : ouvrez la fiche voulue, puis « Aide & guides » en bas du menu.",
+      "PICK_RECORD": "Choisir une fiche",
+      "VIDEOS_TITLE": "Tutoriels vidéo",
+      "MINUTES": "{{count}} min",
+      "SOON": "Bientôt disponible",
+      "SUPPORT_TITLE": "Support",
+      "SUPPORT_TEXT": "Vous n'avez pas trouvé votre réponse ? Contactez le support technique.",
+      "FAQ": {
+        "HOME": {
+          "WHAT": {
+            "Q": "À quoi sert la page d'accueil Paie ?",
+            "A": "Elle regroupe, sous forme de cartes, tous les écrans de paie que vos droits vous ouvrent — les mêmes que la barre latérale. Un clic sur une carte ouvre l'écran."
+          },
+          "MISSING": {
+            "Q": "Il me manque une carte, pourquoi ?",
+            "A": "Chaque écran demande ses propres droits de paie. Une carte absente ici l'est aussi dans la barre latérale : demandez le droit correspondant à votre administrateur."
+          },
+          "EMPTY": {
+            "Q": "Je ne vois aucune carte",
+            "A": "Votre compte n'a encore aucun droit sur les écrans de paie. Demandez à votre administrateur de vous attribuer un rôle Paie."
+          },
+          "CURRENCY": {
+            "Q": "Changer de devise modifie-t-il les montants de paie ?",
+            "A": "Non. La bulle des devises ne change que l'affichage : les montants sont convertis au taux du jour, à titre indicatif. Les montants calculés et enregistrés, eux, ne bougent pas."
+          },
+          "SIMULATE": {
+            "Q": "Comment simuler un salaire ?",
+            "A": "Avec « Simulateur manuel » : net vers brut ou brut vers net, avec le coût employeur. Pour un groupe d'employés, « Simulation cohorte » ; pour un candidat, « Simulations candidats »."
+          },
+          "PAYSLIP": {
+            "Q": "Où trouver les fiches de paie ?",
+            "A": "Dans « Fiches de paie », qui découpe et classe les fiches mensuelles par employé."
+          },
+          "REAL_RUN": {
+            "Q": "Quelle différence entre une simulation et le calcul de paie ?",
+            "A": "Une simulation estime un salaire sans lancer la paie. « Charge salariale » calcule réellement la paie (par collaborateur ou pour tout un pays) et en garde les résultats."
+          },
+          "LANGUAGE": {
+            "Q": "Comment changer la langue ?",
+            "A": "Le module suit la langue choisie dans l'application (sélecteur de langue du portail) : français ou anglais."
+          }
+        }
+      },
+      "CHAT": {
+        "NAME": "Assistant",
+        "TAGLINE": "Réponses tirées de la FAQ et de la documentation",
+        "OPEN": "Ouvrir l'assistant",
+        "ASK": "Poser une question",
+        "OPEN_PAGE": "Ouvrir la page",
+        "TITLE": "Posez votre question",
+        "HELLO": "Bonjour ! Que voulez-vous faire ? Écrivez votre question, ou choisissez-en une ci-dessous.",
+        "PLACEHOLDER": "Ex. : comment est calculé le RAF ?",
+        "SEND": "Envoyer",
+        "CLEAR": "Effacer la conversation",
+        "NO_ANSWER": "Je n'ai pas trouvé de réponse à cette question. Essayez avec d'autres mots, ou parcourez les questions fréquentes ci-dessous.",
+        "SOURCE": "Source : {{page}} › {{kind}}",
+        "START_GUIDE": "Lancer le guide",
+        "SEE_ALSO": "Voir aussi",
+        "HELPFUL": "Cette réponse vous aide ?",
+        "YES": "Oui, cette réponse m’aide",
+        "NO": "Non, cette réponse ne m’aide pas",
+        "THANKS": "Merci pour votre retour.",
+        "GREETING": "Bonjour ! Je suis l'assistant Paie. Posez-moi une question sur l'application, par exemple « comment simuler un salaire ? », ou choisissez-en une ci-dessous.",
+        "NOTHING_FOR": "Je n’ai rien trouvé pour « {{text}} ».",
+        "DID_YOU_MEAN_ONE": "Vouliez-vous dire « {{word}} » ?",
+        "YES_SHORT": "Oui",
+        "NO_SHORT": "Non",
+        "DID_YOU_MEAN_MANY": "Vouliez-vous dire :",
+        "NONE_OF_THEM": "Aucune de ces propositions"
+      },
+      "KIND_FAQ": "Question fréquente",
+      "KIND_DOC": "Documentation"
+    },
+    "SEE_ALL": "Voir tout le guide",
+    "HOME": {
+      "WELCOME_TITLE": "Bienvenue dans le module Paie",
+      "WELCOME_TEXT": "Cette page donne accès à tous les écrans de paie que vos droits vous ouvrent. Suivez le guide pour en faire le tour.",
+      "MODULES_TITLE": "Les écrans de paie",
+      "MODULES_TEXT": "Chaque carte ouvre un écran, le même que dans la barre latérale. Seuls les écrans autorisés par vos droits apparaissent : deux collègues peuvent donc voir des cartes différentes.",
+      "SIMULATION_TITLE": "Simuler un salaire",
+      "SIMULATION_TEXT": "Le simulateur manuel calcule un salaire net à partir du brut, ou l'inverse, avec son coût employeur. « Simulation cohorte » fait de même pour un groupe d'employés et « Simulations candidats » retrouve celles faites pour des candidats. Une simulation ne lance pas la paie réelle.",
+      "RUN_TITLE": "La paie du mois",
+      "RUN_TEXT": "« Charge salariale » lance le calcul de la paie (un collaborateur ou tout un pays) et en garde les résultats. « Fiches de paie » découpe et classe les fiches mensuelles ; « Avances sur salaire » verse les avances approuvées et suit leurs retenues.",
+      "SETTINGS_TITLE": "L'administration de la paie",
+      "SETTINGS_TEXT": "Les jeux de paramètres, les pays, les rubriques, les avantages, les règles des avances et le journal. Réservée aux profils qui paramètrent la paie.",
+      "CURRENCY_TITLE": "La devise d'affichage",
+      "CURRENCY_TEXT": "La bulle en bas à droite choisit la devise dans laquelle les montants sont affichés. Ils sont convertis au taux du jour, à titre indicatif : les montants calculés et enregistrés ne changent pas.",
+      "CHAT_TITLE": "L'assistant d'aide",
+      "CHAT_TEXT": "Posez ici une question sur l'application, par exemple « comment simuler un salaire ? » : l'assistant répond avec la FAQ et la documentation, et peut lancer le guide de la page concernée.",
+      "HELP_TITLE": "Retrouver ce guide",
+      "HELP_TEXT": "« Aide & guides », en bas de la barre latérale, relance ce guide à tout moment et ouvre la FAQ et la documentation. Vous pouvez aussi activer la lecture vocale avec le haut-parleur en haut de chaque étape."
     }
   }
 }

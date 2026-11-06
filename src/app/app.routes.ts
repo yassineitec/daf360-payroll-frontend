@@ -135,13 +135,9 @@ export const routes: Routes = [
         loadChildren: () =>
           import('./modules/budget/budget.routes').then(m => m.BUDGET_ROUTES),
       },
-      {
-        path: 'engine-run',
-        canActivate: [permissionGuard],
-        data: { permissions: ['PAYROLL_RUN_ENGINE'] },
-        loadChildren: () =>
-          import('./modules/engine-run/engine-run.routes').then(m => m.ENGINE_RUN_ROUTES),
-      },
+      // `/payroll/engine-run` supprimée le 2026-11-06 : le calcul se lance depuis « Charge
+      // salariale » (pop-up par collaborateur, calcul groupé par pays). Ancien lien → la liste.
+      { path: 'engine-run', redirectTo: 'engine-results', pathMatch: 'full' },
       {
         path: 'engine-results',
         canActivate: [permissionGuard],

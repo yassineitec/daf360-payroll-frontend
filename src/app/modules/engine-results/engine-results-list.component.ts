@@ -1,17 +1,27 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, TemplateRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { catchError, forkJoin, map, of } from 'rxjs';
+import { type Observable, type Subscription, catchError, forkJoin, from, map, mergeMap, of, switchMap } from 'rxjs';
+import { NotificationService } from '../../core/notification.service';
+import { UserStore } from '../../core/user.store';
 import {
   HrProfileService, LIFECYCLE_STATUSES, contractTypeLabel, departmentFilterOptions,
   type EmployeeFilterOptions, type EmployeeListItem,
 } from '../../core/hr-profile.service';
+import { dayRange, rangeSeed } from '../../shared/filter-utils';
 import { PayrollEngineService, type PayrollResultsSummaryDto } from '../../core/payroll-engine.service';
 import { CurrencyService } from '../../core/currency.service';
 import {
+  ButtonComponent,
   CardComponent,
+  CheckboxComponent,
   DataTableComponent,
+  FormFieldComponent,
+  ModalService,
+  SelectComponent,
+  type ModalRef,
+  type SelectOption,
   EntityCardComponent,
   MetricCardComponent,
   PageComponent,
@@ -38,6 +48,16 @@ import { PaysNamesService } from '../../core/pays-names.service';
 /** Return shape of `total()` — the summed amount plus whether it relied on a fallback rate. */
 interface TotalResult { value: number; approximate: boolean; }
 
+/** Une page de la liste, qu'elle vienne du service RH ou du découpage local (filtres Période / Collaborateurs). */
+interface ListPage { content: EmployeeListItem[]; totalElements: number; totalPages: number; }
+
+/**
+ * Taille demandée au service RH quand la liste doit être recoupée localement (Période ou
+ * Collaborateurs actifs) : tout le périmètre filtré en une page — le plafond par défaut de
+ * Spring Data. Au-delà, les collaborateurs suivants ne seraient pas recoupés.
+ */
+const ALL_EMPLOYEES = 2000;
+
 /**
  * `/payroll/engine-results` — annuaire des collaborateurs (cartes ou tableau). Un clic
  * ouvre `/payroll/engine-results/:employeeId`, l'historique de paie de ce collaborateur
@@ -54,8 +74,9 @@ interface TotalResult { value: number; approximate: boolean; }
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, TranslatePipe,
-    CardComponent, DataTableComponent, EntityCardComponent, MetricCardComponent, PageComponent,
-    PageHeaderComponent, PaginationComponent, SearchToolbarComponent,
+    ButtonComponent, CardComponent, CheckboxComponent, DataTableComponent, EntityCardComponent,
+    FormFieldComponent, MetricCardComponent, PageComponent, PageHeaderComponent, PaginationComponent,
+    SearchToolbarComponent, SelectComponent,
   ],
   templateUrl: './engine-results-list.component.html',
   styleUrl: './engine-results-list.component.scss',
@@ -90,6 +111,11 @@ export class EngineResultsListComponent implements OnInit {
   readonly statusFilter     = signal<string | null>(null);
   readonly departmentFilter = signal<string | null>(null);
   readonly contractFilter   = signal<string | null>(null);
+  /** Filtre « Période » (daterange, au mois près) : collaborateurs ayant un résultat sur la
+   *  période, et KPI additionnés sur ses mois au lieu du dernier mois calculé. */
+  readonly periodFilter     = signal<Date[] | null>(null);
+  /** Filtre « Collaborateurs » (sélection multiple, userId) : liste et KPI limités à eux. */
+  readonly employeeFilter   = signal<number[]>([]);
   readonly viewMode   = signal<'grid' | 'list'>('grid');
   /** 0-indexé, comme `daf-pagination`. */
   readonly page     = signal(0);
@@ -98,6 +124,8 @@ export class EngineResultsListComponent implements OnInit {
   /** Pays actifs de « Pays de paie » (/payroll/admin) — choix du filtre « Pays ». */
   private readonly paysList = signal<PaysDto[]>([]);
   private readonly filterOptions = signal<EmployeeFilterOptions | null>(null);
+  /** Choix du filtre « Collaborateurs » : le personnel en poste du pays filtré (ou de tous). */
+  private readonly employeeOptions = signal<EmployeeListItem[]>([]);
 
   // ── Mémoire de la liste ────────────────────────────────────────────────────
   private readonly listState = inject(EngineResultsListStateService);
@@ -114,6 +142,8 @@ export class EngineResultsListComponent implements OnInit {
       statusFilter:     this.statusFilter(),
       departmentFilter: this.departmentFilter(),
       contractFilter:   this.contractFilter(),
+      periodFilter:     this.periodFilter(),
+      employeeFilter:   this.employeeFilter(),
       viewMode:         this.viewMode(),
       employeeSort:     this.employeeSort(),
       page:             this.page(),
@@ -134,6 +164,8 @@ export class EngineResultsListComponent implements OnInit {
     this.statusFilter.set(s.statusFilter);
     this.departmentFilter.set(s.departmentFilter);
     this.contractFilter.set(s.contractFilter);
+    this.periodFilter.set(s.periodFilter);
+    this.employeeFilter.set(s.employeeFilter);
     this.viewMode.set(s.viewMode);
     this.employeeSort.set(s.employeeSort);
     this.page.set(s.page);
@@ -148,8 +180,47 @@ export class EngineResultsListComponent implements OnInit {
     // Aucun filtre pays par défaut : la liste affiche tout le personnel et le bandeau KPI
     // les totaux de tous les pays ; choisir un pays recharge ces mêmes tuiles pour lui.
     this.hrService.getFilterOptions().subscribe(o => this.filterOptions.set(o));
+    this.loadEmployeeOptions();
     this.load();
     this.loadKpis();
+  }
+
+  /** Personnel proposé par le filtre « Collaborateurs », suivant le filtre pays. */
+  private loadEmployeeOptions(): void {
+    this.hrService.listEmployees({ paysId: this.paysFilter(), page: 0, size: ALL_EMPLOYEES, sort: 'fullName,asc' })
+      .pipe(catchError(() => of({ content: [] as EmployeeListItem[] })))
+      .subscribe(p => this.employeeOptions.set(p.content ?? []));
+  }
+
+  /** Une période est choisie : le titre des KPI dit « période » au lieu de « dernier mois calculé ». */
+  readonly hasPeriodFilter = computed(() => !!this.periodFilter()?.length);
+
+  /** Bornes `YYYY-MM-DD` du filtre « Période » (null sans filtre). */
+  private periodBounds(): [string | null, string | null] {
+    return dayRange(this.periodFilter());
+  }
+
+  /** Période ou collaborateurs choisis : la liste est recoupée localement (voir `load()`). */
+  private isRestricted(): boolean {
+    const [from, to] = this.periodBounds();
+    return !!(from || to) || this.employeeFilter().length > 0;
+  }
+
+  /**
+   * userId admis par les filtres Période et Collaborateurs (intersection des deux) ; `null`
+   * quand aucun ne s'applique. La période interroge la paie : qui a un résultat sur ses mois.
+   */
+  private allowedIds(): Observable<Set<number> | null> {
+    const [from, to] = this.periodBounds();
+    const picked = this.employeeFilter();
+    const withResults$: Observable<number[] | null> = from || to
+      ? this.engineApi.getEmployeesWithResults({ paysId: this.paysFilter(), from, to })
+      : of(null);
+    return withResults$.pipe(map(ids => {
+      if (!ids) return picked.length ? new Set(picked) : null;
+      const set = new Set(ids);
+      return picked.length ? new Set(picked.filter(id => set.has(id))) : set;
+    }));
   }
 
   // ── Bandeau KPI paie ─────────────────────────────────────────────────
@@ -173,12 +244,16 @@ export class EngineResultsListComponent implements OnInit {
     // Pas de remise à `null` ici : les tuiles restent affichées pendant le chargement,
     // leur contenu est simplement remplacé à l'arrivée de la réponse.
     this.kpiLoading.set(true);
+    const [from, to] = this.periodBounds();
+    const picked = this.employeeFilter();
+    const scope = { from, to, employeeIds: picked };
     const summaries$ = paysId != null
-      ? this.engineApi.getResultsSummary(paysId).pipe(map(s => [s]))
-      : this.engineApi.getAllResultsSummaries().pipe(map(list => list.filter(s => s.employeeCount > 0)));
+      ? this.engineApi.getResultsSummary(paysId, scope).pipe(map(s => [s]))
+      : this.engineApi.getAllResultsSummaries(scope).pipe(map(list => list.filter(s => s.employeeCount > 0)));
     forkJoin({
       summaries: summaries$.pipe(catchError(() => of(null))),
-      headcount: this.hrService.listEmployees({ paysId, page: 0, size: 1 }).pipe(
+      // Collaborateurs choisis : la couverture se rapporte à eux, pas à tout l'effectif.
+      headcount: picked.length ? of(picked.length) : this.hrService.listEmployees({ paysId, page: 0, size: 1 }).pipe(
         map(p => p.totalElements ?? 0),
         catchError(() => of(null)),
       ),
@@ -248,6 +323,15 @@ export class EngineResultsListComponent implements OnInit {
   /** Dernier mois calculé, en toutes lettres (« novembre 2026 ») ; une plage quand les pays
    *  n'en sont pas au même mois. */
   private periodLabel(list: PayrollResultsSummaryDto[]): string {
+    // Filtre « Période » : c'est lui qui borne les totaux, on l'affiche tel quel (au mois près).
+    const [from, to] = this.periodBounds();
+    if (from || to) {
+      const locale = this.translate.getCurrentLang() === 'en' ? 'en-GB' : 'fr-FR';
+      const fmt = (iso: string) => new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, 1)
+        .toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+      const a = from ? fmt(from) : '…', b = to ? fmt(to) : '…';
+      return a === b ? a : `${a} – ${b}`;
+    }
     const keys = list
       .filter(s => s.periodYear && s.periodMonth)
       .map(s => s.periodYear! * 100 + s.periodMonth!)
@@ -375,16 +459,35 @@ export class EngineResultsListComponent implements OnInit {
     const current = ++this.seq;
     this.loading.set(true);
     this.error.set(null);
-    this.hrService.listEmployees({
+    const query = {
       search: this.searchText(),
       paysId: this.paysFilter(),
       status: this.statusFilter() ?? undefined,
       department: this.departmentFilter(),
       contract: this.contractFilter(),
-      page: this.page(),
-      size: this.pageSize(),
       sort: this.employeeSortParam(),
-    }).subscribe({
+    };
+    const size = this.pageSize();
+    // Sans Période ni Collaborateurs : pagination serveur, comme avant. Avec : le service RH
+    // ne sait pas filtrer sur une liste d'identifiants, donc tout le périmètre (autres
+    // filtres et tri appliqués côté RH) est demandé d'un coup, recoupé avec les userId admis,
+    // puis découpé en pages ici.
+    const page$: Observable<ListPage> = !this.isRestricted()
+      ? this.hrService.listEmployees({ ...query, page: this.page(), size })
+      : this.allowedIds().pipe(
+          switchMap(ids => this.hrService.listEmployees({ ...query, page: 0, size: ALL_EMPLOYEES }).pipe(
+            map(p => {
+              const all = (p.content ?? []).filter(e => !ids || ids.has(e.userId));
+              const start = this.page() * size;
+              return {
+                content: all.slice(start, start + size),
+                totalElements: all.length,
+                totalPages: Math.ceil(all.length / size),
+              };
+            }),
+          )),
+        );
+    page$.subscribe({
       next: p => {
         if (current !== this.seq) return;
         // Page restaurée devenue hors limites (collaborateurs sortis entre-temps) : on
@@ -426,6 +529,21 @@ export class EngineResultsListComponent implements OnInit {
   }
 
   readonly filterFields = computed<FilterField[]>(() => [{
+    name: 'period',
+    label: this.t('PAYROLL.ENGINE_RESULTS.FILTER_PERIOD'),
+    type: 'daterange',
+    hint: this.t('PAYROLL.ENGINE_RESULTS.FILTER_PERIOD_HINT'),
+  }, {
+    name: 'employees',
+    label: this.t('PAYROLL.ENGINE_RESULTS.FILTER_EMPLOYEES'),
+    type: 'multiselect',
+    searchable: true,
+    placeholder: this.t('PAYROLL.ENGINE_RESULTS.FILTER_ALL'),
+    options: this.employeeOptions().map(e => ({
+      value: String(e.userId),
+      label: e.employeeId ? `${e.fullName} (${e.employeeId})` : e.fullName,
+    })),
+  }, {
     name: 'pays',
     label: this.t('PAYROLL.ENGINE_RESULTS.FILTER_PAYS'),
     type: 'select',
@@ -462,7 +580,9 @@ export class EngineResultsListComponent implements OnInit {
     triggerLabel: this.t('PAYROLL.ENGINE_RESULTS.FILTER_TRIGGER'),
     // `daf-filter` seeds `initialValues` in its own shape — a `select` is a `string[]`.
     initialValues: {
-      pays:       this.paysFilter() != null ? [String(this.paysFilter())] : [],
+      period:     this.periodFilter(),
+      employees:  this.employeeFilter().map(String),
+      pays:      this.paysFilter() != null ? [String(this.paysFilter())] : [],
       status:     this.statusFilter() ? [this.statusFilter()!] : [],
       department: this.departmentFilter() ? [this.departmentFilter()!] : [],
       contract:   this.contractFilter() ? [this.contractFilter()!] : [],
@@ -471,7 +591,13 @@ export class EngineResultsListComponent implements OnInit {
 
   applyFilters(result: FilterResult): void {
     const raw = result['pays'] as string | null;
+    const paysChanged = (raw ? Number(raw) : null) !== this.paysFilter();
     this.paysFilter.set(raw ? Number(raw) : null);
+    this.periodFilter.set(rangeSeed(result['period']));
+    const picked = result['employees'];
+    this.employeeFilter.set((Array.isArray(picked) ? picked : picked ? [picked] : [])
+      .map(v => Number(v)).filter(n => Number.isFinite(n)));
+    if (paysChanged) this.loadEmployeeOptions();
     this.statusFilter.set((result['status'] as string | null) || null);
     this.departmentFilter.set((result['department'] as string | null) || null);
     this.contractFilter.set((result['contract'] as string | null) || null);
@@ -612,5 +738,240 @@ export class EngineResultsListComponent implements OnInit {
     const e = this.employees().find(x => x.userId === userId);
     if (e) rememberEmployee(e);
     this.router.navigate([userId], { relativeTo: this.route });
+  }
+
+  // ── « Calculer la paie du pays » : calcul groupé, en formulaire pop-up ─────────────────
+  // Le serveur n'a pas de lancement groupé (seulement `/engine/run`, un collaborateur à la
+  // fois) : la pop-up enchaîne les mêmes appels que /payroll/engine-run pour chaque
+  // collaborateur en poste du pays, 3 à la fois, avec avancement et bilan. Contrat : celui
+  // de la fiche RH quand le jeu de paramètres actif du pays le tarifie (CDI sans contrat
+  // RH) ; sinon le collaborateur est signalé, pas calculé avec un contrat deviné. Par
+  // défaut, les collaborateurs déjà calculés pour le mois sont laissés de côté (relancer
+  // AJOUTE un résultat, il ne remplace pas l'existant).
+  private readonly modal        = inject(ModalService);
+  private readonly notification = inject(NotificationService);
+  private readonly destroyRef   = inject(DestroyRef);
+  private readonly userStore    = inject(UserStore);
+  /** Calcul groupé réservé à qui peut lancer le moteur (même droit que `POST /engine/run`). */
+  readonly canRunEngine = computed(() => this.userStore.hasPermission('PAYROLL_RUN_ENGINE'));
+  private readonly batchTpl = viewChild<TemplateRef<unknown>>('batchTpl');
+  private batchRef: ModalRef | null = null;
+  private batchSub: Subscription | null = null;
+  /** Page quittée pendant un lot : les calculs pas encore partis ne partent pas. */
+  private readonly stopBatchOnDestroy = this.destroyRef.onDestroy(() => this.batchSub?.unsubscribe());
+
+  private static readonly LEGACY_CONTRACT: Record<string, string> = {
+    PERMANENT: 'CDI', FIXED_TERM: 'CDD', INTERN: 'STAGE',
+  };
+  private static readonly BATCH_CONCURRENCY = 3;
+
+  readonly batchPaysId   = signal<number | null>(null);
+  readonly batchMonth    = signal(new Date().getMonth() + 1);
+  readonly batchYear     = signal(new Date().getFullYear());
+  readonly batchJours    = signal(22);
+  readonly batchSkipDone = signal(true);
+
+  /** Données du pays et du mois choisis : personnel en poste, déjà calculés, contrats tarifés. */
+  private readonly batchStaff     = signal<EmployeeListItem[]>([]);
+  private readonly batchDoneIds   = signal<Set<number>>(new Set());
+  private readonly batchContracts = signal<string[]>([]);
+  readonly batchPsMissing = signal(false);
+  readonly batchPrepLoading = signal(false);
+
+  readonly batchRunning  = signal(false);
+  readonly batchFinished = signal(false);
+  readonly batchProgress = signal({ done: 0, total: 0, ok: 0, failed: 0 });
+  readonly batchFailures = signal<{ name: string; reason: string }[]>([]);
+
+  readonly batchPaysOptions = computed<SelectOption[]>(() =>
+    this.paysList().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})` })));
+
+  readonly batchMonthOptions = computed<SelectOption[]>(() => {
+    const locale = this.translate.currentLang() === 'en' ? 'en-GB' : 'fr-FR';
+    return Array.from({ length: 12 }, (_, i) => {
+      const name = new Date(2000, i, 1).toLocaleDateString(locale, { month: 'long' });
+      return { value: String(i + 1), label: name.charAt(0).toUpperCase() + name.slice(1) };
+    });
+  });
+
+  readonly batchYearOptions = computed<SelectOption[]>(() => {
+    const now = new Date().getFullYear();
+    const years = new Set<number>([now - 3, now - 2, now - 1, now, now + 1, this.batchYear()]);
+    return [...years].sort((a, b) => b - a).map(y => ({ value: String(y), label: String(y) }));
+  });
+
+  /** Contrat appliqué à un collaborateur, ou `null` si son contrat n'est pas tarifé. */
+  private batchContractOf(e: EmployeeListItem): string | null {
+    const types = this.batchContracts();
+    const code = e.contractType?.trim().toUpperCase();
+    const hr = code ? (EngineResultsListComponent.LEGACY_CONTRACT[code] ?? code) : 'CDI';
+    return types.includes(hr) ? hr : null;
+  }
+
+  /** Collaborateurs à calculer, et ceux laissés de côté (déjà calculés / contrat non tarifé). */
+  readonly batchPlan = computed(() => {
+    const done = this.batchDoneIds();
+    const skipDone = this.batchSkipDone();
+    const targets: { e: EmployeeListItem; contract: string }[] = [];
+    let alreadyDone = 0;
+    const unpriced: EmployeeListItem[] = [];
+    for (const e of this.batchStaff()) {
+      if (skipDone && done.has(e.userId)) { alreadyDone++; continue; }
+      const contract = this.batchContractOf(e);
+      if (contract) targets.push({ e, contract }); else unpriced.push(e);
+    }
+    return { targets, alreadyDone, unpriced, staff: this.batchStaff().length, doneCount: done.size };
+  });
+
+  readonly batchPeriodText = computed(() => {
+    const locale = this.translate.currentLang() === 'en' ? 'en-GB' : 'fr-FR';
+    return new Date(this.batchYear(), this.batchMonth() - 1, 1).toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+  });
+
+  readonly batchPercent = computed(() => {
+    const p = this.batchProgress();
+    return p.total ? Math.round(p.done / p.total * 100) : 0;
+  });
+
+  canBatch(): boolean {
+    return !!this.batchPaysId() && !this.batchPrepLoading() && !this.batchRunning() && !this.batchFinished()
+      && this.batchJours() >= 1 && this.batchPlan().targets.length > 0;
+  }
+
+  openBatch(): void {
+    if (this.batchRunning()) { this.batchRef = this.openBatchModal(); return; }
+    this.batchFinished.set(false);
+    this.batchFailures.set([]);
+    this.batchProgress.set({ done: 0, total: 0, ok: 0, failed: 0 });
+    this.batchMonth.set(new Date().getMonth() + 1);
+    this.batchYear.set(new Date().getFullYear());
+    this.batchJours.set(22);
+    this.batchSkipDone.set(true);
+    // Pays filtré de la liste, s'il y en a un.
+    this.batchPaysId.set(this.paysFilter());
+    this.prepareBatch();
+    this.batchRef = this.openBatchModal();
+  }
+
+  /** Boutons dans le corps du formulaire (template) : ceux de la pop-up ne sont pas réactifs,
+   *  ils ne pourraient ni se griser pendant le calcul ni devenir « Fermer » à la fin. */
+  private openBatchModal(): ModalRef {
+    return this.modal.open({
+      title: this.t('PAYROLL.ENGINE_RESULTS.BATCH_TITLE'),
+      subtitle: this.t('PAYROLL.ENGINE_RESULTS.BATCH_SUBTITLE'),
+      icon: 'calculate',
+      body: this.batchTpl()!,
+      size: 'md',
+      closeOnBackdrop: false,
+      buttons: [],
+    });
+  }
+
+  closeBatch(): void {
+    this.batchRef?.close();
+    this.batchRef = null;
+  }
+
+  onBatchPaysChange(selected: string[]): void {
+    const id = selected[0] ? +selected[0] : null;
+    if (id === this.batchPaysId()) return;
+    this.batchPaysId.set(id);
+    this.prepareBatch();
+  }
+
+  setBatchMonth(selected: string[]): void {
+    if (!selected[0] || +selected[0] === this.batchMonth()) return;
+    this.batchMonth.set(+selected[0]);
+    this.prepareBatch();
+  }
+
+  setBatchYear(selected: string[]): void {
+    if (!selected[0] || +selected[0] === this.batchYear()) return;
+    this.batchYear.set(+selected[0]);
+    this.prepareBatch();
+  }
+
+  private prepSeq = 0;
+  /** Recharge le personnel du pays, les déjà-calculés du mois et les contrats tarifés. */
+  private prepareBatch(): void {
+    const seq = ++this.prepSeq;
+    const paysId = this.batchPaysId();
+    this.batchFinished.set(false);
+    this.batchFailures.set([]);
+    this.batchStaff.set([]);
+    this.batchDoneIds.set(new Set());
+    this.batchContracts.set([]);
+    this.batchPsMissing.set(false);
+    if (paysId == null) { this.batchPrepLoading.set(false); return; }
+    this.batchPrepLoading.set(true);
+    const y = this.batchYear(), m = this.batchMonth();
+    const first = `${y}-${String(m).padStart(2, '0')}-01`;
+    const last = `${y}-${String(m).padStart(2, '0')}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+    forkJoin({
+      staff: this.hrService.listEmployees({ paysId, page: 0, size: ALL_EMPLOYEES, sort: 'fullName,asc' })
+        .pipe(map(p => p.content ?? []), catchError(() => of([] as EmployeeListItem[]))),
+      done: this.engineApi.getEmployeesWithResults({ paysId, from: first, to: last })
+        .pipe(catchError(() => of([] as number[]))),
+      ps: this.payrollApi.getActiveParameterSet(paysId).pipe(catchError(() => of(null))),
+    }).subscribe(r => {
+      if (seq !== this.prepSeq) return;
+      this.batchStaff.set(r.staff);
+      this.batchDoneIds.set(new Set(r.done));
+      this.batchContracts.set([...new Set((r.ps?.socialChargeRates ?? []).map(x => x.contractType))]);
+      this.batchPsMissing.set(!r.ps);
+      this.batchPrepLoading.set(false);
+    });
+  }
+
+  runBatch(): void {
+    if (!this.canBatch()) return;
+    const paysId = this.batchPaysId()!;
+    const periodYear = this.batchYear(), periodMonth = this.batchMonth(), jours = this.batchJours();
+    const plan = this.batchPlan();
+    this.batchRunning.set(true);
+    this.batchFinished.set(false);
+    // Contrats non tarifés : signalés d'emblée dans le bilan, sans appel au moteur.
+    this.batchFailures.set(plan.unpriced.map(e => ({
+      name: e.fullName,
+      reason: this.t('PAYROLL.ENGINE_RESULTS.BATCH_UNPRICED', {
+        contract: e.contractType ? contractTypeLabel(e.contractType, this.translate) : '—',
+      }),
+    })));
+    this.batchProgress.set({ done: 0, total: plan.targets.length, ok: 0, failed: 0 });
+
+    this.batchSub = from(plan.targets).pipe(
+      mergeMap(({ e, contract }) => this.engineApi.runPayroll({
+        employeeId: e.userId, paysId, periodYear, periodMonth, contractTypeCode: contract, joursOuvresMois: jours,
+      }).pipe(
+        map(() => ({ e, error: null as string | null })),
+        catchError(err => of({ e, error: (err?.error?.message as string) ?? this.t('PAYROLL.ENGINE_RUN.ERROR') })),
+      ), EngineResultsListComponent.BATCH_CONCURRENCY),
+    ).subscribe({
+      next: r => {
+        this.batchProgress.update(p => ({
+          ...p, done: p.done + 1, ok: p.ok + (r.error ? 0 : 1), failed: p.failed + (r.error ? 1 : 0),
+        }));
+        if (r.error) this.batchFailures.update(list => [...list, { name: r.e.fullName, reason: r.error! }]);
+      },
+      complete: () => this.finishBatch(),
+    });
+  }
+
+  /** Arrête le lot : les calculs déjà partis vont au bout côté serveur, les suivants non. */
+  stopBatch(): void {
+    this.batchSub?.unsubscribe();
+    this.finishBatch();
+  }
+
+  private finishBatch(): void {
+    if (!this.batchRunning()) return;
+    this.batchSub = null;
+    this.batchRunning.set(false);
+    this.batchFinished.set(true);
+    const p = this.batchProgress();
+    this.notification.success(this.t('PAYROLL.ENGINE_RESULTS.BATCH_DONE', { ok: p.ok, period: this.batchPeriodText() }));
+    // Liste et bandeau KPI à jour avec les nouveaux résultats.
+    this.load();
+    this.loadKpis();
   }
 }

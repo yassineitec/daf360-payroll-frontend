@@ -4,7 +4,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { PayrollEngineService, RunPayrollResponse } from '../../core/payroll-engine.service';
 import { NotificationService } from '../../core/notification.service';
 import { readBlobError, saveBlob } from '../../shared/blob-download';
-import { ButtonComponent, CardComponent, type ToolbarAction } from '@khalilrebhiitec/daf360';
+import { ButtonComponent, CardComponent } from '@khalilrebhiitec/daf360';
 import { monthName } from '../../shared/filter-utils';
 import { PayslipBulletinComponent, employerCostOf, type PayslipTotals } from '../../shared/payslip-bulletin/payslip-bulletin.component';
 
@@ -121,20 +121,8 @@ export class EngineResultDetailComponent {
       ?? (this.result()?.rubriqueDetails ?? []).map(r => r.rubriqueCode);
   }
 
-  readonly toolbarActions = computed<ToolbarAction[]>(() => {
-    const empty = (this.bulletin()?.searchedCodes().length ?? 1) === 0;
-    return [
-      { id: 'export-xlsx', icon: 'download', label: this.t('PAYROLL.ENGINE_RESULTS.EXPORT_XLSX'),
-        position: 'right', disabled: empty || this.exportingXlsx() },
-      { id: 'export-pdf', icon: 'picture_as_pdf', label: this.t('PAYROLL.ENGINE_RESULTS.EXPORT_PDF'),
-        position: 'right', disabled: empty || this.exportingPdf() },
-    ];
-  });
-
-  onToolbarAction(id: string): void {
-    if (id === 'export-xlsx') this.exportXlsx();
-    if (id === 'export-pdf') this.exportPdf();
-  }
+  /** Aucune ligne après la recherche du bulletin : rien à exporter (boutons de la carte Actions grisés). */
+  readonly nothingToExport = computed(() => (this.bulletin()?.searchedCodes().length ?? 1) === 0);
 
   private exportName(ext: string): string {
     const r = this.result()!;

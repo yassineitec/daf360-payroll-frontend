@@ -210,13 +210,6 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
     permissions: PAYROLL_SALARY_ADVANCES_PERMISSIONS,
   },
   {
-    id:          'engine-run',
-    labelKey:    'PAYROLL.layout.NAV.ENGINE_RUN',
-    icon:        'payments',
-    route:       'engine-run',
-    permissions: ['PAYROLL_RUN_ENGINE'],
-  },
-  {
     id:          'engine-results',
     labelKey:    'PAYROLL.layout.NAV.ENGINE_RESULTS',
     icon:        'history',

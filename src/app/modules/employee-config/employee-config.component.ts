@@ -130,11 +130,12 @@ export class EmployeeConfigComponent implements OnInit {
     this.router.navigate(['/payroll/engine-results', this.userId]);
   }
 
-  /** Calcul de paie, collaborateur et pays pré-sélectionnés (lus par /payroll/engine-run). */
+  /** Calcul de paie : fiche « Charge salariale » du collaborateur, pop-up de calcul ouverte
+   *  (`?calc=1`), pays pré-sélectionné (`?pays=`). */
   openEngineRun(): void {
     const paysId = this.savedConfig()?.paysId ?? this.employee()?.paysId ?? null;
-    this.router.navigate(['/payroll/engine-run'], {
-      queryParams: { employee: this.userId, ...(paysId != null ? { pays: paysId } : {}) },
+    this.router.navigate(['/payroll/engine-results', this.userId], {
+      queryParams: { calc: 1, ...(paysId != null ? { pays: paysId } : {}) },
     });
   }
 
