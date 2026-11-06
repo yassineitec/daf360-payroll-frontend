@@ -10,7 +10,9 @@ export interface EngineResultsListState {
   statusFilter:     string | null;
   departmentFilter: string | null;
   contractFilter:   string | null;
-  viewMode:         'grid' | 'list';
+  periodFilter:     Date[] | null;
+  employeeFilter:   number[];
+  viewMode:        'grid' | 'list';
   employeeSort:     TableSort | null;
   page:             number;
   pageSize:         number;

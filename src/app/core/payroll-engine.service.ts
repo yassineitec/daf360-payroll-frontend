@@ -88,6 +88,25 @@ function parseRubriqueDetails(raw: unknown): RubriqueResultItem[] {
 }
 
 /** `GET /engine/results/summary` — période/dates à `null` tant que le pays n'a aucun résultat. */
+/**
+ * Périmètre des KPI de `/payroll/engine-results` : `from`/`to` en `YYYY-MM-DD` (au mois près,
+ * bornes incluses — sans eux, le dernier mois calculé) ; `employeeIds` restreint aux
+ * collaborateurs choisis.
+ */
+export interface ResultsScope {
+  from?: string | null;
+  to?: string | null;
+  employeeIds?: number[] | null;
+}
+
+function scopeParams(scope: ResultsScope): HttpParams {
+  let params = new HttpParams();
+  if (scope.from) params = params.set('from', scope.from);
+  if (scope.to) params = params.set('to', scope.to);
+  if (scope.employeeIds?.length) params = params.set('employeeIds', scope.employeeIds.join(','));
+  return params;
+}
+
 export interface PayrollResultsSummaryDto {
   paysId: number;
   currencyCode: string | null;
@@ -255,6 +274,20 @@ export class PayrollEngineService {
       { params: { lang }, responseType: 'blob' });
   }
 
+  /** Historique de paie d'un collaborateur en Excel (liste des périodes de
+   *  `/payroll/engine-results/:employeeId`) : `resultIds` = résultats affichés, dans l'ordre
+   *  du tableau (recherche, filtres et tri appliqués). */
+  exportResultsHistoryXlsx(employeeId: number, resultIds: number[], lang: string): Observable<Blob> {
+    return this.http.post(`${this.base}/results/employee/${employeeId}/export.xlsx`, { ids: resultIds.map(String) },
+      { params: { lang }, responseType: 'blob' });
+  }
+
+  /** Même historique en PDF (pdf-service) ; `employee` = nom affiché dans l'en-tête. */
+  exportResultsHistoryPdf(employeeId: number, resultIds: number[], lang: string, employee: string): Observable<Blob> {
+    return this.http.post(`${this.base}/results/employee/${employeeId}/export.pdf`, { ids: resultIds.map(String) },
+      { params: { lang, employee }, responseType: 'blob' });
+  }
+
   /** Même sélection en PDF (pdf-service) ; `employee` = nom affiché dans l'en-tête. */
   exportResultRubriquesPdf(resultId: number, codes: string[], lang: string, employee: string): Observable<Blob> {
     return this.http.post(`${this.base}/results/${resultId}/rubriques/export.pdf`, { ids: codes },
@@ -262,13 +295,22 @@ export class PayrollEngineService {
   }
 
   /** Totaux du dernier mois calculé pour un pays (KPI de `/payroll/engine-results`). */
-  getResultsSummary(paysId: number): Observable<PayrollResultsSummaryDto> {
-    return this.http.get<PayrollResultsSummaryDto>(`${this.base}/results/summary`, { params: { paysId } });
+  getResultsSummary(paysId: number, scope: ResultsScope = {}): Observable<PayrollResultsSummaryDto> {
+    return this.http.get<PayrollResultsSummaryDto>(`${this.base}/results/summary`,
+      { params: scopeParams(scope).set('paysId', paysId) });
   }
 
   /** Un résumé par pays paie, chacun dans sa devise — à convertir avant de les additionner. */
-  getAllResultsSummaries(): Observable<PayrollResultsSummaryDto[]> {
-    return this.http.get<PayrollResultsSummaryDto[]>(`${this.base}/results/summary/all`);
+  getAllResultsSummaries(scope: ResultsScope = {}): Observable<PayrollResultsSummaryDto[]> {
+    return this.http.get<PayrollResultsSummaryDto[]>(`${this.base}/results/summary/all`,
+      { params: scopeParams(scope) });
+  }
+
+  /** Collaborateurs (userId) ayant au moins un résultat entre `from` et `to` (au mois près). */
+  getEmployeesWithResults(scope: { paysId?: number | null; from?: string | null; to?: string | null }): Observable<number[]> {
+    let params = scopeParams(scope);
+    if (scope.paysId != null) params = params.set('paysId', scope.paysId);
+    return this.http.get<number[]>(`${this.base}/results/employees`, { params });
   }
 
   // ── Calibration ───────────────────────────────────────────────────────────

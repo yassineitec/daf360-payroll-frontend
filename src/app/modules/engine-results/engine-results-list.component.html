@@ -2,6 +2,12 @@
   <daf-page-header
     [title]="'PAYROLL.ENGINE_RESULTS.TITLE' | translate"
     [subtitle]="'PAYROLL.ENGINE_RESULTS.LIST_SUBTITLE' | translate">
+    <!-- Calcul groupé de la paie d'un pays pour un mois (pop-up, voir `openBatch()`). -->
+    @if (canRunEngine()) {
+      <daf-button pageActions
+        [options]="{ variant: 'teal', iconStart: 'calculate', label: ('PAYROLL.ENGINE_RESULTS.BATCH_BUTTON' | translate) }"
+        (onClick)="openBatch()" />
+    }
   </daf-page-header>
 
   <div class="page-body">
@@ -10,7 +16,7 @@
          `helpTitle` de `daf-metric-card`, le popover natif de la bibliothèque. ─── -->
     @if (kpiTiles(); as k) {
       <p class="kpi-period">
-        {{ 'PAYROLL.ENGINE_RESULTS.KPI_PERIOD' | translate: { period: k.period } }}
+        {{ (hasPeriodFilter() ? 'PAYROLL.ENGINE_RESULTS.KPI_PERIOD_RANGE' : 'PAYROLL.ENGINE_RESULTS.KPI_PERIOD') | translate: { period: k.period } }}
         @if (displayCurrencyName(); as cur) {
           · {{ 'PAYROLL.ENGINE_RESULTS.AMOUNTS_IN' | translate: { currency: cur } }}
         }
@@ -96,3 +102,115 @@
     }
   </div>
 </daf-page>
+
+<!-- Formulaire « Calculer la paie du pays » (pop-up). Les boutons sont ici, pas dans le pied
+     de la pop-up : ceux-là ne sont pas réactifs (grisés pendant le calcul, « Fermer » à la fin). -->
+<ng-template #batchTpl>
+  <div class="flex flex-col gap-5">
+    <daf-select
+      [options]="batchPaysOptions()"
+      [selected]="batchPaysId() ? ['' + batchPaysId()] : []"
+      [config]="{
+        label: 'PAYROLL.ENGINE_RUN.PAYS' | translate,
+        placeholder: 'PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate,
+        searchable: true, required: true, fullWidth: true,
+        disabled: batchRunning()
+      }"
+      (selectedChange)="onBatchPaysChange($event)" />
+
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <daf-select
+        [options]="batchMonthOptions()"
+        [selected]="['' + batchMonth()]"
+        [config]="{ label: 'PAYROLL.ENGINE_RUN.PERIOD_MONTH' | translate, required: true, fullWidth: true, disabled: batchRunning() }"
+        (selectedChange)="setBatchMonth($event)" />
+      <daf-select
+        [options]="batchYearOptions()"
+        [selected]="['' + batchYear()]"
+        [config]="{ label: 'PAYROLL.ENGINE_RUN.PERIOD_YEAR' | translate, required: true, fullWidth: true, disabled: batchRunning() }"
+        (selectedChange)="setBatchYear($event)" />
+      <daf-form-field
+        [value]="batchJours()"
+        (valueChange)="batchJours.set(+($event ?? 0))"
+        [options]="{ label: 'PAYROLL.ENGINE_RESULTS.BATCH_WORKDAYS' | translate, type: 'number', required: true, fullWidth: true,
+                     suffixText: 'j', disabled: batchRunning() }" />
+    </div>
+
+    <daf-checkbox
+      [options]="{ label: 'PAYROLL.ENGINE_RESULTS.BATCH_SKIP_DONE' | translate, disabled: batchRunning() }"
+      [checked]="batchSkipDone()"
+      (checkedChange)="batchSkipDone.set($event)" />
+
+    <!-- Ce qui va se passer, avant de lancer. -->
+    @if (batchPaysId()) {
+      <div class="flex flex-col gap-1 rounded-xl bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
+        @if (batchPrepLoading()) {
+          <span>{{ 'PAYROLL.COMMON.LOADING' | translate }}</span>
+        } @else if (batchPsMissing()) {
+          <span class="text-danger">{{ 'PAYROLL.ENGINE_RUN.CONTRACT_NO_PS' | translate }}</span>
+        } @else {
+          @let plan = batchPlan();
+          <span class="text-[22px] font-black leading-tight text-on-surface">
+            {{ 'PAYROLL.ENGINE_RESULTS.BATCH_TARGETS' | translate: { count: plan.targets.length, period: batchPeriodText() } }}
+          </span>
+          <span>{{ 'PAYROLL.ENGINE_RESULTS.BATCH_STAFF' | translate: { count: plan.staff } }}</span>
+          @if (plan.alreadyDone) {
+            <span>{{ 'PAYROLL.ENGINE_RESULTS.BATCH_ALREADY_DONE' | translate: { count: plan.alreadyDone } }}</span>
+          } @else if (!batchSkipDone() && plan.doneCount) {
+            <span class="text-warning">{{ 'PAYROLL.ENGINE_RESULTS.BATCH_RERUN_WARNING' | translate: { count: plan.doneCount } }}</span>
+          }
+          @if (plan.unpriced.length) {
+            <span class="text-warning">{{ 'PAYROLL.ENGINE_RESULTS.BATCH_UNPRICED_COUNT' | translate: { count: plan.unpriced.length } }}</span>
+          }
+        }
+      </div>
+    }
+
+    <!-- Avancement, puis bilan. -->
+    @if (batchRunning() || batchFinished()) {
+      @let p = batchProgress();
+      <div class="flex flex-col gap-2">
+        <div class="flex justify-between text-sm text-on-surface">
+          <span>{{ 'PAYROLL.ENGINE_RESULTS.BATCH_PROGRESS' | translate: { done: p.done, total: p.total } }}</span>
+          <span>{{ batchPercent() }} %</span>
+        </div>
+        <div class="h-2 w-full overflow-hidden rounded-full bg-surface-container-high">
+          <div class="h-full rounded-full bg-primary transition-all" [style.width.%]="batchPercent()"></div>
+        </div>
+        <div class="flex gap-4 text-sm">
+          <span class="text-success">{{ 'PAYROLL.ENGINE_RESULTS.BATCH_OK' | translate: { count: p.ok } }}</span>
+          @if (batchFailures().length) {
+            <span class="text-danger">{{ 'PAYROLL.ENGINE_RESULTS.BATCH_FAILED' | translate: { count: batchFailures().length } }}</span>
+          }
+        </div>
+      </div>
+      @if (batchFailures().length) {
+        <ul class="m-0 flex max-h-48 list-none flex-col gap-1 overflow-y-auto rounded-xl bg-danger/10 px-4 py-3 text-sm">
+          @for (f of batchFailures(); track $index) {
+            <li><span class="font-semibold text-on-surface">{{ f.name }}</span> — <span class="text-danger">{{ f.reason }}</span></li>
+          }
+        </ul>
+      }
+    }
+
+    <p class="m-0 text-body-sm text-on-surface-variant">{{ 'PAYROLL.ENGINE_RUN.SAVE_NOTE' | translate }}</p>
+
+    <div class="flex justify-end gap-3">
+      @if (batchRunning()) {
+        <daf-button
+          [options]="{ variant: 'secondary', iconStart: 'stop_circle', label: ('PAYROLL.ENGINE_RESULTS.BATCH_STOP' | translate) }"
+          (onClick)="stopBatch()" />
+      } @else {
+        <daf-button
+          [options]="{ variant: 'secondary', label: ((batchFinished() ? 'PAYROLL.ENGINE_RESULTS.BATCH_CLOSE' : 'PAYROLL.ENGINE_RUN.EXISTING_CONFIRM_CANCEL') | translate) }"
+          (onClick)="closeBatch()" />
+      }
+      @if (!batchFinished()) {
+        <daf-button
+          [options]="{ variant: 'primary', iconStart: 'calculate', loading: batchRunning(), disabled: !canBatch(),
+                       label: ((batchRunning() ? 'PAYROLL.ENGINE_RUN.RUNNING' : 'PAYROLL.ENGINE_RESULTS.BATCH_RUN') | translate: { count: batchPlan().targets.length }) }"
+          (onClick)="runBatch()" />
+      }
+    </div>
+  </div>
+</ng-template>

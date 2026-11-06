@@ -45,7 +45,7 @@
         "SALARY_ADVANCES": "Salary advances",
         "COHORT": "Cohort simulation",
         "ENGINE_RUN": "Payroll run",
-        "ENGINE_RESULTS": "Payroll results",
+        "ENGINE_RESULTS": "Salary cost",
         "CANDIDATE_SIMULATION": "Candidate simulations",
         "CALIBRATION": "Calibration",
         "PARAMETER_SETS": "Parameters",
@@ -1033,10 +1033,10 @@
       "EXIT_WARNING": "This employee is {{status}}: check that this calculation is intended.",
       "EXISTING_WARNING": "A calculation already exists for {{period}} (result no. {{id}}). Running it again will save a new result, alongside the existing one.",
       "EXISTING_CONFIRM_TITLE": "Run the calculation again?",
-      "EXISTING_CONFIRM_BODY": "A calculation already exists for {{name}} in {{period}} (result no. {{id}}). A new result will be saved alongside the existing one: both will appear in \"Payroll results\".",
+      "EXISTING_CONFIRM_BODY": "A calculation already exists for {{name}} in {{period}} (result no. {{id}}). A new result will be saved alongside the existing one: both will appear in \"Salary cost\".",
       "EXISTING_CONFIRM_OK": "Run it anyway",
       "EXISTING_CONFIRM_CANCEL": "Cancel",
-      "SAVE_NOTE": "The calculation is saved in \"Payroll results\".",
+      "SAVE_NOTE": "The calculation is saved in \"Salary cost\".",
       "RUNNING": "Calculating...",
       "RUN_BUTTON": "Run the calculation",
       "RESULT_TITLE": "Result — Employee {{employeeId}} — {{month}}/{{year}}",
@@ -1090,7 +1090,7 @@
       "EXPORTING": "Exporting…",
       "EXPORT_ERROR": "The export failed. Please try again or contact support.",
       "PRINT": "Print",
-      "OPEN_IN_RESULTS": "View in Payroll results",
+      "OPEN_IN_RESULTS": "View in « Salary cost »",
 
       "EMPTY_TITLE": "Calculate a payslip in three steps",
       "EMPTY_STEP_1": "Choose the country and the employee",
@@ -1154,8 +1154,31 @@
     },
 
     "ENGINE_RESULTS": {
-      "TITLE": "Payroll results",
-      "BREADCRUMB": "Payroll results",
+      "TITLE": "Salary cost",
+      "BREADCRUMB": "Salary cost",
+      "ACTIONS_TITLE": "Actions",
+      "CALC_BUTTON": "Run payroll",
+      "CALC_TITLE": "Run payroll",
+      "CALC_INCOMPLETE": "Choose the country and the contract, and enter at least 1 day worked.",
+      "CALC_SUCCESS": "Payroll for {{period}} calculated and saved (result no. {{id}}).",
+      "BATCH_BUTTON": "Run country payroll",
+      "BATCH_TITLE": "Run country payroll",
+      "BATCH_SUBTITLE": "Every employee in post in the country, for one month",
+      "BATCH_WORKDAYS": "Days worked",
+      "BATCH_SKIP_DONE": "Skip employees already calculated this month",
+      "BATCH_TARGETS": "{{count}} employee(s) to calculate for {{period}}",
+      "BATCH_STAFF": "{{count}} employee(s) in post in this country.",
+      "BATCH_ALREADY_DONE": "{{count}} already calculated this month: skipped.",
+      "BATCH_RERUN_WARNING": "{{count}} employee(s) already calculated this month: a new result will be saved alongside the existing one.",
+      "BATCH_UNPRICED_COUNT": "{{count}} employee(s) with a contract that has no payroll rules in this country: not calculated.",
+      "BATCH_UNPRICED": "Contract {{contract}} has no payroll rules in this country",
+      "BATCH_PROGRESS": "{{done}} / {{total}} calculated",
+      "BATCH_OK": "{{count}} succeeded",
+      "BATCH_FAILED": "{{count}} not calculated",
+      "BATCH_STOP": "Stop",
+      "BATCH_CLOSE": "Close",
+      "BATCH_RUN": "Run the calculation ({{count}})",
+      "BATCH_DONE": "{{ok}} payslip(s) calculated and saved for {{period}}.",
       "EMPLOYEE_LABEL": "Employee",
       "SEARCHING": "Loading...",
       "SEARCH_BUTTON": "Search",
@@ -1188,7 +1211,7 @@
       "DETAIL_COL_NATURE": "Nature",
       "DETAIL_COL_ASSIETTE": "Base",
       "DETAIL_COL_AMOUNT": "Amount",
-      "EMPTY_EMPLOYEE_RESULTS": "No payslip calculated for this employee. Run their calculation from \"Payroll run\".",
+      "EMPTY_EMPLOYEE_RESULTS": "No payslip calculated for this employee. Run it with \"Run payroll\", under the Details card.",
       "DETAIL_LINK": "View payslip",
       "KPI_YEAR_GROSS": "Gross {{year}} to date",
       "KPI_YEAR_DEDUCTIONS": "Deductions {{year}} to date (contributions + tax)",
@@ -1216,6 +1239,8 @@
         "EUR": "Euro",
         "USD": "US dollar",
         "EGP": "Egyptian pound",
+        "SAR": "Saudi riyal",
+        "AED": "UAE dirham",
         "CONVERTED_NOTE": "amounts converted from {{from}} to {{to}} at today's rate"
       },
       "KPI_PERIOD": "Payroll indicators — latest calculated month: {{period}}",
@@ -1229,14 +1254,14 @@
       "KPI_EMPLOYER_COST_HELP": "What the {{period}} payroll costs the company: gross payroll + employer contributions (active payroll rules). A month calculated before 26/10/2026 keeps its old, wrong value until it is run again.",
       "KPI_NET_TOTAL_HELP": "Sum of the net pay of every employee calculated for {{period}}: what will be paid into accounts, in the chosen display currency.",
       "KPI_COVERAGE": "Employees calculated",
-      "KPI_COVERAGE_HELP": "Employees with a payroll result for {{period}}, against the country's headcount in post. The line below gives those still to calculate, from “Payroll run”.",
+      "KPI_COVERAGE_HELP": "Employees with a payroll result for {{period}}, against the country's headcount in post. The line below gives those still to calculate, with “Run country payroll”.",
       "KPI_NOT_CALCULATED_SUB": "{{count}} not calculated",
       "KPI_ALL_CALCULATED": "all calculated",
       "KPI_WITHHELD": "Deductions (contributions + tax)",
       "KPI_WITHHELD_PCT": "{{pct}} % of gross payroll",
       "KPI_WITHHELD_HELP": "What separates gross payroll from net payroll for {{period}}: employee contributions and income tax withheld from salaries.",
       "AMOUNTS_IN": "amounts in {{currency}}",
-      "LIST_SUBTITLE": "Pick an employee to view their payroll results",
+      "LIST_SUBTITLE": "Pick an employee to view their salary cost",
       "SEARCH_EMPLOYEE_PLACEHOLDER": "Search by name or employee number...",
       "FILTER_EMPLOYEES_TITLE": "Filter employees",
       "FILTER_PAYS": "Country",
@@ -1244,6 +1269,10 @@
       "FILTER_IN_POST": "In post",
       "FILTER_DEPARTMENT": "Department",
       "FILTER_CONTRACT": "Contract type",
+      "FILTER_PERIOD": "Period",
+      "FILTER_PERIOD_HINT": "Employees with a payroll result in these months; the indicators add up the months of the period.",
+      "FILTER_EMPLOYEES": "Employees",
+      "KPI_PERIOD_RANGE": "Payroll indicators — period: {{period}}",
       "FILTER_YEAR": "Year",
       "FILTER_MONTH": "Month",
       "COL_EMPLOYEE": "Employee",
@@ -1787,9 +1816,6 @@
         "FILTER_NO_FOREX": "Without an exchange-rate source only",
         "COL_PAYS": "Country",
         "COL_CURRENCY": "Currency",
-        "COL_EUR_RATE": "EUR rate",
-        "COL_USD_RATE": "USD rate",
-        "COL_CHF_RATE": "CHF rate",
         "COL_FISCAL_START": "Fiscal year start",
         "COL_FOREX": "Exchange-rate sources",
         "COL_STATE": "State",
@@ -1801,18 +1827,11 @@
         "EMPTY": "No country is configured in the payroll engine.",
         "ADD": "Add a country",
         "EDIT_TITLE": "Edit payroll country — {{pays}}",
-        "CURRENCY_HINT": "3-letter ISO code (TND, EGP, EUR…).",
-        "CURRENCY_MANAGED_ELSEWHERE": "Managed in Facturation's entity currency admin screen.",
+        "CURRENCY_HINT": "3-letter ISO code (TND, EGP, EUR…). EUR, USD and CHF equivalents use today's rate.",
         "FOREX_HINT": "Optional. JSON: an array (one entry per source) or an object.",
         "DEACTIVATE_WARNING": "An inactive country no longer has engine line items or payroll calculation.",
         "ERR_PAYS": "Choose a country.",
         "ERR_CURRENCY": "Invalid currency: 3-letter ISO code expected.",
-        "ERR_EUR_RATE": "Invalid EUR rate: must be strictly positive.",
-        "ERR_USD_RATE": "Invalid USD rate: must be strictly positive.",
-        "ERR_CHF_RATE": "Invalid CHF rate: must be strictly positive.",
-        "EUR_RATE_HINT": "Overrides the platform-wide default EUR exchange rate for this country — leave blank to use the default. Up to 6 decimals.",
-        "USD_RATE_HINT": "Overrides the platform-wide default USD exchange rate for this country — leave blank to use the default. Up to 6 decimals.",
-        "CHF_RATE_HINT": "Overrides the platform-wide default CHF exchange rate for this country — leave blank to use the default. Up to 6 decimals.",
         "ERR_FOREX": "Exchange-rate sources: invalid JSON (array or object expected)."
       },
       "AUDIT": {
@@ -2100,7 +2119,7 @@
       "HELP": {
         "RULES": "Creates the payroll rules of a country for a year (income tax scale, contributions) and has them approved by the Country Director and the CFO. Used by the simulator, candidate simulations and the employees’ net pay.",
         "COUNTRIES": "Countries handled by payroll, with their currency, fiscal year and activation.",
-        "ENGINE_PARAMS": "Rates, amounts and scales of the actual payroll calculation (Payroll run, Results), by approved version.",
+        "ENGINE_PARAMS": "Rates, amounts and scales of the actual payroll calculation (Salary cost), by approved version.",
         "RUBRIQUES": "Payslip lines of the actual payroll calculation and how each one is calculated.",
         "BENEFITS": "Benefits granted to employees (meals, transport, housing) and their value.",
         "ADVANCE_RULES": "Eligibility conditions for salary advances, by country.",
@@ -2138,6 +2157,145 @@
       "EMPLOYEE_EMPTY": "No employee found",
       "PAYS_PLACEHOLDER": "Search for a country…",
       "PAYS_EMPTY": "No country found"
+    }
+  },
+  "GUIDE": {
+    "HELP_CENTER": "Help & guides",
+    "CLOSE": "Close the guide",
+    "STEP_OF": "{{current}} / {{total}}",
+    "PREV": "Previous",
+    "NEXT": "Next",
+    "DONE": "Finish",
+    "MENU": {
+      "TITLE": "Help on: {{page}}",
+      "NO_PAGE": "Choose the kind of help",
+      "NONE": "This page has no guide yet.",
+      "GUIDE": "Step-by-step guide",
+      "GUIDE_HINT": "A guided tour of this page, element by element",
+      "VIDEOS": "Videos",
+      "VIDEOS_HINT": "{{count}} demo video(s)",
+      "BACK": "Back",
+      "ALL": "The whole help center",
+      "CHAT": "Assistant",
+      "CHAT_HINT": "Ask your question in your own words"
+    },
+    "HINT": {
+      "TITLE": "First visit?",
+      "TEXT": "Follow this page's guide (1 min).",
+      "START": "Start",
+      "LATER": "Later"
+    },
+    "VOICE": {
+      "LISTEN": "Listen",
+      "STOP": "Stop",
+      "ON": "Turn on read-aloud",
+      "OFF": "Turn off read-aloud"
+    },
+    "START": "Start",
+    "SEARCH": {
+      "SECTION": "Section",
+      "FAQ": "Search a question…",
+      "DOCS": "Search the documentation…",
+      "NO_MATCH": "No result for « {{query}} ». Try other words or ask the assistant."
+    },
+    "CENTER": {
+      "SUBTITLE": "Guides, frequently asked questions, documentation and support contact.",
+      "PAGE_HELP": "Page help",
+      "FAQ_TITLE": "Frequently asked questions",
+      "DOCS_TITLE": "Documentation",
+      "GUIDES": "Interactive guides",
+      "OPEN_PAGE": "Open",
+      "NEEDS_RECORD": "This guide starts from a record: open the record you want, then « Help & guides » at the bottom of the menu.",
+      "PICK_RECORD": "Pick a record",
+      "VIDEOS_TITLE": "Video tutorials",
+      "MINUTES": "{{count}} min",
+      "SOON": "Coming soon",
+      "SUPPORT_TITLE": "Support",
+      "SUPPORT_TEXT": "Didn't find your answer? Contact technical support.",
+      "FAQ": {
+        "HOME": {
+          "WHAT": {
+            "Q": "What is the Payroll home page for?",
+            "A": "It gathers, as cards, every payroll screen your rights open — the same as the sidebar. A click on a card opens the screen."
+          },
+          "MISSING": {
+            "Q": "A card is missing, why?",
+            "A": "Each screen requires its own payroll rights. A card missing here is also missing from the sidebar: ask your administrator for the matching right."
+          },
+          "EMPTY": {
+            "Q": "I don't see any card",
+            "A": "Your account has no right on the payroll screens yet. Ask your administrator to give you a Payroll role."
+          },
+          "CURRENCY": {
+            "Q": "Does changing the currency change payroll amounts?",
+            "A": "No. The currency bubble only changes the display: amounts are converted at today's rate, as an indication. Computed and saved amounts do not move."
+          },
+          "SIMULATE": {
+            "Q": "How do I simulate a salary?",
+            "A": "With « Manual simulator »: net to gross or gross to net, with the employer cost. For a group of employees, « Cohort simulation »; for a candidate, « Candidate simulations »."
+          },
+          "PAYSLIP": {
+            "Q": "Where are the payslips?",
+            "A": "In « Payslips », which splits and files the monthly payslips per employee."
+          },
+          "REAL_RUN": {
+            "Q": "What is the difference between a simulation and the payroll run?",
+            "A": "A simulation estimates a salary without running payroll. « Salary cost » actually runs payroll (one employee or a whole country) and keeps the results."
+          },
+          "LANGUAGE": {
+            "Q": "How do I change the language?",
+            "A": "The module follows the language chosen in the app (the portal's language selector): French or English."
+          }
+        }
+      },
+      "CHAT": {
+        "NAME": "Assistant",
+        "TAGLINE": "Answers from the FAQ and documentation",
+        "OPEN": "Open the assistant",
+        "ASK": "Ask a question",
+        "OPEN_PAGE": "Open the page",
+        "TITLE": "Ask your question",
+        "HELLO": "Hello! What would you like to do? Type your question, or pick one below.",
+        "PLACEHOLDER": "E.g. how is the RAF computed?",
+        "SEND": "Send",
+        "CLEAR": "Clear the conversation",
+        "NO_ANSWER": "I couldn't find an answer to this question. Try other words, or browse the frequently asked questions below.",
+        "SOURCE": "Source: {{page}} › {{kind}}",
+        "START_GUIDE": "Start the guide",
+        "SEE_ALSO": "See also",
+        "HELPFUL": "Did this answer help?",
+        "YES": "Yes, this answer helps",
+        "NO": "No, this answer doesn't help",
+        "THANKS": "Thanks for your feedback.",
+        "GREETING": "Hello! I'm the Payroll assistant. Ask me a question about the app, for example « how do I simulate a salary? », or pick one below.",
+        "NOTHING_FOR": "I found nothing for « {{text}} ».",
+        "DID_YOU_MEAN_ONE": "Did you mean « {{word}} »?",
+        "YES_SHORT": "Yes",
+        "NO_SHORT": "No",
+        "DID_YOU_MEAN_MANY": "Did you mean:",
+        "NONE_OF_THEM": "None of these"
+      },
+      "KIND_FAQ": "Frequently asked question",
+      "KIND_DOC": "Documentation"
+    },
+    "SEE_ALL": "See the whole guide",
+    "HOME": {
+      "WELCOME_TITLE": "Welcome to the Payroll module",
+      "WELCOME_TEXT": "This page gives access to every payroll screen your rights open. Follow the guide for a tour.",
+      "MODULES_TITLE": "The payroll screens",
+      "MODULES_TEXT": "Each card opens a screen, the same as in the sidebar. Only the screens your rights allow appear: two colleagues may therefore see different cards.",
+      "SIMULATION_TITLE": "Simulate a salary",
+      "SIMULATION_TEXT": "The manual simulator computes a net salary from the gross, or the other way round, with its employer cost. « Cohort simulation » does the same for a group of employees and « Candidate simulations » finds those made for candidates. A simulation does not run the actual payroll.",
+      "RUN_TITLE": "The month's payroll",
+      "RUN_TEXT": "« Salary cost » runs payroll (one employee or a whole country) and keeps the results. « Payslips » splits and files the monthly payslips; « Salary advances » pays approved advances and tracks their deductions.",
+      "SETTINGS_TITLE": "Payroll administration",
+      "SETTINGS_TEXT": "Parameter sets, countries, pay items, benefits, advance rules and the log. Reserved for the profiles that configure payroll.",
+      "CURRENCY_TITLE": "The display currency",
+      "CURRENCY_TEXT": "The bubble at the bottom right picks the currency amounts are shown in. They are converted at today's rate, as an indication: computed and saved amounts do not change.",
+      "CHAT_TITLE": "The help assistant",
+      "CHAT_TEXT": "Ask a question about the app here, for example « how do I simulate a salary? »: the assistant answers with the FAQ and documentation, and can start the guide of the page concerned.",
+      "HELP_TITLE": "Find this guide again",
+      "HELP_TEXT": "« Help & guides », at the bottom of the sidebar, restarts this guide at any time and opens the FAQ and documentation. You can also turn on read-aloud with the speaker at the top of each step."
     }
   }
 }
