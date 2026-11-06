@@ -1238,6 +1238,11 @@ export class SimulatorComponent implements OnDestroy {
           // Le brut saisi, lui, est exactement la tuile « Brut mensuel » : pas répété.
           { key: this.t('PAYROLL.SIMULATOR.DETAIL.INPUT_NET'),
             value: isNetToGross ? this.money(r.inputNet, cur, 2) : null },
+          // Visible seulement si saisi dans une devise différente de celle du pays -- sinon
+          // r.inputCurrency est null et keep() retire la ligne.
+          { key: this.t('PAYROLL.SIMULATOR.DETAIL.ENTERED_AS'),
+            value: (r.inputCurrency && r.inputAmountOriginal != null)
+              ? this.money(r.inputAmountOriginal, r.inputCurrency, 2) : null },
           // Base de l'IRPP (ancienne barre S2 de la cascade) — le seul montant du calcul
           // qui n'est ni dans les KPI ni dans « Qui reçoit quoi ? ».
           { key: this.t('PAYROLL.SIMULATOR.DETAIL.NET_TAXABLE'), value: this.money(r.netTaxable, cur, 2) },
