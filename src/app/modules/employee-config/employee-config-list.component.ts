@@ -28,6 +28,7 @@ import { rememberEmployee } from './employee-config-employee';
 import { TableSort, delegatedSort, tableTools, toTableSort } from '../../shared/table-tools';
 import { PaysNamesService } from '../../core/pays-names.service';
 import { EmployeeConfigListStateService } from './employee-config-list-state.service';
+import { EmployeeConfigService } from './employee-config.service';
 
 /**
  * `/payroll/employee-config` — « Salaires des collaborateurs », ouverte depuis sa carte de
@@ -61,6 +62,11 @@ export class EmployeeConfigListComponent implements OnInit {
   private readonly route      = inject(ActivatedRoute);
   private readonly translate  = inject(TranslateService);
   private readonly paysNames = inject(PaysNamesService);
+  private readonly configService = inject(EmployeeConfigService);
+
+  /** userId → contrat de la config paie enregistrée : prime sur le contrat de la fiche RH,
+   *  sinon un contrat modifié dans `/employee-config/:id` n'apparaissait pas dans la liste. */
+  readonly payrollContracts = signal<Record<number, string>>({});
 
   private t(key: string, params?: Record<string, unknown>): string {
     this.translate.currentLang();
@@ -165,6 +171,7 @@ export class EmployeeConfigListComponent implements OnInit {
           return;
         }
         this.employees.set(p.content ?? []);
+        this.loadPayrollContracts(current, (p.content ?? []).map(e => e.userId));
         this.totalElements.set(p.totalElements ?? 0);
         this.totalPages.set(Math.max(1, p.totalPages ?? 1));
         this.loading.set(false);
@@ -289,20 +296,32 @@ export class EmployeeConfigListComponent implements OnInit {
     this.load();
   }
 
+  /** En cas d'échec, la liste garde le contrat de la fiche RH plutôt que de rester vide. */
+  private loadPayrollContracts(seq: number, userIds: number[]): void {
+    if (!userIds.length) { this.payrollContracts.set({}); return; }
+    this.configService.getSavedContractTypes(userIds)
+      .pipe(catchError(() => of({} as Record<number, string>)))
+      .subscribe(map => { if (seq === this.seq) this.payrollContracts.set(map ?? {}); });
+  }
+
   private employeeSortParam(): string | null {
     const sort = this.employeeSort();
     const key = sort ? EmployeeConfigListComponent.EMPLOYEE_SORT_KEY[sort.key] : undefined;
     return sort && key ? `${key},${sort.dir}` : null;
   }
 
-  readonly employeeRows = computed<TableRow[]>(() =>
-    this.employees().map(e => ({
+  readonly employeeRows = computed<TableRow[]>(() => {
+    const payroll = this.payrollContracts();
+    return this.employees().map(e => {
+    // Contrat de la config paie s'il a été enregistré, sinon celui de la fiche RH.
+    const contract = payroll[e.userId] ?? e.contractType;
+    return {
       id:         e.userId,
       name:       e.fullName,
       matricule:  e.employeeId ?? '—',
       department: e.department ?? '—',
       // Contrat en clair (« CDI » pour PERMANENT…), comme /payroll/engine-results.
-      contract:   e.contractType ? contractTypeLabel(e.contractType, this.translate) : '—',
+      contract:   contract ? contractTypeLabel(contract, this.translate) : '—',
       pays:       e.paysLabel ?? '—',
       status:     e.lifecycleStatus
         ? {
@@ -310,8 +329,9 @@ export class EmployeeConfigListComponent implements OnInit {
             options: { variant: this.statusVariant(e.lifecycleStatus), size: 'sm', dot: true },
           } satisfies BadgeCell
         : '—',
-    })),
-  );
+    };
+    });
+  });
 
   readonly tableConfig = computed<TableConfig>(() => ({
     // Pas d'en-tête de carte : sans titre, la lib n'y dessine qu'une bande vide au-dessus du tableau.
