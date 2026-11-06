@@ -26,7 +26,7 @@ import {
   type TableColumn,
   type TableRow,
 } from '@khalilrebhiitec/daf360';
-import { PayrollApiService, BenefitCatalogueDto, PaysDto } from '../../core/payroll-api.service';
+import { PayrollApiService, BenefitCatalogueDto, PaysDto, FxRateDto } from '../../core/payroll-api.service';
 import { HrProfileService, HrContractType, contractTypeLabel } from '../../core/hr-profile.service';
 import { AdminSectionHeaderComponent } from '../parameter-sets/admin/admin-section-header.component';
 import { NotificationService } from '../../core/notification.service';
@@ -207,6 +207,42 @@ export class EmployeeConfigComponent implements OnInit {
     const id = this.config()?.paysId;
     return this.paysList().find(p => p.id === id)?.devise ?? '';
   });
+
+  /** `GET /api/payroll/ref/fx-rates` — currencies the gross-salary field's picker can
+   *  offer, besides the country's own working currency (always offered, never needs a
+   *  fetched rate) — same source the Simulator's own currency picker uses. */
+  readonly fxRates = signal<FxRateDto[]>([]);
+
+  /** The field's current currency: what's explicitly selected on the in-progress config,
+   *  or the working currency when nothing has been chosen yet. */
+  readonly currentCurrency = computed(() =>
+    this.config()?.inputCurrency ?? this.salaryCurrency());
+
+  /** Working currency first (always valid, even before fxRates has loaded), then every
+   *  other currency payroll has a cached rate for, alphabetically — same ordering as the
+   *  Simulator's own picker. Named distinctly from `currencyOptions` below (the bonus-form
+   *  currency list), which already owns that name on this component. */
+  readonly salaryCurrencyOptions = computed((): SelectOption[] => {
+    const working = this.salaryCurrency();
+    const others = this.fxRates()
+      .map(r => r.currencyCode)
+      .filter(c => c !== working)
+      .sort();
+    return [working, ...others]
+      .filter((c): c is string => !!c)
+      .map(c => ({ value: c, label: c }));
+  });
+
+  readonly currencySelection = computed((): string[] => [this.currentCurrency()].filter(Boolean) as string[]);
+
+  setCurrency(selected: string[]): void {
+    const cfg = this.config();
+    if (!cfg) return;
+    const picked = selected[0];
+    // Picking back the working currency is treated as null, not an explicit match — same
+    // "no conversion" convention the backend already uses.
+    this.config.set({ ...cfg, inputCurrency: picked && picked !== this.salaryCurrency() ? picked : null });
+  }
 
   // ── État ───────────────────────────────────────────────────────────────
   readonly config = signal<EmployeePayrollConfigDto | null>(null);
@@ -475,6 +511,7 @@ export class EmployeeConfigComponent implements OnInit {
   ngOnInit(): void {
     this.payrollApi.listPays().subscribe(pays => this.paysList.set(pays));
     this.payrollApi.listPayrollPays().subscribe(pays => this.payrollPays.set(pays));
+    this.payrollApi.getFxRates().subscribe(rates => this.fxRates.set(rates));
     if (Number.isFinite(this.userId)) this.load(this.userId);
     // Fermeture ou rechargement de l'onglet du navigateur avec des modifications en cours.
     const beforeUnload = (e: BeforeUnloadEvent) => { if (this.dirty()) e.preventDefault(); };
@@ -589,7 +626,7 @@ export class EmployeeConfigComponent implements OnInit {
     if (cfg === null || cfg.currentGrossSalary == null || this.savedConfig()?.paysId == null) { otherwise?.(); return; }
     const gross = cfg.currentGrossSalary;
     this.calculatingNet.set(true);
-    this.svc.calculateNet(this.userId, gross).subscribe({
+    this.svc.calculateNet(this.userId, gross, cfg.inputCurrency).subscribe({
       next: res => {
         this.calculatingNet.set(false);
         // Relit la config courante : l'utilisateur a pu modifier un autre champ entre-temps,
@@ -679,6 +716,7 @@ export class EmployeeConfigComponent implements OnInit {
       isMarried: cfg.isMarried,
       childrenCount: cfg.childrenCount,
       reason,
+      inputCurrency: cfg.inputCurrency,
     }).subscribe({
       next: updated => {
         this.config.set(updated);

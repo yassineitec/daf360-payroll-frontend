@@ -110,11 +110,23 @@
             <div class="ec-block">
               <daf-section-title [title]="'PAYROLL.EMPLOYEE_CONFIG.SALARY_SECTION' | translate" />
               <div class="field-row">
-                <daf-form-field
-                  [options]="{ label: 'PAYROLL.EMPLOYEE_CONFIG.GROSS_SALARY' | translate, type: 'number', align: 'end', suffixText: salaryCurrency(), placeholder: '0.00', fullWidth: true }"
-                  [value]="cfg.currentGrossSalary"
-                  (valueChange)="onGrossSalaryChange(toNumber($event))">
-                </daf-form-field>
+                <div class="flex-1 min-w-0">
+                  <daf-form-field
+                    [options]="{ label: 'PAYROLL.EMPLOYEE_CONFIG.GROSS_SALARY' | translate, type: 'number', align: 'end', suffixText: currentCurrency(), placeholder: '0.00', fullWidth: true }"
+                    [value]="cfg.currentGrossSalary"
+                    (valueChange)="onGrossSalaryChange(toNumber($event))">
+                  </daf-form-field>
+                  <daf-select
+                    class="mt-2 block"
+                    [options]="salaryCurrencyOptions()"
+                    [config]="{
+                      label: 'PAYROLL.EMPLOYEE_CONFIG.CURRENCY_LABEL' | translate,
+                      hint: 'PAYROLL.EMPLOYEE_CONFIG.CURRENCY_HINT' | translate: { working: salaryCurrency() },
+                    }"
+                    [selected]="currencySelection()"
+                    (selectedChange)="setCurrency($event)">
+                  </daf-select>
+                </div>
                 <daf-form-field
                   [options]="{
                     label: 'PAYROLL.EMPLOYEE_CONFIG.CURRENT_SALARY' | translate, type: 'number', align: 'end',
@@ -124,6 +136,11 @@
                   [value]="cfg.currentNetSalary">
                 </daf-form-field>
               </div>
+              @if (cfg.inputCurrency && cfg.inputAmountOriginal != null) {
+                <p class="text-[12.5px] text-on-surface-variant mt-1">
+                  {{ 'PAYROLL.EMPLOYEE_CONFIG.ENTERED_AS' | translate: { amount: money(cfg.inputAmountOriginal, cfg.inputCurrency) } }}
+                </p>
+              }
             </div>
 
             <!-- 3. Situation familiale — alimente la déduction IRPP « marié »/« par enfant »
