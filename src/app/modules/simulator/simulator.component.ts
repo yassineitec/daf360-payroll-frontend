@@ -1856,6 +1856,11 @@ export class SimulatorComponent implements OnDestroy {
    * reference amounts passed with `currency=''` (IRPP brackets, caps) are left alone. If
    * `fxRateMap` doesn't have a rate for one of the two currencies (sync hasn't run for it
    * yet), the amount is shown in its original currency rather than guessed.
+   *
+   * Exception: when the picked display currency is the current country's own native
+   * currency (see `isNativeCurrencyForCurrentPays` — Tunisia's working currency "EUR" is
+   * itself a label for real TND, Egypt's "USD" for real EGP), the amount is only relabeled,
+   * never rate-converted: it already IS that real currency's figure.
    */
   money(value: number | null | undefined, currency = '', decimals = 0): string {
     if (value == null || Number.isNaN(value)) return '—';
@@ -1863,12 +1868,16 @@ export class SimulatorComponent implements OnDestroy {
     let shown = currency;
     const display = this.displayCurrency();
     if (currency && display && currency !== display && currency === this.currency()) {
-      const rates = this.fxRateMap();
-      const fromRate = rates[currency];
-      const toRate = rates[display];
-      if (fromRate != null && toRate != null) {
-        amount = value * fromRate / toRate;
+      if (this.isNativeCurrencyForCurrentPays(display)) {
         shown = display;
+      } else {
+        const rates = this.fxRateMap();
+        const fromRate = rates[currency];
+        const toRate = rates[display];
+        if (fromRate != null && toRate != null) {
+          amount = value * fromRate / toRate;
+          shown = display;
+        }
       }
     }
     const formatted = new Intl.NumberFormat(this.numberLocale(), {
@@ -1876,6 +1885,20 @@ export class SimulatorComponent implements OnDestroy {
       maximumFractionDigits: decimals,
     }).format(amount);
     return shown ? `${formatted} ${shown}` : formatted;
+  }
+
+  /** Mirrors the backend's FxEntryConversionService.NATIVE_CURRENCY_BY_PAYS_ID: countries
+   *  whose platform "working currency" is a deliberate accounting label for a different real
+   *  currency, not that currency itself. */
+  private static readonly NATIVE_CURRENCY_BY_PAYS_ID: Record<number, string> = {
+    179: 'TND', // Tunisie
+    53: 'EGP',  // Egypte
+  };
+
+  private isNativeCurrencyForCurrentPays(currencyCode: string): boolean {
+    const paysId = this.result()?.paysId ?? this.selectedPaysId();
+    return paysId != null
+      && SimulatorComponent.NATIVE_CURRENCY_BY_PAYS_ID[paysId] === currencyCode;
   }
 
   /** A rate stored as a decimal (0.0918) shown as a percentage (9,18 %). */

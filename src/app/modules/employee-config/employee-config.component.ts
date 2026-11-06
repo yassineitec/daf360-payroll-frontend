@@ -244,18 +244,35 @@ export class EmployeeConfigComponent implements OnInit {
     return this.fxRates().find(r => r.currencyCode === currency)?.rateToEur ?? null;
   }
 
+  /** Mirrors the backend's FxEntryConversionService.NATIVE_CURRENCY_BY_PAYS_ID: countries
+   *  whose platform "working currency" is a deliberate accounting label for a different real
+   *  currency, not that currency itself (Tunisia's "EUR" stands for real TND, Egypt's "USD"
+   *  for real EGP). Picking that real currency must be a no-op, not a rate conversion. */
+  private static readonly NATIVE_CURRENCY_BY_PAYS_ID: Record<number, string> = {
+    179: 'TND', // Tunisie
+    53: 'EGP',  // Egypte
+  };
+
+  private isNativeCurrencyForCurrentPays(currencyCode: string): boolean {
+    const paysId = this.config()?.paysId;
+    return paysId != null
+      && EmployeeConfigComponent.NATIVE_CURRENCY_BY_PAYS_ID[paysId] === currencyCode;
+  }
+
   /** `currentNetSalary` is always computed/stored in the working currency — this
    *  reformats it for display in whatever currency "Devise saisie" currently shows,
    *  using the SAME payroll_fx_rates-sourced `fxRates` the picker already loaded (never
    *  a different rate source: mixing sources is exactly what caused a real round-trip
    *  bug in the Simulator earlier). Falls back to the raw working-currency value when a
-   *  rate is missing, rather than guessing. */
+   *  rate is missing, rather than guessing. When `target` is the country's own native
+   *  currency (see `isNativeCurrencyForCurrentPays`), the stored amount already IS that
+   *  real figure (the backend's entry conversion is itself a no-op for it) — relabel only. */
   readonly netInCurrentCurrency = computed((): number | null => {
     const net = this.config()?.currentNetSalary;
     if (net == null) return null;
     const working = this.salaryCurrency();
     const target = this.currentCurrency();
-    if (!working || !target || target === working) return net;
+    if (!working || !target || target === working || this.isNativeCurrencyForCurrentPays(target)) return net;
     const fromRate = this.rateToEur(working);
     const toRate = this.rateToEur(target);
     if (fromRate == null || toRate == null) return net;
