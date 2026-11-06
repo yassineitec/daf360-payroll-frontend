@@ -1526,10 +1526,14 @@ export class SimulatorComponent implements OnDestroy {
       this.form.get('paysId')!.setValue(r.paysId);
     }
     this.setMode(mode);
+    const hadCustomCurrency = r.inputCurrency != null && r.inputAmountOriginal != null;
     this.form.patchValue({
       profileUserId:  isEmployee ? r.profileUserId : null,
-      inputNet:       mode === 'NET_TO_BRUT' ? r.inputNet : null,
-      inputGross:     mode === 'BRUT_TO_NET' ? r.gross : null,
+      inputNet:       mode === 'NET_TO_BRUT'
+        ? (hadCustomCurrency ? r.inputAmountOriginal : r.inputNet) : null,
+      inputGross:     mode === 'BRUT_TO_NET'
+        ? (hadCustomCurrency ? r.inputAmountOriginal : r.gross) : null,
+      inputCurrency:  hadCustomCurrency ? r.inputCurrency : null,
       candidateLabel: r.candidateLabel ?? '',
       poste:          r.poste ?? '',
       grade:          r.grade ?? '',
@@ -1847,6 +1851,7 @@ export class SimulatorComponent implements OnDestroy {
       mode:       currentMode,
       inputNet:   currentMode === 'NET_TO_BRUT' ? Number(v.inputNet)   / divisor : undefined,
       inputGross: currentMode === 'BRUT_TO_NET' ? Number(v.inputGross) / divisor : undefined,
+      inputCurrency: v.inputCurrency || undefined,
       // Collaborator run: the backend hydrates contractType/grade/discipline from the RH
       // profile, but only for fields the request leaves blank — so they are not sent.
       profileUserId:  isEmployee ? v.profileUserId : null,
