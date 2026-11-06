@@ -7,3 +7,14 @@
 <main class="shell-content">
   <router-outlet />
 </main>
+
+<!-- Display-currency switcher — daf-radial-menu in picker mode, same as finance's shell:
+     the FAB shows the currency in force and fans the alternatives out on hover/tap.
+     At the shell root, not inside <main>: the menu is position: fixed, and an ancestor
+     with a transform/filter/backdrop-filter would become its containing block and pin
+     it to that box instead of the viewport. -->
+<daf-radial-menu
+  [items]="currencyItems()"
+  [config]="currencyMenuConfig()"
+  [active]="currentCurrency() ?? ''"
+  (itemClick)="onCurrencyPick($event)" />

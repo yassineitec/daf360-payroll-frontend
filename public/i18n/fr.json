@@ -23,6 +23,15 @@
         "RESET": "Réinitialiser l'affichage du tableau",
         "SORT_BY": "Trier par {column}",
         "SEARCH": "Rechercher…"
+      },
+      "CURRENCY": {
+        "TITLE": "Devise d'affichage",
+        "TND": "Dinar tunisien",
+        "EUR": "Euro",
+        "USD": "Dollar américain",
+        "EGP": "Livre égyptienne",
+        "SAR": "Riyal saoudien",
+        "AED": "Dirham des Émirats arabes unis"
       }
     },
 

@@ -96,13 +96,3 @@
     }
   </div>
 </daf-page>
-
-<!-- Sélecteur de devise d'affichage — daf-radial-menu en mode picker, comme dans le shell
-     finance : le bouton flottant montre la devise en cours et déploie les autres au
-     survol / tap. Hors de <daf-page> : le menu est en `position: fixed`, et un ancêtre
-     avec transform/filter deviendrait son bloc conteneur au lieu du viewport. -->
-<daf-radial-menu
-  [items]="currencyItems()"
-  [config]="currencyMenuConfig()"
-  [active]="displayCurrency() ?? ''"
-  (itemClick)="onCurrencyPick($event)" />

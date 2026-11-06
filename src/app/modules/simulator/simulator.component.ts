@@ -28,6 +28,7 @@ import { UserStore } from '../../core/user.store';
 import { NotificationService } from '../../core/notification.service';
 import { readBlobError, saveBlob } from '../../shared/blob-download';
 import { HrProfileService, contractTypeLabel, type EmployeeListItem } from '../../core/hr-profile.service';
+import { CurrencyService } from '../../core/currency.service';
 import { searchTableRows, tableTools } from '../../shared/table-tools';
 import { Subject, takeUntil, forkJoin, of, combineLatest } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -270,6 +271,7 @@ export class SimulatorComponent implements OnDestroy {
   private readonly api      = inject(PayrollApiService);
   private readonly hrRef    = inject(HrRefApiService);
   private readonly hrProfiles = inject(HrProfileService);
+  private readonly currencySvc = inject(CurrencyService);
   private readonly fb       = inject(FormBuilder);
   private readonly translate = inject(TranslateService);
   private readonly notify   = inject(NotificationService);
@@ -383,6 +385,12 @@ export class SimulatorComponent implements OnDestroy {
   readonly currency = computed(() =>
     this.result()?.localCurrency ?? this.selectedPays()?.devise ?? '',
   );
+
+  /** Global display-currency pick (shell's `daf-radial-menu`, same `CurrencyService` as
+   *  `/payroll/engine-results`). `null` = show results in the engine's own currency,
+   *  today's behaviour. Only amounts passed to `money()` in `this.currency()` convert —
+   *  the engine's output itself is never touched, only how it's displayed. */
+  readonly displayCurrency = computed(() => this.currencySvc.display());
 
   /** The field's current currency: what's explicitly selected, or the country's working
    *  currency when nothing has been chosen yet (today's default, unchanged). */
@@ -1817,14 +1825,30 @@ export class SimulatorComponent implements OnDestroy {
 
   // ── Formatting ─────────────────────────────────────────────────────────────
 
-  /** Amount + currency, or an em dash when there is nothing to show yet. */
+  /**
+   * Amount + currency, or an em dash when there is nothing to show yet. When `currency`
+   * is the engine's own result currency and a different display currency is picked
+   * (shell's switcher), the amount is converted at today's rate before formatting —
+   * reference amounts passed with `currency=''` (IRPP brackets, caps) are left alone.
+   */
   money(value: number | null | undefined, currency = '', decimals = 0): string {
     if (value == null || Number.isNaN(value)) return '—';
+    let amount = value;
+    let shown = currency;
+    let prefix = '';
+    const display = this.displayCurrency();
+    if (currency && display && currency !== display && currency === this.currency()) {
+      amount = this.currencySvc.convert(value, currency, display);
+      shown = display;
+      if (this.currencySvc.needsFallbackRate(currency) || this.currencySvc.needsFallbackRate(display)) {
+        prefix = '≈ ';
+      }
+    }
     const formatted = new Intl.NumberFormat(this.numberLocale(), {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
-    }).format(value);
-    return currency ? `${formatted} ${currency}` : formatted;
+    }).format(amount);
+    return shown ? `${prefix}${formatted} ${shown}` : formatted;
   }
 
   /** A rate stored as a decimal (0.0918) shown as a percentage (9,18 %). */

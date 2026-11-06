@@ -9,7 +9,7 @@ import {
   type EmployeeFilterOptions, type EmployeeListItem,
 } from '../../core/hr-profile.service';
 import { PayrollEngineService, type PayrollResultsSummaryDto } from '../../core/payroll-engine.service';
-import { CURRENCY_GLYPHS, CurrencyService, SUPPORTED_CURRENCIES } from '../../core/currency.service';
+import { CurrencyService } from '../../core/currency.service';
 import {
   CardComponent,
   DataTableComponent,
@@ -18,10 +18,7 @@ import {
   PageComponent,
   PageHeaderComponent,
   PaginationComponent,
-  RadialMenuComponent,
   SearchToolbarComponent,
-  type RadialMenuConfig,
-  type RadialMenuItem,
   type EntityCardOptions,
   type FilterField,
   type FilterResult,
@@ -61,7 +58,7 @@ interface TotalResult { value: number; approximate: boolean; }
   imports: [
     CommonModule, TranslatePipe,
     CardComponent, DataTableComponent, EntityCardComponent, MetricCardComponent, PageComponent,
-    PageHeaderComponent, PaginationComponent, RadialMenuComponent, SearchToolbarComponent,
+    PageHeaderComponent, PaginationComponent, SearchToolbarComponent,
   ],
   templateUrl: './engine-results-list.component.html',
   styleUrl: './engine-results-list.component.scss',
@@ -199,10 +196,11 @@ export class EngineResultsListComponent implements OnInit {
   readonly sourceCurrencies = computed(() =>
     [...new Set((this.summaries() ?? []).map(s => s.currencyCode).filter((c): c is string => !!c))]);
 
-  // ── Devise d'affichage (daf-radial-menu, comme le sélecteur devise de finance) ──
-  // Les totaux arrivent dans la devise de chaque pays ; le menu les convertit au taux du
-  // jour. `displayCurrency()` = devise réellement affichée : le choix du menu, sinon la
-  // devise commune des pays affichés, sinon EUR quand plusieurs devises se mélangent.
+  // ── Devise d'affichage (choisie via le sélecteur global du shell paie) ──
+  // Les totaux arrivent dans la devise de chaque pays ; `CurrencyService.convert()` les
+  // convertit au taux du jour. `displayCurrency()` = devise réellement affichée : le choix
+  // du sélecteur, sinon la devise commune des pays affichés, sinon EUR quand plusieurs
+  // devises se mélangent.
   readonly displayCurrency = computed(() => {
     const chosen = this.currency.display();
     if (chosen) return chosen;
@@ -217,24 +215,6 @@ export class EngineResultsListComponent implements OnInit {
   /** Devises converties vers `displayCurrency()`, pour la mention sous le titre. */
   readonly convertedFrom = computed(() =>
     this.sourceCurrencies().filter(c => c !== this.displayCurrency()).join(', '));
-
-  readonly currencyItems = computed<RadialMenuItem[]>(() =>
-    SUPPORTED_CURRENCIES.map(code => ({
-      id: code,
-      glyph: CURRENCY_GLYPHS[code],
-      label: this.t(`PAYROLL.ENGINE_RESULTS.CURRENCY.${code}`),
-    })));
-
-  readonly currencyMenuConfig = computed<RadialMenuConfig>(() => ({
-    label: this.t('PAYROLL.ENGINE_RESULTS.CURRENCY.TITLE'),
-    maxVisible: SUPPORTED_CURRENCIES.length,
-    // Rien à convertir sans totaux (aucun résultat, ou service en échec).
-    disabled: this.sourceCurrencies().length === 0,
-  }));
-
-  onCurrencyPick(item: RadialMenuItem): void {
-    this.currency.setDisplay(item.id);
-  }
 
   /** Somme d'un montant sur tous les pays, chacun converti dans la devise d'affichage. Flags the
    *  result as approximate when any contributing country's currency (or the display target

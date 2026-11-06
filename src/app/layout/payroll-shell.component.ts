@@ -6,18 +6,19 @@ import { Router, NavigationEnd, RouterOutlet, ActivatedRoute } from '@angular/ro
 import { filter, map } from 'rxjs';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslateService } from '@ngx-translate/core';
-import { SideNavComponent } from '@khalilrebhiitec/daf360';
-import type { NavItem, SideNavConfig } from '@khalilrebhiitec/daf360';
+import { RadialMenuComponent, SideNavComponent } from '@khalilrebhiitec/daf360';
+import type { NavItem, RadialMenuConfig, RadialMenuItem, SideNavConfig } from '@khalilrebhiitec/daf360';
 import { UserStore } from '../core/user.store';
 import { RemoteStylesService } from '../core/remote-styles.service';
 import { PAYROLL_NAV_DEFS, activeNavRoute, type PayrollNavDef } from '../core/payroll-nav';
+import { CURRENCY_GLYPHS, CurrencyService, SUPPORTED_CURRENCIES } from '../core/currency.service';
 import { environment } from '../../environments/environment';
 
 @Component({
   selector: 'app-payroll-shell',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, SideNavComponent],
+  imports: [RouterOutlet, SideNavComponent, RadialMenuComponent],
   templateUrl: './payroll-shell.component.html',
   styleUrl: './payroll-shell.component.scss',
 })
@@ -29,6 +30,7 @@ export class PayrollShellComponent implements OnInit {
   private readonly injector     = inject(Injector);
   private readonly cdr          = inject(ChangeDetectorRef);
   private readonly translate    = inject(TranslateService);
+  private readonly currencySvc  = inject(CurrencyService);
 
   ngOnInit(): void {
     this.remoteStyles.injectStyles(environment.stylesUrl);
@@ -93,5 +95,33 @@ export class PayrollShellComponent implements OnInit {
     if (item.route) {
       this.router.navigate([item.route], { relativeTo: this.activatedRoute });
     }
+  }
+
+  // ── Display-currency picker (daf-radial-menu) ──────────────────────────────
+  // Same pattern as finance's `fact-shell`: the FAB stands in for the current choice, the
+  // menu only reports a click, `CurrencyService` stays the single writer since it's what
+  // persists the pick and what every page's `money()`/conversion reads back.
+
+  readonly currentCurrency = this.currencySvc.display;
+
+  readonly currencyItems = computed<RadialMenuItem[]>(() => {
+    this.translate.currentLang();
+    return SUPPORTED_CURRENCIES.map(code => ({
+      id: code,
+      glyph: CURRENCY_GLYPHS[code],
+      label: this.translate.instant(`PAYROLL.COMMON.CURRENCY.${code}`),
+    }));
+  });
+
+  readonly currencyMenuConfig = computed<RadialMenuConfig>(() => {
+    this.translate.currentLang();
+    return {
+      label: this.translate.instant('PAYROLL.COMMON.CURRENCY.TITLE'),
+      maxVisible: SUPPORTED_CURRENCIES.length,
+    };
+  });
+
+  onCurrencyPick(item: RadialMenuItem): void {
+    this.currencySvc.setDisplay(item.id);
   }
 }

@@ -23,6 +23,15 @@
         "RESET": "Reset table layout",
         "SORT_BY": "Sort by {column}",
         "SEARCH": "Search…"
+      },
+      "CURRENCY": {
+        "TITLE": "Display currency",
+        "TND": "Tunisian dinar",
+        "EUR": "Euro",
+        "USD": "US dollar",
+        "EGP": "Egyptian pound",
+        "SAR": "Saudi riyal",
+        "AED": "UAE dirham"
       }
     },
 
