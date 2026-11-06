@@ -266,17 +266,20 @@ export class EmployeeConfigComponent implements OnInit {
    *  bug in the Simulator earlier). Falls back to the raw working-currency value when a
    *  rate is missing, rather than guessing. When `target` is the country's own native
    *  currency (see `isNativeCurrencyForCurrentPays`), the stored amount already IS that
-   *  real figure (the backend's entry conversion is itself a no-op for it) — relabel only. */
+   *  real figure (the backend's entry conversion is itself a no-op for it) — relabel only.
+   *  Rounded to a whole number for display — the stored value itself keeps full precision. */
   readonly netInCurrentCurrency = computed((): number | null => {
     const net = this.config()?.currentNetSalary;
     if (net == null) return null;
     const working = this.salaryCurrency();
     const target = this.currentCurrency();
-    if (!working || !target || target === working || this.isNativeCurrencyForCurrentPays(target)) return net;
-    const fromRate = this.rateToEur(working);
-    const toRate = this.rateToEur(target);
-    if (fromRate == null || toRate == null) return net;
-    return net * fromRate / toRate;
+    let value = net;
+    if (working && target && target !== working && !this.isNativeCurrencyForCurrentPays(target)) {
+      const fromRate = this.rateToEur(working);
+      const toRate = this.rateToEur(target);
+      if (fromRate != null && toRate != null) value = net * fromRate / toRate;
+    }
+    return Math.round(value);
   });
 
   setCurrency(selected: string[]): void {
@@ -410,7 +413,7 @@ export class EmployeeConfigComponent implements OnInit {
         date:     this.dateTime(h.changedAt),
         actor:    this.actorLabel(h.changedBy),
         gross:    this.money(h.currentGrossSalary, cur) ?? '—',
-        net:      this.money(h.currentNetSalary, cur) ?? '—',
+        net:      this.moneyWhole(h.currentNetSalary, cur) ?? '—',
         contract: h.contractType ? contractTypeLabel(h.contractType, this.translate) : '—',
         benefits: String(h.selectedBenefitCodes?.length ?? 0),
         reason:   h.reason || '—',
@@ -537,6 +540,14 @@ export class EmployeeConfigComponent implements OnInit {
   money(v: number | null | undefined, currency: string): string | null {
     if (v == null) return null;
     const n = v.toLocaleString(this.locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return currency ? `${n} ${currency}` : n;
+  }
+
+  /** Same as `money()`, but rounded to a whole number — net salary is always shown this way,
+   *  display-only (the stored value keeps full precision). */
+  private moneyWhole(v: number | null | undefined, currency: string): string | null {
+    if (v == null) return null;
+    const n = Math.round(v).toLocaleString(this.locale(), { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     return currency ? `${n} ${currency}` : n;
   }
 

@@ -1191,7 +1191,7 @@ export class SimulatorComponent implements OnDestroy {
     return [
       {
         label: this.t('PAYROLL.SIMULATOR.RESULT.NET_MONTHLY'),
-        value: net != null ? this.money(net, cur, 2) : '—', delta: perYear(net),
+        value: net != null ? this.money(net, cur, 0) : '—', delta: perYear(net),
         options: { icon: 'savings', iconColor: 'text-tertiary', iconBg: 'bg-tertiary/10',
           help: this.t('PAYROLL.SIMULATOR.RESULT.NET_MONTHLY_HELP') } satisfies MetricCardOptions,
       },
@@ -1267,7 +1267,7 @@ export class SimulatorComponent implements OnDestroy {
           // Le net visé seulement : il peut différer du net obtenu (résultat approximatif).
           // Le brut saisi, lui, est exactement la tuile « Brut mensuel » : pas répété.
           { key: this.t('PAYROLL.SIMULATOR.DETAIL.INPUT_NET'),
-            value: isNetToGross ? this.money(r.inputNet, cur, 2) : null },
+            value: isNetToGross ? this.money(r.inputNet, cur, 0) : null },
           // Visible seulement si saisi dans une devise différente de celle du pays -- sinon
           // r.inputCurrency est null et keep() retire la ligne.
           { key: this.t('PAYROLL.SIMULATOR.DETAIL.ENTERED_AS'),
