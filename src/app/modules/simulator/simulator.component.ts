@@ -392,6 +392,20 @@ export class SimulatorComponent implements OnDestroy {
    *  the engine's output itself is never touched, only how it's displayed. */
   readonly displayCurrency = computed(() => this.currencySvc.display());
 
+  /**
+   * Rate-to-EUR map built from `fxRates` (payroll's own cache of finance's `RATE_EUR_*`,
+   * the exact same table `IndividualSimulationService` used server-side to convert
+   * whatever was typed into the working currency). Deliberately NOT `CurrencyService`'s
+   * live market rate: that's a different provider than finance's admin-maintained rate,
+   * so converting a result back through it drifted a 462 TND entry to 464,31 TND on
+   * display — round-tripping through the same rate the backend used is lossless.
+   */
+  readonly fxRateMap = computed<Record<string, number>>(() => {
+    const map: Record<string, number> = { EUR: 1 };
+    for (const r of this.fxRates()) map[r.currencyCode] = r.rateToEur;
+    return map;
+  });
+
   /** The field's current currency: what's explicitly selected, or the country's working
    *  currency when nothing has been chosen yet (today's default, unchanged). */
   readonly currentCurrency = computed(() =>
@@ -1828,27 +1842,30 @@ export class SimulatorComponent implements OnDestroy {
   /**
    * Amount + currency, or an em dash when there is nothing to show yet. When `currency`
    * is the engine's own result currency and a different display currency is picked
-   * (shell's switcher), the amount is converted at today's rate before formatting —
-   * reference amounts passed with `currency=''` (IRPP brackets, caps) are left alone.
+   * (shell's switcher), the amount is converted via `fxRateMap` before formatting —
+   * reference amounts passed with `currency=''` (IRPP brackets, caps) are left alone. If
+   * `fxRateMap` doesn't have a rate for one of the two currencies (sync hasn't run for it
+   * yet), the amount is shown in its original currency rather than guessed.
    */
   money(value: number | null | undefined, currency = '', decimals = 0): string {
     if (value == null || Number.isNaN(value)) return '—';
     let amount = value;
     let shown = currency;
-    let prefix = '';
     const display = this.displayCurrency();
     if (currency && display && currency !== display && currency === this.currency()) {
-      amount = this.currencySvc.convert(value, currency, display);
-      shown = display;
-      if (this.currencySvc.needsFallbackRate(currency) || this.currencySvc.needsFallbackRate(display)) {
-        prefix = '≈ ';
+      const rates = this.fxRateMap();
+      const fromRate = rates[currency];
+      const toRate = rates[display];
+      if (fromRate != null && toRate != null) {
+        amount = value * fromRate / toRate;
+        shown = display;
       }
     }
     const formatted = new Intl.NumberFormat(this.numberLocale(), {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
     }).format(amount);
-    return shown ? `${prefix}${formatted} ${shown}` : formatted;
+    return shown ? `${formatted} ${shown}` : formatted;
   }
 
   /** A rate stored as a decimal (0.0918) shown as a percentage (9,18 %). */
