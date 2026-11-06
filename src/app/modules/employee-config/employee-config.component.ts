@@ -157,12 +157,20 @@ export class EmployeeConfigComponent implements OnInit {
 
   // ── Référentiels ───────────────────────────────────────────────────────
   readonly contractTypes = signal<HrContractType[]>([]);
+  /** Tout le référentiel — devise et libellé des configurations et de l'historique. */
   readonly paysList = signal<PaysDto[]>([]);
+  /** Pays actifs dans le moteur (« Pays de paie » de /payroll/admin) — les seuls proposés. */
+  readonly payrollPays = signal<PaysDto[]>([]);
   readonly benefits = signal<BenefitCatalogueDto[]>([]);
 
-  readonly paysOptions = computed<SelectOption[]>(() =>
-    this.paysList().map(p => ({ value: String(p.id), label: `${p.frenchLabel} (${p.isoCode})`, imageUrl: flagDataUri(p.isoCode) })),
-  );
+  /** Pays de paie ; le pays déjà affecté reste affiché même s'il a été désactivé depuis. */
+  readonly paysOptions = computed<SelectOption[]>(() => {
+    const list = this.payrollPays();
+    const id = this.config()?.paysId;
+    const current = id != null && !list.some(p => p.id === id) ? this.paysList().find(p => p.id === id) : undefined;
+    return (current ? [...list, current] : list)
+      .map(p => ({ value: String(p.id), label: `${p.frenchLabel} (${p.isoCode})`, imageUrl: flagDataUri(p.isoCode) }));
+  });
 
   readonly contractTypeOptions = computed<SelectOption[]>(() => {
     const en = this.isEn();
@@ -466,6 +474,7 @@ export class EmployeeConfigComponent implements OnInit {
   // ── Chargement ─────────────────────────────────────────────────────────
   ngOnInit(): void {
     this.payrollApi.listPays().subscribe(pays => this.paysList.set(pays));
+    this.payrollApi.listPayrollPays().subscribe(pays => this.payrollPays.set(pays));
     if (Number.isFinite(this.userId)) this.load(this.userId);
     // Fermeture ou rechargement de l'onglet du navigateur avec des modifications en cours.
     const beforeUnload = (e: BeforeUnloadEvent) => { if (this.dirty()) e.preventDefault(); };

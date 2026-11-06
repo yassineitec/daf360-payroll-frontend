@@ -62,7 +62,7 @@ export class BudgetComponent implements OnInit {
   );
 
   ngOnInit(): void {
-    this.api.listPays().subscribe(list => this.paysList.set(list));
+    this.api.listPayrollPays().subscribe(list => this.paysList.set(list));
   }
 
   /** Most recent period's budget lines (EMPLOYER_LOADED + EMPLOYEE_NET). */

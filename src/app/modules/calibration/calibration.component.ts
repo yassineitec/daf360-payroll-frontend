@@ -67,7 +67,7 @@ export class CalibrationComponent implements OnInit {
   );
 
   ngOnInit(): void {
-    this.api.listPays().subscribe(list => this.paysList.set(list));
+    this.api.listPayrollPays().subscribe(list => this.paysList.set(list));
   }
 
   readonly period = signal('');

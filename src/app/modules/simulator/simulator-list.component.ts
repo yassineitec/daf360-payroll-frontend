@@ -169,7 +169,7 @@ export class SimulatorListComponent implements OnInit {
       this.paysFilter.set(this.userStore.currentUser()?.paysId ?? null);
     }
 
-    this.api.listPays()
+    this.api.listPayrollPays()
       .pipe(catchError(() => of([] as PaysDto[])))
       .subscribe(list => {
         this.paysList.set(list);
@@ -193,7 +193,7 @@ export class SimulatorListComponent implements OnInit {
   load(): void {
     const paysId = this.paysFilter();
     if (paysId == null) {
-      // Pays pas encore connu : `listPays()` relance le chargement dès qu'il en choisit un.
+      // Pays pas encore connu : `listPayrollPays()` relance le chargement dès qu'il en choisit un.
       this.pageData.set(null);
       return;
     }

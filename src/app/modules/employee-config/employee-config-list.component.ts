@@ -131,7 +131,7 @@ export class EmployeeConfigListComponent implements OnInit {
 
   ngOnInit(): void {
     this.restoreState();
-    this.payrollApi.listPays()
+    this.payrollApi.listPayrollPays()
       .pipe(catchError(() => of([] as PaysDto[])))
       .subscribe(list => this.paysList.set(list));
     this.hrService.getFilterOptions().subscribe(o => this.filterOptions.set(o));

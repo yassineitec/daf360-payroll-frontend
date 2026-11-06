@@ -386,7 +386,7 @@ export class EngineParamsAdminComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.api.listPays().pipe(catchError(() => of([] as PaysDto[]))).subscribe(list => {
+    this.api.listPayrollPays().pipe(catchError(() => of([] as PaysDto[]))).subscribe(list => {
       this.pays.set(list);
       const userPaysId = this.userStore.currentUser()?.paysId;
       // Pays restauré par la mémoire de la section d'abord, s'il est toujours proposé.

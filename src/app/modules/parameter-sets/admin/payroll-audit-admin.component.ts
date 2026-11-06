@@ -233,7 +233,7 @@ export class PayrollAuditAdminComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.api.listPays().pipe(catchError(() => of([] as PaysDto[]))).subscribe(list => {
+    this.api.listPayrollPays().pipe(catchError(() => of([] as PaysDto[]))).subscribe(list => {
       this.pays.set(list);
       // Pays pré-sélectionné = celui du profil de l'utilisateur connecté (s'il est dans la
       // liste), sinon le seul pays possible ; il reste modifiable dans le select.

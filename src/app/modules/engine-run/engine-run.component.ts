@@ -141,7 +141,7 @@ export class EngineRunComponent implements OnInit {
   );
 
   ngOnInit(): void {
-    this.payrollApi.listPays().subscribe({
+    this.payrollApi.listPayrollPays().subscribe({
       next: list => { this.paysList.set(list); this.pageLoading.set(false); },
       error: () => this.pageLoading.set(false),
     });

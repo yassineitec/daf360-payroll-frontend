@@ -142,7 +142,7 @@ export class PayslipBatchComponent implements OnInit {
       this.detailPage.set(0);
     });
     this.loading.set(true);
-    this.payrollApi.listPays().subscribe({
+    this.payrollApi.listPayrollPays().subscribe({
       next: list => { this.paysList.set(list); this.loading.set(false); },
       error: () => this.loading.set(false),
     });

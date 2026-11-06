@@ -1,6 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, untracked, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { catchError, of } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -28,13 +27,11 @@ import {
   type ToolbarToggleOption,
   type MetricDelta,
 } from '@khalilrebhiitec/daf360';
-import { environment } from '../../../environments/environment';
+import { PayrollApiService, type PaysDto } from '../../core/payroll-api.service';
 import { UserStore } from '../../core/user.store';
 import { dayRange, distinctSorted, inDayRange, pickValue, rangeSeed } from '../../shared/filter-utils';
 import { TableSort, delegatedSort, sortTableRows, tableTools, toTableSort } from '../../shared/table-tools';
 import { PaysNamesService } from '../../core/pays-names.service';
-
-interface PaysItem { id: number; iso_code: string; french_label: string; }
 
 /**
  * `/payroll/candidate-simulation` — historique des simulations de rémunération soumises
@@ -59,7 +56,7 @@ interface PaysItem { id: number; iso_code: string; french_label: string; }
 })
 export class CandidateSimulationComponent implements OnInit {
   private readonly candSvc   = inject(CandidateSimulationService);
-  private readonly http      = inject(HttpClient);
+  private readonly api       = inject(PayrollApiService);
   private readonly translate = inject(TranslateService);
   private readonly paysNames = inject(PaysNamesService);
   private readonly userStore = inject(UserStore);
@@ -77,10 +74,10 @@ export class CandidateSimulationComponent implements OnInit {
   readonly candError         = signal<string | null>(null);
   readonly candSearched      = signal(false);
   readonly candidateList     = signal<CandidateSimulationSummaryDto[]>([]);
-  private readonly paysList  = signal<PaysItem[]>([]);
-  /** TOUS les pays du référentiel RH ; celui du profil est pré-sélectionné (`ngOnInit`). */
+  private readonly paysList  = signal<PaysDto[]>([]);
+  /** Pays actifs de « Pays de paie » (/payroll/admin) ; celui du profil est pré-sélectionné (`ngOnInit`). */
   readonly paysOptions = computed<SelectOption[]>(() =>
-    this.paysList().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.french_label)} (${p.iso_code})` })),
+    this.paysList().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})` })),
   );
   /** Chiffres des 4 tuiles — sur la liste complète du pays (pas la recherche / les filtres). */
   readonly candidateKpis = computed(() => {
@@ -350,8 +347,8 @@ export class CandidateSimulationComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.http.get<PaysItem[]>(`${environment.hrApiUrl}/api/hr/config/hs/pays-list`)
-      .pipe(catchError(() => of([] as PaysItem[])))
+    this.api.listPayrollPays()
+      .pipe(catchError(() => of([] as PaysDto[])))
       .subscribe(list => this.paysList.set(list));
 
     // Retour depuis une fiche : on retrouve la liste telle qu'on l'a laissée (pays, filtres,

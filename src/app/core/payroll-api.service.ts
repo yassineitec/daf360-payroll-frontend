@@ -417,6 +417,11 @@ export class PayrollApiService {
     return this.http.get<PaysDto[]>(`${this.base}/ref/pays`);
   }
 
+  /** Pays configurés et actifs dans le moteur (carte « Pays de paie » de /payroll/admin). */
+  listPayrollPays(): Observable<PaysDto[]> {
+    return this.http.get<PaysDto[]>(`${this.base}/ref/pays/payroll`);
+  }
+
   /** One user by id, unfiltered -- resolves a raw `*_by` reference found inside a GENERIC audit
    *  row's field diff (see payroll-audit-display.util.ts `extractActorRefIds`). */
   getUser(id: number): Observable<UsersRefDto> {

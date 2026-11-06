@@ -67,7 +67,7 @@ export class CohortComponent implements OnInit {
   );
 
   ngOnInit(): void {
-    this.api.listPays().subscribe(list => this.paysList.set(list));
+    this.api.listPayrollPays().subscribe(list => this.paysList.set(list));
   }
 
   // Signal-based form state — cleaner with OnPush + daf360 components
