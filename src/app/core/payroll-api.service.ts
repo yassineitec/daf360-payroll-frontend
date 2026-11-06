@@ -133,6 +133,10 @@ export interface SimulationRequest {
   poste?: string;
   grade?: string;
   discipline?: string;
+  /** Currency inputNet/inputGross was actually typed in. Omitted = the country's working
+   *  currency (today's behavior). When set and different, the backend converts before running
+   *  the engine and the result's own inputCurrency/inputAmountOriginal reflect what was typed. */
+  inputCurrency?: string;
 }
 
 /** One evaluated rubrique line returned inside {@link SimulationResultDto.rubriquesApplied}. */
@@ -229,6 +233,10 @@ export interface SimulationResultDto {
   contractType: string;
   // 5 strates
   inputNet: number;            // S1
+  /** Currency actually typed, null = the country's working currency (the common case). */
+  inputCurrency: string | null;
+  /** Amount as typed, in inputCurrency. Null exactly when inputCurrency is null. */
+  inputAmountOriginal: number | null;
   netTaxable: number;          // S2
   taxableBase: number;         // S2 alias
   gross: number;               // S3
@@ -338,6 +346,11 @@ export interface PaysDto {
   isoCode: string;
   frenchLabel: string;
   devise: string;
+}
+
+export interface FxRateDto {
+  currencyCode: string;
+  rateToEur: number;
 }
 
 /** `payroll_countries` — la configuration du moteur par pays (`GET /admin/countries`). */
@@ -467,6 +480,10 @@ export class PayrollApiService {
   getActiveParameterSet(paysId: number): Observable<ParameterSetDto> {
     const params = new HttpParams().set('paysId', paysId);
     return this.http.get<ParameterSetDto>(`${this.base}/parameter-sets/active`, { params });
+  }
+
+  getFxRates(): Observable<FxRateDto[]> {
+    return this.http.get<FxRateDto[]>(`${this.base}/ref/fx-rates`);
   }
 
   createParameterSet(req: Partial<ParameterSetDto>): Observable<ParameterSetDto> {
