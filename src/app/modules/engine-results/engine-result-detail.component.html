@@ -24,15 +24,15 @@
     </div>
   }
 
-  <!-- Le bulletin partagé avec /payroll/engine-run ; exports dans sa barre de recherche. -->
+  <!-- Bulletin partagé (`app-payslip-bulletin`). Pas d'export dans sa barre : « Exporter
+       Excel » / « Exporter PDF » sont dans la carte Actions de la page, qui appelle
+       `exportXlsx()` / `exportPdf()` ci-dessous quand un bulletin est ouvert. -->
   @if (totals(); as k) {
     <app-payslip-bulletin
       [details]="r.rubriqueDetails"
       [totals]="k"
       [currency]="currency()"
       [employerCost]="employerCost()"
-      [toolbarActions]="toolbarActions()"
-      (toolbarAction)="onToolbarAction($event)"
       [(search)]="rubriqueSearch" />
   }
 } @else {

@@ -31,7 +31,6 @@ const MODULE_TONE: Record<string, Tone> = {
   'salary-advances':      'secondary',
   'employee-config':      'secondary',
   'cohort':               'tertiary',
-  'engine-run':           'warning',
   'engine-results':       'teal',
   'candidate-simulation': 'tertiary',
   'calibration':          'secondary',

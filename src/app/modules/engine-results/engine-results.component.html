@@ -67,6 +67,37 @@
           }
         </aside>
       </daf-section-card>
+
+      <!-- Actions — sous la carte Détails, dans leur propre carte, comme le centre d'actions de
+           /finance/affaires/:id : action principale en `lg` pleine largeur, puis la secondaire. -->
+      <daf-section-card>
+        <div class="flex flex-col gap-3 bg-surface-container p-6">
+          <p class="m-0 text-label-caps font-extrabold uppercase tracking-widest text-on-surface-variant">
+            {{ 'PAYROLL.ENGINE_RESULTS.ACTIONS_TITLE' | translate }}
+          </p>
+          <!-- Calcul de la paie de ce collaborateur, en pop-up — seulement avec le droit de lancer le moteur. -->
+          @if (canRunEngine()) {
+            <daf-button
+              [options]="{ variant: 'primary', size: 'lg', fullWidth: true, iconStart: 'calculate',
+                           label: ('PAYROLL.ENGINE_RESULTS.CALC_BUTTON' | translate) }"
+              (onClick)="openCalc()" />
+          }
+          <!-- Exports générés par le serveur : le bulletin ouvert, sinon l'historique (lignes de
+               la liste, filtres et tri appliqués). Deux boutons à largeur égale sur une ligne. -->
+          <div class="grid grid-cols-2 gap-2">
+            <daf-button
+              [options]="{ variant: 'secondary', size: 'sm', fullWidth: true, iconStart: 'table_view',
+                           loading: exportingXlsx(), disabled: exportDisabled() || exportingXlsx(),
+                           label: ((exportingXlsx() ? 'PAYROLL.ENGINE_RUN.EXPORTING' : 'PAYROLL.ENGINE_RESULTS.EXPORT_XLSX') | translate) }"
+              (onClick)="exportResultsXlsx()" />
+            <daf-button
+              [options]="{ variant: 'secondary', size: 'sm', fullWidth: true, iconStart: 'picture_as_pdf',
+                           loading: exportingPdf(), disabled: exportDisabled() || exportingPdf(),
+                           label: ((exportingPdf() ? 'PAYROLL.ENGINE_RUN.EXPORTING' : 'PAYROLL.ENGINE_RESULTS.EXPORT_PDF') | translate) }"
+              (onClick)="exportResultsPdf()" />
+          </div>
+        </div>
+      </daf-section-card>
     </div>
 
     <!-- ══ COLONNE DROITE — KPI, liste des périodes, détail ═════════════════ -->
@@ -144,8 +175,6 @@
         [value]="searchText()"
         (valueChange)="onSearchTextChange($event)"
         [debounce]="300"
-        [actions]="[{ id: 'export-csv', label: ('PAYROLL.ENGINE_RESULTS.EXPORT_CSV' | translate), icon: 'download', position: 'right' }]"
-        (action)="onToolbarAction($event)"
         [filterFields]="filterFields()"
         [filterConfig]="filterConfig()"
         (filterApply)="applyFilters($event)"
@@ -212,3 +241,77 @@
     </div>
   </div>
 </daf-page>
+
+<!-- Formulaire « Calculer la paie » (pop-up) — mêmes champs que /payroll/engine-run, le
+     collaborateur en moins : c'est celui de la page. -->
+<ng-template #calcTpl>
+  <div class="flex flex-col gap-5">
+    <daf-select
+      [options]="calcPaysOptions()"
+      [selected]="calcPaysId() ? ['' + calcPaysId()] : []"
+      [config]="{
+        label: 'PAYROLL.ENGINE_RUN.PAYS' | translate,
+        placeholder: calcPaysOptions().length ? ('PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate) : ('PAYROLL.COMMON.LOADING' | translate),
+        searchable: true, required: true, fullWidth: true
+      }"
+      (selectedChange)="onCalcPaysChange($event)" />
+
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <daf-select
+        [options]="calcMonthOptions()"
+        [selected]="['' + calcMonth()]"
+        [config]="{ label: 'PAYROLL.ENGINE_RUN.PERIOD_MONTH' | translate, required: true, fullWidth: true }"
+        (selectedChange)="$event[0] && calcMonth.set(+$event[0])" />
+      <daf-select
+        [options]="calcYearOptions()"
+        [selected]="['' + calcYear()]"
+        [config]="{ label: 'PAYROLL.ENGINE_RUN.PERIOD_YEAR' | translate, required: true, fullWidth: true }"
+        (selectedChange)="$event[0] && calcYear.set(+$event[0])" />
+    </div>
+
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <daf-select
+        [options]="calcContractOptions()"
+        [selected]="calcContract() ? [calcContract()] : []"
+        [config]="{
+          label: 'PAYROLL.ENGINE_RUN.CONTRACT_TYPE' | translate,
+          placeholder: calcContractPlaceholder(),
+          required: true, fullWidth: true,
+          disabled: !calcContractOptions().length,
+          hint: calcContractHint()
+        }"
+        (selectedChange)="calcContract.set($event[0] || '')" />
+      <daf-form-field
+        [value]="calcJours()"
+        (valueChange)="calcJours.set(+($event ?? 0))"
+        [options]="{ label: 'PAYROLL.ENGINE_RUN.WORKDAYS' | translate, type: 'number', required: true, fullWidth: true,
+                     prefixIcon: 'calendar_view_day', suffixText: 'j', hint: 'PAYROLL.ENGINE_RUN.WORKDAYS_HINT' | translate }" />
+    </div>
+
+    @if (calcExitWarning(); as w) {
+      <div class="flex items-center gap-2 rounded-xl bg-warning/10 px-4 py-3 text-sm text-warning">
+        <span class="material-symbols-outlined text-[18px]">person_off</span>
+        {{ w }}
+      </div>
+    }
+    @if (calcExistingWarning(); as w) {
+      <div class="flex items-center gap-2 rounded-xl bg-warning/10 px-4 py-3 text-sm text-warning">
+        <span class="material-symbols-outlined text-[18px]">history</span>
+        {{ w }}
+      </div>
+    }
+    @if (calcRunning()) {
+      <div class="flex items-center gap-2 rounded-xl bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
+        <span class="material-symbols-outlined text-[18px]">hourglass_top</span>
+        {{ 'PAYROLL.ENGINE_RUN.RUNNING' | translate }}
+      </div>
+    }
+    @if (calcError()) {
+      <div class="flex items-center gap-2 rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">
+        <span class="material-symbols-outlined text-[18px]">error</span>
+        {{ calcError() }}
+      </div>
+    }
+    <p class="m-0 text-body-sm text-on-surface-variant">{{ 'PAYROLL.ENGINE_RUN.SAVE_NOTE' | translate }}</p>
+  </div>
+</ng-template>

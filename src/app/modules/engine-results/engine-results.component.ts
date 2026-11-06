@@ -1,6 +1,10 @@
-import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal, untracked, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, TemplateRef, afterNextRender, computed, inject, signal, untracked, viewChild } from '@angular/core';
+import { UserStore } from '../../core/user.store';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { map } from 'rxjs';
+import { catchError, map, of } from 'rxjs';
+import { NotificationService } from '../../core/notification.service';
+import { readBlobError, saveBlob } from '../../shared/blob-download';
+import { PaysNamesService } from '../../core/pays-names.service';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -11,7 +15,13 @@ import { recallEmployee } from './engine-results-employee';
 import { EngineResultDetailComponent } from './engine-result-detail.component';
 import {
   AvatarComponent,
+  ButtonComponent,
   CardComponent,
+  FormFieldComponent,
+  ModalRef,
+  ModalService,
+  SelectComponent,
+  type SelectOption,
   DataTableComponent,
   EntityCardComponent,
   MetricCardComponent,
@@ -68,7 +78,8 @@ const MARITAL_KEYS: Record<string, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, TranslatePipe,
-    AvatarComponent, CardComponent, DataTableComponent, EntityCardComponent,
+    AvatarComponent, ButtonComponent, CardComponent, DataTableComponent, EntityCardComponent,
+    FormFieldComponent, SelectComponent,
     MetricCardComponent, PageComponent, PageHeaderComponent, PaginationComponent,
     SearchToolbarComponent, SectionCardComponent, StatusBadgeComponent,
     EngineResultDetailComponent,
@@ -444,11 +455,6 @@ export class EngineResultsComponent {
     { id: 'grid', icon: 'grid_view',  tooltip: this.t('PAYROLL.ENGINE_RESULTS.VIEW_GRID') },
   ]);
 
-  /** The toolbar's own "Exporter CSV" action (`[actions]`/`(action)`), instead of a
-   *  separate button row — same mechanism the type doc's canonical example uses. */
-  onToolbarAction(id: string): void {
-    if (id === 'export-csv') this.exportResultsCsv();
-  }
 
   /** « Calculé le 22/10/2026 14:05 ». */
   private calculatedOnText(r: RunPayrollResponse): string {
@@ -487,24 +493,60 @@ export class EngineResultsComponent {
       });
   });
 
-  exportResultsCsv(): void {
-    const columns = this.resultColumns();
-    const rows = this.sortedResultRows();
-    const escape = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const header = columns.map(c => escape(c.label)).join(';');
-    const body = rows.map(row => columns.map(c => {
-      const cell = row[c.key];
-      return escape(c.key === 'calc' ? (cell as { label?: string })?.label : cell);
-    }).join(';')).join('\n');
-    const csv = String.fromCharCode(0xFEFF) + header + '\n' + body;
+  // ── « Exporter Excel » / « Exporter PDF » (carte Actions), générés par le serveur ──────
+  // Bulletin ouvert (`?result=`) : export du bulletin (lignes de sa recherche) — ses anciens
+  // boutons de barre ont été retirés. Sinon : l'historique, lignes de la liste (recherche,
+  // filtres et tri appliqués), toutes pages.
+  private readonly historyExportingXlsx = signal(false);
+  private readonly historyExportingPdf  = signal(false);
+  private readonly openBulletin = viewChild(EngineResultDetailComponent);
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `engine-results-${this.employee()?.employeeId ?? this.employeeId}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+  readonly exportingXlsx = computed(() =>
+    this.historyExportingXlsx() || (this.openBulletin()?.exportingXlsx() ?? false));
+  readonly exportingPdf = computed(() =>
+    this.historyExportingPdf() || (this.openBulletin()?.exportingPdf() ?? false));
+
+  /** Rien à exporter : aucun résultat, ou bulletin ouvert dont la recherche ne garde aucune ligne. */
+  readonly exportDisabled = computed(() => {
+    const b = this.openBulletin();
+    return b && this.selectedResultId() ? b.nothingToExport() : this.resultRows().length === 0;
+  });
+
+  private historyIds(): number[] {
+    return this.sortedResultRows().map(row => row['resultId'] as number);
+  }
+
+  private historyFileName(ext: string): string {
+    const name = (this.employee()?.employeeId ?? String(this.employeeId)).replace(/[^A-Za-z0-9-]+/g, '_');
+    return `Charge_salariale_${name}.${ext}`;
+  }
+
+  exportResultsXlsx(): void {
+    if (this.exportingXlsx() || this.exportDisabled()) return;
+    const bulletin = this.openBulletin();
+    if (bulletin && this.selectedResultId()) { bulletin.exportXlsx(); return; }
+    this.historyExportingXlsx.set(true);
+    this.engineApi.exportResultsHistoryXlsx(this.employeeId, this.historyIds(), this.translate.currentLang() || 'fr').subscribe({
+      next: blob => { this.historyExportingXlsx.set(false); saveBlob(blob, this.historyFileName('xlsx')); },
+      error: err => this.historyExportFailed(err, this.historyExportingXlsx),
+    });
+  }
+
+  exportResultsPdf(): void {
+    if (this.exportingPdf() || this.exportDisabled()) return;
+    const bulletin = this.openBulletin();
+    if (bulletin && this.selectedResultId()) { bulletin.exportPdf(); return; }
+    this.historyExportingPdf.set(true);
+    this.engineApi.exportResultsHistoryPdf(this.employeeId, this.historyIds(), this.translate.currentLang() || 'fr', this.employeeName())
+      .subscribe({
+        next: blob => { this.historyExportingPdf.set(false); saveBlob(blob, this.historyFileName('pdf')); },
+        error: err => this.historyExportFailed(err, this.historyExportingPdf),
+      });
+  }
+
+  private historyExportFailed(err: unknown, busy: { set(v: boolean): void }): void {
+    busy.set(false);
+    readBlobError(err, this.t('PAYROLL.ENGINE_RUN.EXPORT_ERROR')).then(msg => this.notification.error(msg));
   }
 
   loadEmployeeResults(): void {
@@ -635,4 +677,199 @@ export class EngineResultsComponent {
   readonly resultActions = computed(() => [
     { id: 'view', tooltip: this.t('PAYROLL.ENGINE_RESULTS.DETAIL_LINK'), onClick: (row: TableRow) => this.openDetail(row['resultId']) },
   ]);
+
+  // ── « Calculer la paie » : le calcul de /payroll/engine-run, en formulaire pop-up ──────
+  // Même modèle que les formulaires de /payroll/salary-advances (`ModalService` + template).
+  // Le collaborateur est celui de la page : restent le pays, la période, le contrat et les
+  // jours travaillés. Mêmes règles que /payroll/engine-run : contrats tarifés par le jeu de
+  // paramètres actif du pays, contrat de la fiche RH repris d'office, avertissement quand le
+  // mois est déjà calculé (un nouveau lancement AJOUTE un résultat).
+  private readonly modal        = inject(ModalService);
+  private readonly notification = inject(NotificationService);
+  private readonly paysNames    = inject(PaysNamesService);
+  private readonly userStore    = inject(UserStore);
+  private readonly calcTpl = viewChild<TemplateRef<unknown>>('calcTpl');
+  private calcRef: ModalRef | null = null;
+
+  /** Anciens codes RH (assistant d'intégration d'avant migration) → codes de la paie. */
+  private static readonly LEGACY_CONTRACT: Record<string, string> = {
+    PERMANENT: 'CDI', FIXED_TERM: 'CDD', INTERN: 'STAGE',
+  };
+
+  private readonly calcPaysList = signal<PaysDto[]>([]);
+  readonly calcPaysId     = signal<number | null>(null);
+  readonly calcMonth      = signal(new Date().getMonth() + 1);
+  readonly calcYear       = signal(new Date().getFullYear());
+  readonly calcContract   = signal('');
+  readonly calcJours      = signal(22);
+  readonly calcContracts  = signal<string[]>([]);
+  readonly calcContractsLoading = signal(false);
+  readonly calcPsMissing  = signal(false);
+  readonly calcRunning    = signal(false);
+  readonly calcError      = signal<string | null>(null);
+
+  readonly calcPaysOptions = computed<SelectOption[]>(() =>
+    this.calcPaysList().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})` })));
+
+  readonly calcMonthOptions = computed<SelectOption[]>(() => {
+    const locale = this.translate.currentLang() === 'en' ? 'en-GB' : 'fr-FR';
+    return Array.from({ length: 12 }, (_, i) => {
+      const name = new Date(2000, i, 1).toLocaleDateString(locale, { month: 'long' });
+      return { value: String(i + 1), label: name.charAt(0).toUpperCase() + name.slice(1) };
+    });
+  });
+
+  readonly calcYearOptions = computed<SelectOption[]>(() => {
+    const now = new Date().getFullYear();
+    const years = new Set<number>([now - 3, now - 2, now - 1, now, now + 1, this.calcYear()]);
+    return [...years].sort((a, b) => b - a).map(y => ({ value: String(y), label: String(y) }));
+  });
+
+  readonly calcContractOptions = computed<SelectOption[]>(() =>
+    this.calcContracts().map(ct => ({ value: ct, label: contractTypeLabel(ct, this.translate) })));
+
+  readonly calcContractPlaceholder = computed(() =>
+    !this.calcPaysId()             ? this.t('PAYROLL.ENGINE_RUN.CONTRACT_NO_PAYS')
+    : this.calcContractsLoading()  ? this.t('PAYROLL.COMMON.LOADING')
+    : this.calcPsMissing()         ? this.t('PAYROLL.ENGINE_RUN.CONTRACT_NO_PS')
+    :                                this.t('PAYROLL.ENGINE_RUN.CONTRACT_PLACEHOLDER'));
+
+  /** Contrat de la fiche RH, en code de la paie (« CDI », « CIVP »…). */
+  private readonly hrContract = computed(() => {
+    const code = (this.profile()?.contractType ?? this.employee()?.contractType)?.trim().toUpperCase();
+    return code ? (EngineResultsComponent.LEGACY_CONTRACT[code] ?? code) : null;
+  });
+
+  readonly calcContractHint = computed(() => {
+    const hr = this.hrContract();
+    if (!hr || !this.calcContracts().length) return '';
+    const contract = contractTypeLabel(hr, this.translate);
+    if (!this.calcContracts().includes(hr)) return this.t('PAYROLL.ENGINE_RUN.CONTRACT_HR_NOT_PRICED', { contract });
+    return this.calcContract() === hr
+      ? this.t('PAYROLL.ENGINE_RUN.CONTRACT_FROM_HR')
+      : this.t('PAYROLL.ENGINE_RUN.CONTRACT_HR_DIFFERS', { contract });
+  });
+
+  /** Collaborateur sorti ou archivé : le calcul reste possible, mais signalé. */
+  readonly calcExitWarning = computed(() => {
+    const s = this.profile()?.lifecycleStatus ?? this.employee()?.lifecycleStatus;
+    if (s !== 'TERMINATED' && s !== 'ARCHIVED') return null;
+    return this.t('PAYROLL.ENGINE_RUN.EXIT_WARNING', { status: this.t(`PAYROLL.ENGINE_RUN.LIFECYCLE.${s}`).toLowerCase() });
+  });
+
+  /** Mois déjà calculé : le relancer enregistre un résultat de plus. */
+  readonly calcExistingWarning = computed(() => {
+    const y = this.calcYear(), m = this.calcMonth();
+    const r = this.results().filter(x => x.periodYear === y && x.periodMonth === m)
+      .sort((a, b) => b.resultId - a.resultId)[0];
+    return r ? this.t('PAYROLL.ENGINE_RUN.EXISTING_WARNING', { period: this.periodText(r), id: r.resultId }) : null;
+  });
+
+  canCalc(): boolean {
+    return !!this.calcPaysId() && !!this.calcContract() && this.calcJours() >= 1 && !this.calcRunning();
+  }
+
+  /** Calcul réservé à qui peut lancer le moteur (même droit que `POST /engine/run`). */
+  readonly canRunEngine = computed(() => this.userStore.hasPermission('PAYROLL_RUN_ENGINE'));
+
+  /** Arrivée avec `?calc=1` (« Calculer sa paie » de /payroll/employee-config) : pop-up
+   *  ouverte dès le premier rendu, `?pays=` pré-sélectionné ; les deux paramètres sont
+   *  ensuite retirés de l'adresse (un F5 ne rouvre pas la pop-up). */
+  private readonly openCalcFromUrl = afterNextRender(() => {
+    const q = this.route.snapshot.queryParamMap;
+    if (q.get('calc') !== '1') return;
+    const pays = Number(q.get('pays'));
+    this.router.navigate([], { relativeTo: this.route, queryParams: { calc: null, pays: null },
+      queryParamsHandling: 'merge', replaceUrl: true });
+    if (this.canRunEngine()) this.openCalc(pays > 0 ? pays : null);
+  });
+
+  openCalc(paysOverride: number | null = null): void {
+    if (!this.canRunEngine()) return;
+    this.calcError.set(null);
+    this.calcRunning.set(false);
+    this.calcMonth.set(new Date().getMonth() + 1);
+    this.calcYear.set(new Date().getFullYear());
+    this.calcJours.set(22);
+    // Pays du collaborateur (liste), sinon celui de ses résultats.
+    const paysId = paysOverride ?? this.employee()?.paysId ?? this.results().find(r => r.paysId != null)?.paysId ?? null;
+    this.calcPaysId.set(null);
+    this.onCalcPaysChange(paysId != null ? [String(paysId)] : []);
+    if (!this.calcPaysList().length) {
+      this.payrollApi.listPayrollPays().pipe(catchError(() => of([] as PaysDto[])))
+        .subscribe(list => this.calcPaysList.set(list));
+    }
+    this.calcRef = this.modal.open({
+      title: this.t('PAYROLL.ENGINE_RESULTS.CALC_TITLE'),
+      subtitle: this.employeeName(),
+      icon: 'calculate',
+      body: this.calcTpl()!,
+      size: 'md',
+      closeOnBackdrop: false,
+      buttons: [
+        { label: this.t('PAYROLL.ENGINE_RUN.EXISTING_CONFIRM_CANCEL'), variant: 'secondary', action: r => r.close() },
+        { label: this.t('PAYROLL.ENGINE_RUN.RUN_BUTTON'), variant: 'primary', icon: 'calculate', action: () => this.submitCalc() },
+      ],
+    });
+  }
+
+  onCalcPaysChange(selected: string[]): void {
+    const id = selected[0] ? +selected[0] : null;
+    if (id === this.calcPaysId()) return;
+    this.calcPaysId.set(id);
+    this.loadCalcContracts(id);
+  }
+
+  private contractSeq = 0;
+  private loadCalcContracts(paysId: number | null): void {
+    const seq = ++this.contractSeq;
+    this.calcContracts.set([]);
+    this.calcPsMissing.set(false);
+    this.calcContract.set('');
+    if (paysId == null) { this.calcContractsLoading.set(false); return; }
+    this.calcContractsLoading.set(true);
+    this.payrollApi.getActiveParameterSet(paysId).pipe(catchError(() => of(null))).subscribe(ps => {
+      if (seq !== this.contractSeq) return;
+      const types = [...new Set((ps?.socialChargeRates ?? []).map(r => r.contractType))].sort();
+      this.calcContracts.set(types);
+      this.calcPsMissing.set(!ps);
+      this.calcContractsLoading.set(false);
+      // Contrat de la fiche RH s'il est tarifé, sinon CDI, sinon le premier.
+      const hr = this.hrContract();
+      this.calcContract.set(hr && types.includes(hr) ? hr : types.includes('CDI') ? 'CDI' : types[0] ?? '');
+    });
+  }
+
+  /** Bouton « Lancer le calcul » de la pop-up — gardé ici aussi : un ModalButton n'a pas de
+   *  `disabled` réactif. Succès : pop-up fermée, historique rechargé, bulletin ouvert. */
+  private submitCalc(): void {
+    if (this.calcRunning()) return;
+    if (!this.canCalc()) {
+      this.calcError.set(this.t('PAYROLL.ENGINE_RESULTS.CALC_INCOMPLETE'));
+      return;
+    }
+    this.calcRunning.set(true);
+    this.calcError.set(null);
+    this.engineApi.runPayroll({
+      employeeId:       this.employeeId,
+      paysId:           this.calcPaysId()!,
+      periodYear:       this.calcYear(),
+      periodMonth:      this.calcMonth(),
+      contractTypeCode: this.calcContract(),
+      joursOuvresMois:  this.calcJours(),
+    }).subscribe({
+      next: r => {
+        this.calcRunning.set(false);
+        this.calcRef?.close();
+        this.results.update(list => [...list, r]);
+        this.empSearched.set(true);
+        this.notification.success(this.t('PAYROLL.ENGINE_RESULTS.CALC_SUCCESS', { period: this.periodText(r), id: r.resultId }));
+        this.openDetail(r.resultId);
+      },
+      error: e => {
+        this.calcRunning.set(false);
+        this.calcError.set(e?.error?.message ?? this.t('PAYROLL.ENGINE_RUN.ERROR'));
+      },
+    });
+  }
 }
