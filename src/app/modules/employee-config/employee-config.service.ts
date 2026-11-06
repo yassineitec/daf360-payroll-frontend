@@ -17,6 +17,14 @@ export interface EmployeePayrollConfigDto {
   childrenCount: number;
   updatedBy: number | null;
   updatedAt: string | null;
+  /** Set only when the stored gross salary was originally typed in a different currency
+   *  than the working one — null in the common case. */
+  inputCurrency: string | null;
+  inputAmountOriginal: number | null;
+  /** The country's working currency — resolved server-side, same value `salaryCurrency()`
+   *  already derives locally from `paysList`; present for parity with other consumers of
+   *  this DTO shape, not required reading here. */
+  workingCurrency: string | null;
 }
 
 export interface UpsertEmployeePayrollConfigRequest {
@@ -28,6 +36,8 @@ export interface UpsertEmployeePayrollConfigRequest {
   isMarried: boolean;
   childrenCount: number;
   reason: string;
+  /** Omit/null when currentGrossSalary is already in the working currency. */
+  inputCurrency?: string | null;
 }
 
 /** Une version enregistrée de la configuration (`GET …/{id}/history`, plus récente d'abord). */
@@ -40,6 +50,8 @@ export interface EmployeePayrollConfigHistoryDto {
   reason: string | null;
   changedBy: number | null;
   changedAt: string;
+  inputCurrency: string | null;
+  inputAmountOriginal: number | null;
 }
 
 export interface CalculateNetResponse {
@@ -86,8 +98,8 @@ export class EmployeeConfigService {
     return this.http.get<EmployeePayrollConfigHistoryDto[]>(`${this.base}/${profileUserId}/history`);
   }
 
-  calculateNet(profileUserId: number, grossSalary: number): Observable<CalculateNetResponse> {
-    return this.http.post<CalculateNetResponse>(`${this.base}/${profileUserId}/calculate-net`, { grossSalary });
+  calculateNet(profileUserId: number, grossSalary: number, inputCurrency?: string | null): Observable<CalculateNetResponse> {
+    return this.http.post<CalculateNetResponse>(`${this.base}/${profileUserId}/calculate-net`, { grossSalary, inputCurrency });
   }
 
   getBonuses(profileUserId: number): Observable<EmployeePayrollBonusDto[]> {
