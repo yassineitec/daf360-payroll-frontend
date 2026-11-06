@@ -89,6 +89,13 @@ export class EmployeeConfigService {
     return this.http.get<EmployeePayrollConfigDto>(`${this.base}/${profileUserId}`);
   }
 
+  /** userId → contrat de la configuration paie enregistrée (absent = jamais enregistrée). */
+  getSavedContractTypes(userIds: number[]): Observable<Record<number, string>> {
+    return this.http.get<Record<number, string>>(`${this.base}/contract-types`, {
+      params: { userIds: userIds.join(',') },
+    });
+  }
+
   upsert(profileUserId: number, req: UpsertEmployeePayrollConfigRequest): Observable<EmployeePayrollConfigDto> {
     return this.http.put<EmployeePayrollConfigDto>(`${this.base}/${profileUserId}`, req);
   }
