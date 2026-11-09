@@ -46,6 +46,14 @@ import {
 import { dayRange, distinctSorted, inDayRange, monthName, pickValue, rangeSeed } from '../../shared/filter-utils';
 import { TableSort, delegatedSort, sortTableRows, tableTools, toTableSort } from '../../shared/table-tools';
 
+/** Net à payer d'un résultat : `aggregateNet` (brut − cotisations salariales − impôts). Plus
+ *  `strate5` : depuis le 2026-11-06 la strate 5 porte les impôts, plus le net — un pays sans
+ *  rubrique d'impôt affichait 0. Repli sur `strate5` seulement si `aggregateNet` manque
+ *  (avant, le serveur y recopiait déjà la strate 5, alors le net). */
+function netOf(r: RunPayrollResponse): number | null {
+  return r.aggregateNet ?? r.strate5 ?? null;
+}
+
 /** Une ligne libellé / valeur de la carte « Détails ». */
 interface DetailRow { label: string; value: string; }
 interface DetailSection { id: string; title: string; rows: DetailRow[]; }
@@ -309,7 +317,7 @@ export class EngineResultsComponent {
     const latest = this.latestIds();
     const rows = this.results().filter(r => latest.has(r.resultId) && r.periodYear === year);
     const totalGross = rows.reduce((sum, r) => sum + (r.aggregateGross ?? 0), 0);
-    const totalNet = rows.reduce((sum, r) => sum + (r.strate5 ?? 0), 0);
+    const totalNet = rows.reduce((sum, r) => sum + (netOf(r) ?? 0), 0);
     // Retenues salariales réelles : S3 = CNSS salariale + IRPP (S4).
     const totalDeductions = rows.reduce((sum, r) => sum + (r.strate3 ?? 0) + (r.aggregateIrpp ?? r.strate4 ?? 0), 0);
     // Mois manquants : de janvier jusqu'au mois en cours (toute l'année pour une année passée).
@@ -485,7 +493,7 @@ export class EngineResultsComponent {
             metricsColumns: 2,
             metrics: [
               { label: this.t('PAYROLL.ENGINE_RESULTS.COL_GROSS'),   value: this.money(r.aggregateGross) },
-              { label: this.t('PAYROLL.ENGINE_RESULTS.COL_NET_PAY'), value: this.money(r.strate5) },
+              { label: this.t('PAYROLL.ENGINE_RESULTS.COL_NET_PAY'), value: this.money(netOf(r)) },
             ],
             viewLabel: this.t('PAYROLL.ENGINE_RESULTS.DETAIL_LINK'),
           } satisfies EntityCardOptions,
@@ -623,7 +631,7 @@ export class EngineResultsComponent {
         // imposable ni coût employeur).
         employeeCharges: r.strate3,
         irpp:         r.aggregateIrpp ?? r.strate4,
-        netPay:       r.strate5,
+        netPay:       netOf(r),
         calc: {
           label: this.t(isLatest ? 'PAYROLL.ENGINE_RESULTS.CALC_LATEST' : 'PAYROLL.ENGINE_RESULTS.CALC_OLD'),
           options: { variant: (isLatest ? 'success' : 'neutral') as BadgeVariant, size: 'sm' as const },

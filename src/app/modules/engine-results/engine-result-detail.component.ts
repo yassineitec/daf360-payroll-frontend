@@ -83,7 +83,9 @@ export class EngineResultDetailComponent {
       gross:           r.aggregateGross ?? (r.strate1 ?? 0) + (r.strate2 ?? 0),
       employeeCharges: r.strate3 ?? 0,
       irpp:            r.aggregateIrpp ?? r.strate4 ?? 0,
-      net:             r.strate5 ?? 0,
+      // Net = `aggregateNet` (brut − cotisations salariales − impôts). Plus `strate5` : depuis
+      // le 2026-11-06 la strate 5 porte les impôts, plus le net (0 sans rubrique d'impôt).
+      net:             r.aggregateNet ?? r.strate5 ?? 0,
     };
   });
 
