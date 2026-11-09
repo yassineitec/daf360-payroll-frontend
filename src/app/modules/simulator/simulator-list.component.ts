@@ -29,6 +29,7 @@ import {
 } from '@khalilrebhiitec/daf360';
 import {
   PayrollApiService,
+  type FxRateDto,
   type PaysDto,
   type SimulationListItemDto,
   type SimulationPageDto,
@@ -36,6 +37,7 @@ import {
 import { HrProfileService, type HrContractType } from '../../core/hr-profile.service';
 import { PaysNamesService } from '../../core/pays-names.service';
 import { UserStore } from '../../core/user.store';
+import { CurrencyService } from '../../core/currency.service';
 import { NotificationService } from '../../core/notification.service';
 import { readBlobError, saveBlob } from '../../shared/blob-download';
 import { TableSort, delegatedSort, tableTools, toTableSort } from '../../shared/table-tools';
@@ -68,6 +70,7 @@ export class SimulatorListComponent implements OnInit {
   private readonly api        = inject(PayrollApiService);
   private readonly hr         = inject(HrProfileService);
   private readonly router     = inject(Router);
+  private readonly currencySvc = inject(CurrencyService);
   private readonly route      = inject(ActivatedRoute);
   private readonly translate  = inject(TranslateService);
   private readonly paysNames  = inject(PaysNamesService);
@@ -129,6 +132,11 @@ export class SimulatorListComponent implements OnInit {
   }
 
   private readonly paysList      = signal<PaysDto[]>([]);
+  /** Payroll's own cache of finance's `RATE_EUR_*` rows (same source `IndividualSimulationService`
+   *  used server-side) — deliberately NOT `CurrencyService`'s live market rate, same reasoning as
+   *  `simulator.component.ts`'s `fxRateMap`: a different rate provider on the same round-trip would
+   *  drift the figure on display. */
+  private readonly fxRates       = signal<FxRateDto[]>([]);
   private readonly contractTypes = signal<HrContractType[]>([]);
   readonly exportingId = signal<number | null>(null);
 
@@ -168,6 +176,10 @@ export class SimulatorListComponent implements OnInit {
       // rôles ont le droit de lire.
       this.paysFilter.set(this.userStore.currentUser()?.paysId ?? null);
     }
+
+    this.api.getFxRates()
+      .pipe(catchError(() => of([] as FxRateDto[])))
+      .subscribe(rates => this.fxRates.set(rates));
 
     this.api.listPayrollPays()
       .pipe(catchError(() => of([] as PaysDto[])))
@@ -382,6 +394,34 @@ export class SimulatorListComponent implements OnInit {
     return (paysId != null ? SimulatorListComponent.NATIVE_CURRENCY_BY_PAYS_ID[paysId] : undefined) ?? raw;
   });
 
+  /** Global display-currency pick (shell's `daf-radial-menu`, same `CurrencyService` as
+   *  `/payroll/engine-results` and `simulator.component.ts`) -- this list never read it at all
+   *  before, so switching currency in the shell's FAB had zero effect here while every other
+   *  payroll screen reacted to it. `null` = show figures in their real native currency (today's
+   *  behaviour). Only amounts passed through `money()` with an explicit currency convert -- the
+   *  underlying data is never touched, only how it's displayed. */
+  readonly displayCurrency = computed(() => this.currencySvc.display());
+
+  /** Rate-to-EUR map built from `fxRates` -- deliberately the same payroll-cached finance rate
+   *  `IndividualSimulationService` used server-side, not `CurrencyService`'s own live market
+   *  rate (see `simulator.component.ts`'s identical `fxRateMap` for why: two different rate
+   *  providers on the same round-trip would drift the figure on display). */
+  readonly fxRateMap = computed<Record<string, number>>(() => {
+    const map: Record<string, number> = { EUR: 1 };
+    for (const r of this.fxRates()) map[r.currencyCode] = r.rateToEur;
+    return map;
+  });
+
+  /** What to actually label amounts with: the display pick when one is active and convertible,
+   *  the real native currency otherwise. */
+  readonly effectiveCurrency = computed(() => {
+    const display = this.displayCurrency();
+    const trueCurrency = this.currency();
+    if (!display || display === trueCurrency) return trueCurrency;
+    const rates = this.fxRateMap();
+    return rates[trueCurrency] != null && rates[display] != null ? display : trueCurrency;
+  });
+
   private readonly summary = computed(() => this.pageData()?.summary ?? null);
 
   // Quatre tuiles de RÉSULTAT, aucune cliquable : le filtrage passe par le panneau Filtres
@@ -551,6 +591,7 @@ export class SimulatorListComponent implements OnInit {
 
   readonly cards = computed(() => {
     const currency = this.currency();
+    const unit = this.effectiveCurrency();
     const dateFmt = new Intl.DateTimeFormat(this.numberLocale(), { dateStyle: 'short', timeStyle: 'short' });
     return this.rowsData().map(r => {
       const subject = this.subjectLabel(r);
@@ -580,9 +621,9 @@ export class SimulatorListComponent implements OnInit {
           },
           metricsColumns: 2,
           metrics: [
-            { label: this.t('PAYROLL.SIMULATOR.LIST.COL.GROSS'), value: this.money(r.gross, 0), unit: currency },
-            { label: this.t('PAYROLL.SIMULATOR.LIST.COL.NET'), value: this.money(r.netPaid, 0), unit: currency },
-            { label: this.t('PAYROLL.SIMULATOR.LIST.COL.LOADED_COST'), value: this.money(r.loadedCost, 0), unit: currency },
+            { label: this.t('PAYROLL.SIMULATOR.LIST.COL.GROSS'), value: this.money(r.gross, 0, currency, false), unit },
+            { label: this.t('PAYROLL.SIMULATOR.LIST.COL.NET'), value: this.money(r.netPaid, 0, currency, false), unit },
+            { label: this.t('PAYROLL.SIMULATOR.LIST.COL.LOADED_COST'), value: this.money(r.loadedCost, 0, currency, false), unit },
             { label: this.t('PAYROLL.SIMULATOR.LIST.COL.RATIO'),
               value: r.costNetRatio == null ? '—' : `× ${this.money(r.costNetRatio, 2)}` },
           ],
@@ -635,11 +676,30 @@ export class SimulatorListComponent implements OnInit {
     });
   }
 
-  private money(value: number | null | undefined, decimals: number, currency = ''): string {
+  /** `currency` must be the amount's REAL currency (`this.currency()`) for conversion to kick
+   *  in -- passing '' (ratios, coefficients) always skips conversion, same convention as
+   *  `simulator.component.ts`'s own `money()`. `embedUnit=false` returns the converted number
+   *  alone (for card metrics, which show the unit in their own separate `unit:` slot and would
+   *  otherwise display it twice). */
+  private money(value: number | null | undefined, decimals: number, currency = '', embedUnit = true): string {
     if (value == null || Number.isNaN(value)) return '—';
+    let amount = value;
+    let shown = currency;
+    if (currency && currency === this.currency()) {
+      const display = this.displayCurrency();
+      shown = this.effectiveCurrency();
+      if (display && display !== currency) {
+        const rates = this.fxRateMap();
+        const fromRate = rates[currency];
+        const toRate = rates[display];
+        if (fromRate != null && toRate != null) {
+          amount = value * fromRate / toRate;
+        }
+      }
+    }
     const s = new Intl.NumberFormat(this.numberLocale(), {
       minimumFractionDigits: decimals, maximumFractionDigits: decimals,
-    }).format(value);
-    return currency ? `${s} ${currency}` : s;
+    }).format(amount);
+    return embedUnit && shown ? `${s} ${shown}` : s;
   }
 }
