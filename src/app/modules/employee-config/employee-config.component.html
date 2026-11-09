@@ -122,7 +122,7 @@
                     [options]="salaryCurrencyOptions()"
                     [config]="{
                       label: 'PAYROLL.EMPLOYEE_CONFIG.CURRENCY_LABEL' | translate,
-                      hint: 'PAYROLL.EMPLOYEE_CONFIG.CURRENCY_HINT' | translate: { working: salaryCurrency() },
+                      hint: 'PAYROLL.EMPLOYEE_CONFIG.CURRENCY_HINT' | translate: { working: salaryRealCurrency() },
                     }"
                     [selected]="currencySelection()"
                     (selectedChange)="setCurrency($event)">
