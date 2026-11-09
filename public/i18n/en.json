@@ -550,6 +550,8 @@
       "NET_RECALC_SUFFIX": "(net recalculated)",
       "CONTRACT_FROM_HR": "Taken from the employee's HR record",
       "CONTRACT_HR_DIFFERS": "Differs from the HR record contract ({{contract}})",
+      "CONTRACT_NOT_PRICED": "The contract \"{{contract}}\" has no payroll rules in this country: it cannot be saved. Allowed contracts: {{allowed}}.",
+      "CONTRACT_NO_RULES": "This country has no active payroll rules: the contract \"{{contract}}\" cannot be saved.",
       "UNSAVED": "Unsaved changes: enter the reason, then click \"Save\".",
       "UNSAVED_OTHER_TAB": "The payroll configuration has unsaved changes (\"Payroll configuration\" tab).",
       "NEVER_SAVED": "Configuration never saved: check the proposed values, then save it.",
@@ -1243,7 +1245,8 @@
         "AED": "UAE dirham",
         "CONVERTED_NOTE": "amounts converted from {{from}} to {{to}} at today's rate"
       },
-      "KPI_PERIOD": "Payroll indicators — latest calculated month: {{period}}",
+      "KPI_PERIOD": "Payroll indicators — all calculations, up to {{period}}",
+      "KPI_ALL_PERIOD": "all calculated months",
       "KPI_NO_PERIOD": "no calculation",
       "KPI_PICK_COUNTRY": "Pick a country in the filters to show payroll indicators.",
       "KPI_GROSS_PAYROLL": "Gross payroll",

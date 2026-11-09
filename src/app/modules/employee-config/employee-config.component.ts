@@ -351,6 +351,32 @@ export class EmployeeConfigComponent implements OnInit {
       : this.t('PAYROLL.EMPLOYEE_CONFIG.CONTRACT_HR_DIFFERS', { contract: contractTypeLabel(hr, this.translate) });
   });
 
+  // ── Contrat hors des règles de paie ─────────────────────────────────────────
+  // La liste des contrats reste celle du RH (liste configurable « Type de contrat »), mais
+  // seuls ceux que les règles de paie actives du pays tarifent (social_charge_rates) peuvent
+  // être enregistrés : un autre contrat donnerait un net et une paie sans charges ni CNSS.
+  /** Contrats tarifés par les règles de paie actives du pays ; `null` tant que non chargé
+   *  (rien n'est bloqué avant de savoir). */
+  readonly pricedContracts = signal<string[] | null>(null);
+
+  /** Le contrat choisi n'a pas de règles de paie dans le pays : message + enregistrement bloqué. */
+  readonly contractUnpriced = computed(() => {
+    const code = this.config()?.contractType?.trim().toUpperCase();
+    const priced = this.pricedContracts();
+    return !!code && priced != null && !priced.includes(code);
+  });
+
+  readonly contractError = computed(() => {
+    if (!this.contractUnpriced()) return '';
+    const cfg = this.config()!;
+    const ct = this.contractTypes().find(c => c.code === cfg.contractType);
+    const contract = ct ? ((this.isEn() ? ct.labelEn : ct.labelFr) || ct.code) : cfg.contractType;
+    const priced = this.pricedContracts() ?? [];
+    return priced.length
+      ? this.t('PAYROLL.EMPLOYEE_CONFIG.CONTRACT_NOT_PRICED', { contract, allowed: priced.join(', ') })
+      : this.t('PAYROLL.EMPLOYEE_CONFIG.CONTRACT_NO_RULES', { contract });
+  });
+
   // ── Net calculé automatiquement à partir du brut ──────────────────────────
   // Le net n'est plus saisi : il est recalculé (après une courte pause de frappe) à chaque
   // changement du brut, par le serveur. ⚠ Le serveur calcule avec le pays, le contrat et les
@@ -739,6 +765,8 @@ export class EmployeeConfigComponent implements OnInit {
   save(): void {
     const cfg = this.config();
     if (cfg === null || cfg.paysId == null || this.saving()) return;
+    // Contrat sans règles de paie dans le pays : bloqué (le message est sous le select).
+    if (this.contractUnpriced()) { this.saveError.set(this.contractError()); return; }
     if (this.reason().trim() === '') { this.reasonTried.set(true); return; }
     if ((cfg.currentGrossSalary ?? 0) < 0 || (cfg.currentNetSalary ?? 0) < 0) {
       this.saveError.set(this.t('PAYROLL.EMPLOYEE_CONFIG.NEGATIVE_SALARY'));
@@ -924,9 +952,15 @@ export class EmployeeConfigComponent implements OnInit {
   }
 
   private loadBenefitsFor(paysId: number): void {
+    this.pricedContracts.set(null);
     this.payrollApi.getActiveParameterSet(paysId).subscribe({
-      next: ps => this.benefits.set(ps.benefits ?? []),
-      error: () => this.benefits.set([]),
+      next: ps => {
+        this.benefits.set(ps.benefits ?? []);
+        this.pricedContracts.set([...new Set((ps.socialChargeRates ?? [])
+          .map(r => r.contractType?.trim().toUpperCase()).filter((c): c is string => !!c))]);
+      },
+      // Pas de règles de paie actives pour ce pays : aucun contrat n'a de règles.
+      error: () => { this.benefits.set([]); this.pricedContracts.set([]); },
     });
   }
 

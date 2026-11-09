@@ -320,8 +320,9 @@ export class EngineResultsListComponent implements OnInit {
     return target ? `${prefix}${n} ${target}` : `${prefix}${n}`;
   }
 
-  /** Dernier mois calculé, en toutes lettres (« novembre 2026 ») ; une plage quand les pays
-   *  n'en sont pas au même mois. */
+  /** Avec le filtre « Période » : la période choisie. Sans : le DERNIER mois calculé, en
+   *  toutes lettres (« décembre 2026 ») — les cartes additionnent alors tous les calculs
+   *  jusqu'à ce mois-là (en-tête « tous les calculs, jusqu'à … »). */
   private periodLabel(list: PayrollResultsSummaryDto[]): string {
     // Filtre « Période » : c'est lui qui borne les totaux, on l'affiche tel quel (au mois près).
     const [from, to] = this.periodBounds();
@@ -340,8 +341,7 @@ export class EngineResultsListComponent implements OnInit {
     const locale = this.translate.getCurrentLang() === 'en' ? 'en-GB' : 'fr-FR';
     const fmt = (k: number) => new Date(Math.floor(k / 100), (k % 100) - 1, 1)
       .toLocaleDateString(locale, { month: 'long', year: 'numeric' });
-    const first = keys[0], last = keys[keys.length - 1];
-    return first === last ? fmt(last) : `${fmt(first)} – ${fmt(last)}`;
+    return fmt(keys[keys.length - 1]);
   }
 
   /** Les cinq tuiles, prêtes pour le template — TOUJOURS affichées : « — » tant que
@@ -372,6 +372,9 @@ export class EngineResultsListComponent implements OnInit {
       employeeCount:   list.reduce((acc, x) => acc + x.employeeCount, 0),
     };
     const period = this.periodLabel(list);
+    // Aides des tuiles : la période filtrée, sinon « l'ensemble des mois calculés » (sans
+    // filtre, les totaux couvrent tout l'historique, pas seulement le dernier mois).
+    const helpPeriod = this.hasPeriodFilter() ? period : this.t('PAYROLL.ENGINE_RESULTS.KPI_ALL_PERIOD');
     const headcount = this.headcount();
     // Collaborateurs en poste sans résultat sur la période. ⚠ `employeeCount` compte les
     // RÉSULTATS (un recalcul du même mois compte deux fois) tant que le résumé serveur ne
@@ -393,7 +396,7 @@ export class EngineResultsListComponent implements OnInit {
           delta: null,
           options: {
             icon: 'account_balance_wallet',
-            help: this.t('PAYROLL.ENGINE_RESULTS.KPI_GROSS_PAYROLL_HELP', { period }),
+            help: this.t('PAYROLL.ENGINE_RESULTS.KPI_GROSS_PAYROLL_HELP', { period: helpPeriod }),
           },
         },
         {
@@ -402,7 +405,7 @@ export class EngineResultsListComponent implements OnInit {
           delta: null,
           options: {
             valueColor: 'text-primary', icon: 'payments',
-            help: this.t('PAYROLL.ENGINE_RESULTS.KPI_NET_TOTAL_HELP', { period }),
+            help: this.t('PAYROLL.ENGINE_RESULTS.KPI_NET_TOTAL_HELP', { period: helpPeriod }),
           },
         },
         {
@@ -413,7 +416,7 @@ export class EngineResultsListComponent implements OnInit {
             : null,
           options: {
             icon: 'receipt_long',
-            help: this.t('PAYROLL.ENGINE_RESULTS.KPI_WITHHELD_HELP', { period }),
+            help: this.t('PAYROLL.ENGINE_RESULTS.KPI_WITHHELD_HELP', { period: helpPeriod }),
           },
         },
         {
@@ -424,7 +427,7 @@ export class EngineResultsListComponent implements OnInit {
             : null,
           options: {
             icon: 'account_balance', valueColor: 'text-primary',
-            help: this.t('PAYROLL.ENGINE_RESULTS.KPI_EMPLOYER_COST_HELP', { period }),
+            help: this.t('PAYROLL.ENGINE_RESULTS.KPI_EMPLOYER_COST_HELP', { period: helpPeriod }),
           },
         },
         {
@@ -442,7 +445,7 @@ export class EngineResultsListComponent implements OnInit {
               : missing > 0
                 ? { valueColor: 'text-warning', icon: 'person_alert', iconColor: 'text-warning', iconBg: 'bg-warning/10' }
                 : { valueColor: 'text-success', icon: 'task_alt', iconColor: 'text-success', iconBg: 'bg-success/10' }),
-            help: this.t('PAYROLL.ENGINE_RESULTS.KPI_COVERAGE_HELP', { period }),
+            help: this.t('PAYROLL.ENGINE_RESULTS.KPI_COVERAGE_HELP', { period: helpPeriod }),
             // Dernière tuile de la rangée : l'aide s'ouvre vers le haut (pas de débordement).
             helpPlacement: 'top',
           },

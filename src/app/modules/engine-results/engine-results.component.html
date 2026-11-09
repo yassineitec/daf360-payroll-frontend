@@ -160,10 +160,10 @@
          filtres et sa page conservés. ─────────────────────────────────────────── -->
     @if (selectedResultId() && results().length > 0) {
       <app-engine-result-detail
-        [results]="results()"
+        [results]="shownResults()"
         [resultId]="selectedResultId()!"
         [employeeName]="employeeName()"
-        [currency]="currencyCode()"
+        [currency]="displayCurrency()"
         (openResult)="openDetail($event)"
         (closed)="closeDetail()" />
     } @else if (results().length > 0) {

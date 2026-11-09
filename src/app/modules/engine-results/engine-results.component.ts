@@ -10,6 +10,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { PayrollEngineService, RunPayrollResponse } from '../../core/payroll-engine.service';
 import { PayrollApiService, PaysDto } from '../../core/payroll-api.service';
+import { CurrencyService } from '../../core/currency.service';
 import { EmployeeProfileDetail, HrProfileService, contractTypeLabel } from '../../core/hr-profile.service';
 import { recallEmployee } from './engine-results-employee';
 import { EngineResultDetailComponent } from './engine-result-detail.component';
@@ -266,11 +267,41 @@ export class EngineResultsComponent {
     return devise && /^[A-Z]{3}$/.test(devise) ? devise : null;
   });
 
+  // ── Devise d'affichage : sélecteur rond du shell, comme la liste /payroll/engine-results ──
+  // Sans choix, la devise du pays. Les montants enregistrés restent dans la devise du pays :
+  // seule cette copie d'affichage (`shownResults`) est convertie, au taux du jour.
+  private readonly fx = inject(CurrencyService);
+
+  readonly displayCurrency = computed<string | null>(() => this.fx.display() ?? this.currencyCode());
+
+  /** 1 unité de la devise du pays exprimée dans la devise d'affichage (1 sans conversion). */
+  private readonly fxRate = computed(() => {
+    const from = this.currencyCode(), to = this.displayCurrency();
+    return from && to && from !== to ? this.fx.convert(1, from, to) : 1;
+  });
+
+  /** Résultats tels qu'affichés : tous les montants convertis dans `displayCurrency()`. Les
+   *  indicateurs, le tableau, les cartes et le bulletin les lisent ; les exports serveur et la
+   *  logique (dernier calcul, filtres) restent sur `results()`. */
+  readonly shownResults = computed<RunPayrollResponse[]>(() => {
+    const k = this.fxRate();
+    if (k === 1) return this.results();
+    const m = (v: number | null | undefined) => (v == null ? (v as null) : v * k);
+    return this.results().map(r => ({
+      ...r,
+      strate1: m(r.strate1), strate2: m(r.strate2), strate3: m(r.strate3),
+      strate4: m(r.strate4), strate5: m(r.strate5),
+      aggregateGross: m(r.aggregateGross), aggregateEmployerCharges: m(r.aggregateEmployerCharges),
+      aggregateNet: m(r.aggregateNet), aggregateIrpp: m(r.aggregateIrpp), loadedCost: m(r.loadedCost),
+      rubriqueDetails: (r.rubriqueDetails ?? []).map(d => ({ ...d, amount: d.amount * k, assiette: m(d.assiette) })),
+    }));
+  });
+
   /** Montant formaté, dans la devise quand on la connaît (« 959,840 TND »). */
   money(v: number | null | undefined): string {
     if (v == null) return '—';
     const locale = this.translate.currentLang() === 'en' ? 'en-GB' : 'fr-FR';
-    const currency = this.currencyCode();
+    const currency = this.displayCurrency();
     return new Intl.NumberFormat(locale, {
       ...(currency ? { style: 'currency', currency } : {}),
       minimumFractionDigits: 2, maximumFractionDigits: 2,
@@ -315,7 +346,7 @@ export class EngineResultsComponent {
   readonly employeeKpis = computed(() => {
     const year = this.kpiYear();
     const latest = this.latestIds();
-    const rows = this.results().filter(r => latest.has(r.resultId) && r.periodYear === year);
+    const rows = this.shownResults().filter(r => latest.has(r.resultId) && r.periodYear === year);
     const totalGross = rows.reduce((sum, r) => sum + (r.aggregateGross ?? 0), 0);
     const totalNet = rows.reduce((sum, r) => sum + (netOf(r) ?? 0), 0);
     // Retenues salariales réelles : S3 = CNSS salariale + IRPP (S4).
@@ -395,7 +426,7 @@ export class EngineResultsComponent {
     const calculated = dayRange(this.calculatedFilter());
     const latest = this.latestIds();
     const showOld = this.showOld();
-    return this.results().filter(r => {
+    return this.shownResults().filter(r => {
       // « octobre 2026 », « 10/2026 » ou le n° du résultat.
       const period = `${this.periodText(r)} ${r.periodMonth}/${r.periodYear}`.toLowerCase();
       const matchesQuery = !query || period.includes(query) || String(r.resultId).includes(query);
@@ -476,7 +507,7 @@ export class EngineResultsComponent {
   /** Vue carte — mêmes résultats/actions que le tableau, juste une autre présentation. */
   readonly resultCards = computed(() => {
     const latest = this.latestIds();
-    return this.sortedResultRows().map(row => this.results().find(r => r.resultId === row['resultId'])!)
+    return this.sortedResultRows().map(row => this.shownResults().find(r => r.resultId === row['resultId'])!)
       .filter(Boolean)
       .map(r => {
         const isLatest = latest.has(r.resultId);
@@ -591,7 +622,7 @@ export class EngineResultsComponent {
   /** Montant de colonne : en devise quand on la connaît (`type: 'currency'` de la lib). */
   private moneyColumn(): Pick<TableColumn, 'type' | 'format'> {
     const digits = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
-    const currency = this.currencyCode();
+    const currency = this.displayCurrency();
     return currency ? { type: 'currency', format: { currency, ...digits } } : { type: 'number', format: digits };
   }
 

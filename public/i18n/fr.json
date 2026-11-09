@@ -550,6 +550,8 @@
       "NET_RECALC_SUFFIX": "(net recalculé)",
       "CONTRACT_FROM_HR": "Repris de la fiche RH du collaborateur",
       "CONTRACT_HR_DIFFERS": "Différent du contrat de la fiche RH ({{contract}})",
+      "CONTRACT_NOT_PRICED": "Le contrat « {{contract}} » n'a pas de règles de paie dans ce pays : il ne peut pas être enregistré. Contrats possibles : {{allowed}}.",
+      "CONTRACT_NO_RULES": "Ce pays n'a pas de règles de paie actives : le contrat « {{contract}} » ne peut pas être enregistré.",
       "UNSAVED": "Modifications non enregistrées : indiquez le motif puis cliquez sur « Enregistrer ».",
       "UNSAVED_OTHER_TAB": "La configuration de paie a des modifications non enregistrées (onglet « Configuration de paie »).",
       "NEVER_SAVED": "Configuration jamais enregistrée : vérifiez les valeurs proposées puis enregistrez-la.",
@@ -1243,7 +1245,8 @@
         "AED": "Dirham des Émirats",
         "CONVERTED_NOTE": "montants convertis de {{from}} en {{to}} au taux du jour"
       },
-      "KPI_PERIOD": "Indicateurs de paie — dernier mois calculé : {{period}}",
+      "KPI_PERIOD": "Indicateurs de paie — tous les calculs, jusqu'à {{period}}",
+      "KPI_ALL_PERIOD": "l'ensemble des mois calculés",
       "KPI_NO_PERIOD": "aucun calcul",
       "KPI_PICK_COUNTRY": "Sélectionnez un pays dans les filtres pour afficher les indicateurs de paie.",
       "KPI_GROSS_PAYROLL": "Masse salariale brute",

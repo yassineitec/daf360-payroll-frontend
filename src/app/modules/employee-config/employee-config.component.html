@@ -98,7 +98,8 @@
                     placeholder: (cfg.paysId == null ? 'PAYROLL.EMPLOYEE_CONFIG.CONTRACT_NEEDS_COUNTRY' : 'PAYROLL.EMPLOYEE_CONFIG.SELECT_CONTRACT') | translate,
                     disabled: cfg.paysId == null,
                     fullWidth: true,
-                    hint: contractHint()
+                    hint: contractUnpriced() ? '' : contractHint(),
+                    error: contractError()
                   }"
                   (selectedChange)="$event[0] && onContractTypeChange($event[0])">
                 </daf-select>
@@ -206,7 +207,7 @@
               <daf-button
                 [label]="'PAYROLL.EMPLOYEE_CONFIG.SAVE' | translate"
                 variant="teal"
-                [options]="{ iconStart: 'save', loading: saving(), disabled: saving() || cfg.paysId == null }"
+                [options]="{ iconStart: 'save', loading: saving(), disabled: saving() || cfg.paysId == null || contractUnpriced() }"
                 (onClick)="save()">
               </daf-button>
             </div>
