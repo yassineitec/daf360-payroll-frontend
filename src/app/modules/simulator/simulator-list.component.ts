@@ -363,10 +363,24 @@ export class SimulatorListComponent implements OnInit {
 
   // ── KPI ────────────────────────────────────────────────────────────────────
 
-  readonly currency = computed(() =>
-    this.rowsData().find(r => r.localCurrency)?.localCurrency
+  /** Mirrors the backend's FxEntryConversionService.NATIVE_CURRENCY_BY_PAYS_ID (and the same
+   *  override already applied in simulator.component.ts/employee-config.component.ts): Tunisia's
+   *  platform "working currency" is stored as the accounting label "EUR", Egypt's as "USD" —
+   *  neither is the REAL currency these figures are actually in (TND/EGP). Without this override,
+   *  this list fell back to `localCurrency`/`pays.devise`, which still carries that fake label,
+   *  and every card showed "EUR" for Tunisia regardless of what currency the amount is truly in. */
+  private static readonly NATIVE_CURRENCY_BY_PAYS_ID: Record<number, string> = {
+    179: 'TND', // Tunisie
+    53: 'EGP',  // Egypte
+  };
+
+  readonly currency = computed(() => {
+    const raw = this.rowsData().find(r => r.localCurrency)?.localCurrency
       ?? this.paysList().find(p => p.id === this.paysFilter())?.devise
-      ?? '');
+      ?? '';
+    const paysId = this.paysFilter() ?? this.rowsData().find(r => r.paysId != null)?.paysId;
+    return (paysId != null ? SimulatorListComponent.NATIVE_CURRENCY_BY_PAYS_ID[paysId] : undefined) ?? raw;
+  });
 
   private readonly summary = computed(() => this.pageData()?.summary ?? null);
 
