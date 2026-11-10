@@ -7,6 +7,7 @@ import {
   CheckboxComponent,
   DataTableComponent,
   FormFieldComponent,
+  MetricCardComponent,
   ModalService,
   PageComponent,
   PageHeaderComponent,
@@ -20,6 +21,8 @@ import {
   type ModalRef,
   type TabItem,
   type BreadcrumbItem,
+  type MetricCardOptions,
+  type MetricDelta,
   type SelectOption,
   type TableAction,
   type TableConfig,
@@ -27,8 +30,8 @@ import {
   type TableRow,
 } from '@khalilrebhiitec/daf360';
 import { PayrollApiService, BenefitCatalogueDto, PaysDto, FxRateDto } from '../../core/payroll-api.service';
-import { HrProfileService, HrContractType, contractTypeLabel } from '../../core/hr-profile.service';
-import { AdminSectionHeaderComponent } from '../parameter-sets/admin/admin-section-header.component';
+import { EmployeeProfileDetail, HrProfileService, HrContractType, contractTypeLabel } from '../../core/hr-profile.service';
+import { EmployeeDetailsCardComponent, MARITAL_KEYS } from '../../shared/employee-details/employee-details-card.component';
 import { NotificationService } from '../../core/notification.service';
 import { UserStore } from '../../core/user.store';
 import {
@@ -38,6 +41,8 @@ import {
   EmployeeConfigService, EmployeePayrollConfigDto, EmployeePayrollBonusDto, EmployeePayrollConfigHistoryDto,
 } from './employee-config.service';
 import { recallEmployee } from './employee-config-employee';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import type { GuideStep } from '../../shared/guide/page-guide.types';
 import { searchTableRows, tableTools } from '../../shared/table-tools';
 import { flagDataUri } from '../../shared/country-flags';
 
@@ -53,12 +58,28 @@ const LEGACY_CONTRACT: Record<string, string> = { PERMANENT: 'CDI', FIXED_TERM: 
  * daf360-rh-frontend's Rémunération tab — both call the same
  * `GET/PUT /api/payroll/employee-configs/{id}`.
  *
- * En-tête = le collaborateur ouvert (dernière modification, liens vers ses bulletins et son
- * calcul), puis trois `daf-tabs` : configuration de paie, primes exceptionnelles (modèle
+ * Même mise en page que `/payroll/engine-results/:id` : à gauche le titre, la carte
+ * « Détails » partagée (fiche RH) et les actions ; à droite les KPI de la configuration
+ * enregistrée, puis trois `daf-tabs` : configuration de paie, primes exceptionnelles (modèle
  * des sections /rh/admin : barre + « Ajouter » → pop-up), historique des versions.
  * Retours d'action en toasts, suppression et sortie sans enregistrer confirmées via
  * `ModalService`.
  */
+/** Guide de la page — `target` = un `data-guide` du gabarit, `tab` = l'onglet montré. */
+const guideStep = (key: string, icon: string, target?: string, tab?: string): GuideStep => ({
+  icon, titleKey: `GUIDE.EMPLOYEE_CONFIG_DETAIL.${key}_TITLE`, textKey: `GUIDE.EMPLOYEE_CONFIG_DETAIL.${key}_TEXT`, target, tab,
+});
+const GUIDE_STEPS: GuideStep[] = [
+  guideStep('WELCOME',    'manage_accounts', 'ec-detail-header'),
+  guideStep('KPIS',       'monitoring',      'ec-detail-kpis'),
+  guideStep('TABS',       'tab',             'ec-detail-tabs'),
+  // Le formulaire est dans une pop-up : le guide montre le résumé et le bouton qui l'ouvre.
+  guideStep('SUMMARY',    'fact_check',      'ec-detail-summary',    'config'),
+  guideStep('EDIT',       'edit',            'ec-detail-edit',       'config'),
+  guideStep('BONUSES',    'card_giftcard',   'ec-detail-bonuses',    'bonuses'),
+  guideStep('HISTORY',    'history',         'ec-detail-history',    'history'),
+];
+
 @Component({
   selector: 'app-employee-config',
   standalone: true,
@@ -66,8 +87,8 @@ const LEGACY_CONTRACT: Record<string, string> = { PERMANENT: 'CDI', FIXED_TERM: 
   imports: [
     TranslatePipe,
     ButtonComponent, CardComponent, CheckboxComponent, DataTableComponent, FormFieldComponent,
-    AdminSectionHeaderComponent, PageComponent, PageHeaderComponent, SearchToolbarComponent, SectionCardComponent,
-    SectionTitleComponent, SelectComponent, SkeletonComponent, TabsComponent,
+    EmployeeDetailsCardComponent, MetricCardComponent, PageComponent, PageHeaderComponent, SearchToolbarComponent, SectionCardComponent,
+    SectionTitleComponent, SelectComponent, SkeletonComponent, TabsComponent, PageGuideComponent,
   ],
   templateUrl: './employee-config.component.html',
   styleUrl: './employee-config.component.scss',
@@ -106,20 +127,99 @@ export class EmployeeConfigComponent implements OnInit {
   readonly employeeName = computed(() =>
     this.employee()?.fullName ?? this.t('PAYROLL.EMPLOYEE_CONFIG.EMPLOYEE_FALLBACK', { id: this.userId }));
 
+  /** Même fil que /payroll/engine-results/:id : Paie › Rémunération › collaborateur. */
   readonly breadcrumbs = computed((): BreadcrumbItem[] => [
-    { label: this.t('PAYROLL.ADMIN_HOME.TITLE'), link: '/payroll/admin' },
-    { label: this.t('PAYROLL.EMPLOYEE_CONFIG.BREADCRUMB'), link: '/payroll/employee-config' },
+    { label: this.t('PAYROLL.COMMON.BREADCRUMB_ROOT'), link: '/payroll' },
+    { label: this.t('PAYROLL.layout.NAV.EMPLOYEE_CONFIG'), link: '/payroll/employee-config' },
     { label: this.employeeName() },
   ]);
 
-  /** Matricule · département · pays, puis la dernière modification enregistrée ; phrase
-   *  générique si la page est ouverte par lien et jamais configurée. */
-  readonly employeeSubtitle = computed(() => {
-    const e = this.employee();
-    const parts = e ? [e.employeeId, e.department, e.paysLabel].filter(Boolean) as string[] : [];
-    const last = this.lastChangeText();
-    if (last) parts.push(last);
-    return parts.length ? parts.join(' · ') : this.t('PAYROLL.EMPLOYEE_CONFIG.SUBTITLE');
+  // ── Carte « Détails » (colonne gauche) : fiche RH complète, lue par `profileId` (transmis
+  //    par la liste). Ouverte par lien, la page n'en a pas : la carte se limite au nom.
+  readonly profile = signal<EmployeeProfileDetail | null>(null);
+  readonly profileLoading = signal(false);
+
+  private loadProfile(): void {
+    const profileId = this.employee()?.profileId;
+    if (!profileId) return;
+    this.profileLoading.set(true);
+    this.hrService.getProfile(profileId).subscribe({
+      next: p  => { this.profile.set(p); this.profileLoading.set(false); },
+      error: () => this.profileLoading.set(false),
+    });
+  }
+
+  // ── Écarts avec la fiche RH ───────────────────────────────────────────────
+  // La carte « Détails » montre la fiche RH, le formulaire la configuration de PAIE (celle
+  // que le moteur utilise) : quand elles diffèrent, le formulaire le dit sous le champ.
+  private static normContract(code: string | null | undefined): string | null {
+    const c = code?.trim().toUpperCase();
+    return c ? (LEGACY_CONTRACT[c] ?? c) : null;
+  }
+
+  /** « Fiche RH : CDI » quand le contrat de la fiche RH n'est pas celui choisi ici. */
+  readonly hrContractDiff = computed((): string | null => {
+    const hr = this.profile()?.contractType ?? this.employee()?.contractType;
+    const cfg = this.config()?.contractType;
+    const a = EmployeeConfigComponent.normContract(hr), b = EmployeeConfigComponent.normContract(cfg);
+    if (!a || !b || a === b) return null;
+    return this.t('PAYROLL.EMPLOYEE_CONFIG.HR_DIFF', { value: contractTypeLabel(hr!, this.translate) });
+  });
+
+  /** « Fiche RH : marié(e), 2 enfants » quand la situation familiale de la fiche RH diffère. */
+  readonly hrFamilyDiff = computed((): string | null => {
+    const p = this.profile();
+    const cfg = this.config();
+    if (!p || !cfg) return null;
+    const key = p.maritalStatus ? MARITAL_KEYS[p.maritalStatus.toUpperCase()] : undefined;
+    const marriedDiff = key != null && (key === 'MARRIED') !== cfg.isMarried;
+    const children = p.numberOfChildren;
+    const childrenDiff = children != null && children !== (cfg.childrenCount ?? 0);
+    if (!marriedDiff && !childrenDiff) return null;
+    const parts = [
+      key ? this.t(`PAYROLL.ENGINE_RESULTS.DETAILS.MARITAL.${key}`) : null,
+      children != null ? this.t('PAYROLL.EMPLOYEE_CONFIG.HR_CHILDREN', { count: children }) : null,
+    ].filter(Boolean);
+    return this.t('PAYROLL.EMPLOYEE_CONFIG.HR_DIFF', { value: parts.join(', ') });
+  });
+
+  // ── KPI : la configuration ENREGISTRÉE (pas le formulaire en cours), comme les tuiles de
+  //    /payroll/engine-results/:id résument ses résultats. ─────────────────────────────
+  readonly kpiTiles = computed((): { label: string; value: string; delta: MetricDelta | null; options: MetricCardOptions }[] => {
+    const saved = this.savedConfig();
+    const empty = '—';
+    const cur = EmployeeConfigComponent.realCurrencyFor(saved?.paysId, this.paysList().find(p => p.id === saved?.paysId)?.devise ?? '');
+    const never = !saved || saved.updatedAt == null;
+    const now = new Date();
+    const thisMonth = this.bonuses().filter(b => b.periodYear === now.getFullYear() && b.periodMonth === now.getMonth() + 1).length;
+    return [
+      {
+        label: this.t('PAYROLL.EMPLOYEE_CONFIG.KPI_GROSS'),
+        value: never ? empty : (this.money(saved!.currentGrossSalary, cur) ?? empty),
+        delta: saved?.inputCurrency && saved.inputAmountOriginal != null
+          ? { value: this.t('PAYROLL.EMPLOYEE_CONFIG.ENTERED_AS', { amount: this.money(saved.inputAmountOriginal, saved.inputCurrency) }), direction: 'neutral' }
+          : null,
+        options: { icon: 'account_balance_wallet', help: this.t('PAYROLL.EMPLOYEE_CONFIG.KPI_GROSS_HELP') },
+      },
+      {
+        label: this.t('PAYROLL.EMPLOYEE_CONFIG.KPI_NET'),
+        value: never ? empty : (this.moneyWhole(saved!.currentNetSalary, cur) ?? empty),
+        delta: null,
+        options: { icon: 'payments', valueColor: 'text-primary', help: this.t('PAYROLL.EMPLOYEE_CONFIG.KPI_NET_HELP') },
+      },
+      {
+        label: this.t('PAYROLL.EMPLOYEE_CONFIG.KPI_BENEFITS'),
+        value: saved ? `${saved.selectedBenefitCodes.length} / ${this.benefits().length}` : empty,
+        delta: null,
+        options: { icon: 'redeem', help: this.t('PAYROLL.EMPLOYEE_CONFIG.KPI_BENEFITS_HELP') },
+      },
+      {
+        label: this.t('PAYROLL.EMPLOYEE_CONFIG.KPI_BONUSES'),
+        value: this.bonusesLoading() ? empty : String(this.bonuses().length),
+        delta: thisMonth ? { value: this.t('PAYROLL.EMPLOYEE_CONFIG.KPI_BONUSES_SUB', { count: thisMonth }), direction: 'neutral' } : null,
+        options: { icon: 'card_giftcard', help: this.t('PAYROLL.EMPLOYEE_CONFIG.KPI_BONUSES_HELP'), helpPlacement: 'top' },
+      },
+    ];
   });
 
   /** Liens d'en-tête vers les autres écrans du collaborateur, selon les droits. */
@@ -142,6 +242,22 @@ export class EmployeeConfigComponent implements OnInit {
   // ── Onglets : configuration / primes / historique — `tabParam` porte l'onglet actif
   //    dans `?tab=` (F5, lien partagé, précédent/suivant), comme parameter-sets.
   readonly activeTab = tabParam(['config', 'bonuses', 'history'] as const, 'config');
+
+  // ── Guide (« Aide & guides ») — tant que la configuration n'est pas chargée, il n'y a
+  //    ni onglets ni formulaire à montrer : seule la présentation reste.
+  readonly guideSteps = computed(() => this.config() ? GUIDE_STEPS : GUIDE_STEPS.slice(0, 1));
+  /** L'onglet de l'utilisateur, rendu à la fermeture du guide (qui ouvre ceux qu'il explique). */
+  private tabBeforeGuide: 'config' | 'bonuses' | 'history' | null = null;
+
+  onGuideTab(tab: string): void {
+    this.tabBeforeGuide ??= this.activeTab();
+    this.activeTab.set(tab as 'config' | 'bonuses' | 'history');
+  }
+
+  onGuideClosed(): void {
+    if (this.tabBeforeGuide) this.activeTab.set(this.tabBeforeGuide);
+    this.tabBeforeGuide = null;
+  }
 
   readonly tabs = computed<TabItem[]>(() => [
     { id: 'config',  label: this.t('PAYROLL.EMPLOYEE_CONFIG.CONFIG_TITLE'), icon: 'manage_accounts' },
@@ -583,7 +699,7 @@ export class EmployeeConfigComponent implements OnInit {
 
   /** Same as `money()`, but rounded to a whole number — net salary is always shown this way,
    *  display-only (the stored value keeps full precision). */
-  private moneyWhole(v: number | null | undefined, currency: string): string | null {
+  moneyWhole(v: number | null | undefined, currency: string): string | null {
     if (v == null) return null;
     const n = Math.round(v).toLocaleString(this.locale(), { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     return currency ? `${n} ${currency}` : n;
@@ -606,6 +722,7 @@ export class EmployeeConfigComponent implements OnInit {
     this.payrollApi.listPayrollPays().subscribe(pays => this.payrollPays.set(pays));
     this.payrollApi.getFxRates().subscribe(rates => this.fxRates.set(rates));
     if (Number.isFinite(this.userId)) this.load(this.userId);
+    this.loadProfile();
     // Fermeture ou rechargement de l'onglet du navigateur avec des modifications en cours.
     const beforeUnload = (e: BeforeUnloadEvent) => { if (this.dirty()) e.preventDefault(); };
     window.addEventListener('beforeunload', beforeUnload);
@@ -740,6 +857,77 @@ export class EmployeeConfigComponent implements OnInit {
     });
   }
 
+  // ── Onglet « Configuration de paie » : résumé en lecture + pop-up de saisie ─────────
+  /** Résumé de la configuration affichée (enregistrée, ou en cours de saisie si la pop-up a
+   *  été fermée sans enregistrer — le bandeau le signale). */
+  readonly configSummary = computed(() => {
+    const cfg = this.config();
+    if (!cfg) return [];
+    const cur = this.salaryRealCurrency();
+    type Row = { label: string; value: string };
+    const row = (labelKey: string, value: string | null | undefined): Row | null =>
+      value == null || value === '' ? null : { label: this.t(labelKey), value };
+    const rows = (list: (Row | null)[]) => list.filter((r): r is Row => !!r);
+    const pays = this.paysOptions().find(o => o.value === String(cfg.paysId))?.label;
+    const contract = this.contractTypeOptions().find(o => o.value === cfg.contractType)?.label
+      ?? (cfg.contractType ? contractTypeLabel(cfg.contractType, this.translate) : null);
+    const selected = this.benefits().filter(b => cfg.selectedBenefitCodes.includes(b.benefitCode));
+    const total = this.benefits().length;
+    // Pas de section « Salaire » : brut et net sont déjà les deux premiers KPI, juste au-dessus.
+    return [
+      {
+        id: 'assignment', icon: 'badge', count: '', title: this.t('PAYROLL.EMPLOYEE_CONFIG.SECTION_ASSIGNMENT'), empty: '',
+        rows: rows([row('PAYROLL.EMPLOYEE_CONFIG.COUNTRY', pays ?? '—'), row('PAYROLL.EMPLOYEE_CONFIG.CONTRACT_TYPE', contract ?? '—')]),
+        diffs: [this.hrContractDiff()].filter((d): d is string => !!d),
+      },
+      {
+        id: 'family', icon: 'family_restroom', count: '', title: this.t('PAYROLL.EMPLOYEE_CONFIG.FAMILY_SECTION'), empty: '',
+        rows: rows([
+          row('PAYROLL.EMPLOYEE_CONFIG.MARITAL', this.t(`PAYROLL.ENGINE_RESULTS.DETAILS.MARITAL.${cfg.isMarried ? 'MARRIED' : 'SINGLE'}`)),
+          row('PAYROLL.EMPLOYEE_CONFIG.CHILDREN_COUNT', String(cfg.childrenCount ?? 0)),
+        ]),
+        diffs: [this.hrFamilyDiff()].filter((d): d is string => !!d),
+      },
+      {
+        id: 'benefits', icon: 'redeem',
+        count: total ? `${selected.length} / ${total}` : '',
+        title: this.t('PAYROLL.EMPLOYEE_CONFIG.BENEFITS'),
+        empty: this.t('PAYROLL.EMPLOYEE_CONFIG.NO_BENEFIT_SELECTED'),
+        rows: selected.map(b => ({ label: this.benefitLabel(b), value: this.money(b.monthlyValue, cur) ?? '—' })),
+        diffs: [] as string[],
+      },
+    ];
+  });
+
+  private readonly configFormTpl = viewChild<TemplateRef<unknown>>('configFormTpl');
+  private configModalRef: ModalRef | null = null;
+
+  /** Ouvre la saisie. Une saisie interrompue (pop-up fermée par la croix) est reprise telle
+   *  quelle ; « Annuler » la remet à la version enregistrée. Boutons dans le corps : ceux de
+   *  la pop-up ne sont pas réactifs (chargement, grisé). */
+  openConfigForm(): void {
+    const tpl = this.configFormTpl();
+    if (!tpl || !this.config()) return;
+    this.saveError.set(null);
+    this.configModalRef = this.modal.open({
+      title: this.t('PAYROLL.EMPLOYEE_CONFIG.CONFIG_TITLE'),
+      subtitle: this.employeeName(),
+      icon: 'manage_accounts',
+      size: 'lg',
+      closeOnBackdrop: false,
+      maximizable: true,
+      body: tpl,
+      buttons: [],
+    });
+  }
+
+  cancelConfigForm(): void {
+    this.resetConfig();
+    this.saveError.set(null);
+    this.configModalRef?.close();
+    this.configModalRef = null;
+  }
+
   /** Revient à la dernière version enregistrée (référentiels du pays rechargés si besoin). */
   resetConfig(): void {
     const saved = this.savedConfig();
@@ -832,6 +1020,8 @@ export class EmployeeConfigComponent implements OnInit {
     this.reason.set('');
     this.reasonTried.set(false);
     this.notify.success(this.t('PAYROLL.EMPLOYEE_CONFIG.SAVE_SUCCESS'));
+    this.configModalRef?.close();
+    this.configModalRef = null;
     this.loadHistory(this.userId);
     const paysId = this.savedConfig()?.paysId;
     if (paysId != null) this.loadActorNames(paysId);

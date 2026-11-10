@@ -123,6 +123,9 @@ export const PAYROLL_AUDIT_PERMISSIONS = [
   'PAYROLL_SUPER_ADMIN',
 ];
 
+/** Carte « Assistant & FAQ » — même code que `/api/payroll/help-faq` (liste complète et écritures). */
+export const PAYROLL_HELP_FAQ_PERMISSIONS = ['PAYROLL_SUPER_ADMIN'];
+
 /**
  * `/payroll/budget` — the budget lines + forecast outputs. Mirrors the backend exactly:
  * both calls the page makes (`GET /calibration/budget-lines`, `/calibration/forecast-outputs`)
@@ -142,7 +145,7 @@ export const PAYROLL_BUDGET_PERMISSIONS = [
  * The live payroll screens.
  *
  * `admin` is the administration home (the former `parameter-sets` page, whose old URL now
- * redirects to it); `employee-config` is a module without a sidebar entry (`hiddenInSidebar`).
+ * redirects to it); `employee-config` is the « Rémunération » entry.
  * Every entry here MUST have a matching route in `app.routes.ts` and vice-versa: an entry
  * with no route navigates into the `**` redirect, and a route with no entry is only
  * reachable by typing the URL. If a screen ever has to be switched off again, comment it
@@ -238,9 +241,9 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
     permissions: ['PAYROLL_RUN_CALIBRATION'],
   },
   /**
-   * The per-employee payroll configuration — no sidebar entry: it opens from its card on
-   * the administration home. Still a module, so the payroll home card and the landing guard
-   * keep offering it (a holder of these codes alone cannot open the administration).
+   * « Rémunération » — the per-employee payroll configuration (salary, contract, benefits,
+   * bonuses). Its own sidebar entry since 2026-11-10; it used to open only from a card on
+   * the administration home.
    */
   {
     id:          'employee-config',
@@ -248,8 +251,6 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
     icon:        'manage_accounts',
     route:       'employee-config',
     permissions: PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS,
-    hiddenInSidebar: true,
-    highlightRoute:  'admin',
   },
   /**
    * Administration — one entry, like Administration / Admin in RH and Finance, kept last. It

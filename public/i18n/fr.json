@@ -26,6 +26,7 @@
       },
       "CURRENCY": {
         "TITLE": "Devise d'affichage",
+        "SHORT": "Devise",
         "TND": "Dinar tunisien",
         "EUR": "Euro",
         "USD": "Dollar américain",
@@ -41,7 +42,7 @@
         "SIMULATOR": "Simulateur manuel",
         "ADMIN": "Administration",
         "PAYSLIPS": "Fiches de paie",
-        "EMPLOYEE_CONFIG": "Salaires des collaborateurs",
+        "EMPLOYEE_CONFIG": "Rémunération",
         "SALARY_ADVANCES": "Avances sur salaire",
         "COHORT": "Simulation cohorte",
         "ENGINE_RUN": "Calcul de paie",
@@ -583,6 +584,41 @@
       "KPI_AWAY_HELP": "Collaborateurs actuellement en congé ou en mission.",
       "KPI_PAYS": "Pays paie",
       "KPI_PAYS_HELP": "Nombre de pays configurés dans le module paie.",
+      "KPI_GROSS": "Salaire brut mensuel",
+      "KPI_GROSS_HELP": "Brut enregistré dans la configuration de paie, dans la devise du pays.",
+      "KPI_NET": "Net estimé",
+      "KPI_NET_HELP": "Net calculé à partir du brut enregistré, avec les règles de paie en vigueur du pays.",
+      "KPI_BENEFITS": "Avantages",
+      "KPI_BENEFITS_HELP": "Avantages en nature sélectionnés, sur ceux que proposent les règles de paie du pays.",
+      "KPI_BONUSES": "Primes exceptionnelles",
+      "KPI_BONUSES_SUB": "{{count}} ce mois-ci",
+      "KPI_BONUSES_HELP": "Primes enregistrées pour ce collaborateur (onglet « Primes exceptionnelles »).",
+      "HR_DIFF": "Fiche RH : {{value}}",
+      "HR_CHILDREN": "{{count}} enfant(s)",
+      "EDIT_CONFIG": "Modifier la configuration",
+      "CONFIGURE": "Configurer la paie",
+      "ENTERED_IN": "Saisi en",
+      "MARITAL": "Situation",
+      "NO_BENEFIT_SELECTED": "Aucun avantage sélectionné.",
+      "RESUME": "Reprendre la saisie",
+      "UNSAVED_POPUP": "La configuration de paie a des modifications non enregistrées.",
+      "LAST_UPDATE": "Dernière modification",
+      "NEVER_SAVED_SHORT": "Jamais enregistrée",
+      "KPI_EMPLOYEES": "Collaborateurs",
+      "KPI_EMPLOYEES_HELP": "Collaborateurs correspondant aux filtres (sans filtre de statut : ceux en poste).",
+      "KPI_EMPLOYEES_SUB": "{{count}} départements",
+      "KPI_CONFIGURED": "Salaires configurés",
+      "KPI_CONFIGURED_SUB": "{{pct}} % de l'effectif",
+      "KPI_CONFIGURED_HELP": "Collaborateurs dont la configuration de paie (pays, contrat, salaire) a été enregistrée au moins une fois.",
+      "KPI_MISSING": "À configurer",
+      "KPI_MISSING_SUB": "Jamais enregistrés",
+      "KPI_ALL_CONFIGURED": "Tous configurés",
+      "KPI_MISSING_HELP": "Collaborateurs sans configuration de paie enregistrée : le calcul de paie du mois ne peut pas partir de leur salaire.",
+      "KPI_COUNTRIES": "Pays",
+      "KPI_COUNTRIES_HELP": "Pays de rattachement distincts des collaborateurs affichés.",
+      "COL_CONFIG": "Configuration",
+      "CONFIG_SAVED": "Enregistrée",
+      "CONFIG_MISSING": "À configurer",
       "CONFIG_TITLE": "Configuration de paie",
       "REASON_HINT": "Obligatoire pour enregistrer — conservé dans l'historique des modifications.",
       "SECTION_ASSIGNMENT": "Affectation",
@@ -1802,6 +1838,58 @@
     },
 
     "ADMIN_HOME": {
+      "HELP_FAQ": {
+        "title": "Assistant & FAQ",
+        "subtitle": "{{count}} question(s) ajoutée(s) par l'administration, en plus de la FAQ livrée avec l'application. L'assistant d'aide (la bulle en bas à droite) et « Aide & guides » les affichent pour la page choisie.",
+        "search": "Rechercher une question, une réponse…",
+        "page": "Page",
+        "allPages": "Toutes les pages",
+        "new": "Nouvelle question",
+        "newTitle": "Nouvelle question",
+        "editTitle": "Modifier la question",
+        "pageLabel": "Page concernée *",
+        "languages": "Langues",
+        "question": "Question",
+        "answer": "Réponse",
+        "questionPh": "Ex. : Comment calculer la paie de tout un pays ?",
+        "answerPh": "La réponse, telle que l’assistant l’affichera.",
+        "optionalLang": "Facultatif : sans traduction, la question s’affiche en français dans cette langue.",
+        "order": "Ordre",
+        "publish": "Publiée (visible dans l’assistant et l’aide)",
+        "cancel": "Annuler",
+        "save": "Enregistrer",
+        "saving": "Enregistrement…",
+        "delete": "Supprimer",
+        "deleteTitle": "Supprimer la question",
+        "deleteBody": "La question « {{question}} » sera supprimée définitivement. Pour la masquer seulement, dépubliez-la.",
+        "empty": "Aucune question pour l'instant. « Nouvelle question » en ajoute une pour une page.",
+        "noMatch": "Aucune question ne correspond.",
+        "word": "question(s)",
+        "colPage": "Page",
+        "colQuestion": "Question (français)",
+        "colQuestionEn": "Question (anglais)",
+        "notTranslated": "Non traduite — affichée en français",
+        "colLangs": "Langues",
+        "colOrder": "Ordre",
+        "colStatus": "Statut",
+        "published": "Publiée",
+        "unpublished": "Non publiée",
+        "edit": "Modifier",
+        "unpublish": "Dépublier",
+        "publishAction": "Publier",
+        "pageRequired": "Choisissez la page concernée.",
+        "frRequired": "La question et la réponse en français sont obligatoires.",
+        "pairRequired": "Dans une langue, remplissez la question ET la réponse, ou laissez les deux vides.",
+        "loadError": "Impossible de charger les questions.",
+        "saveError": "Impossible d'enregistrer la question.",
+        "deleteError": "Impossible de supprimer la question.",
+        "filters": {
+          "title": "Filtres",
+          "apply": "Appliquer",
+          "reset": "Réinitialiser",
+          "trigger": "Filtres"
+        }
+      },
       "TITLE": "Administration",
       "SUBTITLE": "Paramétrage de la paie : jeux de paramètres, pays, rubriques, avantages, règles des avances et journal des modifications.",
       "ENTITY": "Entité {{pays}}",
@@ -1813,6 +1901,7 @@
         "ADVANCE_RULES": "Avances sur salaire",
         "EMPLOYEE_CONFIG": "Salaires des collaborateurs",
         "AUDIT": "Historique et contrôle",
+        "HELP_FAQ": "Assistant & FAQ",
         "RUBRIQUES": "Éléments du bulletin",
         "BENEFITS": "Avantages en nature",
         "ENGINE_PARAMS": "Taux et barèmes",
@@ -2140,7 +2229,8 @@
         "BENEFITS": "Avantages accordés aux collaborateurs (repas, transport, logement) et leur valeur.",
         "ADVANCE_RULES": "Conditions d'accès aux avances sur salaire, par pays.",
         "EMPLOYEE_CONFIG": "Salaire, contrat, avantages et primes de chaque collaborateur.",
-        "AUDIT": "Historique des modifications de la paie, pour le contrôle interne."
+        "AUDIT": "Historique des modifications de la paie, pour le contrôle interne.",
+        "HELP_FAQ": "Questions et réponses ajoutées à l'assistant d'aide, en plus de la FAQ livrée avec l'application."
       },
       "NO_RESULT": "Aucun résultat pour cette recherche ou ce filtre.",
       "LIST": {
@@ -2244,7 +2334,7 @@
           },
           "CURRENCY": {
             "Q": "Changer de devise modifie-t-il les montants de paie ?",
-            "A": "Non. La bulle des devises ne change que l'affichage : les montants sont convertis au taux du jour, à titre indicatif. Les montants calculés et enregistrés, eux, ne bougent pas."
+            "A": "Non. « Devise », en bas de la barre latérale (la bulle en bas à droite sur mobile), ne change que l'affichage : les montants sont convertis au taux du jour, à titre indicatif. Les montants calculés et enregistrés, eux, ne bougent pas."
           },
           "SIMULATE": {
             "Q": "Comment simuler un salaire ?",
@@ -2261,6 +2351,386 @@
           "LANGUAGE": {
             "Q": "Comment changer la langue ?",
             "A": "Le module suit la langue choisie dans l'application (sélecteur de langue du portail) : français ou anglais."
+          }
+        },
+        "SIMULATOR": {
+          "EMPTY": {
+            "Q": "La liste des simulations est vide",
+            "A": "La liste n'affiche qu'un pays à la fois : choisissez-le dans « Filtres ». Si un pays est choisi, vérifiez la recherche et les autres filtres, ou lancez une nouvelle simulation."
+          },
+          "NEW": {
+            "Q": "Je ne vois pas « Nouvelle simulation »",
+            "A": "Le bouton demande le droit de lancer des simulations (PAYROLL_RUN_SIMULATION). Demandez-le à votre administrateur."
+          },
+          "DUPLICATE": {
+            "Q": "Comment refaire une simulation avec d’autres chiffres ?",
+            "A": "Dans la liste, l'action « Dupliquer » de la ligne ouvre une nouvelle simulation préremplie avec celle-ci : changez ce qu'il faut et simulez. Depuis le résultat, « Modifier la simulation » fait de même."
+          },
+          "RATIO": {
+            "Q": "Que veut dire le coefficient de charge ?",
+            "A": "Ce que l'entreprise dépense pour 1 versé en net au salarié (brut, avantages et cotisations patronales). × 1,60 signifie que pour 1 000 de net, l'entreprise dépense 1 600."
+          },
+          "PARTIAL": {
+            "Q": "Pourquoi un résultat est « approximatif » ?",
+            "A": "Le calcul n'a pas pu tomber exactement sur le montant visé (net vers brut) : le résultat est proche mais à vérifier avant de le communiquer. Filtres › Fiabilité n'affiche que ceux-là."
+          },
+          "EXPORT": {
+            "Q": "Comment exporter une simulation ?",
+            "A": "En Excel depuis l'action de la ligne dans la liste ; en Excel ou en PDF, ou à l'impression, depuis les actions rapides de son résultat."
+          }
+        },
+        "SIMULATOR_NEW": {
+          "NO_RULES": {
+            "Q": "« Règles de paie non disponibles » : que faire ?",
+            "A": "Les règles de paie de ce pays ne sont pas encore validées pour l'année. La simulation sera possible dès leur validation dans Administration de la paie ; prévenez l'administrateur de la paie."
+          },
+          "DIRECTION": {
+            "Q": "Net vers brut ou brut vers net ?",
+            "A": "Net vers brut quand vous partez du salaire que la personne doit toucher (une offre à un candidat) ; brut vers net quand vous connaissez le brut et voulez savoir ce qu'il reste."
+          },
+          "EMPLOYEE": {
+            "Q": "Pourquoi je ne saisis pas le contrat d’un collaborateur ?",
+            "A": "Pour un collaborateur, le contrat, le grade et la discipline sont repris de sa fiche RH. Vous pouvez choisir un autre contrat à l'étape Salaire, ou laisser vide pour garder l'actuel."
+          },
+          "CURRENCY": {
+            "Q": "Puis-je saisir un montant dans une autre devise ?",
+            "A": "Oui : à l'étape Salaire, « Devise saisie » permet une autre devise que celle du pays. Le montant est converti avant le calcul."
+          },
+          "BENEFITS": {
+            "Q": "Les avantages en nature changent-ils le résultat ?",
+            "A": "Oui : un avantage imposable entre dans la base de l'impôt, un avantage exonéré non ; tous deux comptent dans le coût employeur."
+          },
+          "BLOCKED": {
+            "Q": "« Simuler » ne fait rien",
+            "A": "Il manque une information : le message juste au-dessus de la barre du bas, à la dernière étape, dit laquelle (pays, collaborateur, montant…)."
+          }
+        },
+        "SIMULATION_DETAIL": {
+          "EDIT": {
+            "Q": "Comment corriger une simulation ?",
+            "A": "« Modifier la simulation » dans les actions rapides rouvre le formulaire prérempli. Une fois relancée, c'est une nouvelle simulation : l'ancienne reste dans la liste."
+          },
+          "COST": {
+            "Q": "Que comprend le coût employeur ?",
+            "A": "Le brut, les avantages exonérés et les cotisations patronales. L'onglet Vue générale le découpe par destinataire."
+          },
+          "TABS": {
+            "Q": "Il manque un onglet",
+            "A": "Seuls les onglets qui ont du contenu s'affichent : pas de « Lignes du bulletin » sans rubrique appliquée, pas de cotisations ou de barème si les règles utilisées n'ont pas pu être lues avec vos droits."
+          },
+          "APPROX": {
+            "Q": "Un bandeau dit que le résultat est approximatif",
+            "A": "Le calcul s'est arrêté au plus près du montant visé sans l'atteindre exactement. Vérifiez le résultat avant de le communiquer, ou relancez avec un autre montant."
+          },
+          "EXPORT": {
+            "Q": "Comment partager le résultat ?",
+            "A": "Exportez-le en Excel ou en PDF, ou imprimez-le, depuis les actions rapides à gauche."
+          }
+        },
+        "CANDIDATE_SIMULATION": {
+          "EMPTY": {
+            "Q": "Je ne vois aucun candidat",
+            "A": "Choisissez d'abord un pays dans « Filtrer ». Si la liste reste vide, aucune proposition n'a encore été soumise pour ce pays depuis le recrutement (module RH)."
+          },
+          "ORIGIN": {
+            "Q": "D'où viennent ces propositions ?",
+            "A": "Du recrutement, dans le module RH : la RH y simule le salaire d'un candidat et le soumet à la DAF. Cette page les suit, elle n'en crée pas."
+          },
+          "PENDING": {
+            "Q": "Comment voir seulement les propositions en attente ?",
+            "A": "Filtrer › Statut › En attente. La tuile « En attente de décision » indique aussi depuis quand attend la plus ancienne."
+          },
+          "GAP": {
+            "Q": "Que veut dire l'écart moyen demandé / proposé ?",
+            "A": "La moyenne, sur les candidats qui ont indiqué un salaire, de l'écart entre le net qu'ils demandent et le net proposé par la RH. Positif : les candidats demandent plus que l'offre."
+          },
+          "DECIDE": {
+            "Q": "Où la DAF approuve-t-elle une proposition ?",
+            "A": "Dans le module Finance, écran « Approbation Coûts ». La décision apparaît ensuite ici, dans le statut et le fil de la négociation."
+          }
+        },
+        "CANDIDATE_DETAIL": {
+          "ROUNDS": {
+            "Q": "Pourquoi plusieurs propositions pour un candidat ?",
+            "A": "Chaque nouvelle offre de la RH, après une demande du candidat ou une contre-proposition de la DAF, est une proposition de plus. Le fil les montre toutes, dans l'ordre."
+          },
+          "SURCOST": {
+            "Q": "Comment est calculé le surcoût ?",
+            "A": "(net demandé − net proposé) × coefficient de charge de la proposition × 12. C'est une estimation : l'impôt n'est pas proportionnel au salaire."
+          },
+          "DUPLICATE": {
+            "Q": "Comment simuler une autre offre pour ce candidat ?",
+            "A": "« Nouvelle simulation à partir de la dernière » ouvre le simulateur prérempli avec la dernière proposition ; changez le montant et simulez. Il faut le droit de lancer des simulations."
+          },
+          "RH": {
+            "Q": "Comment voir le dossier complet du candidat ?",
+            "A": "« Voir la fiche candidat (RH) » ouvre le candidat dans le recrutement, si vous avez un droit sur les candidats dans le module RH."
+          }
+        },
+        "SALARY_ADVANCES": {
+          "FLOW": {
+            "Q": "Comment se déroule une avance sur salaire ?",
+            "A": "Le collaborateur la demande, la finance l'approuve ou la refuse (module Finance, « Approbation Coûts »), puis la paie la verse dans l'onglet « À verser ». Le versement crée l'échéancier, et chaque mois les retenues se traitent dans l'onglet « Retenues »."
+          },
+          "NOT_LISTED": {
+            "Q": "Une avance n'apparaît pas dans « À verser »",
+            "A": "Seules les avances approuvées par la finance et pas encore versées y sont. Regardez son statut dans l'onglet « Suivi » : elle peut être encore en attente de la finance, refusée, retirée ou déjà versée."
+          },
+          "SCHEDULE": {
+            "Q": "Quand commencent les retenues ?",
+            "A": "Au mois de la première retenue prévu par la demande, ou au mois en cours si celui-ci est déjà passé au moment du versement. Le montant est réparti sur le nombre de mensualités choisi."
+          },
+          "MONTH": {
+            "Q": "Comment préparer les retenues du mois pour le logiciel de paie ?",
+            "A": "Onglet « Retenues » : choisissez le mois, « Exporter pour la paie (CSV) », intégrez le fichier dans le logiciel de paie, puis marquez les retenues « Prélevée » une fois qu'elles figurent sur les bulletins (une par une ou « Tout marquer prélevé »)."
+          },
+          "SKIP_WAIVE": {
+            "Q": "Reporter ou solder autrement : quelle différence ?",
+            "A": "« Reporter » : la retenue n'a pas été prélevée ce mois-ci, elle est replanifiée un mois après la dernière et le montant dû ne change pas. « Solder autrement » : la somme a été récupérée hors paie (solde de tout compte, espèces) ou abandonnée ; la mensualité est close. Un motif est demandé dans les deux cas."
+          },
+          "MATRICULE": {
+            "Q": "« Matricule paie manquant » : que faire ?",
+            "A": "Le logiciel de paie reconnaît le collaborateur par son matricule de paie. Faites-le renseigner sur sa fiche dans le module RH ; Filtres › « Sans matricule de paie uniquement » liste les lignes concernées."
+          },
+          "RULES": {
+            "Q": "Où changer la durée maximale ou ouvrir les avances pour un pays ?",
+            "A": "Dans Administration de la paie, carte « Avances sur salaire » — le bouton « Règles des avances » en haut de la page y mène. Un pays sans règle ouverte ne propose pas d'avance ; il n'y a pas de plafond de montant, la finance en juge."
+          }
+        },
+        "ENGINE_RESULTS": {
+          "WHAT": {
+            "Q": "Quelle différence avec le simulateur ?",
+            "A": "Le simulateur fait des essais qui n'engagent rien. Ici, c'est la paie réelle : un calcul est enregistré comme bulletin du collaborateur pour le mois choisi et compte dans les indicateurs."
+          },
+          "BATCH": {
+            "Q": "Comment calculer la paie de tout un pays pour un mois ?",
+            "A": "« Calculer la paie du pays », en haut de la page (avec le droit de lancer le moteur). Choisissez le pays, le mois, l'année et les jours travaillés (22 pour un mois complet), lisez le résumé, puis lancez. Le bilan liste les collaborateurs non calculés et la raison."
+          },
+          "MISSING": {
+            "Q": "Un collaborateur n'apparaît pas",
+            "A": "La liste vient des fiches RH. Vérifiez l'orthographe ou le matricule, puis les filtres (pays, statut, période, département, contrat) : un filtre « Période » ne garde que les collaborateurs qui ont un bulletin sur ces mois. S'il n'a pas de fiche RH, il faut la créer dans le module RH."
+          },
+          "UNPRICED": {
+            "Q": "« Contrat sans règles de paie dans ce pays » : que faire ?",
+            "A": "Le moteur ne sait pas calculer ce type de contrat dans ce pays : il n'a pas de règles de paie validées. Elles se règlent dans Administration de la paie ; en attendant, ces collaborateurs sont laissés de côté par le calcul groupé."
+          },
+          "RERUN": {
+            "Q": "Que se passe-t-il si je recalcule un mois ?",
+            "A": "Un nouveau bulletin est enregistré en plus de l'ancien, et c'est le dernier qui compte dans les cumuls. Dans le calcul groupé, la case « Ne pas recalculer les collaborateurs déjà calculés ce mois-ci » (cochée par défaut) évite les doublons."
+          },
+          "CURRENCY": {
+            "Q": "Dans quelle devise sont les montants ?",
+            "A": "Dans la devise choisie en bas de la barre latérale. Sans choix, c'est la devise du pays, ou l'euro quand plusieurs pays se mélangent. Les montants convertis le sont au taux du jour, et la ligne au-dessus des indicateurs le signale."
+          },
+          "KPI_EMPTY": {
+            "Q": "Les indicateurs sont vides ou à zéro",
+            "A": "Aucun bulletin n'a encore été calculé sur le périmètre choisi (pays, période, collaborateurs). Élargissez les filtres ou lancez le calcul du mois."
+          }
+        },
+        "ENGINE_RESULTS_DETAIL": {
+          "CALC": {
+            "Q": "Comment calculer la paie d'un collaborateur pour un mois ?",
+            "A": "Sur sa fiche, carte Actions › « Calculer la paie » (avec le droit de lancer le moteur). Choisissez le pays, le mois, l'année, le contrat et les jours travaillés — moins de 22 pour une entrée ou une sortie en cours de mois — puis lancez. Le bulletin est enregistré et s'ajoute à la liste."
+          },
+          "CONTRACT": {
+            "Q": "D'où vient le contrat proposé ?",
+            "A": "De la fiche RH du collaborateur, si ce contrat a des règles de paie dans le pays. Sinon, un message le dit et vous choisissez le contrat à appliquer parmi ceux qui en ont."
+          },
+          "OLD": {
+            "Q": "J'ai recalculé un mois : où est l'ancien bulletin ?",
+            "A": "Il est gardé mais masqué. Cochez « Afficher les anciens calculs » dans Filtrer. Un ancien bulletin ouvert affiche un bandeau qui mène au dernier calcul, le seul compté dans les cumuls."
+          },
+          "YEAR": {
+            "Q": "Sur quelle année portent les cumuls ?",
+            "A": "Sur l'année choisie dans Filtrer, sinon la plus récente qui a un bulletin. « Mois calculés » compte les mois de cette année qui ont un bulletin, et la ligne dessous liste ceux qui en manquent."
+          },
+          "EXPORT": {
+            "Q": "Qu'exportent « Exporter Excel » et « Exporter PDF » ?",
+            "A": "Le bulletin ouvert, s'il y en a un (avec la recherche de rubriques appliquée). Sinon, l'historique des bulletins tel que la liste l'affiche : recherche, filtres et tri compris, toutes pages."
+          },
+          "PARTIAL": {
+            "Q": "« Fiche RH complète indisponible »",
+            "A": "La paie n'a pas pu lire la fiche RH complète du collaborateur : la carte Détails reste partielle. Rouvrez-le depuis la liste « Charge salariale » ; si le message reste, vérifiez sa fiche dans le module RH."
+          }
+        },
+        "PAYSLIPS": {
+          "HOW": {
+            "Q": "Comment les fiches arrivent-elles chez les collaborateurs ?",
+            "A": "Chaque page du PDF est lue : le matricule de paie imprimé dessus est cherché parmi les fiches RH du pays choisi. La page est alors déposée dans le dossier SharePoint RH du collaborateur."
+          },
+          "MISSING_BATCH": {
+            "Q": "Un lot distribué par un collègue n'apparaît pas",
+            "A": "L'historique est gardé dans chaque navigateur, pas sur le serveur. Les lots d'un autre poste ou d'un collègue n'y sont pas, mais leurs fiches sont bien dans SharePoint."
+          },
+          "TO_CHECK": {
+            "Q": "Que veut dire « À vérifier » ?",
+            "A": "Certaines pages du lot n'ont pas été déposées. Ouvrez le rapport : la colonne « Que faire ? » donne l'action pour chaque page. Pour ne voir que ces lots : Filtrer › Statut « À vérifier »."
+          },
+          "REDO": {
+            "Q": "Puis-je redistribuer un mois ?",
+            "A": "Oui : relancez une distribution avec le même pays et le même mois. Les fiches des mêmes collaborateurs sont remplacées dans SharePoint, et les indicateurs ne comptent que le dernier lot du mois."
+          },
+          "RIGHTS": {
+            "Q": "Qui peut distribuer les fiches de paie ?",
+            "A": "Ceux qui ont le droit RH de gérer les fiches de paie : le traitement (rapprochement des matricules et dépôt SharePoint) est fait par le service RH, cet écran ne fait que le lancer."
+          }
+        },
+        "PAYSLIP_NEW": {
+          "FORMAT": {
+            "Q": "Quel fichier déposer ?",
+            "A": "Le PDF du mois tel que le sort le logiciel de paie : un seul fichier, 50 Mo au plus, une fiche par page. Une page sans matricule (page blanche, récapitulatif) sera signalée « Non identifiée »."
+          },
+          "ALREADY": {
+            "Q": "« Ce mois a déjà été distribué »",
+            "A": "Un lot du même pays et du même mois existe dans l'historique de ce navigateur. Distribuer à nouveau remplace les fiches des mêmes collaborateurs dans SharePoint ; « Voir ce rapport » ouvre le lot précédent."
+          },
+          "LONG": {
+            "Q": "Le traitement est long",
+            "A": "Le découpage et le dépôt dans SharePoint peuvent prendre quelques minutes pour un gros fichier. Ne fermez pas la page : le rapport s'ouvre tout seul à la fin."
+          }
+        },
+        "PAYSLIP_REPORT": {
+          "UNKNOWN": {
+            "Q": "« Matricule inconnu » : que faire ?",
+            "A": "Aucun collaborateur du pays n'a ce matricule de paie sur sa fiche RH. Renseignez-le (ou corrigez-le) dans le module RH, puis distribuez à nouveau le mois."
+          },
+          "UNIDENTIFIED": {
+            "Q": "« Non identifiée » : que faire ?",
+            "A": "Aucun matricule n'a pu être lu sur la page : page blanche, récapitulatif ou matricule illisible. Vérifiez cette page dans le PDF ; si c'est une vraie fiche, corrigez le fichier et distribuez à nouveau."
+          },
+          "DUPLICATE": {
+            "Q": "« Doublon » : que faire ?",
+            "A": "Le même matricule figure sur deux pages : seule la première a été déposée. Vérifiez le fichier (fiche en double, ou matricule mal imprimé)."
+          },
+          "NOT_FILED": {
+            "Q": "« Non déposée » : que faire ?",
+            "A": "Le collaborateur est reconnu mais la fiche n'a pas pu être rangée : chemin SharePoint des fiches de paie non configuré pour ce pays (Administration RH › SharePoint), dossier du collaborateur ambigu, ou dépôt en échec. Corrigez, puis distribuez à nouveau le mois."
+          },
+          "NOT_FOUND": {
+            "Q": "« Lot introuvable »",
+            "A": "Ce lot n'est pas dans l'historique de ce navigateur : traité depuis un autre poste, ou historique effacé. Les fiches déposées restent dans SharePoint."
+          }
+        },
+        "EMPLOYEE_CONFIG": {
+          "WHY": {
+            "Q": "À quoi sert cette configuration ?",
+            "A": "Le calcul de paie du mois (Charge salariale) prend le salaire brut et la situation familiale enregistrés ici. Sans salaire enregistré, le calcul est refusé avec le message « Salaire non renseigné »."
+          },
+          "MISSING": {
+            "Q": "Un collaborateur n'apparaît pas",
+            "A": "La liste vient des fiches RH. Vérifiez l'orthographe ou le matricule, puis les filtres (pays, statut, département, contrat). Sans fiche RH, il faut la créer dans le module RH."
+          },
+          "READONLY": {
+            "Q": "Je ne peux pas enregistrer",
+            "A": "La modification demande le droit de gérer la configuration de paie ; le droit de consultation seul ne suffit pas. Vérifiez aussi qu'un pays est choisi, que le contrat a des règles de paie dans ce pays et que le motif est rempli."
+          }
+        },
+        "EMPLOYEE_CONFIG_DETAIL": {
+          "CONTRACT": {
+            "Q": "« Le contrat n'a pas de règles de paie dans ce pays »",
+            "A": "Le moteur ne sait pas calculer ce contrat dans ce pays. Choisissez un des contrats proposés, ou faites ajouter des règles pour ce contrat dans Administration de la paie."
+          },
+          "NET": {
+            "Q": "Le net ne s'affiche pas ou dit « recalculé à l'enregistrement »",
+            "A": "Le net est calculé à partir du pays enregistré. Pour une première configuration, enregistrez d'abord le pays. Si vous changez le pays, le contrat ou les avantages, le net est recalculé à l'enregistrement."
+          },
+          "CURRENCY": {
+            "Q": "Saisir le salaire dans une autre devise",
+            "A": "Choisissez la devise dans « Devise saisie » sous le brut. Le montant est converti dans la devise de travail du pays, et la ligne « Saisi comme » garde le montant d'origine."
+          },
+          "NEVER_SAVED": {
+            "Q": "« Configuration jamais enregistrée »",
+            "A": "Les valeurs affichées sont des propositions (contrat repris de la fiche RH, notamment). Vérifiez-les, indiquez un motif et enregistrez : la configuration existe alors pour le calcul de paie."
+          },
+          "BONUS_EDIT": {
+            "Q": "Comment modifier une prime ?",
+            "A": "Une prime ne se modifie pas : supprimez-la puis ajoutez-la de nouveau avec les bonnes valeurs."
+          },
+          "WHO": {
+            "Q": "Qui a changé le salaire, et pourquoi ?",
+            "A": "Onglet « Historique » : chaque version avec sa date, son auteur, le brut et le net, le contrat, les avantages et le motif saisi."
+          }
+        },
+        "ADMIN": {
+          "WHICH": {
+            "Q": "Règles de paie ou Taux et barèmes : lequel modifier ?",
+            "A": "Les deux, selon l'effet voulu. « Règles de paie » pilotent le simulateur, les simulations candidats et le net de « Salaires des collaborateurs ». « Taux et barèmes » et « Éléments du bulletin » pilotent le calcul de paie réel (Charge salariale). Un nouveau taux de cotisation se reporte dans les deux."
+          },
+          "CARD_MISSING": {
+            "Q": "Une carte n'apparaît pas",
+            "A": "Chaque carte demande ses propres droits (pays, éléments du bulletin, avances, journal…). Demandez à votre administrateur le droit correspondant."
+          }
+        },
+        "ADMIN_RULES": {
+          "WORKFLOW": {
+            "Q": "Comment des règles de paie entrent-elles en vigueur ?",
+            "A": "Brouillon (modifiable) → « Soumettre » → approbations du Directeur Pays et de la DAF, dans n'importe quel ordre. Dès les deux approbations, le jeu devient actif et le précédent est archivé."
+          },
+          "READONLY": {
+            "Q": "Je ne peux pas modifier un jeu",
+            "A": "Seul un brouillon se modifie. Pour changer des règles soumises ou en vigueur, créez « Nouvelles règles » en partant des règles en vigueur, modifiez ce qui change, puis faites-les valider."
+          }
+        },
+        "ADMIN_CREATE": {
+          "COPY": {
+            "Q": "Que recopie « Partir des règles en vigueur » ?",
+            "A": "Le barème de l'impôt, les cotisations, les avantages en nature et les éléments du bulletin du jeu en vigueur du pays. S'il n'y en a pas, la case l'indique et vous saisissez tout."
+          }
+        },
+        "ADMIN_COUNTRIES": {
+          "INACTIVE": {
+            "Q": "Que se passe-t-il si je désactive un pays ?",
+            "A": "Il n'a plus d'éléments du bulletin ni de calcul de paie."
+          },
+          "CURRENCY": {
+            "Q": "Quelle devise saisir ?",
+            "A": "Le code ISO de 3 lettres de la devise de paie du pays (TND, EGP, EUR…). Les équivalents en EUR, USD et CHF utilisent le taux du jour."
+          }
+        },
+        "ADMIN_ENGINE_PARAMS": {
+          "CIRCUIT": {
+            "Q": "Qui valide une version de taux et barèmes ?",
+            "A": "Soumission puis approbation par les RH, approbation par la Finance, et activation par la Finance. L'écran affiche à chaque étape qui doit agir."
+          },
+          "MISSING_KEYS": {
+            "Q": "« Paramètres manquants » : que faire ?",
+            "A": "Des éléments du bulletin actifs utilisent des paramètres absents de la version. Ajoutez-les au brouillon (« Ajouter un paramètre ») : sinon la soumission est refusée."
+          }
+        },
+        "ADMIN_RUBRIQUES": {
+          "IMPACT": {
+            "Q": "Une modification change-t-elle les bulletins déjà calculés ?",
+            "A": "Non : elle vaut pour les prochains calculs de paie du pays. Pour corriger un mois déjà calculé, relancez son calcul dans « Charge salariale »."
+          },
+          "ORDER": {
+            "Q": "À quoi servent l'étape et l'ordre ?",
+            "A": "L'étape regroupe les lignes (salaire de base, primes, cotisations, impôt, net) et chaque étape a un total réutilisable. Un ordre plus petit place la ligne plus haut et la calcule avant les suivantes."
+          }
+        },
+        "ADMIN_ADVANCE_RULES": {
+          "CLOSED": {
+            "Q": "Comment fermer les avances dans un pays ?",
+            "A": "Modifiez sa règle et passez-la en « Avances fermées » : le pays ne propose plus d'avance."
+          }
+        },
+        "ADMIN_AUDIT": {
+          "WHAT": {
+            "Q": "Que contient le journal ?",
+            "A": "Les enregistrements de la configuration de paie des collaborateurs (salaire, contrat, avantages, motif) et les changements de statut des avances. Les modifications des règles et des taux n'y figurent pas."
+          }
+        },
+        "ADMIN_HELP_FAQ": {
+          "ADD": {
+            "Q": "Comment ajouter une question à l'assistant ?",
+            "A": "Administration › Assistant & FAQ › « Nouvelle question » : choisissez la page, saisissez la question et la réponse en français (l'anglais est facultatif), puis enregistrez en la laissant « Publiée ». Elle apparaît aussitôt dans l'assistant et dans « Aide & guides »."
+          },
+          "HIDE": {
+            "Q": "Masquer une question sans la supprimer",
+            "A": "Dépubliez-la avec l'action de sa ligne : elle reste dans la liste, mais l'assistant ne la montre plus. Republiez-la quand vous voulez."
+          },
+          "TRANSLATION": {
+            "Q": "Et si je ne traduis pas en anglais ?",
+            "A": "La question s'affiche en français pour les utilisateurs en anglais. Une traduction doit avoir la question ET la réponse, sinon l'enregistrement est refusé."
           }
         }
       },
@@ -2307,11 +2777,308 @@
       "SETTINGS_TITLE": "L'administration de la paie",
       "SETTINGS_TEXT": "Les jeux de paramètres, les pays, les rubriques, les avantages, les règles des avances et le journal. Réservée aux profils qui paramètrent la paie.",
       "CURRENCY_TITLE": "La devise d'affichage",
-      "CURRENCY_TEXT": "La bulle en bas à droite choisit la devise dans laquelle les montants sont affichés. Ils sont convertis au taux du jour, à titre indicatif : les montants calculés et enregistrés ne changent pas.",
+      "CURRENCY_TEXT": "« Devise », en bas de la barre latérale (la bulle en bas à droite sur mobile), choisit la devise dans laquelle les montants sont affichés. Ils sont convertis au taux du jour, à titre indicatif : les montants calculés et enregistrés ne changent pas.",
       "CHAT_TITLE": "L'assistant d'aide",
       "CHAT_TEXT": "Posez ici une question sur l'application, par exemple « comment simuler un salaire ? » : l'assistant répond avec la FAQ et la documentation, et peut lancer le guide de la page concernée.",
       "HELP_TITLE": "Retrouver ce guide",
       "HELP_TEXT": "« Aide & guides », en bas de la barre latérale, relance ce guide à tout moment et ouvre la FAQ et la documentation. Vous pouvez aussi activer la lecture vocale avec le haut-parleur en haut de chaque étape."
+    },
+    "SIMULATOR": {
+      "WELCOME_TITLE": "Le simulateur manuel",
+      "WELCOME_TEXT": "Cette page liste les simulations de salaire individuelles d'un pays : celles faites pour des candidats comme pour des collaborateurs. Une simulation estime un salaire, elle ne lance pas la paie.",
+      "NEW_TITLE": "Nouvelle simulation",
+      "NEW_TEXT": "Ouvre le formulaire en trois étapes : qui, quel salaire, quels avantages. Le bouton n'apparaît qu'avec le droit de lancer des simulations.",
+      "KPIS_TITLE": "Les indicateurs",
+      "KPIS_TEXT": "Calculés sur toutes les simulations qui correspondent à la recherche et aux filtres, pas seulement sur la page affichée : coefficient de charge moyen (ce que l'entreprise dépense pour 1 de net), fourchette du coût employeur mensuel, nombre de simulations du mois et résultats approximatifs à vérifier. Survolez une tuile pour son explication.",
+      "TOOLBAR_TITLE": "Rechercher et filtrer",
+      "TOOLBAR_TEXT": "La recherche porte sur le candidat, le collaborateur ou le poste. « Filtres » choisit le pays — la liste n'affiche qu'un pays à la fois —, le type de contrat, le sujet (candidat ou collaborateur), le type de calcul (net vers brut ou brut vers net) et la fiabilité. À droite, basculez entre la vue tableau et la vue cartes.",
+      "RESULTS_TITLE": "Les simulations",
+      "RESULTS_TEXT": "Un clic sur une ligne (ou une carte) ouvre le résultat. Les actions de la ligne dupliquent la simulation dans une nouvelle — le formulaire est alors prérempli — ou l'exportent en Excel. Cliquez sur un en-tête de colonne pour trier.",
+      "PAGINATION_TITLE": "Pagination",
+      "PAGINATION_TEXT": "Choisissez le nombre de lignes par page et passez d’une page à l’autre ; les indicateurs, eux, restent calculés sur l’ensemble."
+    },
+    "SIMULATOR_NEW": {
+      "PAGE": "Nouvelle simulation",
+      "WELCOME_TITLE": "Simuler un salaire",
+      "WELCOME_TEXT": "Trois étapes, dans l'ordre que vous voulez : qui, quel salaire, quels avantages. « Simuler » calcule le résultat et ouvre sa fiche. Rien n'est versé : c'est une estimation.",
+      "HEADER_TITLE": "Le résumé de la saisie",
+      "HEADER_TEXT": "Les pastilles du titre résument ce que vous avez saisi — pays, sujet, contrat, montant et sens du calcul — et se mettent à jour à mesure que vous avancez.",
+      "STEP1_TITLE": "1 · Qui ?",
+      "STEP1_TEXT": "Choisissez le pays : la simulation utilise ses règles de paie validées de l'année (la pastille à droite indique l'année et la devise). Puis le sujet : un candidat (nom, poste, grade, discipline à saisir) ou un collaborateur déjà dans le module RH, dont le contrat, le grade et la discipline sont repris de sa fiche.",
+      "STEP2_TITLE": "2 · Salaire",
+      "STEP2_TEXT": "Le type de calcul : du net souhaité vers le brut, ou du brut vers le net. Saisissez le montant, mensuel ou annuel (l'annuel est divisé par 12), sa devise si ce n'est pas celle du pays, le type de contrat, les jours travaillés, et la situation familiale qui joue sur l'impôt (marié, enfants à charge).",
+      "STEP3_TITLE": "3 · Avantages",
+      "STEP3_TEXT": "Cochez les avantages en nature du pays à inclure dans le calcul ; chacun indique s'il est imposable ou exonéré. « Tout cocher » les prend tous. Sans avantage prévu pour le pays, vous pouvez simuler directement.",
+      "RAIL_TITLE": "Passer d’une étape à l’autre",
+      "RAIL_TEXT": "La barre du bas montre votre progression : cliquez sur une étape pour y aller, dans n'importe quel ordre, ou utilisez « Précédent ». « Annuler » ramène à la liste.",
+      "SIMULATE_TITLE": "Simuler",
+      "SIMULATE_TEXT": "À la dernière étape, « Suivant » devient « Simuler ». S'il manque quelque chose, le message juste au-dessus de la barre dit quoi. Le résultat s'ouvre dans sa fiche ; « Modifier la simulation » ramène ce formulaire, valeurs intactes."
+    },
+    "SIMULATION_DETAIL": {
+      "PAGE": "Résultat d'une simulation",
+      "WELCOME_TITLE": "Le résultat de la simulation",
+      "WELCOME_TEXT": "La fiche d'une simulation : à gauche ce qui a été saisi et les actions, à droite les chiffres et leur détail. Le fil d'Ariane en haut ramène à la liste.",
+      "DETAILS_TITLE": "Détails",
+      "DETAILS_TEXT": "Le profil simulé, le contexte (pays, devise, règles de paie utilisées) et les entrées du calcul : montant saisi, net imposable, avantages inclus et fiabilité du résultat — « Exact » ou « Approximatif · à vérifier ».",
+      "ACTIONS_TITLE": "Actions rapides",
+      "ACTIONS_TEXT": "« Modifier la simulation » rouvre le formulaire prérempli pour corriger et relancer. Exportez le résultat en Excel ou en PDF, ou imprimez-le.",
+      "KPIS_TITLE": "Les indicateurs",
+      "KPIS_TEXT": "Ce que touche le salarié, son brut, ce que paie l'entreprise et le coefficient de charge (le coût total pour 1 de net). Survolez une tuile pour son explication. Un bandeau au-dessus signale un résultat approximatif.",
+      "TABS_TITLE": "Les onglets",
+      "TABS_TEXT": "Seuls les onglets qui ont du contenu pour cette simulation apparaissent : vue générale, lignes du bulletin, cotisations sociales et barème de l'impôt.",
+      "OVERVIEW_TITLE": "Vue générale",
+      "OVERVIEW_TEXT": "« Qui reçoit quoi ? » découpe le coût chargé mensuel par destinataire : ce que touche le salarié, ce qui est prélevé sur son salaire (impôt, cotisations salariales) et ce que l'employeur paie en plus (cotisations patronales). L'anneau en montre la répartition.",
+      "RUBRIQUES_TITLE": "Lignes du bulletin",
+      "RUBRIQUES_TEXT": "Les rubriques appliquées par le calcul, comme sur un bulletin de paie, avec leur montant.",
+      "CHARGES_TITLE": "Cotisations sociales",
+      "CHARGES_TEXT": "Les taux de cotisation en vigueur utilisés pour ce calcul, pour le contrat simulé : part salariale et part patronale.",
+      "IRPP_TITLE": "Barème de l'impôt (IRPP)",
+      "IRPP_TEXT": "Les tranches de l'impôt sur le revenu utilisées pour ce calcul."
+    },
+    "CANDIDATE_SIMULATION": {
+      "WELCOME_TITLE": "Les simulations candidats",
+      "WELCOME_TEXT": "Les propositions de salaire faites aux candidats par le recrutement (module RH), et la décision de la DAF sur chacune. Cette page les suit ; elle n'en crée pas.",
+      "KPIS_TITLE": "Les indicateurs",
+      "KPIS_TEXT": "Pour le pays choisi : les candidats en attente de décision (et depuis quand attend le plus ancien), la part acceptée par la DAF, l'écart moyen entre le net demandé par les candidats et le net proposé, et le nombre de candidats. À zéro tant qu'aucun pays n'est choisi.",
+      "TOOLBAR_TITLE": "Rechercher et filtrer",
+      "TOOLBAR_TEXT": "Recherchez un candidat par son nom. « Filtrer » choisit le pays — obligatoire pour afficher des candidats — et le statut (en attente, approuvé, refusé). À droite, la vue cartes ou la vue tableau.",
+      "RESULTS_TITLE": "Les candidats",
+      "RESULTS_TEXT": "Une ligne par candidat : poste, lieu, nombre de propositions, dernière proposition et statut. Un clic ouvre sa fiche et le fil de la négociation."
+    },
+    "CANDIDATE_DETAIL": {
+      "PAGE": "Fiche d'un candidat",
+      "WELCOME_TITLE": "La fiche du candidat",
+      "WELCOME_TEXT": "Toute la négociation salariale avec ce candidat : chaque proposition de la RH, ce que le candidat demandait et la réponse de la DAF. Le fil d’Ariane ramène à la liste.",
+      "IDENTITY_TITLE": "Le candidat",
+      "IDENTITY_TEXT": "Les informations du candidat transmises par le recrutement : poste, lieu, dernière soumission et dernière décision.",
+      "ACTIONS_TITLE": "Actions rapides",
+      "ACTIONS_TEXT": "« Nouvelle simulation à partir de la dernière » ouvre le simulateur prérempli avec la dernière proposition. « Voir la fiche candidat (RH) » ouvre le candidat dans le recrutement. Chaque action n'apparaît qu'avec le droit correspondant.",
+      "KPIS_TITLE": "Les indicateurs",
+      "KPIS_TEXT": "Pour la dernière proposition : le net proposé par la RH, le net demandé et l'écart avec l'offre, le coût employeur, et le surcoût annuel estimé si la demande du candidat était acceptée.",
+      "TIMELINE_TITLE": "Le fil de la négociation",
+      "TIMELINE_TEXT": "Une étape par proposition, la plus ancienne en haut : ce que la RH a proposé, ce que le candidat demandait, puis la réponse de la DAF (en attente, approuvée, refusée ou contre-proposition) avec sa note.",
+      "DETAIL_TITLE": "Le détail d'une proposition",
+      "DETAIL_TEXT": "Un clic sur une étape ouvre son détail : la décision de la DAF, trois chiffres clés et le détail du calcul, replié, comme un bulletin. Les flèches passent à la proposition précédente ou suivante sans fermer la fenêtre."
+    },
+    "SALARY_ADVANCES": {
+      "WELCOME_TITLE": "Les avances sur salaire",
+      "WELCOME_TEXT": "Le bureau paie des avances : le collaborateur demande une avance, la finance l'approuve, la paie la verse ici puis la récupère par retenues sur les bulletins des mois suivants.",
+      "RULES_TITLE": "Règles des avances",
+      "RULES_TEXT": "Les règles par pays (avances ouvertes ou fermées, durée maximale de remboursement, ancienneté minimale) se modifient dans l'administration de la paie ; ce bouton y mène. Il n'apparaît qu'avec le droit d'ouvrir l'administration.",
+      "KPIS_TITLE": "Les indicateurs",
+      "KPIS_TEXT": "Les avances approuvées à verser, celles en cours de remboursement, les retenues du mois encore à traiter et l'encours total restant dû, par devise.",
+      "TABS_TITLE": "Les trois onglets",
+      "TABS_TEXT": "« À verser », « Retenues » et « Suivi » suivent l'ordre du travail : verser ce que la finance a approuvé, retenir chaque mois, puis suivre toutes les avances. Le chiffre sur un onglet dit combien de lignes y attendent.",
+      "PAYOUT_TITLE": "À verser",
+      "PAYOUT_TEXT": "Les avances approuvées par la finance qui n'ont pas encore été versées. Recherchez un collaborateur et filtrez (pays, devise, première retenue, date d'approbation…). « Détail » montre la demande, la décision de la finance et l'échéancier.",
+      "PAY_TITLE": "Verser une avance",
+      "PAY_TEXT": "« Verser » enregistre le versement : mode (virement, espèces, carte, autre), date, référence et commentaire. Le versement crée l'échéancier : les retenues commencent au mois prévu, ou au mois en cours si celui-ci est passé.",
+      "MONTH_TITLE": "Le mois de paie",
+      "MONTH_TEXT": "Choisissez le mois avec les flèches (« Mois en cours » y revient). Le résumé donne le nombre de retenues, ce qui reste à retenir et ce qui est déjà prélevé. « Exporter pour la paie (CSV) » produit la liste pour le logiciel de paie ; « Tout marquer prélevé » valide d'un coup les retenues du mois.",
+      "DEDUCTIONS_TITLE": "Traiter les retenues",
+      "DEDUCTIONS_TEXT": "Une ligne par mensualité du mois. Une fois la retenue sur le bulletin, marquez-la « Prélevée ». « Reporter » la replanifie un mois après la dernière (le montant dû ne change pas) ; « Solder autrement » la clôt quand la somme a été récupérée hors paie ou abandonnée. Ces deux actions demandent un motif.",
+      "FOLLOWUP_TITLE": "Suivi",
+      "FOLLOWUP_TEXT": "Toutes les avances, quel que soit leur statut : en attente de la finance, à verser, en remboursement, remboursée, refusée ou retirée. Filtrez par statut ou par date, et ouvrez le détail d'une avance pour son échéancier."
+    },
+    "ENGINE_RESULTS": {
+      "WELCOME_TITLE": "La charge salariale",
+      "WELCOME_TEXT": "C'est ici que la paie réelle se calcule et se consulte : un collaborateur par carte ou par ligne, issu des fiches RH. Ouvrez-en un pour voir ses bulletins mois par mois et lancer son calcul.",
+      "BATCH_TITLE": "Calculer la paie du pays",
+      "BATCH_TEXT": "Calcule d'un coup la paie de tous les collaborateurs en poste d'un pays pour un mois : choisissez le pays, le mois, l'année et les jours travaillés. Avant de lancer, la fenêtre dit combien seront calculés, combien le sont déjà et combien ont un contrat sans règles de paie. « Arrêter » interrompt le lot.",
+      "KPIS_TITLE": "Les indicateurs",
+      "KPIS_TEXT": "Masse salariale brute et nette, retenues (cotisations et impôt), coût employeur et nombre de collaborateurs calculés par rapport à l'effectif. La ligne au-dessus dit sur quels mois ils portent et dans quelle devise ; survolez une tuile pour sa définition.",
+      "TOOLBAR_TITLE": "Recherche et filtres",
+      "TOOLBAR_TEXT": "Cherchez par nom ou matricule. « Filtrer » restreint par période, collaborateurs, pays, statut, département ou type de contrat ; la période et le pays changent aussi les indicateurs. Les icônes à droite basculent entre cartes et tableau.",
+      "RESULTS_TITLE": "Les collaborateurs",
+      "RESULTS_TEXT": "Chaque carte ou ligne montre le matricule, le pays, le département et le contrat. Cliquez dessus pour ouvrir la fiche de paie du collaborateur ; en tableau, les en-têtes trient la liste.",
+      "PAGINATION_TITLE": "Pagination",
+      "PAGINATION_TEXT": "Changez de page ou le nombre de collaborateurs affichés par page. La recherche, les filtres et la page sont gardés quand vous revenez d'une fiche."
+    },
+    "ENGINE_RESULTS_DETAIL": {
+      "PAGE": "Fiche d'un collaborateur",
+      "WELCOME_TITLE": "La fiche de paie d'un collaborateur",
+      "WELCOME_TEXT": "Tous les bulletins calculés de ce collaborateur, mois par mois. Le fil d'Ariane ramène à la liste « Charge salariale », avec sa recherche et ses filtres.",
+      "CARD_TITLE": "La carte Détails",
+      "CARD_TEXT": "Ce que la paie sait du collaborateur, repris de sa fiche RH : matricule, statut, contrat (type, embauche, ancienneté, fin), poste (département, grade) et paie (pays, situation familiale, enfants à charge, CNSS). Une ligne vide n'est pas affichée.",
+      "ACTIONS_TITLE": "Les actions",
+      "ACTIONS_TEXT": "« Calculer la paie » ouvre le calcul d'un mois pour ce collaborateur (avec le droit de lancer le moteur). « Exporter Excel » et « Exporter PDF » exportent le bulletin ouvert, sinon l'historique tel que la liste l'affiche (recherche, filtres et tri compris).",
+      "KPIS_TITLE": "Le cumul de l'année",
+      "KPIS_TEXT": "Brut, retenues et net cumulés sur une année (celle du filtre, sinon la plus récente), et le nombre de mois calculés sur 12. Un mois recalculé n'est compté qu'une fois : son dernier calcul.",
+      "TOOLBAR_TITLE": "Rechercher un mois",
+      "TOOLBAR_TEXT": "Tapez un mois (« octobre 2026 ») ou filtrez par année et par mois. Les anciens calculs d'un mois relancé sont masqués : « Afficher les anciens calculs », dans Filtrer, les montre.",
+      "PERIODS_TITLE": "Les bulletins",
+      "PERIODS_TEXT": "Un bulletin par mois calculé : brut, net à payer, impôt, coût employeur, date du calcul. Cliquez dessus pour l'ouvrir dans la page ; le bouton Retour du navigateur ou le fil d'Ariane le referme.",
+      "PAYSLIP_TITLE": "Le bulletin ouvert",
+      "PAYSLIP_TEXT": "Brut, cotisations (CNSS), impôt (IRPP) et net à payer, puis les gains et les retenues rubrique par rubrique, le coût pour l'entreprise et « Où va le brut ? ». Le champ de recherche filtre les rubriques par code ou libellé. Si le mois a été recalculé depuis, un bandeau le dit et ouvre le dernier calcul."
+    },
+    "PAYSLIPS": {
+      "WELCOME_TITLE": "Les fiches de paie",
+      "WELCOME_TEXT": "Chaque mois, le logiciel de paie produit un PDF avec toutes les fiches. Ici, vous le déposez : chaque page est reconnue par le matricule de paie du collaborateur et rangée dans son dossier SharePoint RH. Cette page liste les lots déjà distribués.",
+      "NEW_TITLE": "Distribuer des fiches de paie",
+      "NEW_TEXT": "Ouvre l'import : choisissez le pays et le mois, déposez le PDF du mois, puis confirmez.",
+      "KPIS_TITLE": "Les indicateurs",
+      "KPIS_TEXT": "Le dernier mois distribué, les fiches déposées sur le total des pages, les pages à corriger et le nombre de lots traités. Un mois redistribué ne compte qu'une fois : son dernier lot.",
+      "NOTE_TITLE": "Un historique propre à ce navigateur",
+      "NOTE_TEXT": "La liste est gardée dans ce navigateur (les 20 derniers lots). Un lot distribué depuis un autre poste ou par un collègue n'y figure pas, et vider les données du navigateur l'efface. Les fiches, elles, restent dans SharePoint.",
+      "TOOLBAR_TITLE": "Recherche et filtres",
+      "TOOLBAR_TEXT": "Cherchez un fichier, un pays ou un mois. « Filtrer » restreint par pays, mois, date ou statut : « À vérifier » ne garde que les lots qui ont des pages à corriger. Les icônes à droite basculent entre cartes et tableau.",
+      "RESULTS_TITLE": "Les lots",
+      "RESULTS_TEXT": "Un lot par fichier traité : pays, mois, fichier, date et statut (« Complet » ou « À vérifier »). Cliquez dessus pour ouvrir son rapport page par page."
+    },
+    "PAYSLIP_NEW": {
+      "PAGE": "Nouvelle distribution",
+      "WELCOME_TITLE": "Distribuer les fiches du mois",
+      "WELCOME_TEXT": "Deux choses à donner — le pays et le mois, puis le PDF — et une confirmation. Le traitement découpe le fichier, une page par fiche, et dépose chaque fiche dans le dossier SharePoint RH du collaborateur.",
+      "PERIOD_TITLE": "1. Pays et mois de paie",
+      "PERIOD_TEXT": "Le pays dit parmi quels collaborateurs chercher les matricules et dans quel arbre SharePoint déposer. Si ce mois a déjà été distribué pour ce pays depuis ce navigateur, un bandeau le dit : les fiches des mêmes collaborateurs seront remplacées.",
+      "FILE_TITLE": "2. Le fichier de paie",
+      "FILE_TEXT": "Un PDF de 50 Mo au plus, une fiche par page, tel que le sort le logiciel de paie. Le nombre de pages détectées s'affiche ; « Remplacer le fichier » ou « Retirer » pour changer de fichier.",
+      "SUBMIT_TITLE": "Distribuer",
+      "SUBMIT_TEXT": "« Distribuer les fiches » demande confirmation, puis lance le traitement : quelques minutes, sans fermer la page. Le rapport du lot s'ouvre à la fin. « Annuler » revient à la liste sans rien déposer."
+    },
+    "PAYSLIP_REPORT": {
+      "PAGE": "Rapport d'un lot",
+      "WELCOME_TITLE": "Le rapport d'un lot",
+      "WELCOME_TEXT": "Ce qu'est devenue chaque page du fichier : déposée dans le dossier du collaborateur, ou non, et pourquoi. Un lot absent de l'historique de ce navigateur ne peut pas être affiché.",
+      "DETAILS_TITLE": "La carte Détails",
+      "DETAILS_TEXT": "Le pays, le mois de paie, le fichier, la date du traitement, le taux de distribution et le rang du lot dans le mois (1er envoi, ou envoi suivant qui remplace le précédent).",
+      "ACTIONS_TITLE": "Actions rapides",
+      "ACTIONS_TEXT": "« Distribuer des fiches de paie » lance un nouvel import ; « Exporter (Excel) » télécharge le détail par page ; « Imprimer » imprime le rapport.",
+      "KPIS_TITLE": "Les indicateurs",
+      "KPIS_TEXT": "Pages du PDF, fiches distribuées, problèmes dans le fichier (matricule non lu, inconnu ou en double) et fiches non déposées dans SharePoint (collaborateur reconnu, dépôt impossible). Survolez une tuile pour le détail.",
+      "TABLE_TITLE": "Détail par page",
+      "TABLE_TEXT": "Une ligne par page : matricule lu, collaborateur, statut, fiche SharePoint et « Que faire ? ». Filtrez pour ne garder que les pages à corriger, corrigez la cause, puis distribuez à nouveau le mois."
+    },
+    "EMPLOYEE_CONFIG": {
+      "WELCOME_TITLE": "Salaires des collaborateurs",
+      "WELCOME_TEXT": "La configuration de paie de chaque collaborateur : pays, contrat, salaire brut, situation familiale, avantages et primes. Le calcul de paie du mois part de ce qui est enregistré ici.",
+      "KPIS_TITLE": "Indicateurs",
+      "KPIS_TEXT": "Effectif filtré, salaires déjà configurés, collaborateurs restant à configurer et pays couverts. Les tuiles suivent les filtres, pas la recherche. Survolez une tuile pour le détail.",
+      "TOOLBAR_TITLE": "Recherche et filtres",
+      "TOOLBAR_TEXT": "Cherchez par nom ou matricule. « Filtrer » restreint par pays, statut, département ou type de contrat. À droite, réinitialisez le tri ou choisissez les colonnes du tableau.",
+      "RESULTS_TITLE": "Les collaborateurs",
+      "RESULTS_TEXT": "Une carte (ou une ligne en vue tableau) par collaborateur, issue de sa fiche RH : matricule, département, contrat, pays, statut et état de sa configuration. Cliquez pour ouvrir sa configuration ; en vue tableau, les en-têtes trient la liste.",
+      "PAGINATION_TITLE": "Pagination",
+      "PAGINATION_TEXT": "Le nombre total de collaborateurs et le changement de page. La recherche, les filtres et la page sont gardés quand vous revenez d'une fiche."
+    },
+    "EMPLOYEE_CONFIG_DETAIL": {
+      "PAGE": "Configuration d'un collaborateur",
+      "WELCOME_TITLE": "La configuration de paie d'un collaborateur",
+      "WELCOME_TEXT": "Sous le nom, la date et l'auteur de la dernière modification. « Voir ses bulletins » ouvre sa charge salariale ; « Calculer sa paie » y ouvre directement le calcul d'un mois (selon vos droits).",
+      "KPIS_TITLE": "Indicateurs",
+      "KPIS_TEXT": "La configuration enregistrée en un coup d’œil : brut, net estimé, avantages et primes. Elles ne changent qu’après « Enregistrer ». À gauche, la carte « Détails » montre la fiche RH ; un écart avec la paie est signalé sous le champ concerné.",
+      "TABS_TITLE": "Les trois onglets",
+      "TABS_TEXT": "« Configuration de paie » se modifie puis s'enregistre avec un motif. « Primes exceptionnelles » s'enregistre à chaque ajout. « Historique » liste les versions enregistrées. Le chiffre d'un onglet donne son nombre de lignes.",
+      "SUMMARY_TITLE": "La configuration enregistrée",
+      "SUMMARY_TEXT": "Pays, contrat, salaire brut et net, situation familiale et avantages, en lecture. Un écart avec la fiche RH est signalé sous la section concernée.",
+      "EDIT_TITLE": "Modifier",
+      "EDIT_TEXT": "Ouvre le formulaire dans une pop-up. Le net est recalculé à partir du brut ; indiquez le motif du changement puis « Enregistrer ». Fermée sans enregistrer, la saisie reste en cours : le bandeau permet de la reprendre ou de l’annuler.",
+      "ASSIGNMENT_TITLE": "Affectation",
+      "ASSIGNMENT_TEXT": "Le pays choisit les règles de paie appliquées ; le contrat doit avoir des règles de paie dans ce pays, sinon il ne peut pas être enregistré. Pour une première configuration, le contrat est repris de la fiche RH.",
+      "SALARY_TITLE": "Salaire",
+      "SALARY_TEXT": "Saisissez le brut ; le net est calculé automatiquement avec les règles de paie en vigueur du pays et les avantages cochés. Par défaut, le brut se saisit dans la devise de travail du pays ; « Devise saisie » permet d'en utiliser une autre, le montant d'origine reste affiché.",
+      "FAMILY_TITLE": "Situation familiale",
+      "FAMILY_TEXT": "Marié(e) et nombre d'enfants à charge alimentent les déductions familiales de l'impôt prévues par les règles de paie du pays. Sans déduction configurée, ils n'ont pas d'effet.",
+      "BENEFITS_TITLE": "Avantages en nature",
+      "BENEFITS_TEXT": "Les avantages prévus par les règles de paie en vigueur du pays, avec leur montant mensuel. Cochez ceux dont bénéficie le collaborateur ; le compteur du titre en donne le nombre.",
+      "SAVE_TITLE": "Motif et enregistrement",
+      "SAVE_TEXT": "Un motif est obligatoire (par ex. « revalorisation annuelle ») : il est gardé dans l'historique. « Enregistrer » crée une nouvelle version ; « Annuler les modifications » revient à la dernière. Quitter la page avec des modifications demande confirmation.",
+      "BONUSES_TITLE": "Primes exceptionnelles",
+      "BONUSES_TEXT": "Les primes ponctuelles du collaborateur : libellé, montant, devise, mois et année. « Ajouter une prime » l'enregistre tout de suite ; la suppression demande confirmation.",
+      "HISTORY_TITLE": "Historique",
+      "HISTORY_TEXT": "Chaque enregistrement de la configuration, du plus récent au plus ancien : date, auteur, brut, net, contrat, avantages et motif."
+    },
+    "ADMIN": {
+      "WELCOME_TITLE": "L'administration de la paie",
+      "WELCOME_TEXT": "Tout le paramétrage de la paie, une carte par section. Sous le titre, le pays dont vous voyez la configuration.",
+      "PAYS_TITLE": "Changer de pays",
+      "PAYS_TEXT": "Les administrateurs qui gèrent plusieurs pays choisissent ici celui à configurer ; les sections ouvertes ensuite partent de ce pays.",
+      "CARDS_TITLE": "Les sections",
+      "CARDS_TEXT": "Survolez une carte pour savoir ce qu'elle contient, cliquez pour l'ouvrir. Le fil d'Ariane « Administration » ramène ici. Vous ne voyez que les cartes permises par vos droits ; « Salaires des collaborateurs » ouvre sa propre page.",
+      "TWO_SYSTEMS_TITLE": "Deux jeux de règles",
+      "TWO_SYSTEMS_TEXT": "« Règles de paie » servent au simulateur, aux simulations candidats et au net affiché dans « Salaires des collaborateurs ». « Taux et barèmes » et « Éléments du bulletin » servent au calcul de paie réel (Charge salariale). Un changement de taux doit donc être fait aux deux endroits."
+    },
+    "ADMIN_RULES": {
+      "WELCOME_TITLE": "Règles de paie",
+      "WELCOME_TEXT": "Les jeux de règles d'un pays pour une année : barème de l'impôt, cotisations sociales, rubriques et avantages en nature. Le chiffre du titre donne le nombre de jeux affichés.",
+      "TOOLBAR_TITLE": "Recherche, filtres et création",
+      "TOOLBAR_TEXT": "Cherchez une année ou une version. « Filtrer » choisit le pays et restreint par statut, année, approbation ou date. « Nouvelles règles » (selon vos droits) crée un brouillon.",
+      "TABLE_TITLE": "Les jeux de règles",
+      "TABLE_TEXT": "Version, statut, nombre de cotisations, de rubriques et d'avantages, approbations et date de création. « Gérer » ouvre la fiche d'un jeu.",
+      "SET_HEADER_TITLE": "La fiche du jeu",
+      "SET_HEADER_TEXT": "Son statut et ses approbations (Directeur Pays, DAF). Un brouillon se modifie (« Barème & déductions ») puis se soumet ; un jeu soumis s'approuve par le Directeur Pays et la DAF, dans n'importe quel ordre. Avec les deux, il entre en vigueur et remplace le précédent.",
+      "SET_TABS_TITLE": "Les onglets du jeu",
+      "SET_TABS_TEXT": "Charges sociales, Rubriques de paie et, s'il y en a, Avantages en nature. « Modifier » n'apparaît que sur un brouillon ; sinon le jeu est en lecture seule.",
+      "SET_TABLE_TITLE": "Le contenu de l'onglet",
+      "SET_TABLE_TEXT": "Les lignes de l'onglet, avec leur recherche ; à droite, réinitialiser le tri ou choisir les colonnes."
+    },
+    "ADMIN_CREATE": {
+      "WELCOME_TITLE": "Nouvelles règles de paie",
+      "WELCOME_TEXT": "Crée un brouillon de règles pour un pays et une année. Il ne s'applique à rien tant qu'il n'a pas été soumis puis validé par le Directeur Pays et la DAF.",
+      "FORM_TITLE": "Le formulaire",
+      "FORM_TEXT": "Pays et année, puis « Partir des règles en vigueur » (coché par défaut) : barème de l'impôt, cotisations, avantages et éléments du bulletin sont recopiés, vous ne modifiez que ce qui change. Décocher repart de zéro.",
+      "ADVANCED_TITLE": "Paramètres avancés",
+      "ADVANCED_TEXT": "Repliés par défaut : tolérance et itérations du calcul, seuil de calibration, abattement forfaitaire et déductions familiales de l'impôt. Ils s'ouvrent d'eux-mêmes si l'un est en erreur.",
+      "ACTIONS_TITLE": "Enregistrer le brouillon",
+      "ACTIONS_TEXT": "L'encadré rappelle le circuit de validation. « Enregistrer » crée le brouillon et ouvre sa fiche ; « Annuler » revient à la liste."
+    },
+    "ADMIN_COUNTRIES": {
+      "WELCOME_TITLE": "Pays et devises",
+      "WELCOME_TEXT": "Les pays gérés par le calcul de paie, avec leur devise, le début de l'exercice et leurs sources de change. Un pays absent ou inactif n'a ni éléments du bulletin ni calcul de paie. « Ajouter un pays » selon vos droits.",
+      "TOOLBAR_TITLE": "Recherche et filtres",
+      "TOOLBAR_TEXT": "Cherchez un pays ; « Filtrer » peut ne garder que les pays sans source de change.",
+      "TABLE_TITLE": "Les pays",
+      "TABLE_TEXT": "Pays, devise, début de l'exercice, sources de change, état (actif ou inactif) et date de création. L'action de la ligne ouvre la modification."
+    },
+    "ADMIN_ENGINE_PARAMS": {
+      "WELCOME_TITLE": "Taux et barèmes",
+      "WELCOME_TEXT": "Les taux, montants et barèmes du calcul de paie réel, utilisés par les éléments du bulletin. Seule la version active d'un pays sert au calcul. « Nouvelle version » crée un brouillon.",
+      "PAYS_TITLE": "Le pays",
+      "PAYS_TEXT": "Le pays dont vous voyez les versions, choisi en haut à droite de la page.",
+      "VERSIONS_TITLE": "Les versions",
+      "VERSIONS_TEXT": "Les versions du pays, de la plus ancienne à la plus récente, avec leur statut. Cliquez sur une version pour l'ouvrir.",
+      "CIRCUIT_TITLE": "Le circuit de validation",
+      "CIRCUIT_TEXT": "Brouillon → soumise → approuvée RH → approuvée Finance → active. L'étape suivante s'affiche avec son bouton si vous en avez le droit, sinon qui doit la faire. Activer une version archive l'ancienne.",
+      "PARAMS_TITLE": "Les paramètres",
+      "PARAMS_TEXT": "Les valeurs de la version ouverte (taux, montants, barèmes), avec leur recherche. Seul un brouillon se modifie : date d'effet, « Ajouter un paramètre », modification d'une ligne."
+    },
+    "ADMIN_RUBRIQUES": {
+      "WELCOME_TITLE": "Éléments du bulletin",
+      "WELCOME_TEXT": "Les lignes calculées sur le bulletin du calcul de paie réel (salaire de base, cotisations, impôt…), dans l'ordre du bulletin. Leurs valeurs viennent de « Taux et barèmes ».",
+      "PAYS_TITLE": "Le pays",
+      "PAYS_TEXT": "Le pays dont vous voyez les éléments, choisi en haut à droite de la page.",
+      "TOOLBAR_TITLE": "Recherche et filtres",
+      "TOOLBAR_TEXT": "Cherchez une ligne par code ou libellé ; « Filtrer » restreint la liste.",
+      "TABLE_TITLE": "Les lignes du bulletin",
+      "TABLE_TEXT": "Chaque ligne avec son étape (salaire de base, primes, cotisations, impôt, net), son ordre et son mode de calcul. Ouvrez-en une pour la voir ou la modifier : une modification vaut pour les prochains calculs, pas pour ceux déjà enregistrés."
+    },
+    "ADMIN_ADVANCE_RULES": {
+      "WELCOME_TITLE": "Avances sur salaire",
+      "WELCOME_TEXT": "Les conditions d'accès aux avances, par pays. Un pays sans règle ouverte ne propose pas d'avance. Il n'y a pas de plafond sur le montant : la finance en juge.",
+      "TOOLBAR_TITLE": "Recherche",
+      "TOOLBAR_TEXT": "Cherchez un pays dans la liste des règles.",
+      "TABLE_TITLE": "Les règles",
+      "TABLE_TEXT": "Pour chaque pays : devise, durée maximale de remboursement (1 à 24 mois), ancienneté minimale et état (avances ouvertes ou fermées). « Ajouter un pays » crée une règle, « Modifier » la change."
+    },
+    "ADMIN_AUDIT": {
+      "WELCOME_TITLE": "Historique et contrôle",
+      "WELCOME_TEXT": "Les modifications de la configuration de paie des collaborateurs et les changements de statut des avances, du plus récent au plus ancien. Choisissez le pays, cherchez et filtrez à droite.",
+      "TABLE_TITLE": "Le journal",
+      "TABLE_TEXT": "Une ligne par modification : date, domaine, type, objet, action, détail et auteur. Cliquez pour voir le détail avant / après ; des modifications faites ensemble s'ouvrent groupées."
+    },
+    "ADMIN_HELP_FAQ": {
+      "WELCOME_TITLE": "Assistant & FAQ",
+      "WELCOME_TEXT": "Les questions que vous ajoutez vous-même, en plus de la FAQ livrée avec l'application. L'assistant d'aide (la bulle en bas à droite) et « Aide & guides » les proposent sur la page choisie. « Nouvelle question » en ajoute une.",
+      "TOOLBAR_TITLE": "Recherche et filtres",
+      "TOOLBAR_TEXT": "Cherchez dans les questions et les réponses ; « Filtres » ne garde qu'une page.",
+      "TABLE_TITLE": "Les questions",
+      "TABLE_TEXT": "Page, question en français et en anglais, langues remplies, ordre et statut. Les actions de ligne modifient, publient ou dépublient (la question reste mais n'est plus montrée) et suppriment."
+    },
+    "GROUPS": {
+      "GENERAL": "Général",
+      "RULES": "Règles de paie (simulation)",
+      "ENGINE": "Calcul de paie réel",
+      "CONTROL": "Avances, contrôle et aide"
     }
   }
 }

@@ -10,8 +10,10 @@ export interface EmployeeConfigListState {
   statusFilter:     string | null;
   departmentFilter: string | null;
   contractFilter:   string | null;
+  viewMode:         'grid' | 'list';
   employeeSort:     TableSort | null;
   page:             number;
+  pageSize:         number;
 }
 
 /**

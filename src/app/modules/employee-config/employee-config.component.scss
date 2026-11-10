@@ -1,15 +1,29 @@
-/* Mise en page de /payroll/admin (et /rh/admin) : annule le padding de `.shell-content`
-   puis repose 24px à l'intérieur. */
-:host { display: block; margin: -2rem; }
-@media (max-width: 1024px) { :host { margin: -1.5rem; } }
-@media (max-width: 768px)  { :host { margin: 0; } }
-.ec-content { min-width: 0; overflow-x: hidden; padding: 20px 24px 24px; }
-@media (max-width: 640px) { .ec-content { padding: 12px 16px 16px; } }
+/* ── Deux colonnes, même recette que /payroll/engine-results/:id (`.detail-split`) ─────
+   Flex, jamais grid : `flex-wrap` + `min-width` donnent le repli. */
+.detail-split { display: flex; flex-wrap: wrap; gap: 2rem; align-items: flex-start; padding: 0 0 2rem; }
+.detail-aside { flex: 0 1 30%; min-width: 320px; max-width: 420px; position: sticky; top: 1.5rem;
+                display: flex; flex-direction: column; gap: 1.5rem; }
+.detail-main  { flex: 1 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 1.5rem; }
+@media (max-width: 1400px) {
+  .detail-split { gap: 1.5rem; }
+  .detail-aside { min-width: 300px; max-width: 360px; }
+}
+@media (max-width: 1150px) {
+  .detail-aside { flex: 1 1 100%; max-width: none; min-width: 0; position: static; }
+}
 
-/* Fil d'Ariane seul : le nom du collaborateur est repris par l'en-tête de section. */
-.ec-breadcrumb-header { display: block; }
-.ec-breadcrumb-header ::ng-deep h1 { display: none; }
-.ec-breadcrumb-header ::ng-deep nav { font-size: 15px; line-height: 1.4; }
+/* Dernière modification, sous les actions. */
+.ec-last-change { margin: 0; font-size: 12px; line-height: 1.4; color: var(--color-on-surface-variant, #44474c); }
+
+/* ── KPI — mêmes règles que /payroll/engine-results/:id. */
+.kpi-row  { display: grid; gap: 1.5rem; align-items: stretch; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.kpi-cell { display: flex; flex-direction: column; min-width: 0; min-height: 118px; }
+@media (max-width: 640px) { .kpi-row { gap: 1rem; } }
+
+/* Écart avec la fiche RH, sous un champ. */
+.ec-hr-diff { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 12px;
+              color: var(--color-warning, #8a5a00); }
+.ec-hr-diff .material-symbols-outlined { font-size: 16px; }
 
 .page-body     { display: flex; flex-direction: column; gap: 16px; }
 .alert--error  { padding: 8px 12px; border-radius: 8px; font-size: 12px;
@@ -41,3 +55,55 @@
 
 /* Formulaire de la pop-up « Ajouter une prime » : espacement plus serré que la carte. */
 .ec-modal-form { gap: 16px; }
+
+/* ── Résumé de la configuration (onglet « Configuration de paie ») ──
+   Bouton au-dessus, hors carte ; puis une carte par section, en grille. */
+.ec-summary       { display: flex; flex-direction: column; gap: 16px; }
+.ec-summary__bar  { display: flex; justify-content: flex-end; }
+/* Carte unique : en-tête « Dernière modification », puis les sections en colonnes séparées
+   par un filet (empilées, séparées par un filet horizontal, quand la place manque). */
+.ec-card            { display: flex; flex-direction: column; }
+.ec-card__head      { display: flex; align-items: center; gap: 12px; padding: 14px 20px;
+                      border-bottom: 1px solid color-mix(in srgb, var(--color-outline-variant, #c5c6cd) 60%, transparent); }
+.ec-card__head-icon { font-size: 20px; color: var(--color-on-surface-variant, #44474c); }
+.ec-card__head-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ec-card__head-label { font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+                       color: var(--color-on-surface-variant, #44474c); }
+.ec-card__head-value { font-size: 13px; font-weight: 600; color: var(--color-on-surface, #191c1e); overflow-wrap: anywhere; }
+.ec-card__grid      { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.ec-card__grid > .ec-tile + .ec-tile {
+  border-left: 1px solid color-mix(in srgb, var(--color-outline-variant, #c5c6cd) 60%, transparent);
+}
+@media (max-width: 900px) {
+  .ec-card__grid > .ec-tile + .ec-tile {
+    border-left: 0;
+    border-top: 1px solid color-mix(in srgb, var(--color-outline-variant, #c5c6cd) 60%, transparent);
+  }
+}
+
+.ec-tile        { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; height: 100%; box-sizing: border-box; }
+.ec-tile__head  { display: flex; align-items: center; gap: 10px; }
+.ec-tile__icon  { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 10px; display: inline-flex;
+                  align-items: center; justify-content: center; font-size: 19px;
+                  color: var(--color-primary, #1b2a4a);
+                  background: color-mix(in srgb, var(--color-primary, #1b2a4a) 9%, transparent); }
+.ec-tile__title { margin: 0; flex: 1 1 auto; font-size: 14px; font-weight: 700; color: var(--color-on-surface, #191c1e); }
+.ec-tile__count { flex: 0 0 auto; border-radius: 999px; padding: .1rem .55rem; font-size: 11px; font-weight: 700;
+                  color: var(--color-on-surface-variant, #44474c);
+                  background: var(--color-surface-container-highest, #e2e3e5); }
+
+.ec-tile__rows  { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.ec-tile__row   { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ec-tile__row dt { margin: 0; font-size: 11.5px; color: var(--color-on-surface-variant, #44474c); }
+.ec-tile__row dd { margin: 0; font-size: 14px; font-weight: 600; color: var(--color-on-surface, #191c1e); overflow-wrap: anywhere; }
+
+.ec-tile__empty { margin: 0; font-size: 13px; color: var(--color-on-surface-variant, #44474c); }
+.ec-tile__diff  { margin: auto 0 0; display: inline-flex; align-self: flex-start; align-items: center; gap: 6px;
+                  padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+                  color: var(--color-warning, #8a5a00);
+                  background: color-mix(in srgb, var(--color-warning, #b7791f) 12%, transparent); }
+.ec-tile__diff .material-symbols-outlined { font-size: 15px; }
+
+/* Bandeau « modifications non enregistrées » avec ses deux actions. */
+.notice--actions { align-items: center; flex-wrap: wrap; }
+.notice__text    { flex: 1 1 240px; }

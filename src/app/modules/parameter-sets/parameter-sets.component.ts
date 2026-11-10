@@ -50,8 +50,8 @@ import { NotificationService } from '../../core/notification.service';
 import { UserStore } from '../../core/user.store';
 import {
   PAYROLL_AUDIT_PERMISSIONS, PAYROLL_BENEFITS_PERMISSIONS, PAYROLL_COUNTRIES_PERMISSIONS,
-  PAYROLL_CREATE_PARAMSET_PERMISSIONS, PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS, PAYROLL_ENGINE_PARAMS_PERMISSIONS,
-  PAYROLL_ENGINE_RUBRIQUES_PERMISSIONS,
+  PAYROLL_CREATE_PARAMSET_PERMISSIONS, PAYROLL_ENGINE_PARAMS_PERMISSIONS,
+  PAYROLL_ENGINE_RUBRIQUES_PERMISSIONS, PAYROLL_HELP_FAQ_PERMISSIONS,
   PAYROLL_SALARY_ADVANCES_PERMISSIONS,
 } from '../../core/payroll-nav';
 import { AdminSectionHeaderComponent } from './admin/admin-section-header.component';
@@ -66,8 +66,11 @@ import { EngineParamsAdminComponent } from './admin/engine-params-admin.componen
 import { EngineRubriquesAdminComponent } from './admin/engine-rubriques-admin.component';
 import { PayrollAuditAdminComponent } from './admin/payroll-audit-admin.component';
 import { PayrollCountriesAdminComponent } from './admin/payroll-countries-admin.component';
+import { HelpFaqAdminComponent } from './admin/help-faq-admin.component';
 import { dayRange, distinctSorted, inDayRange, pickValue, rangeSeed } from '../../shared/filter-utils';
 import { PaysNamesService } from '../../core/pays-names.service';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import type { GuideStep } from '../../shared/guide/page-guide.types';
 
 import { flagDataUri } from '../../shared/country-flags';
 /** Pastille de statut d'un jeu dans le tableau. */
@@ -82,7 +85,7 @@ interface IrppRow { upper: number | null; ratePct: number | null; }
 /** Étapes du circuit de validation : soumission, approbation Directeur Pays, approbation DAF. */
 type WorkflowStep = 'submit' | 'hr' | 'finance';
 
-type ParamSetsSection = 'create' | 'list' | 'countries' | 'engine-params' | 'rubriques' | 'benefits' | 'advance-rules' | 'audit';
+type ParamSetsSection = 'create' | 'list' | 'countries' | 'engine-params' | 'rubriques' | 'benefits' | 'advance-rules' | 'audit' | 'help-faq';
 
 /** Même langage ton → couleur d'icône que les cartes de /rh/admin. */
 const TONE_ICON = {
@@ -123,8 +126,12 @@ const CARDS: AdminCard[] = [
   { key: 'rubriques',       labelKey: 'PAYROLL.ADMIN_HOME.CARDS.RUBRIQUES',        icon: 'receipt_long',    tone: 'primary',   permissions: PAYROLL_ENGINE_RUBRIQUES_PERMISSIONS, helpKey: 'RUBRIQUES' },
   // { key: 'benefits',        labelKey: 'PAYROLL.ADMIN_HOME.CARDS.BENEFITS',         icon: 'redeem',          tone: 'teal',      permissions: PAYROLL_BENEFITS_PERMISSIONS, helpKey: 'BENEFITS' },
   { key: 'advance-rules',   labelKey: 'PAYROLL.ADMIN_HOME.CARDS.ADVANCE_RULES',    icon: 'request_quote',   tone: 'warning',   permissions: PAYROLL_SALARY_ADVANCES_PERMISSIONS, helpKey: 'ADVANCE_RULES' },
-  { key: 'employee-config', labelKey: 'PAYROLL.ADMIN_HOME.CARDS.EMPLOYEE_CONFIG',  icon: 'manage_accounts', tone: 'teal',      permissions: PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS, route: '/payroll/employee-config', helpKey: 'EMPLOYEE_CONFIG' },
+  // Rémunération : entrée de la barre latérale depuis le 2026-11-10.
+  // { key: 'employee-config', labelKey: 'PAYROLL.ADMIN_HOME.CARDS.EMPLOYEE_CONFIG',  icon: 'manage_accounts', tone: 'teal',      permissions: PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS, route: '/payroll/employee-config', helpKey: 'EMPLOYEE_CONFIG' },
   { key: 'audit',           labelKey: 'PAYROLL.ADMIN_HOME.CARDS.AUDIT',            icon: 'history',         tone: 'secondary', permissions: PAYROLL_AUDIT_PERMISSIONS, helpKey: 'AUDIT' },
+  // Questions ajoutées à l'assistant d'aide, comme « Assistant & FAQ » de /rh/admin et
+  // /finance/admin — écritures réservées au super-administrateur paie (`PayrollHelpFaqController`).
+  { key: 'help-faq',        labelKey: 'PAYROLL.ADMIN_HOME.CARDS.HELP_FAQ',         icon: 'smart_toy',       tone: 'teal',      permissions: PAYROLL_HELP_FAQ_PERMISSIONS, helpKey: 'HELP_FAQ' },
 ];
 
 /**
@@ -162,6 +169,74 @@ function sectionParam(ids: () => readonly ParamSetsSection[]) {
   return state;
 }
 
+// ── Guides (« Aide & guides ») : un par section, sous la clé `admin-<section>` ; l'accueil
+//    des cartes a la clé `admin`. Les éléments des sections autonomes (dossier admin/) sont
+//    visés par sélecteur, pour ne pas toucher à leurs gabarits.
+const g = (page: string, key: string, icon: string, at?: string): GuideStep => ({
+  icon, titleKey: `GUIDE.${page}.${key}_TITLE`, textKey: `GUIDE.${page}.${key}_TEXT`,
+  ...(at?.startsWith('[') || at?.includes(' ') || at?.startsWith('.') ? { selector: at } : { target: at }),
+});
+const sel = (host: string, inner: string) => `${host} ${inner}`;
+const HOME_GUIDE: GuideStep[] = [
+  g('ADMIN', 'WELCOME', 'admin_panel_settings', 'adm-home-header'),
+  g('ADMIN', 'PAYS',    'public',               'adm-home-pays'),
+  g('ADMIN', 'CARDS',   'apps',                 'adm-home-cards'),
+  g('ADMIN', 'TWO_SYSTEMS', 'compare_arrows'),
+];
+const RULES_GUIDE: GuideStep[] = [
+  g('ADMIN_RULES', 'WELCOME', 'gavel',       'adm-rules-header'),
+  g('ADMIN_RULES', 'TOOLBAR', 'filter_list', 'adm-rules-toolbar'),
+  g('ADMIN_RULES', 'TABLE',   'table_rows',  'adm-rules-table'),
+];
+const SET_GUIDE: GuideStep[] = [
+  g('ADMIN_RULES', 'SET_HEADER', 'verified', 'adm-set-header'),
+  g('ADMIN_RULES', 'SET_TABS',   'tab',      'adm-set-tabs'),
+  g('ADMIN_RULES', 'SET_TABLE',  'table_rows', 'adm-set-table'),
+];
+const CREATE_GUIDE: GuideStep[] = [
+  g('ADMIN_CREATE', 'WELCOME',  'add_circle', 'adm-create-header'),
+  g('ADMIN_CREATE', 'FORM',     'edit_note',  'adm-create-form'),
+  g('ADMIN_CREATE', 'ADVANCED', 'tune',       'adm-create-advanced'),
+  g('ADMIN_CREATE', 'ACTIONS',  'save',       'adm-create-actions'),
+];
+const CO = 'app-payroll-countries-admin', EP = 'app-engine-params-admin', RU = 'app-engine-rubriques-admin',
+      AR = 'app-advance-rules-admin', AU = 'app-payroll-audit-admin';
+const SECTION_GUIDES: Partial<Record<ParamSetsSection, GuideStep[]>> = {
+  'countries': [
+    g('ADMIN_COUNTRIES', 'WELCOME', 'public',      sel(CO, 'app-admin-section-header')),
+    g('ADMIN_COUNTRIES', 'TOOLBAR', 'filter_list', sel(CO, 'daf-search-toolbar')),
+    g('ADMIN_COUNTRIES', 'TABLE',   'table_rows',  sel(CO, '.admin-table-scroll')),
+  ],
+  'engine-params': [
+    g('ADMIN_ENGINE_PARAMS', 'WELCOME',  'tune',        sel(EP, 'app-admin-section-header')),
+    g('ADMIN_ENGINE_PARAMS', 'PAYS',     'public',      'adm-header-pays'),
+    g('ADMIN_ENGINE_PARAMS', 'VERSIONS', 'layers',      sel(EP, '.versions')),
+    g('ADMIN_ENGINE_PARAMS', 'CIRCUIT',  'verified',    sel(EP, '.circuit')),
+    g('ADMIN_ENGINE_PARAMS', 'PARAMS',   'table_rows',  sel(EP, '.admin-table-scroll')),
+  ],
+  'rubriques': [
+    g('ADMIN_RUBRIQUES', 'WELCOME', 'receipt_long', sel(RU, 'app-admin-section-header')),
+    g('ADMIN_RUBRIQUES', 'PAYS',    'public',       'adm-header-pays'),
+    g('ADMIN_RUBRIQUES', 'TOOLBAR', 'filter_list',  sel(RU, 'daf-search-toolbar')),
+    g('ADMIN_RUBRIQUES', 'TABLE',   'table_rows',   sel(RU, '.admin-table-scroll')),
+  ],
+  'advance-rules': [
+    g('ADMIN_ADVANCE_RULES', 'WELCOME', 'request_quote', sel(AR, 'app-admin-section-header')),
+    g('ADMIN_ADVANCE_RULES', 'TOOLBAR', 'filter_list',   sel(AR, '.admin-toolbar')),
+    g('ADMIN_ADVANCE_RULES', 'TABLE',   'table_rows',    sel(AR, '.admin-table-scroll')),
+  ],
+  'help-faq': [
+    g('ADMIN_HELP_FAQ', 'WELCOME', 'smart_toy',   sel('app-help-faq-admin', 'app-admin-section-header')),
+    g('ADMIN_HELP_FAQ', 'TOOLBAR', 'filter_list', sel('app-help-faq-admin', 'daf-search-toolbar')),
+    g('ADMIN_HELP_FAQ', 'TABLE',   'table_rows',  sel('app-help-faq-admin', '.table-scroll')),
+  ],
+  'audit': [
+    g('ADMIN_AUDIT', 'WELCOME', 'history',    sel(AU, 'app-admin-section-header')),
+    g('ADMIN_AUDIT', 'TABLE',   'table_rows', sel(AU, '.admin-table-scroll')),
+  ],
+};
+
+
 @Component({
   selector: 'app-parameter-sets',
   standalone: true,
@@ -173,7 +248,7 @@ function sectionParam(ids: () => readonly ParamSetsSection[]) {
     SearchToolbarComponent, SectionTitleComponent, SelectComponent, StatusBadgeComponent, TabsComponent,
     AdminModalFooterComponent, AdminSectionHeaderComponent, AdminSpinnerComponent, AdminTableFooterComponent,
     AdvanceRulesAdminComponent, BenefitsCatalogueAdminComponent, EngineParamsAdminComponent, EngineRubriquesAdminComponent,
-    PayrollAuditAdminComponent, PayrollCountriesAdminComponent,
+    PayrollAuditAdminComponent, PayrollCountriesAdminComponent, HelpFaqAdminComponent, PageGuideComponent,
   ],
   templateUrl: './parameter-sets.component.html',
   styleUrl: './parameter-sets.component.scss',
@@ -329,6 +404,19 @@ export class ParameterSetsComponent implements OnInit {
   // puis une page détail avec fil d'Ariane et onglets internes. Le jeu ouvert vit dans
   // `?set=` (avec `?pays=`, sans lequel la liste ne serait pas chargée au rafraîchissement).
   readonly openSetId = signal<number | null>(null);
+
+  /** Guide de la section ouverte : sa clé (`GUIDE_PAGES.guideKey`) et ses étapes. */
+  readonly guideKey = computed(() => {
+    const tab = this.activeTab();
+    return tab === null ? 'admin' : tab === 'list' ? 'admin-rules' : `admin-${tab}`;
+  });
+  readonly guideSteps = computed<GuideStep[]>(() => {
+    const tab = this.activeTab();
+    if (tab === null) return HOME_GUIDE.filter(s => s.target !== 'adm-home-pays' || this.canSwitchPays());
+    if (tab === 'list') return this.detailSet() ? SET_GUIDE : RULES_GUIDE;
+    if (tab === 'create') return CREATE_GUIDE;
+    return SECTION_GUIDES[tab] ?? [];
+  });
   readonly detailTab = signal<string>('charges');
 
   readonly detailSet = computed(() => {
