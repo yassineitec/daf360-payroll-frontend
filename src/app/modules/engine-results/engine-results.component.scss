@@ -19,39 +19,7 @@
   .detail-aside { flex: 1 1 100%; max-width: none; min-width: 0; position: static; }
 }
 
-/* ── Carte « Détails » — mêmes styles que le panneau `.dp-*` de la fiche affaire ──
-   La surface (fond, bordure, rayon, survol) vient de `daf-section-card`. */
-.dp-card  { display: flex; flex-direction: column; }
-.dp-block { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; }
-
-.dp-identity       { flex-direction: row; align-items: center; gap: 12px; }
-.dp-identity__body { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 6px; }
-.dp-identity__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.dp-chip           { border-radius: 999px; padding: .1rem .55rem; font-size: 11px; font-weight: 600;
-                     color: var(--color-on-surface-variant, #44474c);
-                     background: var(--color-surface-container-highest, #e2e3e5); }
-
-/* Le seul style de libellé de section du panneau. */
-.dp-label { margin: 0; font-size: 9px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
-            color: var(--color-on-surface-variant, #44474c); }
-
-/* Seul filet de la carte : entre sections (Contrat → Poste → Paie). */
-.dp-rule        { height: 1px; background: var(--color-outline-variant, #c5c6cd); opacity: .55; }
-.dp-rule--major { height: 2px; opacity: .4; }
-
-.dp-rows      { margin: 0; }
-.dp-row       { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
-                padding: 6px 0; }
-.dp-row--last { padding-bottom: 0; }
-.dp-row__key  { margin: 0; font-size: 12px; color: var(--color-on-surface-variant, #44474c); }
-.dp-row__val  { margin: 0; font-size: 12.5px; font-weight: 600; color: var(--color-on-surface, #191c1e);
-                text-align: right; overflow-wrap: anywhere; }
-
-.dp-hint { margin: 0; padding: 0 16px 14px; font-size: 11px; color: var(--color-on-surface-variant, #44474c); }
-
-@media (max-width: 640px) {
-  .dp-block { padding: 12px 14px; }
-}
+/* Carte « Détails » : composant partagé app-employee-details-card (ses styles y sont). */
 
 /* ── Bandeau de cumul (KPIs) — mêmes règles que /payroll/simulator/:id : tuiles de la lib à
    leur taille normale, grille auto-fit, hauteur minimale commune. */

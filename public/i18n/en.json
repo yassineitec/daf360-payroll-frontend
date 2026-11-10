@@ -26,6 +26,7 @@
       },
       "CURRENCY": {
         "TITLE": "Display currency",
+        "SHORT": "Currency",
         "TND": "Tunisian dinar",
         "EUR": "Euro",
         "USD": "US dollar",
@@ -41,7 +42,7 @@
         "SIMULATOR": "Manual simulator",
         "ADMIN": "Administration",
         "PAYSLIPS": "Payslips",
-        "EMPLOYEE_CONFIG": "Employee salaries",
+        "EMPLOYEE_CONFIG": "Compensation",
         "SALARY_ADVANCES": "Salary advances",
         "COHORT": "Cohort simulation",
         "ENGINE_RUN": "Payroll run",
@@ -583,6 +584,41 @@
       "KPI_AWAY_HELP": "Employees currently on leave or on mission.",
       "KPI_PAYS": "Payroll countries",
       "KPI_PAYS_HELP": "Number of countries configured in the payroll module.",
+      "KPI_GROSS": "Monthly gross salary",
+      "KPI_GROSS_HELP": "Gross saved in the payroll configuration, in the country’s currency.",
+      "KPI_NET": "Estimated net",
+      "KPI_NET_HELP": "Net computed from the saved gross with the country’s current payroll rules.",
+      "KPI_BENEFITS": "Benefits",
+      "KPI_BENEFITS_HELP": "Benefits in kind selected, out of those the country’s payroll rules offer.",
+      "KPI_BONUSES": "One-off bonuses",
+      "KPI_BONUSES_SUB": "{{count}} this month",
+      "KPI_BONUSES_HELP": "Bonuses saved for this employee (« One-off bonuses » tab).",
+      "HR_DIFF": "HR record: {{value}}",
+      "HR_CHILDREN": "{{count}} child(ren)",
+      "EDIT_CONFIG": "Edit configuration",
+      "CONFIGURE": "Set up payroll",
+      "ENTERED_IN": "Entered as",
+      "MARITAL": "Status",
+      "NO_BENEFIT_SELECTED": "No benefit selected.",
+      "RESUME": "Resume editing",
+      "UNSAVED_POPUP": "The payroll configuration has unsaved changes.",
+      "LAST_UPDATE": "Last update",
+      "NEVER_SAVED_SHORT": "Never saved",
+      "KPI_EMPLOYEES": "Employees",
+      "KPI_EMPLOYEES_HELP": "Employees matching the filters (without a status filter: those in post).",
+      "KPI_EMPLOYEES_SUB": "{{count}} departments",
+      "KPI_CONFIGURED": "Salaries configured",
+      "KPI_CONFIGURED_SUB": "{{pct}} % of headcount",
+      "KPI_CONFIGURED_HELP": "Employees whose payroll configuration (country, contract, salary) has been saved at least once.",
+      "KPI_MISSING": "To configure",
+      "KPI_MISSING_SUB": "Never saved",
+      "KPI_ALL_CONFIGURED": "All configured",
+      "KPI_MISSING_HELP": "Employees with no saved payroll configuration: the month's payroll run cannot start from their salary.",
+      "KPI_COUNTRIES": "Countries",
+      "KPI_COUNTRIES_HELP": "Distinct home countries of the employees shown.",
+      "COL_CONFIG": "Configuration",
+      "CONFIG_SAVED": "Saved",
+      "CONFIG_MISSING": "To configure",
       "CONFIG_TITLE": "Payroll configuration",
       "REASON_HINT": "Required to save — kept in the change history.",
       "SECTION_ASSIGNMENT": "Assignment",
@@ -1649,6 +1685,19 @@
       "RUBRIQUES_EDITOR_MODAL_TITLE": "Edit payroll items",
       "CANCEL": "Cancel",
       "EDIT": "Edit",
+      "EDIT_ALL": "Edit all",
+      "ADD_ROW": "Add",
+      "ADD_CHARGE_TITLE": "Add a social charge",
+      "EDIT_CHARGE_TITLE": "Edit social charge",
+      "ADD_RUBRIQUE_TITLE": "Add a payroll item",
+      "EDIT_RUBRIQUE_TITLE": "Edit payroll item",
+      "ADD_BENEFIT_TITLE": "Add a benefit",
+      "EDIT_BENEFIT_TITLE": "Edit benefit",
+      "DELETE_ROW_TITLE": "Delete line",
+      "DELETE_ROW_CONFIRM": "Delete “{{label}}” from this rule set? This takes effect immediately.",
+      "ROW_DELETED": "Line deleted.",
+      "ERR_CHARGE_REQUIRED": "The charge code and label are required.",
+      "ERR_RUBRIQUE_REQUIRED": "The item code and French label are required.",
       "COL_TYPE": "Type",
       "COL_CODE": "Code",
       "COL_LABEL": "Label",
@@ -1656,7 +1705,7 @@
       "COL_EMPLOYER_SHARE": "Emplr. share",
       "COL_BASE": "Base",
       "COL_CAP_OR_ORDER": "Cap / Order",
-      "CHARGES_EMPTY_READONLY": "No charge configured — click “Edit” to add one.",
+      "CHARGES_EMPTY_READONLY": "No charge configured — click “Add” to create one.",
       "ADD_CHARGE_LINE": "+ Add a line",
       "SAVING": "Saving…",
       "SAVE": "Save",
@@ -1691,7 +1740,7 @@
       "COL_CONTRACTS": "Contracts",
       "COL_ACTIVE": "Active",
       "CONTRACTS_ALL": "All",
-      "RUBRIQUES_EMPTY_READONLY": "No line item configured — click “Edit” to add one.",
+      "RUBRIQUES_EMPTY_READONLY": "No line item configured — click “Add” to create one.",
       "ADD_RUBRIQUE": "+ Add a line item",
       "SAVE_ALL": "Save all",
       "RUBRIQUES_EMPTY_EDITOR": "No line item — click “Add a line item”.",
@@ -1789,6 +1838,58 @@
     },
 
     "ADMIN_HOME": {
+      "HELP_FAQ": {
+        "title": "Assistant & FAQ",
+        "subtitle": "{{count}} question(s) added by the administration, on top of the FAQ shipped with the app. The help assistant (the bubble at the bottom right) and « Help & guides » show them for the chosen page.",
+        "search": "Search a question, an answer…",
+        "page": "Page",
+        "allPages": "All pages",
+        "new": "New question",
+        "newTitle": "New question",
+        "editTitle": "Edit the question",
+        "pageLabel": "Page *",
+        "languages": "Languages",
+        "question": "Question",
+        "answer": "Answer",
+        "questionPh": "E.g. How do I calculate a whole country's payroll?",
+        "answerPh": "The answer, as the assistant will show it.",
+        "optionalLang": "Optional: without a translation, the question shows in French in this language.",
+        "order": "Order",
+        "publish": "Published (visible in the assistant and the help)",
+        "cancel": "Cancel",
+        "save": "Save",
+        "saving": "Saving…",
+        "delete": "Delete",
+        "deleteTitle": "Delete the question",
+        "deleteBody": "The question « {{question}} » will be deleted for good. To only hide it, unpublish it.",
+        "empty": "No question yet. « New question » adds one for a page.",
+        "noMatch": "No question matches.",
+        "word": "question(s)",
+        "colPage": "Page",
+        "colQuestion": "Question (French)",
+        "colQuestionEn": "Question (English)",
+        "notTranslated": "Not translated — shown in French",
+        "colLangs": "Languages",
+        "colOrder": "Order",
+        "colStatus": "Status",
+        "published": "Published",
+        "unpublished": "Unpublished",
+        "edit": "Edit",
+        "unpublish": "Unpublish",
+        "publishAction": "Publish",
+        "pageRequired": "Choose the page.",
+        "frRequired": "The French question and answer are required.",
+        "pairRequired": "In a language, fill in the question AND the answer, or leave both empty.",
+        "loadError": "Could not load the questions.",
+        "saveError": "Could not save the question.",
+        "deleteError": "Could not delete the question.",
+        "filters": {
+          "title": "Filters",
+          "apply": "Apply",
+          "reset": "Reset",
+          "trigger": "Filters"
+        }
+      },
       "TITLE": "Administration",
       "SUBTITLE": "Payroll set-up: parameter sets, countries, line items, benefits, advance rules and change log.",
       "ENTITY": "Entity {{pays}}",
@@ -1800,6 +1901,7 @@
         "ADVANCE_RULES": "Salary advances",
         "EMPLOYEE_CONFIG": "Employee salaries",
         "AUDIT": "History and control",
+        "HELP_FAQ": "Assistant & FAQ",
         "RUBRIQUES": "Payslip items",
         "BENEFITS": "Benefits in kind",
         "ENGINE_PARAMS": "Rates and scales",
@@ -2127,7 +2229,8 @@
         "BENEFITS": "Benefits granted to employees (meals, transport, housing) and their value.",
         "ADVANCE_RULES": "Eligibility conditions for salary advances, by country.",
         "EMPLOYEE_CONFIG": "Each employee's salary, contract, benefits and bonuses.",
-        "AUDIT": "History of payroll changes, for internal control."
+        "AUDIT": "History of payroll changes, for internal control.",
+        "HELP_FAQ": "Questions and answers added to the help assistant, on top of the FAQ shipped with the app."
       },
       "NO_RESULT": "No result for this search or filter.",
       "LIST": {
@@ -2231,7 +2334,7 @@
           },
           "CURRENCY": {
             "Q": "Does changing the currency change payroll amounts?",
-            "A": "No. The currency bubble only changes the display: amounts are converted at today's rate, as an indication. Computed and saved amounts do not move."
+            "A": "No. « Currency », at the bottom of the sidebar (the bubble at the bottom right on mobile), only changes the display: amounts are converted at today's rate, as an indication. Computed and saved amounts do not move."
           },
           "SIMULATE": {
             "Q": "How do I simulate a salary?",
@@ -2248,6 +2351,386 @@
           "LANGUAGE": {
             "Q": "How do I change the language?",
             "A": "The module follows the language chosen in the app (the portal's language selector): French or English."
+          }
+        },
+        "SIMULATOR": {
+          "EMPTY": {
+            "Q": "The simulation list is empty",
+            "A": "The list shows one country at a time: pick it in « Filters ». If a country is picked, check the search and the other filters, or run a new simulation."
+          },
+          "NEW": {
+            "Q": "I don't see « New simulation »",
+            "A": "The button requires the right to run simulations (PAYROLL_RUN_SIMULATION). Ask your administrator for it."
+          },
+          "DUPLICATE": {
+            "Q": "How do I redo a simulation with other figures?",
+            "A": "In the list, the row's « Duplicate » action opens a new simulation prefilled with it: change what you need and simulate. From the result, « Edit simulation » does the same."
+          },
+          "RATIO": {
+            "Q": "What does the cost ratio mean?",
+            "A": "What the company spends for 1 paid in net to the employee (gross, benefits and employer contributions). × 1.60 means that for 1,000 of net, the company spends 1,600."
+          },
+          "PARTIAL": {
+            "Q": "Why is a result « approximate »?",
+            "A": "The calculation could not land exactly on the target amount (net to gross): the result is close but should be checked before sharing. Filters › Reliability shows only those."
+          },
+          "EXPORT": {
+            "Q": "How do I export a simulation?",
+            "A": "To Excel from the row action in the list; to Excel or PDF, or print, from its result's quick actions."
+          }
+        },
+        "SIMULATOR_NEW": {
+          "NO_RULES": {
+            "Q": "« Payroll rules not available »: what now?",
+            "A": "This country's payroll rules are not approved yet for the year. Simulation will be possible once they are approved in Payroll administration; let the payroll administrator know."
+          },
+          "DIRECTION": {
+            "Q": "Net to gross or gross to net?",
+            "A": "Net to gross when you start from what the person should receive (an offer to a candidate); gross to net when you know the gross and want to know what remains."
+          },
+          "EMPLOYEE": {
+            "Q": "Why don't I enter an employee's contract?",
+            "A": "For an employee, the contract, grade and discipline come from their HR record. You can pick another contract at the Salary step, or leave it empty to keep the current one."
+          },
+          "CURRENCY": {
+            "Q": "Can I enter an amount in another currency?",
+            "A": "Yes: at the Salary step, « Entered currency » allows a currency other than the country's. The amount is converted before the calculation."
+          },
+          "BENEFITS": {
+            "Q": "Do benefits in kind change the result?",
+            "A": "Yes: a taxable benefit enters the income tax base, an exempt one does not; both count in the employer cost."
+          },
+          "BLOCKED": {
+            "Q": "« Simulate » does nothing",
+            "A": "Something is missing: the message just above the bottom bar, on the last step, says what (country, employee, amount…)."
+          }
+        },
+        "SIMULATION_DETAIL": {
+          "EDIT": {
+            "Q": "How do I correct a simulation?",
+            "A": "« Edit simulation » in the quick actions reopens the prefilled form. Once rerun, it is a new simulation: the old one stays in the list."
+          },
+          "COST": {
+            "Q": "What does the employer cost include?",
+            "A": "The gross, exempt benefits and employer contributions. The Overview tab splits it by recipient."
+          },
+          "TABS": {
+            "Q": "A tab is missing",
+            "A": "Only tabs with content show: no « Payslip lines » without an applied pay item, no contributions or tax scale if the rules used could not be read with your rights."
+          },
+          "APPROX": {
+            "Q": "A banner says the result is approximate",
+            "A": "The calculation stopped as close as possible to the target amount without reaching it exactly. Check the result before sharing it, or rerun with another amount."
+          },
+          "EXPORT": {
+            "Q": "How do I share the result?",
+            "A": "Export it to Excel or PDF, or print it, from the quick actions on the left."
+          }
+        },
+        "CANDIDATE_SIMULATION": {
+          "EMPTY": {
+            "Q": "I don't see any candidate",
+            "A": "First pick a country in « Filter ». If the list stays empty, no proposal has been submitted yet for this country from recruitment (HR module)."
+          },
+          "ORIGIN": {
+            "Q": "Where do these proposals come from?",
+            "A": "From recruitment, in the HR module: HR simulates a candidate's salary there and submits it to the DAF. This page tracks them; it does not create any."
+          },
+          "PENDING": {
+            "Q": "How do I see only pending proposals?",
+            "A": "Filter › Status › Pending. The « Awaiting decision » tile also shows how long the oldest has waited."
+          },
+          "GAP": {
+            "Q": "What does the average asked / offered gap mean?",
+            "A": "The average, over candidates who gave a salary, of the gap between the net they ask and the net offered by HR. Positive: candidates ask more than the offer."
+          },
+          "DECIDE": {
+            "Q": "Where does the DAF approve a proposal?",
+            "A": "In the Finance module, « Cost Approval » screen. The decision then shows here, in the status and the negotiation thread."
+          }
+        },
+        "CANDIDATE_DETAIL": {
+          "ROUNDS": {
+            "Q": "Why several proposals for one candidate?",
+            "A": "Each new HR offer, after a candidate's request or a DAF counter-proposal, is one more proposal. The thread shows them all, in order."
+          },
+          "SURCOST": {
+            "Q": "How is the extra cost computed?",
+            "A": "(net asked − net offered) × the proposal's cost ratio × 12. It is an estimate: income tax is not proportional to salary."
+          },
+          "DUPLICATE": {
+            "Q": "How do I simulate another offer for this candidate?",
+            "A": "« New simulation from the latest » opens the simulator prefilled with the latest proposal; change the amount and simulate. It requires the right to run simulations."
+          },
+          "RH": {
+            "Q": "How do I see the candidate's full record?",
+            "A": "« View candidate record (HR) » opens the candidate in recruitment, if you have a right on candidates in the HR module."
+          }
+        },
+        "SALARY_ADVANCES": {
+          "FLOW": {
+            "Q": "How does a salary advance work?",
+            "A": "The employee requests it, finance approves or rejects it (Finance module, « Cost Approval »), then payroll pays it in the « To pay out » tab. Paying creates the schedule, and each month the deductions are processed in the « Deductions » tab."
+          },
+          "NOT_LISTED": {
+            "Q": "An advance is missing from « To pay out »",
+            "A": "Only advances approved by finance and not yet paid are there. Check its status in the « Follow-up » tab: it may still await finance, be rejected, withdrawn or already paid."
+          },
+          "SCHEDULE": {
+            "Q": "When do the deductions start?",
+            "A": "In the first deduction month set by the request, or the current month if it has already passed when the advance is paid. The amount is split over the chosen number of instalments."
+          },
+          "MONTH": {
+            "Q": "How do I prepare the month's deductions for the payroll software?",
+            "A": "« Deductions » tab: pick the month, « Export for payroll (CSV) », load the file into the payroll software, then mark the deductions « Deducted » once they are on the payslips (one by one or « Mark all deducted »)."
+          },
+          "SKIP_WAIVE": {
+            "Q": "Postpone or settle otherwise: what is the difference?",
+            "A": "« Postpone »: the deduction was not taken this month; it is rescheduled one month after the last and the amount due does not change. « Settle otherwise »: the sum was recovered outside payroll (final settlement, cash) or written off; the instalment is closed. A reason is required in both cases."
+          },
+          "MATRICULE": {
+            "Q": "« Payroll ID missing »: what now?",
+            "A": "The payroll software recognises the employee by their payroll ID. Have it filled in on their record in the HR module; Filters › « Without a payroll ID only » lists the rows concerned."
+          },
+          "RULES": {
+            "Q": "Where do I change the maximum period or open advances for a country?",
+            "A": "In Payroll administration, « Salary advances » card — the « Advance rules » button at the top of the page leads there. A country without an open rule offers no advance; there is no amount cap, finance decides."
+          }
+        },
+        "ENGINE_RESULTS": {
+          "WHAT": {
+            "Q": "How is this different from the simulator?",
+            "A": "The simulator runs trials that commit nothing. Here it is the real payroll: a calculation is saved as the employee’s payslip for the chosen month and counts in the indicators."
+          },
+          "BATCH": {
+            "Q": "How do I calculate the payroll of a whole country for a month?",
+            "A": "« Run country payroll », at the top of the page (with the right to run the engine). Pick the country, month, year and days worked (22 for a full month), read the summary, then run it. The report lists the employees not calculated and why."
+          },
+          "MISSING": {
+            "Q": "An employee is missing",
+            "A": "The list comes from the HR records. Check the spelling or ID, then the filters (country, status, period, department, contract): a « Period » filter keeps only employees with a payslip in those months. Without an HR record, it must be created in the HR module."
+          },
+          "UNPRICED": {
+            "Q": "« Contract with no payroll rules in this country »: what now?",
+            "A": "The engine cannot calculate this contract type in this country: it has no validated payroll rules. They are set in Payroll administration; until then, the batch leaves these employees out."
+          },
+          "RERUN": {
+            "Q": "What happens if I recalculate a month?",
+            "A": "A new payslip is saved in addition to the old one, and the latest counts in the totals. In the batch, the « Skip employees already calculated this month » box (ticked by default) avoids duplicates."
+          },
+          "CURRENCY": {
+            "Q": "Which currency are the amounts in?",
+            "A": "In the currency chosen at the bottom of the sidebar. Without a choice, it is the country’s currency, or the euro when several countries mix. Converted amounts use today’s rate, and the line above the indicators says so."
+          },
+          "KPI_EMPTY": {
+            "Q": "The indicators are empty or zero",
+            "A": "No payslip has been calculated yet for the chosen scope (country, period, employees). Widen the filters or run the month’s calculation."
+          }
+        },
+        "ENGINE_RESULTS_DETAIL": {
+          "CALC": {
+            "Q": "How do I calculate an employee's payroll for a month?",
+            "A": "On their record, Actions card › « Run payroll » (with the right to run the engine). Pick the country, month, year, contract and days worked — fewer than 22 for a mid-month start or exit — then run it. The payslip is saved and added to the list."
+          },
+          "CONTRACT": {
+            "Q": "Where does the proposed contract come from?",
+            "A": "From the employee's HR record, if that contract has payroll rules in the country. Otherwise a message says so and you choose the contract to apply among those that have rules."
+          },
+          "OLD": {
+            "Q": "I recalculated a month: where is the old payslip?",
+            "A": "It is kept but hidden. Tick « Show earlier calculations » in Filter. An earlier payslip, once open, shows a banner leading to the latest calculation, the only one counted in the totals."
+          },
+          "YEAR": {
+            "Q": "Which year do the totals cover?",
+            "A": "The year chosen in Filter, otherwise the most recent one with a payslip. « Months calculated » counts the months of that year with a payslip, and the line below lists those missing one."
+          },
+          "EXPORT": {
+            "Q": "What do « Export Excel » and « Export PDF » export?",
+            "A": "The open payslip, if there is one (with the line search applied). Otherwise the payslip history as the list shows it: search, filters and sort included, all pages."
+          },
+          "PARTIAL": {
+            "Q": "« Full HR record unavailable »",
+            "A": "Payroll could not read the employee's full HR record: the Details card stays partial. Reopen them from the « Salary cost » list; if the message stays, check their record in the HR module."
+          }
+        },
+        "PAYSLIPS": {
+          "HOW": {
+            "Q": "How do the payslips reach the employees?",
+            "A": "Each page of the PDF is read: the payroll ID printed on it is looked up among the HR records of the chosen country. The page is then filed in the employee's HR SharePoint folder."
+          },
+          "MISSING_BATCH": {
+            "Q": "A batch distributed by a colleague is missing",
+            "A": "The history is kept in each browser, not on the server. Batches from another computer or a colleague are not in it, but their payslips are in SharePoint."
+          },
+          "TO_CHECK": {
+            "Q": "What does « To check » mean?",
+            "A": "Some pages of the batch were not filed. Open the report: the « What to do? » column gives the action for each page. To see only those batches: Filter › Status « To check »."
+          },
+          "REDO": {
+            "Q": "Can I redistribute a month?",
+            "A": "Yes: run a distribution again with the same country and month. The same employees’ payslips are replaced in SharePoint, and the indicators count only the month’s latest batch."
+          },
+          "RIGHTS": {
+            "Q": "Who can distribute payslips?",
+            "A": "Those with the HR right to manage payslips: the processing (ID matching and SharePoint filing) is done by the HR service, this screen only starts it."
+          }
+        },
+        "PAYSLIP_NEW": {
+          "FORMAT": {
+            "Q": "Which file should I drop?",
+            "A": "The month’s PDF as the payroll software outputs it: a single file, 50 MB at most, one payslip per page. A page without an ID (blank page, summary) will be reported « Unidentified »."
+          },
+          "ALREADY": {
+            "Q": "« This month was already distributed »",
+            "A": "A batch for the same country and month is in this browser's history. Distributing again replaces the same employees’ payslips in SharePoint; « View that report » opens the previous batch."
+          },
+          "LONG": {
+            "Q": "Processing takes a while",
+            "A": "Splitting and filing to SharePoint can take a few minutes for a large file. Do not close the page: the report opens by itself at the end."
+          }
+        },
+        "PAYSLIP_REPORT": {
+          "UNKNOWN": {
+            "Q": "« Unknown matricule »: what now?",
+            "A": "No employee of the country has this payroll ID on their HR record. Fill it in (or correct it) in the HR module, then distribute the month again."
+          },
+          "UNIDENTIFIED": {
+            "Q": "« Unidentified »: what now?",
+            "A": "No ID could be read on the page: blank page, summary or unreadable ID. Check that page in the PDF; if it is a real payslip, fix the file and distribute again."
+          },
+          "DUPLICATE": {
+            "Q": "« Duplicate »: what now?",
+            "A": "The same ID appears on two pages: only the first one was filed. Check the file (duplicated payslip, or misprinted ID)."
+          },
+          "NOT_FILED": {
+            "Q": "« Not filed »: what now?",
+            "A": "The employee is recognised but the payslip could not be filed: SharePoint path for payslips not set for this country (HR administration › SharePoint), employee folder ambiguous, or filing failed. Fix it, then distribute the month again."
+          },
+          "NOT_FOUND": {
+            "Q": "« Batch not found »",
+            "A": "This batch is not in this browser's history: processed from another computer, or history cleared. The payslips filed stay in SharePoint."
+          }
+        },
+        "EMPLOYEE_CONFIG": {
+          "WHY": {
+            "Q": "What is this configuration for?",
+            "A": "The month's payroll calculation (Salary cost) takes the gross salary and family situation saved here. Without a saved salary, the calculation is refused with a “salary not set” message."
+          },
+          "MISSING": {
+            "Q": "An employee is missing",
+            "A": "The list comes from the HR records. Check the spelling or ID, then the filters (country, status, department, contract). Without an HR record, it must be created in the HR module."
+          },
+          "READONLY": {
+            "Q": "I cannot save",
+            "A": "Editing requires the right to manage payroll configuration; the view right alone is not enough. Also check that a country is chosen, that the contract has payroll rules in that country and that the reason is filled in."
+          }
+        },
+        "EMPLOYEE_CONFIG_DETAIL": {
+          "CONTRACT": {
+            "Q": "« The contract has no payroll rules in this country »",
+            "A": "The engine cannot calculate this contract in this country. Choose one of the contracts offered, or have rules added for this contract in Payroll administration."
+          },
+          "NET": {
+            "Q": "The net is missing or says it will be recalculated on save",
+            "A": "The net is calculated from the saved country. For a first configuration, save the country first. If you change the country, contract or benefits, the net is recalculated on save."
+          },
+          "CURRENCY": {
+            "Q": "Entering the salary in another currency",
+            "A": "Choose the currency in « Entered currency » under the gross. The amount is converted into the country's working currency, and the « Entered as » line keeps the original amount."
+          },
+          "NEVER_SAVED": {
+            "Q": "« Configuration never saved »",
+            "A": "The values shown are proposals (contract taken from the HR record, notably). Check them, enter a reason and save: the configuration then exists for the payroll calculation."
+          },
+          "BONUS_EDIT": {
+            "Q": "How do I edit a bonus?",
+            "A": "A bonus cannot be edited: delete it, then add it again with the right values."
+          },
+          "WHO": {
+            "Q": "Who changed the salary, and why?",
+            "A": "« History » tab: each version with its date, author, gross and net, contract, benefits and the reason entered."
+          }
+        },
+        "ADMIN": {
+          "WHICH": {
+            "Q": "Payroll rules or Rates and scales: which to change?",
+            "A": "« Payroll rules » drive the simulator, candidate simulations and the net in « Employee salaries ». « Rates and scales » and « Payslip items » drive the real payroll calculation (Salary cost). A new contribution rate is entered in both, depending on the effect wanted."
+          },
+          "CARD_MISSING": {
+            "Q": "A card is missing",
+            "A": "Each card needs its own rights (countries, payslip items, advances, log…). Ask your administrator for the matching right."
+          }
+        },
+        "ADMIN_RULES": {
+          "WORKFLOW": {
+            "Q": "How do payroll rules come into force?",
+            "A": "Draft (editable) → « Submit » → approvals by the Country Director and the CFO, in any order. Once both have approved, the set becomes active and the previous one is archived."
+          },
+          "READONLY": {
+            "Q": "I cannot edit a set",
+            "A": "Only a draft can be edited. To change submitted or active rules, create « New rules » starting from the rules in force, change what differs, then have them approved."
+          }
+        },
+        "ADMIN_CREATE": {
+          "COPY": {
+            "Q": "What does « Start from the rules in force » copy?",
+            "A": "The country's tax scale, contributions, benefits in kind and payslip items from the set in force. If there is none, the box says so and you enter everything."
+          }
+        },
+        "ADMIN_COUNTRIES": {
+          "INACTIVE": {
+            "Q": "What happens if I deactivate a country?",
+            "A": "It no longer has payslip items or payroll calculation."
+          },
+          "CURRENCY": {
+            "Q": "Which currency should I enter?",
+            "A": "The 3-letter ISO code of the country's payroll currency (TND, EGP, EUR…). EUR, USD and CHF equivalents use today's rate."
+          }
+        },
+        "ADMIN_ENGINE_PARAMS": {
+          "CIRCUIT": {
+            "Q": "Who approves a version of rates and scales?",
+            "A": "Submission then approval by HR, approval by Finance, and activation by Finance. At each step the screen shows who must act."
+          },
+          "MISSING_KEYS": {
+            "Q": "« Missing parameters »: what now?",
+            "A": "Active payslip items use parameters missing from the version. Add them to the draft (« Add a parameter »): otherwise submission is refused."
+          }
+        },
+        "ADMIN_RUBRIQUES": {
+          "IMPACT": {
+            "Q": "Does a change affect payslips already calculated?",
+            "A": "No: it applies to the country's next payroll calculations. To correct a month already calculated, rerun it in « Salary cost »."
+          },
+          "ORDER": {
+            "Q": "What are the step and the order for?",
+            "A": "The step groups the lines (base salary, bonuses, contributions, tax, net) and each step has a reusable total. A smaller order puts the line higher and calculates it before the following ones."
+          }
+        },
+        "ADMIN_ADVANCE_RULES": {
+          "CLOSED": {
+            "Q": "How do I close advances in a country?",
+            "A": "Edit its rule and set it to « Advances closed »: the country no longer offers advances."
+          }
+        },
+        "ADMIN_AUDIT": {
+          "WHAT": {
+            "Q": "What does the log contain?",
+            "A": "Saves of employees' payroll configuration (salary, contract, benefits, reason) and advance status changes. Changes to rules and rates are not in it."
+          }
+        },
+        "ADMIN_HELP_FAQ": {
+          "ADD": {
+            "Q": "How do I add a question to the assistant?",
+            "A": "Administration › Assistant & FAQ › « New question »: choose the page, type the question and answer in French (English is optional), then save it left « Published ». It shows at once in the assistant and in « Help & guides »."
+          },
+          "HIDE": {
+            "Q": "Hiding a question without deleting it",
+            "A": "Unpublish it with its row action: it stays in the list, but the assistant no longer shows it. Publish it again whenever you want."
+          },
+          "TRANSLATION": {
+            "Q": "What if I don't translate into English?",
+            "A": "The question shows in French to users in English. A translation needs the question AND the answer, otherwise saving is refused."
           }
         }
       },
@@ -2294,11 +2777,308 @@
       "SETTINGS_TITLE": "Payroll administration",
       "SETTINGS_TEXT": "Parameter sets, countries, pay items, benefits, advance rules and the log. Reserved for the profiles that configure payroll.",
       "CURRENCY_TITLE": "The display currency",
-      "CURRENCY_TEXT": "The bubble at the bottom right picks the currency amounts are shown in. They are converted at today's rate, as an indication: computed and saved amounts do not change.",
+      "CURRENCY_TEXT": "« Currency », at the bottom of the sidebar (the bubble at the bottom right on mobile), picks the currency amounts are shown in. They are converted at today's rate, as an indication: computed and saved amounts do not change.",
       "CHAT_TITLE": "The help assistant",
       "CHAT_TEXT": "Ask a question about the app here, for example « how do I simulate a salary? »: the assistant answers with the FAQ and documentation, and can start the guide of the page concerned.",
       "HELP_TITLE": "Find this guide again",
       "HELP_TEXT": "« Help & guides », at the bottom of the sidebar, restarts this guide at any time and opens the FAQ and documentation. You can also turn on read-aloud with the speaker at the top of each step."
+    },
+    "SIMULATOR": {
+      "WELCOME_TITLE": "The manual simulator",
+      "WELCOME_TEXT": "This page lists a country's individual salary simulations — those made for candidates as well as for employees. A simulation estimates a salary; it does not run payroll.",
+      "NEW_TITLE": "New simulation",
+      "NEW_TEXT": "Opens the three-step form: who, what salary, which benefits. The button only shows with the right to run simulations.",
+      "KPIS_TITLE": "The indicators",
+      "KPIS_TEXT": "Computed on every simulation matching the search and filters, not just the page shown: average cost ratio (what the company spends for 1 of net), range of the monthly employer cost, number of simulations this month and approximate results to check. Hover a tile for its explanation.",
+      "TOOLBAR_TITLE": "Search and filter",
+      "TOOLBAR_TEXT": "Search covers the candidate, the employee or the position. « Filters » picks the country — the list shows one country at a time —, the contract type, the subject (candidate or employee), the calculation type (net to gross or gross to net) and reliability. On the right, switch between table and card views.",
+      "RESULTS_TITLE": "The simulations",
+      "RESULTS_TEXT": "A click on a row (or a card) opens the result. The row actions duplicate the simulation into a new one — the form is then prefilled — or export it to Excel. Click a column header to sort.",
+      "PAGINATION_TITLE": "Pagination",
+      "PAGINATION_TEXT": "Pick the number of rows per page and move between pages; the indicators stay computed on the whole set."
+    },
+    "SIMULATOR_NEW": {
+      "PAGE": "New simulation",
+      "WELCOME_TITLE": "Simulate a salary",
+      "WELCOME_TEXT": "Three steps, in any order: who, what salary, which benefits. « Simulate » computes the result and opens its page. Nothing is paid: it is an estimate.",
+      "HEADER_TITLE": "Summary of the entry",
+      "HEADER_TEXT": "The title badges sum up what you entered — country, subject, contract, amount and calculation direction — and update as you go.",
+      "STEP1_TITLE": "1 · Who?",
+      "STEP1_TEXT": "Pick the country: the simulation uses its approved payroll rules for the year (the badge on the right shows the year and currency). Then the subject: a candidate (name, position, grade, discipline to enter) or an employee already in the HR module, whose contract, grade and discipline come from their record.",
+      "STEP2_TITLE": "2 · Salary",
+      "STEP2_TEXT": "The calculation type: from the desired net to the gross, or from the gross to the net. Enter the amount, monthly or yearly (yearly is divided by 12), its currency if not the country's, the contract type, the working days, and the family situation that affects income tax (married, dependent children).",
+      "STEP3_TITLE": "3 · Benefits",
+      "STEP3_TEXT": "Tick the country's benefits in kind to include in the calculation; each shows whether it is taxable or exempt. « Check all » takes them all. With no benefit for the country, you can simulate straight away.",
+      "RAIL_TITLE": "Moving between steps",
+      "RAIL_TEXT": "The bottom bar shows your progress: click a step to go there, in any order, or use « Previous ». « Cancel » goes back to the list.",
+      "SIMULATE_TITLE": "Simulate",
+      "SIMULATE_TEXT": "On the last step, « Next » becomes « Simulate ». If something is missing, the message just above the bar says what. The result opens in its page; « Edit simulation » brings this form back, values intact."
+    },
+    "SIMULATION_DETAIL": {
+      "PAGE": "Simulation result",
+      "WELCOME_TITLE": "The simulation result",
+      "WELCOME_TEXT": "A simulation's page: on the left what was entered and the actions, on the right the figures and their breakdown. The breadcrumb at the top goes back to the list.",
+      "DETAILS_TITLE": "Details",
+      "DETAILS_TEXT": "The simulated profile, the context (country, currency, payroll rules used) and the calculation inputs: amount entered, taxable net, benefits included and reliability of the result — « Exact » or « Approximate · to check ».",
+      "ACTIONS_TITLE": "Quick actions",
+      "ACTIONS_TEXT": "« Edit simulation » reopens the prefilled form to correct and rerun. Export the result to Excel or PDF, or print it.",
+      "KPIS_TITLE": "The indicators",
+      "KPIS_TEXT": "What the employee receives, their gross, what the company pays and the cost ratio (total cost for 1 of net). Hover a tile for its explanation. A banner above flags an approximate result.",
+      "TABS_TITLE": "The tabs",
+      "TABS_TEXT": "Only the tabs with content for this simulation appear: overview, payslip lines, social contributions and income tax scale.",
+      "OVERVIEW_TITLE": "Overview",
+      "OVERVIEW_TEXT": "« Who gets what? » splits the monthly loaded cost by recipient: what the employee receives, what is withheld from their salary (income tax, employee contributions) and what the employer pays on top (employer contributions). The ring shows the split.",
+      "RUBRIQUES_TITLE": "Payslip lines",
+      "RUBRIQUES_TEXT": "The pay items applied by the calculation, as on a payslip, with their amount.",
+      "CHARGES_TITLE": "Social contributions",
+      "CHARGES_TEXT": "The contribution rates in force used for this calculation, for the simulated contract: employee and employer shares.",
+      "IRPP_TITLE": "Income tax scale (IRPP)",
+      "IRPP_TEXT": "The income tax brackets used for this calculation."
+    },
+    "CANDIDATE_SIMULATION": {
+      "WELCOME_TITLE": "Candidate simulations",
+      "WELCOME_TEXT": "The salary proposals made to candidates by recruitment (HR module), and the DAF's decision on each. This page tracks them; it does not create any.",
+      "KPIS_TITLE": "The indicators",
+      "KPIS_TEXT": "For the selected country: candidates awaiting a decision (and how long the oldest has waited), the share approved by the DAF, the average gap between the net asked by candidates and the net offered, and the number of candidates. Zero until a country is picked.",
+      "TOOLBAR_TITLE": "Search and filter",
+      "TOOLBAR_TEXT": "Search a candidate by name. « Filter » picks the country — required to show candidates — and the status (pending, approved, rejected). On the right, card or table view.",
+      "RESULTS_TITLE": "The candidates",
+      "RESULTS_TEXT": "One row per candidate: position, location, number of proposals, latest proposal and status. A click opens their page and the negotiation thread."
+    },
+    "CANDIDATE_DETAIL": {
+      "PAGE": "Candidate page",
+      "WELCOME_TITLE": "The candidate's page",
+      "WELCOME_TEXT": "The whole salary negotiation with this candidate: each HR proposal, what the candidate asked and the DAF's answer. The breadcrumb goes back to the list.",
+      "IDENTITY_TITLE": "The candidate",
+      "IDENTITY_TEXT": "The candidate's information sent by recruitment: position, location, latest submission and latest decision.",
+      "ACTIONS_TITLE": "Quick actions",
+      "ACTIONS_TEXT": "« New simulation from the latest » opens the simulator prefilled with the latest proposal. « View candidate record (HR) » opens the candidate in recruitment. Each action only shows with the matching right.",
+      "KPIS_TITLE": "The indicators",
+      "KPIS_TEXT": "For the latest proposal: the net offered by HR, the net asked and the gap with the offer, the employer cost, and the estimated yearly extra cost if the candidate's request were accepted.",
+      "TIMELINE_TITLE": "The negotiation thread",
+      "TIMELINE_TEXT": "One step per proposal, oldest at the top: what HR offered, what the candidate asked, then the DAF's answer (pending, approved, rejected or counter-proposal) with its note.",
+      "DETAIL_TITLE": "Detail of a proposal",
+      "DETAIL_TEXT": "A click on a step opens its detail: the DAF's decision, three key figures and the calculation breakdown, folded, like a payslip. The arrows move to the previous or next proposal without closing the window."
+    },
+    "SALARY_ADVANCES": {
+      "WELCOME_TITLE": "Salary advances",
+      "WELCOME_TEXT": "Payroll's advances desk: the employee requests an advance, finance approves it, payroll pays it here and then recovers it through deductions on the following months' payslips.",
+      "RULES_TITLE": "Advance rules",
+      "RULES_TEXT": "The per-country rules (advances open or closed, maximum repayment period, minimum seniority) are edited in payroll administration; this button leads there. It only shows with the right to open administration.",
+      "KPIS_TITLE": "The indicators",
+      "KPIS_TEXT": "Approved advances to pay, those being repaid, the month’s deductions still to process and the total outstanding amount, per currency.",
+      "TABS_TITLE": "The three tabs",
+      "TABS_TEXT": "« To pay out », « Deductions » and « Follow-up » follow the order of the work: pay what finance approved, deduct each month, then track every advance. The number on a tab says how many rows wait there.",
+      "PAYOUT_TITLE": "To pay",
+      "PAYOUT_TEXT": "Advances approved by finance and not paid yet. Search an employee and filter (country, currency, first deduction, approval date…). « Details » shows the request, finance's decision and the schedule.",
+      "PAY_TITLE": "Paying an advance",
+      "PAY_TEXT": "« Pay out » records the payment: method (transfer, cash, card, other), date, reference and comment. Paying creates the schedule: deductions start in the planned month, or the current month if it has passed.",
+      "MONTH_TITLE": "The payroll month",
+      "MONTH_TEXT": "Pick the month with the arrows (« Current month » goes back to it). The summary gives the number of deductions, what remains to deduct and what is already deducted. « Export for payroll (CSV) » produces the list for the payroll software; « Mark all deducted » confirms the month’s deductions at once.",
+      "DEDUCTIONS_TITLE": "Processing deductions",
+      "DEDUCTIONS_TEXT": "One row per instalment of the month. Once the deduction is on the payslip, mark it « Deducted ». « Postpone » reschedules it one month after the last (the amount due does not change); « Settle otherwise » closes it when the sum was recovered outside payroll or written off. Both actions need a reason.",
+      "FOLLOWUP_TITLE": "Follow-up",
+      "FOLLOWUP_TEXT": "Every advance, whatever its status: awaiting finance, to pay, being repaid, repaid, rejected or withdrawn. Filter by status or date, and open an advance’s detail for its schedule."
+    },
+    "ENGINE_RESULTS": {
+      "WELCOME_TITLE": "Salary cost",
+      "WELCOME_TEXT": "This is where the real payroll is calculated and reviewed: one employee per card or row, taken from the HR records. Open one to see their payslips month by month and run their calculation.",
+      "BATCH_TITLE": "Run country payroll",
+      "BATCH_TEXT": "Calculates in one go the payroll of every employee in post in a country for one month: pick the country, month, year and days worked. Before you run it, the window says how many will be calculated, how many already are and how many have a contract with no payroll rules. « Stop » interrupts the batch.",
+      "KPIS_TITLE": "The indicators",
+      "KPIS_TEXT": "Gross and net payroll, deductions (contributions and tax), employer cost and the number of employees calculated against the headcount. The line above says which months they cover and in which currency; hover a tile for its definition.",
+      "TOOLBAR_TITLE": "Search and filters",
+      "TOOLBAR_TEXT": "Search by name or ID. « Filter » narrows by period, employees, country, status, department or contract type; the period and the country also change the indicators. The icons on the right switch between cards and table.",
+      "RESULTS_TITLE": "The employees",
+      "RESULTS_TEXT": "Each card or row shows the ID, country, department and contract. Click it to open the employee's payroll record; in the table, the headers sort the list.",
+      "PAGINATION_TITLE": "Pagination",
+      "PAGINATION_TEXT": "Change page or the number of employees shown per page. The search, filters and page are kept when you come back from a record."
+    },
+    "ENGINE_RESULTS_DETAIL": {
+      "PAGE": "An employee's record",
+      "WELCOME_TITLE": "An employee's payroll record",
+      "WELCOME_TEXT": "Every calculated payslip of this employee, month by month. The breadcrumb leads back to the « Salary cost » list, with its search and filters.",
+      "CARD_TITLE": "The Details card",
+      "CARD_TEXT": "What payroll knows about the employee, taken from their HR record: ID, status, contract (type, hire date, seniority, end), position (department, grade) and payroll (country, marital status, dependent children, CNSS). An empty line is not shown.",
+      "ACTIONS_TITLE": "The actions",
+      "ACTIONS_TEXT": "« Run payroll » opens the calculation of one month for this employee (with the right to run the engine). « Export Excel » and « Export PDF » export the open payslip, otherwise the history as the list shows it (search, filters and sort included).",
+      "KPIS_TITLE": "The year to date",
+      "KPIS_TEXT": "Gross, deductions and net for one year (the filter's, otherwise the most recent), and the number of months calculated out of 12. A rerun month counts once: its latest calculation.",
+      "TOOLBAR_TITLE": "Find a month",
+      "TOOLBAR_TEXT": "Type a month (« October 2026 ») or filter by year and month. Earlier calculations of a rerun month are hidden: « Show earlier calculations », in Filter, shows them.",
+      "PERIODS_TITLE": "The payslips",
+      "PERIODS_TEXT": "One payslip per calculated month: gross, net pay, tax, employer cost, calculation date. Click it to open it in the page; the browser's Back button or the breadcrumb closes it.",
+      "PAYSLIP_TITLE": "The open payslip",
+      "PAYSLIP_TEXT": "Gross, contributions (CNSS), tax (IRPP) and net pay, then earnings and deductions line by line, the cost to the company and « Where does the gross go? ». The search field filters the lines by code or label. If the month was rerun since, a banner says so and opens the latest calculation."
+    },
+    "PAYSLIPS": {
+      "WELCOME_TITLE": "Payslips",
+      "WELCOME_TEXT": "Each month the payroll software produces a PDF with every payslip. You drop it here: each page is recognised by the employee's payroll ID and filed in their HR SharePoint folder. This page lists the batches already distributed.",
+      "NEW_TITLE": "Distribute payslips",
+      "NEW_TEXT": "Opens the import: pick the country and month, drop the month's PDF, then confirm.",
+      "KPIS_TITLE": "The indicators",
+      "KPIS_TEXT": "The latest month distributed, payslips filed out of all pages, pages to fix and the number of batches processed. A redistributed month counts once: its latest batch.",
+      "NOTE_TITLE": "A history kept by this browser",
+      "NOTE_TEXT": "The list is kept in this browser (the last 20 batches). A batch distributed from another computer or by a colleague is not in it, and clearing the browser data erases it. The payslips themselves stay in SharePoint.",
+      "TOOLBAR_TITLE": "Search and filters",
+      "TOOLBAR_TEXT": "Search a file, a country or a month. « Filter » narrows by country, month, date or status: « To check » keeps only batches with pages to fix. The icons on the right switch between cards and table.",
+      "RESULTS_TITLE": "The batches",
+      "RESULTS_TEXT": "One batch per processed file: country, month, file, date and status (« Complete » or « To check »). Click it to open its page-by-page report."
+    },
+    "PAYSLIP_NEW": {
+      "PAGE": "New distribution",
+      "WELCOME_TITLE": "Distributing the month's payslips",
+      "WELCOME_TEXT": "Two things to give — the country and month, then the PDF — and a confirmation. Processing splits the file, one page per payslip, and files each payslip in the employee's HR SharePoint folder.",
+      "PERIOD_TITLE": "1. Country and payroll month",
+      "PERIOD_TEXT": "The country tells among which employees to look up the IDs and in which SharePoint tree to file. If this month was already distributed for this country from this browser, a banner says so: the same employees’ payslips will be replaced.",
+      "FILE_TITLE": "2. The payroll file",
+      "FILE_TEXT": "A PDF of 50 MB at most, one payslip per page, as the payroll software outputs it. The number of pages detected is shown; « Replace file » or « Remove » to change file.",
+      "SUBMIT_TITLE": "Distribute",
+      "SUBMIT_TEXT": "« Distribute payslips » asks for confirmation, then starts processing: a few minutes, without closing the page. The batch report opens at the end. « Cancel » goes back to the list without filing anything."
+    },
+    "PAYSLIP_REPORT": {
+      "PAGE": "Batch report",
+      "WELCOME_TITLE": "A batch report",
+      "WELCOME_TEXT": "What became of each page of the file: filed in the employee's folder or not, and why. A batch missing from this browser's history cannot be shown.",
+      "DETAILS_TITLE": "The Details card",
+      "DETAILS_TEXT": "The country, payroll month, file, processing date, distribution rate and the batch’s rank in the month (first send, or a later send replacing the previous one).",
+      "ACTIONS_TITLE": "Quick actions",
+      "ACTIONS_TEXT": "« Distribute payslips » starts a new import; « Export (Excel) » downloads the detail by page; « Print » prints the report.",
+      "KPIS_TITLE": "The indicators",
+      "KPIS_TEXT": "Pages in the PDF, payslips distributed, problems in the file (ID not read, unknown or duplicated) and payslips not filed to SharePoint (employee recognised, filing impossible). Hover a tile for the detail.",
+      "TABLE_TITLE": "Detail by page",
+      "TABLE_TEXT": "One row per page: ID read, employee, status, SharePoint payslip and « What to do? ». Filter to keep only the pages to fix, fix the cause, then distribute the month again."
+    },
+    "EMPLOYEE_CONFIG": {
+      "WELCOME_TITLE": "Employee salaries",
+      "WELCOME_TEXT": "Each employee's payroll configuration: country, contract, gross salary, family situation, benefits and bonuses. The month's payroll calculation starts from what is saved here.",
+      "KPIS_TITLE": "Indicators",
+      "KPIS_TEXT": "Filtered headcount, salaries already configured, employees left to configure and countries covered. The tiles follow the filters, not the search. Hover a tile for details.",
+      "TOOLBAR_TITLE": "Search and filters",
+      "TOOLBAR_TEXT": "Search by name or ID. « Filter » narrows by country, status, department or contract type. On the right, reset the sort or choose the table columns.",
+      "RESULTS_TITLE": "The employees",
+      "RESULTS_TEXT": "One card (or one row in table view) per employee, from their HR record: ID, department, contract, country, status and configuration state. Click to open their configuration; in table view, the headers sort the list.",
+      "PAGINATION_TITLE": "Pagination",
+      "PAGINATION_TEXT": "The total number of employees and the page change. The search, filters and page are kept when you come back from a record."
+    },
+    "EMPLOYEE_CONFIG_DETAIL": {
+      "PAGE": "An employee's configuration",
+      "WELCOME_TITLE": "An employee's payroll configuration",
+      "WELCOME_TEXT": "« View payslips » opens their salary cost; « Calculate payroll » opens the calculation of a month there directly (depending on your rights). Under the name: date and author of the last change.",
+      "KPIS_TITLE": "Indicators",
+      "KPIS_TEXT": "The saved configuration at a glance: gross, estimated net, benefits and bonuses. They only change after « Save ». On the left, the « Details » card shows the HR record; a difference with payroll is flagged under the field concerned.",
+      "TABS_TITLE": "The three tabs",
+      "TABS_TEXT": "« Payroll configuration » is edited then saved with a reason. « Exceptional bonuses » saves on each addition. « History » lists the saved versions. The number on a tab gives its row count.",
+      "SUMMARY_TITLE": "The saved configuration",
+      "SUMMARY_TEXT": "Country, contract, gross and net salary, family situation and benefits, read-only. A difference with the HR record is flagged under the section concerned.",
+      "EDIT_TITLE": "Edit",
+      "EDIT_TEXT": "Opens the form in a pop-up. The net is recomputed from the gross; give the reason for the change then « Save ». Closed without saving, the input is kept: the banner lets you resume or discard it.",
+      "ASSIGNMENT_TITLE": "Assignment",
+      "ASSIGNMENT_TEXT": "The country selects the payroll rules applied; the contract must have payroll rules in that country, otherwise it cannot be saved. For a first configuration, the contract is taken from the HR record.",
+      "SALARY_TITLE": "Salary",
+      "SALARY_TEXT": "Enter the gross; the net is calculated automatically with the country's payroll rules in force and the benefits ticked. By default the gross is entered in the country's working currency; « Entered currency » lets you use another one, and the original amount stays shown.",
+      "FAMILY_TITLE": "Family situation",
+      "FAMILY_TEXT": "Married and number of dependent children feed the family tax deductions set in the country's payroll rules. Without such a deduction configured, they have no effect.",
+      "BENEFITS_TITLE": "Benefits in kind",
+      "BENEFITS_TEXT": "The benefits set in the country's payroll rules in force, with their monthly amount. Tick those the employee receives; the counter in the title gives how many.",
+      "SAVE_TITLE": "Reason and saving",
+      "SAVE_TEXT": "A reason is required (e.g. « annual raise »): it is kept in the history. « Save » creates a new version; « Discard changes » goes back to the last one. Leaving the page with changes asks for confirmation.",
+      "BONUSES_TITLE": "Exceptional bonuses",
+      "BONUSES_TEXT": "The employee's one-off bonuses: label, amount, currency, month and year. « Add a bonus » saves it at once; deleting asks for confirmation.",
+      "HISTORY_TITLE": "History",
+      "HISTORY_TEXT": "Every save of the configuration, newest first: date, author, gross, net, contract, benefits and reason."
+    },
+    "ADMIN": {
+      "WELCOME_TITLE": "Payroll administration",
+      "WELCOME_TEXT": "All payroll settings, one card per section. Under the title, the country whose configuration you see.",
+      "PAYS_TITLE": "Change country",
+      "PAYS_TEXT": "Administrators managing several countries pick here the one to configure; the sections opened next start from that country.",
+      "CARDS_TITLE": "The sections",
+      "CARDS_TEXT": "Hover a card to see what it holds, click to open it. The « Administration » breadcrumb brings you back here. You only see the cards your rights allow; « Employee salaries » opens its own page.",
+      "TWO_SYSTEMS_TITLE": "Two sets of rules",
+      "TWO_SYSTEMS_TEXT": "« Payroll rules » feed the simulator, candidate simulations and the net shown in « Employee salaries ». « Rates and scales » and « Payslip items » feed the real payroll calculation (Salary cost). A rate change must therefore be made in both places."
+    },
+    "ADMIN_RULES": {
+      "WELCOME_TITLE": "Payroll rules",
+      "WELCOME_TEXT": "A country's rule sets for one year: income tax scale, social contributions, payroll items and benefits in kind. The number in the title gives how many sets are shown.",
+      "TOOLBAR_TITLE": "Search, filters and creation",
+      "TOOLBAR_TEXT": "« Filter » picks the country and narrows by status, year, approval or date. Search a year or a version. « New rules » (depending on your rights) creates a draft.",
+      "TABLE_TITLE": "The rule sets",
+      "TABLE_TEXT": "Version, status, number of contributions, items and benefits, approvals and creation date. « Manage » opens a set.",
+      "SET_HEADER_TITLE": "The rule set",
+      "SET_HEADER_TEXT": "Its status and approvals (Country Director, CFO). A draft is edited (« Brackets & deductions ») then submitted; a submitted set is approved by the Country Director and the CFO, in any order. With both, it comes into force and replaces the previous one.",
+      "SET_TABS_TITLE": "The set's tabs",
+      "SET_TABS_TEXT": "Social charges, Payroll items and, if any, Benefits in kind. « Edit » only shows on a draft; otherwise the set is read-only.",
+      "SET_TABLE_TITLE": "The tab's content",
+      "SET_TABLE_TEXT": "The tab's rows, with their search; on the right, reset the sort or choose the columns."
+    },
+    "ADMIN_CREATE": {
+      "WELCOME_TITLE": "New payroll rules",
+      "WELCOME_TEXT": "Creates a draft of rules for a country and a year. It applies to nothing until it has been submitted, then approved by the Country Director and the CFO.",
+      "FORM_TITLE": "The form",
+      "FORM_TEXT": "Country and year, then « Start from the rules in force » (ticked by default): the tax scale, contributions, benefits and payslip items are copied, you only change what differs. Unticking starts from scratch.",
+      "ADVANCED_TITLE": "Advanced settings",
+      "ADVANCED_TEXT": "Collapsed by default: calculation tolerance and iterations, calibration threshold, flat-rate allowance and family tax deductions. They open by themselves if one is in error.",
+      "ACTIONS_TITLE": "Saving the draft",
+      "ACTIONS_TEXT": "The box recalls the approval circuit. « Save » creates the draft and opens it; « Cancel » goes back to the list."
+    },
+    "ADMIN_COUNTRIES": {
+      "WELCOME_TITLE": "Countries and currencies",
+      "WELCOME_TEXT": "The countries handled by the payroll calculation, with their currency, fiscal year start and exchange sources. A missing or inactive country has neither payslip items nor payroll calculation. « Add a country » depending on your rights.",
+      "TOOLBAR_TITLE": "Search and filters",
+      "TOOLBAR_TEXT": "Search a country; « Filter » can keep only countries without an exchange source.",
+      "TABLE_TITLE": "The countries",
+      "TABLE_TEXT": "Country, currency, fiscal year start, exchange sources, state (active or inactive) and creation date. The row's action opens the edit."
+    },
+    "ADMIN_ENGINE_PARAMS": {
+      "WELCOME_TITLE": "Rates and scales",
+      "WELCOME_TEXT": "The rates, amounts and scales of the real payroll calculation, used by the payslip items. Only a country's active version is used. « New version » creates a draft.",
+      "PAYS_TITLE": "The country",
+      "PAYS_TEXT": "The country whose versions you see, chosen at the top right of the page.",
+      "VERSIONS_TITLE": "The versions",
+      "VERSIONS_TEXT": "The country's versions, oldest to newest, with their status. Click a version to open it.",
+      "CIRCUIT_TITLE": "The approval circuit",
+      "CIRCUIT_TEXT": "Draft → submitted → approved HR → approved Finance → active. The next step shows with its button if you have the right, otherwise who must do it. Activating a version archives the old one.",
+      "PARAMS_TITLE": "The parameters",
+      "PARAMS_TEXT": "The open version's values (rates, amounts, scales), with their search. Only a draft can be edited: effective date, « Add a parameter », editing a row."
+    },
+    "ADMIN_RUBRIQUES": {
+      "WELCOME_TITLE": "Payslip items",
+      "WELCOME_TEXT": "The lines calculated on the payslip of the real payroll calculation (base salary, contributions, tax…), in payslip order. Their values come from « Rates and scales ».",
+      "PAYS_TITLE": "The country",
+      "PAYS_TEXT": "The country whose items you see, chosen at the top right of the page.",
+      "TOOLBAR_TITLE": "Search and filters",
+      "TOOLBAR_TEXT": "Search a line by code or label; « Filter » narrows the list.",
+      "TABLE_TITLE": "The payslip lines",
+      "TABLE_TEXT": "Each line with its step (base salary, bonuses, contributions, tax, net), its order and its calculation mode. Open one to view or edit it: a change applies to the next calculations, not to those already saved."
+    },
+    "ADMIN_ADVANCE_RULES": {
+      "WELCOME_TITLE": "Salary advances",
+      "WELCOME_TEXT": "The conditions for salary advances, per country. A country without an open rule offers no advance. There is no amount cap: finance decides.",
+      "TOOLBAR_TITLE": "Search",
+      "TOOLBAR_TEXT": "Search a country in the list of rules.",
+      "TABLE_TITLE": "The rules",
+      "TABLE_TEXT": "For each country: currency, maximum repayment period (1 to 24 months), minimum seniority and state (advances open or closed). « Add a country » creates a rule, « Edit » changes it."
+    },
+    "ADMIN_AUDIT": {
+      "WELCOME_TITLE": "History and control",
+      "WELCOME_TEXT": "Changes to employees' payroll configuration and advance status changes, newest first. Pick the country, search and filter on the right.",
+      "TABLE_TITLE": "The log",
+      "TABLE_TEXT": "One row per change: date, domain, type, subject, action, detail and author. Click to see the before / after detail; changes made together open grouped."
+    },
+    "ADMIN_HELP_FAQ": {
+      "WELCOME_TITLE": "Assistant & FAQ",
+      "WELCOME_TEXT": "The questions you add yourself, on top of the FAQ shipped with the app. The help assistant (the bubble at the bottom right) and « Help & guides » offer them on the chosen page. « New question » adds one.",
+      "TOOLBAR_TITLE": "Search and filters",
+      "TOOLBAR_TEXT": "Search the questions and answers; « Filters » keeps a single page.",
+      "TABLE_TITLE": "The questions",
+      "TABLE_TEXT": "Page, question in French and English, languages filled in, order and status. The row actions edit, publish or unpublish (the question stays but is no longer shown) and delete."
+    },
+    "GROUPS": {
+      "GENERAL": "General",
+      "RULES": "Payroll rules (simulation)",
+      "ENGINE": "Real payroll calculation",
+      "CONTROL": "Advances, control and help"
     }
   }
 }

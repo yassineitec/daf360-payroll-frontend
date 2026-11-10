@@ -50,8 +50,8 @@ import { NotificationService } from '../../core/notification.service';
 import { UserStore } from '../../core/user.store';
 import {
   PAYROLL_AUDIT_PERMISSIONS, PAYROLL_BENEFITS_PERMISSIONS, PAYROLL_COUNTRIES_PERMISSIONS,
-  PAYROLL_CREATE_PARAMSET_PERMISSIONS, PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS, PAYROLL_ENGINE_PARAMS_PERMISSIONS,
-  PAYROLL_ENGINE_RUBRIQUES_PERMISSIONS,
+  PAYROLL_CREATE_PARAMSET_PERMISSIONS, PAYROLL_ENGINE_PARAMS_PERMISSIONS,
+  PAYROLL_ENGINE_RUBRIQUES_PERMISSIONS, PAYROLL_HELP_FAQ_PERMISSIONS,
   PAYROLL_SALARY_ADVANCES_PERMISSIONS,
 } from '../../core/payroll-nav';
 import { AdminSectionHeaderComponent } from './admin/admin-section-header.component';
@@ -66,8 +66,11 @@ import { EngineParamsAdminComponent } from './admin/engine-params-admin.componen
 import { EngineRubriquesAdminComponent } from './admin/engine-rubriques-admin.component';
 import { PayrollAuditAdminComponent } from './admin/payroll-audit-admin.component';
 import { PayrollCountriesAdminComponent } from './admin/payroll-countries-admin.component';
+import { HelpFaqAdminComponent } from './admin/help-faq-admin.component';
 import { dayRange, distinctSorted, inDayRange, pickValue, rangeSeed } from '../../shared/filter-utils';
 import { PaysNamesService } from '../../core/pays-names.service';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import type { GuideStep } from '../../shared/guide/page-guide.types';
 
 import { flagDataUri } from '../../shared/country-flags';
 /** Pastille de statut d'un jeu dans le tableau. */
@@ -82,7 +85,7 @@ interface IrppRow { upper: number | null; ratePct: number | null; }
 /** Étapes du circuit de validation : soumission, approbation Directeur Pays, approbation DAF. */
 type WorkflowStep = 'submit' | 'hr' | 'finance';
 
-type ParamSetsSection = 'create' | 'list' | 'countries' | 'engine-params' | 'rubriques' | 'benefits' | 'advance-rules' | 'audit';
+type ParamSetsSection = 'create' | 'list' | 'countries' | 'engine-params' | 'rubriques' | 'benefits' | 'advance-rules' | 'audit' | 'help-faq';
 
 /** Même langage ton → couleur d'icône que les cartes de /rh/admin. */
 const TONE_ICON = {
@@ -123,8 +126,12 @@ const CARDS: AdminCard[] = [
   { key: 'rubriques',       labelKey: 'PAYROLL.ADMIN_HOME.CARDS.RUBRIQUES',        icon: 'receipt_long',    tone: 'primary',   permissions: PAYROLL_ENGINE_RUBRIQUES_PERMISSIONS, helpKey: 'RUBRIQUES' },
   // { key: 'benefits',        labelKey: 'PAYROLL.ADMIN_HOME.CARDS.BENEFITS',         icon: 'redeem',          tone: 'teal',      permissions: PAYROLL_BENEFITS_PERMISSIONS, helpKey: 'BENEFITS' },
   { key: 'advance-rules',   labelKey: 'PAYROLL.ADMIN_HOME.CARDS.ADVANCE_RULES',    icon: 'request_quote',   tone: 'warning',   permissions: PAYROLL_SALARY_ADVANCES_PERMISSIONS, helpKey: 'ADVANCE_RULES' },
-  { key: 'employee-config', labelKey: 'PAYROLL.ADMIN_HOME.CARDS.EMPLOYEE_CONFIG',  icon: 'manage_accounts', tone: 'teal',      permissions: PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS, route: '/payroll/employee-config', helpKey: 'EMPLOYEE_CONFIG' },
+  // Rémunération : entrée de la barre latérale depuis le 2026-11-10.
+  // { key: 'employee-config', labelKey: 'PAYROLL.ADMIN_HOME.CARDS.EMPLOYEE_CONFIG',  icon: 'manage_accounts', tone: 'teal',      permissions: PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS, route: '/payroll/employee-config', helpKey: 'EMPLOYEE_CONFIG' },
   { key: 'audit',           labelKey: 'PAYROLL.ADMIN_HOME.CARDS.AUDIT',            icon: 'history',         tone: 'secondary', permissions: PAYROLL_AUDIT_PERMISSIONS, helpKey: 'AUDIT' },
+  // Questions ajoutées à l'assistant d'aide, comme « Assistant & FAQ » de /rh/admin et
+  // /finance/admin — écritures réservées au super-administrateur paie (`PayrollHelpFaqController`).
+  { key: 'help-faq',        labelKey: 'PAYROLL.ADMIN_HOME.CARDS.HELP_FAQ',         icon: 'smart_toy',       tone: 'teal',      permissions: PAYROLL_HELP_FAQ_PERMISSIONS, helpKey: 'HELP_FAQ' },
 ];
 
 /**
@@ -162,6 +169,74 @@ function sectionParam(ids: () => readonly ParamSetsSection[]) {
   return state;
 }
 
+// ── Guides (« Aide & guides ») : un par section, sous la clé `admin-<section>` ; l'accueil
+//    des cartes a la clé `admin`. Les éléments des sections autonomes (dossier admin/) sont
+//    visés par sélecteur, pour ne pas toucher à leurs gabarits.
+const g = (page: string, key: string, icon: string, at?: string): GuideStep => ({
+  icon, titleKey: `GUIDE.${page}.${key}_TITLE`, textKey: `GUIDE.${page}.${key}_TEXT`,
+  ...(at?.startsWith('[') || at?.includes(' ') || at?.startsWith('.') ? { selector: at } : { target: at }),
+});
+const sel = (host: string, inner: string) => `${host} ${inner}`;
+const HOME_GUIDE: GuideStep[] = [
+  g('ADMIN', 'WELCOME', 'admin_panel_settings', 'adm-home-header'),
+  g('ADMIN', 'PAYS',    'public',               'adm-home-pays'),
+  g('ADMIN', 'CARDS',   'apps',                 'adm-home-cards'),
+  g('ADMIN', 'TWO_SYSTEMS', 'compare_arrows'),
+];
+const RULES_GUIDE: GuideStep[] = [
+  g('ADMIN_RULES', 'WELCOME', 'gavel',       'adm-rules-header'),
+  g('ADMIN_RULES', 'TOOLBAR', 'filter_list', 'adm-rules-toolbar'),
+  g('ADMIN_RULES', 'TABLE',   'table_rows',  'adm-rules-table'),
+];
+const SET_GUIDE: GuideStep[] = [
+  g('ADMIN_RULES', 'SET_HEADER', 'verified', 'adm-set-header'),
+  g('ADMIN_RULES', 'SET_TABS',   'tab',      'adm-set-tabs'),
+  g('ADMIN_RULES', 'SET_TABLE',  'table_rows', 'adm-set-table'),
+];
+const CREATE_GUIDE: GuideStep[] = [
+  g('ADMIN_CREATE', 'WELCOME',  'add_circle', 'adm-create-header'),
+  g('ADMIN_CREATE', 'FORM',     'edit_note',  'adm-create-form'),
+  g('ADMIN_CREATE', 'ADVANCED', 'tune',       'adm-create-advanced'),
+  g('ADMIN_CREATE', 'ACTIONS',  'save',       'adm-create-actions'),
+];
+const CO = 'app-payroll-countries-admin', EP = 'app-engine-params-admin', RU = 'app-engine-rubriques-admin',
+      AR = 'app-advance-rules-admin', AU = 'app-payroll-audit-admin';
+const SECTION_GUIDES: Partial<Record<ParamSetsSection, GuideStep[]>> = {
+  'countries': [
+    g('ADMIN_COUNTRIES', 'WELCOME', 'public',      sel(CO, 'app-admin-section-header')),
+    g('ADMIN_COUNTRIES', 'TOOLBAR', 'filter_list', sel(CO, 'daf-search-toolbar')),
+    g('ADMIN_COUNTRIES', 'TABLE',   'table_rows',  sel(CO, '.admin-table-scroll')),
+  ],
+  'engine-params': [
+    g('ADMIN_ENGINE_PARAMS', 'WELCOME',  'tune',        sel(EP, 'app-admin-section-header')),
+    g('ADMIN_ENGINE_PARAMS', 'PAYS',     'public',      'adm-header-pays'),
+    g('ADMIN_ENGINE_PARAMS', 'VERSIONS', 'layers',      sel(EP, '.versions')),
+    g('ADMIN_ENGINE_PARAMS', 'CIRCUIT',  'verified',    sel(EP, '.circuit')),
+    g('ADMIN_ENGINE_PARAMS', 'PARAMS',   'table_rows',  sel(EP, '.admin-table-scroll')),
+  ],
+  'rubriques': [
+    g('ADMIN_RUBRIQUES', 'WELCOME', 'receipt_long', sel(RU, 'app-admin-section-header')),
+    g('ADMIN_RUBRIQUES', 'PAYS',    'public',       'adm-header-pays'),
+    g('ADMIN_RUBRIQUES', 'TOOLBAR', 'filter_list',  sel(RU, 'daf-search-toolbar')),
+    g('ADMIN_RUBRIQUES', 'TABLE',   'table_rows',   sel(RU, '.admin-table-scroll')),
+  ],
+  'advance-rules': [
+    g('ADMIN_ADVANCE_RULES', 'WELCOME', 'request_quote', sel(AR, 'app-admin-section-header')),
+    g('ADMIN_ADVANCE_RULES', 'TOOLBAR', 'filter_list',   sel(AR, '.admin-toolbar')),
+    g('ADMIN_ADVANCE_RULES', 'TABLE',   'table_rows',    sel(AR, '.admin-table-scroll')),
+  ],
+  'help-faq': [
+    g('ADMIN_HELP_FAQ', 'WELCOME', 'smart_toy',   sel('app-help-faq-admin', 'app-admin-section-header')),
+    g('ADMIN_HELP_FAQ', 'TOOLBAR', 'filter_list', sel('app-help-faq-admin', 'daf-search-toolbar')),
+    g('ADMIN_HELP_FAQ', 'TABLE',   'table_rows',  sel('app-help-faq-admin', '.table-scroll')),
+  ],
+  'audit': [
+    g('ADMIN_AUDIT', 'WELCOME', 'history',    sel(AU, 'app-admin-section-header')),
+    g('ADMIN_AUDIT', 'TABLE',   'table_rows', sel(AU, '.admin-table-scroll')),
+  ],
+};
+
+
 @Component({
   selector: 'app-parameter-sets',
   standalone: true,
@@ -173,7 +248,7 @@ function sectionParam(ids: () => readonly ParamSetsSection[]) {
     SearchToolbarComponent, SectionTitleComponent, SelectComponent, StatusBadgeComponent, TabsComponent,
     AdminModalFooterComponent, AdminSectionHeaderComponent, AdminSpinnerComponent, AdminTableFooterComponent,
     AdvanceRulesAdminComponent, BenefitsCatalogueAdminComponent, EngineParamsAdminComponent, EngineRubriquesAdminComponent,
-    PayrollAuditAdminComponent, PayrollCountriesAdminComponent,
+    PayrollAuditAdminComponent, PayrollCountriesAdminComponent, HelpFaqAdminComponent, PageGuideComponent,
   ],
   templateUrl: './parameter-sets.component.html',
   styleUrl: './parameter-sets.component.scss',
@@ -210,9 +285,11 @@ export class ParameterSetsComponent implements OnInit {
   private readonly rubriquesEditorTpl = viewChild<TemplateRef<unknown>>('rubriquesEditorTpl');
   private readonly fieldsEditorTpl    = viewChild<TemplateRef<unknown>>('fieldsEditorTpl');
   private readonly workflowConfirmTpl = viewChild<TemplateRef<unknown>>('workflowConfirmTpl');
+  private readonly benefitEditorTpl   = viewChild<TemplateRef<unknown>>('benefitEditorTpl');
   private chargesModalRef:   ModalRef | null = null;
   private rubriquesModalRef: ModalRef | null = null;
   private fieldsModalRef:    ModalRef | null = null;
+  private benefitModalRef:   ModalRef | null = null;
 
   // ── Sections, sur le modèle de /rh/admin : sans `?tab=`, un accueil en cartes (une par
   //    section) ; une carte ouvre sa section — paramétrage, suivi des jeux, pays de paie,
@@ -327,6 +404,19 @@ export class ParameterSetsComponent implements OnInit {
   // puis une page détail avec fil d'Ariane et onglets internes. Le jeu ouvert vit dans
   // `?set=` (avec `?pays=`, sans lequel la liste ne serait pas chargée au rafraîchissement).
   readonly openSetId = signal<number | null>(null);
+
+  /** Guide de la section ouverte : sa clé (`GUIDE_PAGES.guideKey`) et ses étapes. */
+  readonly guideKey = computed(() => {
+    const tab = this.activeTab();
+    return tab === null ? 'admin' : tab === 'list' ? 'admin-rules' : `admin-${tab}`;
+  });
+  readonly guideSteps = computed<GuideStep[]>(() => {
+    const tab = this.activeTab();
+    if (tab === null) return HOME_GUIDE.filter(s => s.target !== 'adm-home-pays' || this.canSwitchPays());
+    if (tab === 'list') return this.detailSet() ? SET_GUIDE : RULES_GUIDE;
+    if (tab === 'create') return CREATE_GUIDE;
+    return SECTION_GUIDES[tab] ?? [];
+  });
   readonly detailTab = signal<string>('charges');
 
   readonly detailSet = computed(() => {
@@ -349,9 +439,7 @@ export class ParameterSetsComponent implements OnInit {
     return [
       { id: 'charges',   label: this.t('PAYROLL.PARAMETER_SETS.TAB_CHARGES'),   icon: 'payments',     count: ps.socialChargeRates.length },
       { id: 'rubriques', label: this.t('PAYROLL.PARAMETER_SETS.TAB_RUBRIQUES'), icon: 'receipt_long', count: ps.rubriques.length },
-      ...(ps.benefits.length
-        ? [{ id: 'benefits', label: this.t('PAYROLL.PARAMETER_SETS.TAB_BENEFITS'), icon: 'redeem', count: ps.benefits.length }]
-        : []),
+      { id: 'benefits', label: this.t('PAYROLL.PARAMETER_SETS.TAB_BENEFITS'), icon: 'redeem', count: ps.benefits.length },
     ];
   });
 
@@ -651,6 +739,9 @@ export class ParameterSetsComponent implements OnInit {
   readonly savingCharges    = signal(false);
   /** Erreur d'enregistrement des charges, en bandeau dans la pop-up (comme RH). */
   readonly chargesError     = signal<string | null>(null);
+  /** CRUD ligne à ligne : index de la seule charge affichée dans la pop-up (ajout ou
+   *  modification d'une ligne) ; null = éditeur complet (« Tout modifier »). */
+  readonly chargesFocus     = signal<number | null>(null);
 
   readonly contractTypes   = signal<HrContractType[]>([]);
   readonly baseCalcOptions = computed(() => [
@@ -688,6 +779,9 @@ export class ParameterSetsComponent implements OnInit {
   /** Erreur d'enregistrement des rubriques, en bandeau dans la pop-up (comme RH). */
   readonly rubriquesError     = signal<string | null>(null);
   readonly expandedRubriques  = signal<Set<number>>(new Set());
+  /** Index de la seule rubrique affichée dans la pop-up (ajout / modification d'une ligne) ;
+   *  null = éditeur complet. */
+  readonly rubriquesFocus = signal<number | null>(null);
   readonly testGross          = signal<number>(3000);
 
   readonly natureOptions = computed(() => [
@@ -1112,8 +1206,9 @@ export class ParameterSetsComponent implements OnInit {
   }
 
   // ── Charges sociales ──────────────────────────────────────────────────────
-  openChargesEditor(ps: ParameterSetDto): void {
+  openChargesEditor(ps: ParameterSetDto, focus: number | 'new' | null = null): void {
     this.closeRubriquesEditor();
+    this.closeBenefitEditor();
     while (this.editRates.length) this.editRates.removeAt(0);
     ps.socialChargeRates.forEach(r => this.editRates.push(this.fb.group({
       contractType:    [r.contractType],
@@ -1127,13 +1222,17 @@ export class ParameterSetsComponent implements OnInit {
       formulaEr:       [r.formulaEr ?? ''],
       evalOrder:       [r.evalOrder ?? 0],
     })));
+    if (focus === 'new') this.addEditRate();
+    this.chargesFocus.set(focus === 'new' ? this.editRates.length - 1 : focus);
     this.editingChargesId.set(ps.id);
     this.chargesError.set(null);
     this.onEditRateSearch('');
     const tpl = this.chargesEditorTpl();
     if (!tpl) return;
     this.chargesModalRef = this.modalService.open({
-      title: this.t('PAYROLL.PARAMETER_SETS.CHARGES_EDITOR_MODAL_TITLE'),
+      title: this.t(focus === 'new' ? 'PAYROLL.PARAMETER_SETS.ADD_CHARGE_TITLE'
+        : focus != null ? 'PAYROLL.PARAMETER_SETS.EDIT_CHARGE_TITLE'
+        : 'PAYROLL.PARAMETER_SETS.CHARGES_EDITOR_MODAL_TITLE'),
       subtitle: this.itemTitle(ps),
       icon: 'payments',
       size: 'xl',
@@ -1143,6 +1242,7 @@ export class ParameterSetsComponent implements OnInit {
 
   closeChargesEditor(): void {
     this.editingChargesId.set(null);
+    this.chargesFocus.set(null);
     while (this.editRates.length) this.editRates.removeAt(0);
     this.chargesModalRef?.close();
     this.chargesModalRef = null;
@@ -1240,8 +1340,23 @@ export class ParameterSetsComponent implements OnInit {
   saveCharges(psId: number): void {
     if (this.savingCharges()) return;
     this.chargesError.set(null);
+    const focus = this.chargesFocus();
+    const groups = focus != null ? [this.editRateGroup(focus)] : this.editRates.controls;
+    groups.forEach(g => g.markAllAsTouched());
+    if (groups.some(g => g.invalid)) {
+      this.chargesError.set(this.t('PAYROLL.PARAMETER_SETS.ERR_CHARGE_REQUIRED'));
+      return;
+    }
+    let rates = this.chargesForm.getRawValue().rates as SocialChargeRateDto[];
+    if (focus != null) {
+      // Une seule ligne modifiée : les autres repartent telles que lues du serveur.
+      const current = [...(this.selected()?.socialChargeRates ?? [])];
+      const row = rates[focus];
+      if (focus < current.length) current[focus] = { ...current[focus], ...row };
+      else current.push(row);
+      rates = current;
+    }
     this.savingCharges.set(true);
-    const rates = this.chargesForm.getRawValue().rates as SocialChargeRateDto[];
     this.api.updateSocialChargeRates(psId, rates).subscribe({
       next: updated => {
         this.paramSets.update(ps => ps.map(p => p.id === updated.id ? updated : p));
@@ -1257,18 +1372,24 @@ export class ParameterSetsComponent implements OnInit {
   }
 
   // ── Rubriques de paie ──────────────────────────────────────────────────────
-  openRubriquesEditor(ps: ParameterSetDto): void {
+  openRubriquesEditor(ps: ParameterSetDto, focus: number | 'new' | null = null): void {
     this.closeChargesEditor();
+    this.closeBenefitEditor();
     while (this.editRubriques.length) this.editRubriques.removeAt(0);
     (ps.rubriques ?? []).forEach(r => this.editRubriques.push(this.makeRubriqueGroup(r)));
-    // Auto-expand the first card so the form is immediately visible.
-    this.expandedRubriques.set(new Set([0]));
+    if (focus === 'new') this.editRubriques.push(this.makeRubriqueGroup({}));
+    const index = focus === 'new' ? this.editRubriques.length - 1 : focus;
+    this.rubriquesFocus.set(index);
+    // Auto-expand the first card (or the edited one) so the form is immediately visible.
+    this.expandedRubriques.set(new Set([index ?? 0]));
     this.editingRubriquesId.set(ps.id);
     this.rubriquesError.set(null);
     const tpl = this.rubriquesEditorTpl();
     if (!tpl) return;
     this.rubriquesModalRef = this.modalService.open({
-      title: this.t('PAYROLL.PARAMETER_SETS.RUBRIQUES_EDITOR_MODAL_TITLE'),
+      title: this.t(focus === 'new' ? 'PAYROLL.PARAMETER_SETS.ADD_RUBRIQUE_TITLE'
+        : focus != null ? 'PAYROLL.PARAMETER_SETS.EDIT_RUBRIQUE_TITLE'
+        : 'PAYROLL.PARAMETER_SETS.RUBRIQUES_EDITOR_MODAL_TITLE'),
       subtitle: this.itemTitle(ps),
       icon: 'receipt_long',
       size: 'xl',
@@ -1304,6 +1425,7 @@ export class ParameterSetsComponent implements OnInit {
 
   closeRubriquesEditor(): void {
     this.editingRubriquesId.set(null);
+    this.rubriquesFocus.set(null);
     this.expandedRubriques.set(new Set());
     while (this.editRubriques.length) this.editRubriques.removeAt(0);
     this.rubriquesModalRef?.close();
@@ -1331,9 +1453,41 @@ export class ParameterSetsComponent implements OnInit {
   saveRubriques(psId: number): void {
     if (this.savingRubriques()) return;
     this.rubriquesError.set(null);
-    this.savingRubriques.set(true);
+    const focus = this.rubriquesFocus();
+    const groups = focus != null ? [this.editRubriqueGroup(focus)] : this.editRubriques.controls;
+    groups.forEach(g => g.markAllAsTouched());
+    if (groups.some(g => g.invalid)) {
+      this.rubriquesError.set(this.t('PAYROLL.PARAMETER_SETS.ERR_RUBRIQUE_REQUIRED'));
+      return;
+    }
     const raw = this.rubriquesForm.getRawValue().items as any[];
-    const payload: SavePayrollRubriqueRequest[] = raw.map((r, idx) => ({
+    let payload = this.rubriqueRequests(raw);
+    if (focus != null) {
+      // Une seule rubrique modifiée : les autres repartent telles que lues du serveur
+      // (types de contrat inconnus de la liste RH compris).
+      const current = (this.selected()?.rubriques ?? []).map(r => rubriqueToRequest(r));
+      if (focus < current.length) current[focus] = payload[focus];
+      else current.push(payload[focus]);
+      payload = current.map((r, idx) => ({ ...r, displayOrder: idx }));
+    }
+    this.savingRubriques.set(true);
+    this.api.updateRubriques(psId, payload).subscribe({
+      next: updated => {
+        this.paramSets.update(ps => ps.map(p => p.id === updated.id ? updated : p));
+        this.selected.update(s => s?.id === updated.id ? updated : s);
+        this.closeRubriquesEditor();
+        this.savingRubriques.set(false);
+      },
+      error: err => {
+        this.rubriquesError.set(err?.error?.detail ?? err?.error?.message ?? this.t('PAYROLL.PARAMETER_SETS.ERROR_SAVE_RUBRIQUES'));
+        this.savingRubriques.set(false);
+      },
+    });
+  }
+
+  /** Formulaire de rubriques → corps de requête (ordre d'affichage = position). */
+  private rubriqueRequests(raw: any[]): SavePayrollRubriqueRequest[] {
+    return raw.map((r, idx) => ({
       code:                     r.code,
       labelFr:                  r.labelFr,
       labelEn:                  r.labelEn?.trim() || null,
@@ -1356,16 +1510,183 @@ export class ParameterSetsComponent implements OnInit {
           .join(',') || null,
       isActive:                 r.isActive,
     }));
-    this.api.updateRubriques(psId, payload).subscribe({
+  }
+
+  // ── CRUD ligne à ligne de la page détail (brouillon uniquement) ──────────────
+  // Le serveur ne connaît que le remplacement de la liste complète d'un jeu : ajouter,
+  // modifier ou supprimer une ligne renvoie toute la liste, la ligne en plus/en moins.
+  /** Ajout depuis le bouton de l'onglet actif. */
+  addDetailRow(ps: ParameterSetDto): void {
+    const tab = this.detailTab();
+    if (tab === 'rubriques') this.openRubriquesEditor(ps, 'new');
+    else if (tab === 'benefits') this.openBenefitEditor(ps, null);
+    else this.openChargesEditor(ps, 'new');
+  }
+
+  /** Éditeur complet (toutes les lignes) de l'onglet actif — ordre, saisie en masse. */
+  editAllDetailRows(ps: ParameterSetDto): void {
+    if (this.detailTab() === 'rubriques') this.openRubriquesEditor(ps);
+    else this.openChargesEditor(ps);
+  }
+
+  private rowActions(edit: (i: number) => void, remove: (i: number) => void): NonNullable<TableConfig['actions']> {
+    // Tous statuts (brouillon, soumis, actif, archivé) : le serveur accepte l'édition directe.
+    return this.detailSet()
+      ? [
+          { id: 'edit', icon: 'edit', tooltip: this.t('PAYROLL.ADMIN_HOME.EDIT'),
+            onClick: row => edit(row['_index'] as number) },
+          { id: 'delete', icon: 'delete', tooltip: this.t('PAYROLL.ADMIN_HOME.DELETE'), variant: 'danger',
+            onClick: row => remove(row['_index'] as number) },
+        ]
+      : [];
+  }
+
+  readonly chargesTableConfig = computed<TableConfig>(() => ({
+    ...this.readTableConfig(this.chargesSearch().trim() ? 'PAYROLL.ADMIN_HOME.NO_RESULT' : 'PAYROLL.PARAMETER_SETS.CHARGES_EMPTY_READONLY'),
+    actions: this.rowActions(i => this.openChargesEditor(this.detailSet()!, i), i => this.confirmDeleteRow('charges', i)),
+  }));
+
+  readonly rubriquesTableConfig = computed<TableConfig>(() => ({
+    ...this.readTableConfig(this.rubriquesSearch().trim() ? 'PAYROLL.ADMIN_HOME.NO_RESULT' : 'PAYROLL.PARAMETER_SETS.RUBRIQUES_EMPTY_READONLY'),
+    actions: this.rowActions(i => this.openRubriquesEditor(this.detailSet()!, i), i => this.confirmDeleteRow('rubriques', i)),
+  }));
+
+  readonly benefitsTableConfig = computed<TableConfig>(() => ({
+    ...this.readTableConfig(this.benefitsSearch().trim() ? 'PAYROLL.ADMIN_HOME.NO_RESULT' : 'PAYROLL.PARAMETER_SETS.BENEFITS_EMPTY_READONLY'),
+    actions: this.rowActions(i => this.openBenefitEditor(this.detailSet()!, i), i => this.confirmDeleteRow('benefits', i)),
+  }));
+
+  /** Confirmation puis suppression d'une ligne (charge, rubrique ou avantage). */
+  private confirmDeleteRow(kind: 'charges' | 'rubriques' | 'benefits', index: number): void {
+    const ps = this.detailSet();
+    if (!ps) return;
+    let label: string | null = null;
+    if (kind === 'charges') {
+      const r = ps.socialChargeRates[index];
+      label = r ? `${r.chargeCode} — ${r.chargeLabel} (${r.contractType})` : null;
+    } else if (kind === 'rubriques') {
+      const r = ps.rubriques[index];
+      label = r ? `${r.code} — ${r.labelFr}` : null;
+    } else {
+      const b = ps.benefits[index];
+      label = b ? `${b.benefitCode} — ${b.benefitLabelFr}` : null;
+    }
+    if (!label) return;
+    let deleting = false;
+    this.modalService.open({
+      title: this.t('PAYROLL.PARAMETER_SETS.DELETE_ROW_TITLE'),
+      body: this.t('PAYROLL.PARAMETER_SETS.DELETE_ROW_CONFIRM', { label }),
+      size: 'sm',
+      closeOnBackdrop: false,
+      buttons: [
+        { label: this.t('PAYROLL.ADMIN_HOME.CANCEL'), variant: 'secondary', action: r => r.close() },
+        {
+          label: this.t('PAYROLL.ADMIN_HOME.DELETE'), variant: 'primary',
+          action: r => {
+            if (deleting) return;
+            deleting = true;
+            const call = kind === 'charges'
+              ? this.api.updateSocialChargeRates(ps.id, ps.socialChargeRates.filter((_, i) => i !== index))
+              : kind === 'rubriques'
+                ? this.api.updateRubriques(ps.id, ps.rubriques.filter((_, i) => i !== index)
+                    .map((x, i) => ({ ...rubriqueToRequest(x), displayOrder: i })))
+                : this.api.updateBenefits(ps.id, ps.benefits.filter((_, i) => i !== index));
+            call.subscribe({
+              next: updated => {
+                this.replaceSet(updated);
+                this.notification.success(this.t('PAYROLL.PARAMETER_SETS.ROW_DELETED'));
+                r.close();
+              },
+              error: err => {
+                deleting = false;
+                r.close();
+                this.notification.error(err?.error?.detail ?? err?.error?.message ?? this.t('PAYROLL.PARAMETER_SETS.ERROR_GENERIC'));
+              },
+            });
+          },
+        },
+      ],
+    });
+  }
+
+  private replaceSet(updated: ParameterSetDto): void {
+    this.paramSets.update(ps => ps.map(p => p.id === updated.id ? updated : p));
+    this.selected.update(s => s?.id === updated.id ? updated : s);
+  }
+
+  // ── Avantages : une pop-up par avantage (ajout / modification) ─────────────
+  readonly benefitForm    = signal<BenefitCatalogueDto>(blankBenefit());
+  readonly benefitIndex   = signal<number | null>(null);
+  readonly benefitError   = signal<string | null>(null);
+  readonly savingBenefit  = signal(false);
+  private editingBenefitSetId: number | null = null;
+
+  readonly yesNoOptions = computed<SelectOption[]>(() => [
+    { value: 'yes', label: this.t('PAYROLL.PARAMETER_SETS.YES') },
+    { value: 'no',  label: this.t('PAYROLL.PARAMETER_SETS.NO') },
+  ]);
+
+  patchBenefit(change: Partial<BenefitCatalogueDto>): void {
+    this.benefitForm.update(f => ({ ...f, ...change }));
+  }
+
+  benefitText(value: unknown): string { return (value ?? '').toString().trim(); }
+
+  benefitAmount(value: unknown): number {
+    const n = Number(value);
+    return value === '' || value == null || isNaN(n) ? 0 : n;
+  }
+
+  openBenefitEditor(ps: ParameterSetDto, index: number | null): void {
+    this.closeChargesEditor();
+    this.closeRubriquesEditor();
+    this.editingBenefitSetId = ps.id;
+    this.benefitIndex.set(index);
+    this.benefitForm.set(index == null ? blankBenefit() : { ...ps.benefits[index] });
+    this.benefitError.set(null);
+    const tpl = this.benefitEditorTpl();
+    if (!tpl) return;
+    this.benefitModalRef = this.modalService.open({
+      title: this.t(index == null ? 'PAYROLL.PARAMETER_SETS.ADD_BENEFIT_TITLE' : 'PAYROLL.PARAMETER_SETS.EDIT_BENEFIT_TITLE'),
+      subtitle: this.itemTitle(ps),
+      icon: 'redeem',
+      size: 'md',
+      body: tpl,
+      closeOnBackdrop: false,
+    });
+  }
+
+  closeBenefitEditor(): void {
+    this.editingBenefitSetId = null;
+    this.benefitModalRef?.close();
+    this.benefitModalRef = null;
+  }
+
+  saveBenefit(): void {
+    const ps = this.selected();
+    if (!ps || ps.id !== this.editingBenefitSetId || this.savingBenefit()) return;
+    const index = this.benefitIndex();
+    const f = this.benefitForm();
+    const list = [...ps.benefits];
+    const others = list.filter((_, i) => i !== index);
+    const problem = !f.benefitCode.trim() ? 'PAYROLL.ADMIN_HOME.BENEFITS.ERR_CODE'
+      : others.some(o => o.benefitCode.trim().toUpperCase() === f.benefitCode.trim().toUpperCase()) ? 'PAYROLL.ADMIN_HOME.BENEFITS.ERR_DUPLICATE'
+      : !f.benefitLabelFr.trim() ? 'PAYROLL.ADMIN_HOME.BENEFITS.ERR_LABEL'
+      : f.monthlyValue < 0 || f.employeeShare < 0 || f.employerShare < 0 ? 'PAYROLL.ADMIN_HOME.BENEFITS.ERR_NEGATIVE'
+      : null;
+    if (problem) { this.benefitError.set(this.t(problem, { code: f.benefitCode.trim() })); return; }
+    if (index == null) list.push(f); else list[index] = f;
+    this.benefitError.set(null);
+    this.savingBenefit.set(true);
+    this.api.updateBenefits(ps.id, list).subscribe({
       next: updated => {
-        this.paramSets.update(ps => ps.map(p => p.id === updated.id ? updated : p));
-        this.selected.update(s => s?.id === updated.id ? updated : s);
-        this.closeRubriquesEditor();
-        this.savingRubriques.set(false);
+        this.replaceSet(updated);
+        this.savingBenefit.set(false);
+        this.closeBenefitEditor();
       },
       error: err => {
-        this.rubriquesError.set(err?.error?.detail ?? err?.error?.message ?? this.t('PAYROLL.PARAMETER_SETS.ERROR_SAVE_RUBRIQUES'));
-        this.savingRubriques.set(false);
+        this.benefitError.set(err?.error?.detail ?? err?.error?.message ?? this.t('PAYROLL.ADMIN_HOME.SAVE_ERROR'));
+        this.savingBenefit.set(false);
       },
     });
   }
@@ -1556,8 +1877,9 @@ export class ParameterSetsComponent implements OnInit {
   ]);
 
   chargesRows(ps: ParameterSetDto): TableRow[] {
-    return (ps.socialChargeRates ?? []).map(r => ({
-      id:              r.chargeCode,
+    return (ps.socialChargeRates ?? []).map((r, i) => ({
+      id:              `charge-${i}`,
+      _index:          i,
       contractType:    { label: r.contractType, options: { variant: 'neutral' as BadgeVariant, size: 'sm' as const } },
       chargeCode:      r.chargeCode,
       chargeLabel:     r.chargeLabel,
@@ -1596,8 +1918,9 @@ export class ParameterSetsComponent implements OnInit {
   ]);
 
   benefitsRows(ps: ParameterSetDto): TableRow[] {
-    return (ps.benefits ?? []).map(b => ({
-      id:             b.benefitCode,
+    return (ps.benefits ?? []).map((b, i) => ({
+      id:             `benefit-${i}`,
+      _index:         i,
       benefitCode:    b.benefitCode,
       benefitLabelFr: b.benefitLabelFr,
       monthlyValue:   b.monthlyValue,
@@ -1620,8 +1943,9 @@ export class ParameterSetsComponent implements OnInit {
   ]);
 
   rubriquesRows(ps: ParameterSetDto): TableRow[] {
-    return (ps.rubriques ?? []).map(r => ({
-      id:            r.code,
+    return (ps.rubriques ?? []).map((r, i) => ({
+      id:            `rubrique-${i}`,
+      _index:        i,
       code:          r.code,
       labelFr:       r.labelFr,
       nature:        { label: this.natureLabel(r.nature), options: { variant: this.natureVariant(r.nature), size: 'sm' as const } },
@@ -1921,6 +2245,8 @@ export class ParameterSetsComponent implements OnInit {
   }
 
   editRateRows(): TableRow[] {
+    const focus = this.chargesFocus();
+    if (focus != null) return [{ id: `line-${focus}` }];
     const m = this.editRateMatches;
     return this.editRates.controls
       .map((ctrl, i) => ({ ctrl, i }))
@@ -1994,7 +2320,7 @@ export class ParameterSetsComponent implements OnInit {
     // d'évaluation des charges (variables de formule des lignes précédentes). Chaque
     // cellule retrouve son FormGroup par `rowIndex(row)`.
     ...tableTools(this.translate),
-    actions: [{ id: 'remove', icon: 'close', tooltip: this.t('PAYROLL.PARAMETER_SETS.REMOVE'), variant: 'danger',
+    actions: this.chargesFocus() != null ? [] : [{ id: 'remove', icon: 'close', tooltip: this.t('PAYROLL.PARAMETER_SETS.REMOVE'), variant: 'danger',
                 onClick: row => this.removeEditRate(this.rowIndex(row)) }],
   }));
 
@@ -2016,6 +2342,25 @@ export class ParameterSetsComponent implements OnInit {
 /** Options d'un `daf-select` de pays : libellé traduit, code ISO et drapeau. */
 function toPaysOptions(list: PaysDto[], names: PaysNamesService): SelectOption[] {
   return list.map(p => ({ value: String(p.id), label: `${names.name(p.id, p.frenchLabel)} (${p.isoCode})`, imageUrl: flagDataUri(p.isoCode) }));
+}
+
+/** Rubrique lue du serveur → corps de requête, sans passer par le formulaire. */
+function rubriqueToRequest(r: PayrollRubriqueDto): SavePayrollRubriqueRequest {
+  return {
+    code: r.code, labelFr: r.labelFr, labelEn: r.labelEn, nature: r.nature, calcMode: r.calcMode,
+    amount: r.amount, rate: r.rate, capAmount: r.capAmount,
+    employerSharePct: r.employerSharePct, employeeSharePct: r.employeeSharePct,
+    isSubjectToSocialCharges: r.isSubjectToSocialCharges, isSubjectToIrpp: r.isSubjectToIrpp,
+    direction: r.direction, contractTypes: r.contractTypes, isActive: r.isActive,
+    formulaExpression: r.formulaExpression ?? null, displayOrder: r.displayOrder,
+  };
+}
+
+function blankBenefit(): BenefitCatalogueDto {
+  return {
+    benefitCode: '', benefitLabelFr: '', benefitLabelEn: null, valuationMethod: 'TAX_AUTHORITY',
+    monthlyValue: 0, employeeShare: 0, employerShare: 0, isTaxable: true,
+  };
 }
 
 /** Arrondi à 2 décimales d'un taux en pourcentage (0.0918 × 100 = 9.180000000000001). */

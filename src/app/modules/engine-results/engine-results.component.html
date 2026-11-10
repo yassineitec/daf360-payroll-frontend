@@ -15,62 +15,19 @@
            Pas de bouton "Retour à la liste" : le fil d'Ariane (`Résultats de paie`)
            ramène déjà à `/payroll/engine-results`. Titre = le collaborateur, comme les
            fiches simulateur et candidat ; pas de sous-titre (il redisait le nom). -->
-      <daf-page-header
+      <daf-page-header data-guide="res-detail-header"
         size="md"
         [title]="employeeName()"
         [titleWrap]="true"
         [breadcrumbs]="breadcrumbs()" />
 
-      <daf-section-card>
-        <aside class="dp-card" [attr.aria-label]="'PAYROLL.ENGINE_RESULTS.DETAILS.PANEL_ARIA' | translate">
-
-          <!-- 1. Identité — photo, matricule, statut ; le nom est le titre de la page. -->
-          <section class="dp-block dp-identity">
-            <daf-avatar [data]="{ name: employeeName(), avatarUrl: photoSrc() }" size="lg" />
-            <div class="dp-identity__body">
-              <div class="dp-identity__meta">
-                @if (matricule(); as m) {
-                  <span class="dp-chip">{{ 'PAYROLL.ENGINE_RESULTS.COL_MATRICULE' | translate }} {{ m }}</span>
-                }
-                @if (lifecycle(); as l) {
-                  <daf-badge [label]="l.label" [options]="{ variant: l.variant, size: 'sm' }" />
-                }
-              </div>
-            </div>
-          </section>
-
-          <!-- 2..4. Contrat / Poste / Paie — une section par bloc, lignes libellé → valeur.
-               Une ligne sans valeur n'est pas affichée ; une section vide non plus. -->
-          @for (s of detailSections(); track s.id) {
-            <!-- Filet uniquement ENTRE sections (Contrat | Poste | Paie) — aucun sous
-                 l'identité ni entre les lignes d'une section. -->
-            @if (!$first) {
-              <div class="dp-rule dp-rule--major"></div>
-            }
-            <section class="dp-block" [attr.aria-labelledby]="'dp-h-' + s.id">
-              <h3 class="dp-label" [id]="'dp-h-' + s.id">{{ s.title }}</h3>
-              <dl class="dp-rows">
-                @for (r of s.rows; track r.label; let last = $last) {
-                  <div class="dp-row" [class.dp-row--last]="last">
-                    <dt class="dp-row__key">{{ r.label }}</dt>
-                    <dd class="dp-row__val">{{ r.value }}</dd>
-                  </div>
-                }
-              </dl>
-            </section>
-          }
-
-          @if (profileLoading()) {
-            <p class="dp-hint">{{ 'PAYROLL.COMMON.LOADING' | translate }}</p>
-          } @else if (!profile()) {
-            <p class="dp-hint">{{ 'PAYROLL.ENGINE_RESULTS.DETAILS.PARTIAL' | translate }}</p>
-          }
-        </aside>
-      </daf-section-card>
+      <!-- Carte « Détails » partagée avec /payroll/employee-config/:id. -->
+      <app-employee-details-card data-guide="res-detail-card"
+        [name]="employeeName()" [employee]="employee()" [profile]="profile()" [loading]="profileLoading()" />
 
       <!-- Actions — sous la carte Détails, dans leur propre carte, comme le centre d'actions de
            /finance/affaires/:id : action principale en `lg` pleine largeur, puis la secondaire. -->
-      <daf-section-card>
+      <daf-section-card data-guide="res-detail-actions">
         <div class="flex flex-col gap-3 bg-surface-container p-6">
           <p class="m-0 text-label-caps font-extrabold uppercase tracking-widest text-on-surface-variant">
             {{ 'PAYROLL.ENGINE_RESULTS.ACTIONS_TITLE' | translate }}
@@ -119,7 +76,7 @@
     @if (results().length > 0 && !selectedResultId()) {
       @let k = employeeKpis();
       <!-- Même grille et même taille de tuile que /payroll/simulator/:id (`.kpi-row` / `.kpi-cell`). -->
-      <section class="kpi-row">
+      <section class="kpi-row" data-guide="res-detail-kpis">
         <daf-metric-card class="kpi-cell"
           [label]="'PAYROLL.ENGINE_RESULTS.KPI_YEAR_GROSS' | translate: { year: k.year }"
           [value]="money(k.totalGross)" [delta]="employeeKpiDeltas().gross"
@@ -159,7 +116,7 @@
          (ou le bouton Retour du navigateur) ramène la liste, avec sa recherche, ses
          filtres et sa page conservés. ─────────────────────────────────────────── -->
     @if (selectedResultId() && results().length > 0) {
-      <app-engine-result-detail
+      <app-engine-result-detail data-guide="res-detail-payslip"
         [results]="shownResults()"
         [resultId]="selectedResultId()!"
         [employeeName]="employeeName()"
@@ -170,7 +127,7 @@
       <!-- ── Liste des périodes — recherche/filtre/vue carte-tableau, comme
            /finance/affaires et /payroll/candidate-simulation (`daf-search-toolbar`
            embarque les trois). ──────────────────────────────────────────────── -->
-      <daf-search-toolbar
+      <daf-search-toolbar data-guide="res-detail-toolbar"
         [placeholder]="'PAYROLL.ENGINE_RESULTS.SEARCH_PLACEHOLDER' | translate"
         [value]="searchText()"
         (valueChange)="onSearchTextChange($event)"
@@ -192,7 +149,7 @@
       }
 
       @if (viewMode() === 'grid') {
-        <div class="grid grid-cols-3 gap-5 same-height-cards">
+        <div class="grid grid-cols-3 gap-5 same-height-cards" data-guide="res-detail-periods">
           @for (card of pagedResultCards(); track card.id) {
             <daf-entity-card
               [options]="card.options"
@@ -208,7 +165,7 @@
       } @else {
         <!-- Tableau nu, comme l'exemple de la bibliothèque (demo-app) et
              /payroll/candidate-simulation : pas de daf-card autour. -->
-        <daf-data-table
+        <daf-data-table data-guide="res-detail-periods"
           [columns]="resultColumns()"
           [rows]="pagedResultRows()"
           [config]="resultTableConfig()"
@@ -241,6 +198,8 @@
     </div>
   </div>
 </daf-page>
+
+<app-page-guide storageKey="engine-results-detail" [steps]="guideSteps()" />
 
 <!-- Formulaire « Calculer la paie » (pop-up) — mêmes champs que /payroll/engine-run, le
      collaborateur en moins : c'est celui de la page. -->

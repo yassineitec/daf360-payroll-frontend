@@ -14,8 +14,9 @@ import { CurrencyService } from '../../core/currency.service';
 import { EmployeeProfileDetail, HrProfileService, contractTypeLabel } from '../../core/hr-profile.service';
 import { recallEmployee } from './engine-results-employee';
 import { EngineResultDetailComponent } from './engine-result-detail.component';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import type { GuideStep } from '../../shared/guide/page-guide.types';
 import {
-  AvatarComponent,
   ButtonComponent,
   CardComponent,
   FormFieldComponent,
@@ -31,7 +32,6 @@ import {
   PaginationComponent,
   SearchToolbarComponent,
   SectionCardComponent,
-  StatusBadgeComponent,
   type BreadcrumbItem,
   type BadgeVariant,
   type EntityCardOptions,
@@ -46,6 +46,7 @@ import {
 } from '@khalilrebhiitec/daf360';
 import { dayRange, distinctSorted, inDayRange, monthName, pickValue, rangeSeed } from '../../shared/filter-utils';
 import { TableSort, delegatedSort, sortTableRows, tableTools, toTableSort } from '../../shared/table-tools';
+import { EmployeeDetailsCardComponent } from '../../shared/employee-details/employee-details-card.component';
 
 /** Net à payer d'un résultat : `aggregateNet` (brut − cotisations salariales − impôts). Plus
  *  `strate5` : depuis le 2026-11-06 la strate 5 porte les impôts, plus le net — un pays sans
@@ -56,18 +57,9 @@ function netOf(r: RunPayrollResponse): number | null {
 }
 
 /** Une ligne libellé / valeur de la carte « Détails ». */
-interface DetailRow { label: string; value: string; }
-interface DetailSection { id: string; title: string; rows: DetailRow[]; }
 
 /** Codes de la liste RH `MARITAL_STATUS` (configurable en base) → clé de traduction ;
  *  un code inconnu s'affiche tel quel. */
-const MARITAL_KEYS: Record<string, string> = {
-  SINGLE: 'SINGLE', CELIBATAIRE: 'SINGLE',
-  MARRIED: 'MARRIED', MARIE: 'MARRIED',
-  DIVORCED: 'DIVORCED', DIVORCE: 'DIVORCED',
-  WIDOWED: 'WIDOWED', VEUF: 'WIDOWED',
-};
-
 /**
  * `/payroll/engine-results/:employeeId` — historique des résultats de paie réels d'un
  * collaborateur (résultats calculés par le moteur, détail par rubrique — tout via les
@@ -81,17 +73,29 @@ const MARITAL_KEYS: Record<string, string> = {
  * Le détail d'une période s'affiche dans la page, à la place de la liste
  * (`EngineResultDetailComponent`, `?result=<id>`) depuis le 2026-10-21 — plus de pop-up.
  */
+/** Guide de la page — `target` = un `data-guide` du gabarit. */
+const guideStep = (key: string, icon: string, target?: string): GuideStep => ({
+  icon, titleKey: `GUIDE.ENGINE_RESULTS_DETAIL.${key}_TITLE`, textKey: `GUIDE.ENGINE_RESULTS_DETAIL.${key}_TEXT`, target,
+});
+const GUIDE_WELCOME = guideStep('WELCOME', 'badge',        'res-detail-header');
+const GUIDE_CARD    = guideStep('CARD',    'contact_page', 'res-detail-card');
+const GUIDE_ACTIONS = guideStep('ACTIONS', 'bolt',         'res-detail-actions');
+const GUIDE_KPIS    = guideStep('KPIS',    'monitoring',   'res-detail-kpis');
+const GUIDE_TOOLBAR = guideStep('TOOLBAR', 'filter_list',  'res-detail-toolbar');
+const GUIDE_PERIODS = guideStep('PERIODS', 'calendar_month', 'res-detail-periods');
+const GUIDE_PAYSLIP = guideStep('PAYSLIP', 'receipt_long', 'res-detail-payslip');
+
 @Component({
   selector: 'app-engine-results',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, TranslatePipe,
-    AvatarComponent, ButtonComponent, CardComponent, DataTableComponent, EntityCardComponent,
+    EmployeeDetailsCardComponent, ButtonComponent, CardComponent, DataTableComponent, EntityCardComponent,
     FormFieldComponent, SelectComponent,
     MetricCardComponent, PageComponent, PageHeaderComponent, PaginationComponent,
-    SearchToolbarComponent, SectionCardComponent, StatusBadgeComponent,
-    EngineResultDetailComponent,
+    SearchToolbarComponent, SectionCardComponent,
+    EngineResultDetailComponent, PageGuideComponent,
   ],
   templateUrl: './engine-results.component.html',
   styleUrl: './engine-results.component.scss',
@@ -163,89 +167,6 @@ export class EngineResultsComponent {
       // Carte en mode dégradé (données de la liste) — l'historique de paie reste utilisable.
       error: () => this.profileLoading.set(false),
     });
-  }
-
-  readonly photoSrc = computed(() => this.hrApi.photoSrc(this.profile()?.photoUrl));
-  readonly matricule = computed(() => this.profile()?.matricule ?? this.employee()?.employeeId ?? null);
-
-  readonly lifecycle = computed(() => {
-    const s = this.profile()?.lifecycleStatus ?? this.employee()?.lifecycleStatus;
-    if (!s) return null;
-    const key = `PAYROLL.ENGINE_RESULTS.LIFECYCLE.${s}`;
-    const label = this.t(key);
-    const variant: BadgeVariant = s === 'ACTIVE' ? 'success'
-      : (s === 'TERMINATED' || s === 'ARCHIVED') ? 'neutral' : 'warning';
-    return { label: label === key ? s : label, variant };
-  });
-
-  readonly detailSections = computed<DetailSection[]>(() => {
-    const p = this.profile();
-    const e = this.employee();
-    const row = (key: string, value: string | number | null | undefined): DetailRow | null =>
-      value == null || value === '' ? null : { label: this.t(`PAYROLL.ENGINE_RESULTS.DETAILS.${key}`), value: String(value) };
-    const section = (id: string, rows: (DetailRow | null)[]): DetailSection => ({
-      id, title: this.t(`PAYROLL.ENGINE_RESULTS.DETAILS.SECTION_${id}`), rows: rows.filter((r): r is DetailRow => !!r),
-    });
-
-    return [
-      section('CONTRACT', [
-        row('CONTRACT_TYPE', this.contractLabel(p?.contractType ?? e?.contractType)),
-        row('HIRE_DATE', this.formatDate(p?.hireDate)),
-        row('SENIORITY', this.seniority(p?.hireDate)),
-        row('CONTRACT_END', this.formatDate(p?.contractEndDate)),
-        row('PROBATION_END', p?.isOnProbation ? this.formatDate(p?.probationEndDate) : null),
-        row('REGIME', p?.regimeLabelFr),
-      ]),
-      section('POSITION', [
-        row('DEPARTMENT', p?.department ?? e?.department),
-        row('GRADE', p?.grade),
-        row('DISCIPLINE', p?.discipline),
-        row('NOG_LEVEL', p?.nogLevel),
-        row('PAYS', p?.paysLabel ?? e?.paysLabel),
-      ]),
-      section('PAYROLL', [
-        row('MARITAL_STATUS', this.maritalLabel(p?.maritalStatus)),
-        row('CHILDREN', p?.numberOfChildren),
-        row('CNSS', p?.cnssNumber),
-        row('CNSS_DATE', this.formatDate(p?.cnssAffiliationDate)),
-      ]),
-    ].filter(s => s.rows.length > 0);
-  });
-
-  private formatDate(iso: string | null | undefined): string | null {
-    if (!iso) return null;
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return null;
-    return d.toLocaleDateString(this.translate.currentLang() === 'en' ? 'en-GB' : 'fr-FR',
-      { day: '2-digit', month: 'short', year: 'numeric' });
-  }
-
-  /** « 3 ans 4 mois » depuis la date d'embauche. */
-  private seniority(iso: string | null | undefined): string | null {
-    if (!iso) return null;
-    const start = new Date(iso);
-    if (Number.isNaN(start.getTime())) return null;
-    const now = new Date();
-    let months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-    if (now.getDate() < start.getDate()) months--;
-    if (months < 0) return null;
-    const years = Math.floor(months / 12);
-    const rest = months % 12;
-    const parts: string[] = [];
-    if (years) parts.push(this.t('PAYROLL.ENGINE_RESULTS.DETAILS.YEARS', { count: years }));
-    if (rest || !years) parts.push(this.t('PAYROLL.ENGINE_RESULTS.DETAILS.MONTHS', { count: rest }));
-    return parts.join(' ');
-  }
-
-  /** Contrat en clair (« CDI » pour PERMANENT…). */
-  private contractLabel(code: string | null | undefined): string | null {
-    return code ? contractTypeLabel(code, this.translate) : null;
-  }
-
-  private maritalLabel(code: string | null | undefined): string | null {
-    if (!code) return null;
-    const key = MARITAL_KEYS[code.toUpperCase()];
-    return key ? this.t(`PAYROLL.ENGINE_RESULTS.DETAILS.MARITAL.${key}`) : code;
   }
 
   backToList(): void {
@@ -811,6 +732,13 @@ export class EngineResultsComponent {
   /** Calcul réservé à qui peut lancer le moteur (même droit que `POST /engine/run`). */
   readonly canRunEngine = computed(() => this.userStore.hasPermission('PAYROLL_RUN_ENGINE'));
 
+  /** Guide (« Aide & guides ») : le bulletin ouvert, sinon la liste des mois — ce qui est à l'écran. */
+  readonly guideSteps = computed<GuideStep[]>(() => {
+    const head = [GUIDE_WELCOME, GUIDE_CARD, GUIDE_ACTIONS];
+    if (!this.results().length) return head;
+    return this.selectedResultId() ? [...head, GUIDE_PAYSLIP] : [...head, GUIDE_KPIS, GUIDE_TOOLBAR, GUIDE_PERIODS];
+  });
+
   /** Arrivée avec `?calc=1` (« Calculer sa paie » de /payroll/employee-config) : pop-up
    *  ouverte dès le premier rendu, `?pays=` pré-sélectionné ; les deux paramètres sont
    *  ensuite retirés de l'adresse (un F5 ne rouvre pas la pop-up). */
@@ -907,7 +835,7 @@ export class EngineResultsComponent {
       },
       error: e => {
         this.calcRunning.set(false);
-        this.calcError.set(e?.error?.message ?? this.t('PAYROLL.ENGINE_RUN.ERROR'));
+        this.calcError.set(e?.error?.detail ?? e?.error?.message ?? this.t('PAYROLL.ENGINE_RUN.ERROR'));
       },
     });
   }
