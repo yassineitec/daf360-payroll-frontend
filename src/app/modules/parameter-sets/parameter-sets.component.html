@@ -446,29 +446,39 @@
             }
           </app-admin-section-header>
 
-          <!-- Onglets + action de l'onglet à droite (le « Ajouter » des sections RH) ; seul un
-               brouillon se modifie — sinon une mention « lecture seule ». -->
+          <!-- Onglets + actions de l'onglet à droite (le « Ajouter » des sections RH) ; tous
+               les statuts se modifient (brouillon, soumis, actif, archivé). -->
           <div class="ps-detail-tabs">
             <div class="ps-detail-tabs__tabs">
               <daf-tabs [tabs]="detailTabs()" [(active)]="detailTab" [tabsLabel]="itemTitle(ps)" [idPrefix]="'parameter-set-detail-tabs'" />
             </div>
-            @if (ps.status !== 'DRAFT') {
-              <p class="editor-hint ps-readonly">
-                <span class="material-symbols-outlined" aria-hidden="true">lock</span>
-                {{ 'PAYROLL.PARAMETER_SETS.READONLY_HINT' | translate: { status: statusLabel(ps) } }}
-              </p>
-            } @else if (detailTab() !== 'benefits') {
-              <daf-button class="admin-desktop-only"
-                [label]="'PAYROLL.PARAMETER_SETS.EDIT' | translate"
-                variant="teal"
-                [options]="{ iconStart: 'edit' }"
-                (onClick)="detailTab() === 'rubriques' ? openRubriquesEditor(ps) : openChargesEditor(ps)" />
-              <daf-button class="admin-mobile-only"
-                [title]="'PAYROLL.PARAMETER_SETS.EDIT' | translate"
-                variant="teal"
-                [options]="{ iconStart: 'edit', size: 'sm' }"
-                (onClick)="detailTab() === 'rubriques' ? openRubriquesEditor(ps) : openChargesEditor(ps)" />
-            }
+              <!-- CRUD ligne à ligne : « Ajouter » ouvre une pop-up pour UNE ligne ; chaque ligne
+                   du tableau porte Modifier / Supprimer. « Tout modifier » garde l'éditeur
+                   complet (ordre d'évaluation, saisie en masse). -->
+              <div class="ps-detail-tabs__actions">
+                @if (detailTab() !== 'benefits') {
+                  <daf-button class="admin-desktop-only"
+                    [label]="'PAYROLL.PARAMETER_SETS.EDIT_ALL' | translate"
+                    variant="secondary"
+                    [options]="{ iconStart: 'edit_note' }"
+                    (onClick)="editAllDetailRows(ps)" />
+                  <daf-button class="admin-mobile-only"
+                    [title]="'PAYROLL.PARAMETER_SETS.EDIT_ALL' | translate"
+                    variant="secondary"
+                    [options]="{ iconStart: 'edit_note', size: 'sm' }"
+                    (onClick)="editAllDetailRows(ps)" />
+                }
+                <daf-button class="admin-desktop-only"
+                  [label]="'PAYROLL.PARAMETER_SETS.ADD_ROW' | translate"
+                  variant="teal"
+                  [options]="{ iconStart: 'add' }"
+                  (onClick)="addDetailRow(ps)" />
+                <daf-button class="admin-mobile-only"
+                  [title]="'PAYROLL.PARAMETER_SETS.ADD_ROW' | translate"
+                  variant="teal"
+                  [options]="{ iconStart: 'add', size: 'sm' }"
+                  (onClick)="addDetailRow(ps)" />
+              </div>
           </div>
 
           <!-- Tableau directement sur la page (plus de carte englobante) : le `daf-data-table`
@@ -488,7 +498,7 @@
                       [table]="rubriquesTable" />
                   </div>
                   <daf-data-table #rubriquesTable [columns]="rubriquesColumns()" [rows]="rubriquesView()"
-                    [config]="readTableConfig(rubriquesSearch().trim() ? 'PAYROLL.ADMIN_HOME.NO_RESULT' : 'PAYROLL.PARAMETER_SETS.RUBRIQUES_EMPTY_READONLY')" />
+                    [config]="rubriquesTableConfig()" />
                 </div>
             }
             @case ('benefits') {
@@ -502,7 +512,7 @@
                       [table]="benefitsTable" />
                   </div>
                   <daf-data-table #benefitsTable [columns]="benefitsColumns()" [rows]="benefitsView()"
-                    [config]="readTableConfig(benefitsSearch().trim() ? 'PAYROLL.ADMIN_HOME.NO_RESULT' : 'PAYROLL.PARAMETER_SETS.BENEFITS_EMPTY_READONLY')" />
+                    [config]="benefitsTableConfig()" />
                 </div>
             }
             @default {
@@ -516,7 +526,7 @@
                       [table]="chargesTable" />
                   </div>
                   <daf-data-table #chargesTable [columns]="chargesColumns()" [rows]="chargesView()"
-                    [config]="readTableConfig(chargesSearch().trim() ? 'PAYROLL.ADMIN_HOME.NO_RESULT' : 'PAYROLL.PARAMETER_SETS.CHARGES_EMPTY_READONLY')" />
+                    [config]="chargesTableConfig()" />
                 </div>
             }
           }
@@ -578,6 +588,7 @@
            ══════════════════════════════════════════════════════════════════════════ -->
       <ng-template #chargesEditorTpl>
         <div class="charges-editor" [formGroup]="chargesForm">
+          @if (chargesFocus() === null) {
           <div class="editor-toolbar">
             <daf-button [label]="'PAYROLL.PARAMETER_SETS.ADD_CHARGE_LINE' | translate" variant="secondary" [options]="{ size: 'sm', iconStart: 'add' }" (onClick)="addEditRate()" />
           </div>
@@ -590,6 +601,7 @@
             [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
             [value]="editRateSearch()" [debounce]="200" (valueChange)="onEditRateSearch($event)"
             [table]="editRateTable" />
+          }
 
           <!-- `daf-data-table` à cellules éditables (au lieu de la grille maison). En mode
                FORMULE, les colonnes salarié / patronal portent directement le champ de
@@ -808,11 +820,58 @@
         </div>
       </ng-template>
 
+      <ng-template #benefitEditorTpl>
+        <div class="benefit-form">
+          <div class="benefit-form__grid">
+            <daf-form-field
+              [value]="benefitForm().benefitCode"
+              (valueChange)="patchBenefit({ benefitCode: benefitText($event).toUpperCase() })"
+              [options]="{ label: ('PAYROLL.ADMIN_HOME.BENEFITS.COL_CODE' | translate), placeholder: 'MEAL', required: true, fullWidth: true }" />
+            <daf-select
+              [options]="yesNoOptions()"
+              [selected]="[benefitForm().isTaxable ? 'yes' : 'no']"
+              [config]="{ label: ('PAYROLL.ADMIN_HOME.BENEFITS.COL_TAXABLE' | translate), required: true, fullWidth: true }"
+              (selectedChange)="patchBenefit({ isTaxable: $event[0] === 'yes' })" />
+            <daf-form-field
+              [value]="benefitForm().benefitLabelFr"
+              (valueChange)="patchBenefit({ benefitLabelFr: benefitText($event) })"
+              [options]="{ label: ('PAYROLL.ADMIN_HOME.BENEFITS.LABEL_FR' | translate), required: true, fullWidth: true }" />
+            <daf-form-field
+              [value]="benefitForm().benefitLabelEn ?? ''"
+              (valueChange)="patchBenefit({ benefitLabelEn: benefitText($event) || null })"
+              [options]="{ label: ('PAYROLL.ADMIN_HOME.BENEFITS.LABEL_EN' | translate), fullWidth: true }" />
+            <daf-form-field
+              [value]="benefitForm().monthlyValue"
+              (valueChange)="patchBenefit({ monthlyValue: benefitAmount($event) })"
+              [options]="{ label: ('PAYROLL.ADMIN_HOME.BENEFITS.COL_MONTHLY' | translate), type: 'number', align: 'end', suffixText: editorDevise(), fullWidth: true }" />
+            <daf-form-field
+              [value]="benefitForm().employeeShare"
+              (valueChange)="patchBenefit({ employeeShare: benefitAmount($event) })"
+              [options]="{ label: ('PAYROLL.ADMIN_HOME.BENEFITS.COL_EMPLOYEE' | translate), type: 'number', align: 'end', suffixText: editorDevise(), fullWidth: true }" />
+            <daf-form-field
+              [value]="benefitForm().employerShare"
+              (valueChange)="patchBenefit({ employerShare: benefitAmount($event) })"
+              [options]="{ label: ('PAYROLL.ADMIN_HOME.BENEFITS.COL_EMPLOYER' | translate), type: 'number', align: 'end', suffixText: editorDevise(), fullWidth: true }" />
+          </div>
+          @if (benefitError()) {
+            <div class="admin-error-banner" role="alert">{{ benefitError() }}</div>
+          }
+          <app-admin-modal-footer
+            [saveLabel]="'PAYROLL.PARAMETER_SETS.SAVE' | translate"
+            [cancelLabel]="'PAYROLL.ADMIN_HOME.CANCEL' | translate"
+            [saving]="savingBenefit()"
+            (save)="saveBenefit()"
+            (cancel)="closeBenefitEditor()" />
+        </div>
+      </ng-template>
+
       <ng-template #rubriquesEditorTpl>
         <div class="rubriques-editor" [formGroup]="rubriquesForm">
-          <div class="editor-toolbar">
-            <daf-button [label]="'PAYROLL.PARAMETER_SETS.ADD_RUBRIQUE' | translate" variant="secondary" [options]="{ size: 'sm', iconStart: 'add' }" (onClick)="addEditRubrique()" />
-          </div>
+          @if (rubriquesFocus() === null) {
+            <div class="editor-toolbar">
+              <daf-button [label]="'PAYROLL.PARAMETER_SETS.ADD_RUBRIQUE' | translate" variant="secondary" [options]="{ size: 'sm', iconStart: 'add' }" (onClick)="addEditRubrique()" />
+            </div>
+          }
 
           @if (editRubriques.length === 0) {
             <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'lg', icon: 'info', description: ('PAYROLL.PARAMETER_SETS.RUBRIQUES_EMPTY_EDITOR' | translate) }" />
@@ -828,6 +887,7 @@
 
             <ng-container formArrayName="items">
               @for (ctrl of editRubriques.controls; track $index; let i = $index) {
+                @if (rubriquesFocus() === null || rubriquesFocus() === i) {
                 <!-- Carte dépliable sans `state` (pas de couleur par nature). Le montant
                      d'aperçu passe dans le sous-titre au lieu d'un texte maison dans l'en-tête. -->
                 <daf-accordion-card
@@ -844,11 +904,13 @@
                   (openChange)="toggleRubriqueCard(i)">
 
                   <div headerAction class="rch-header-action" (click)="$event.stopPropagation()">
+                    @if (rubriquesFocus() === null) {
                     <daf-button
                       variant="ghost"
                       [options]="{ size: 'sm', iconStart: 'close', title: 'PAYROLL.PARAMETER_SETS.REMOVE_RUBRIQUE' | translate }"
                       (onClick)="removeEditRubrique(i)">
                     </daf-button>
+                    }
                   </div>
 
                   <div class="rg-section">
@@ -1028,6 +1090,7 @@
                   </div>
 
                 </daf-accordion-card>
+                }
               }
             </ng-container>
           }

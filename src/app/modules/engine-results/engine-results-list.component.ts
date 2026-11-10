@@ -947,7 +947,7 @@ export class EngineResultsListComponent implements OnInit {
         employeeId: e.userId, paysId, periodYear, periodMonth, contractTypeCode: contract, joursOuvresMois: jours,
       }).pipe(
         map(() => ({ e, error: null as string | null })),
-        catchError(err => of({ e, error: (err?.error?.message as string) ?? this.t('PAYROLL.ENGINE_RUN.ERROR') })),
+        catchError(err => of({ e, error: (err?.error?.detail as string) ?? (err?.error?.message as string) ?? this.t('PAYROLL.ENGINE_RUN.ERROR') })),
       ), EngineResultsListComponent.BATCH_CONCURRENCY),
     ).subscribe({
       next: r => {

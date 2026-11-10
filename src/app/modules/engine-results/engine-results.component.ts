@@ -907,7 +907,7 @@ export class EngineResultsComponent {
       },
       error: e => {
         this.calcRunning.set(false);
-        this.calcError.set(e?.error?.message ?? this.t('PAYROLL.ENGINE_RUN.ERROR'));
+        this.calcError.set(e?.error?.detail ?? e?.error?.message ?? this.t('PAYROLL.ENGINE_RUN.ERROR'));
       },
     });
   }
