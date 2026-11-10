@@ -409,15 +409,18 @@ export class SimulatorComponent implements OnDestroy {
     return map;
   });
 
-  /** The field's current currency: what's explicitly selected, or the country's working
-   *  currency when nothing has been chosen yet (today's default, unchanged). */
+  /** The field's current currency: what's explicitly selected, or the country's REAL
+   *  currency when nothing has been chosen yet — its native currency when it has one (see
+   *  `nativeCurrencyForCurrentPays`; Tunisia's amounts are always entered in TND even though
+   *  the platform's working-currency label is "EUR"), the engine's working currency
+   *  otherwise. */
   readonly currentCurrency = computed(() =>
-    this.formValue().inputCurrency ?? this.currency());
+    this.formValue().inputCurrency ?? this.nativeCurrencyForCurrentPays() ?? this.currency());
 
-  /** Working currency first (it's always valid, even before fxRates has loaded), then every
-   *  other currency payroll has a cached rate for, alphabetically. */
+  /** Native/working currency first (it's always valid, even before fxRates has loaded), then
+   *  every other currency payroll has a cached rate for, alphabetically. */
   readonly currencyOptions = computed((): SelectOption[] => {
-    const working = this.currency();
+    const working = this.nativeCurrencyForCurrentPays() ?? this.currency();
     const others = this.fxRates()
       .map(r => r.currencyCode)
       .filter(c => c !== working)
@@ -429,9 +432,12 @@ export class SimulatorComponent implements OnDestroy {
 
   setCurrency(selected: string[]): void {
     const picked = selected[0];
-    // Treat "picked back the working currency" as null, not as an explicit match: it's the
-    // same thing submit()/IndividualSimulationService already treat as "no conversion".
-    this.form.get('inputCurrency')!.setValue(picked && picked !== this.currency() ? picked : null);
+    const working = this.nativeCurrencyForCurrentPays() ?? this.currency();
+    // Treat "picked back the working/native currency" as null, not as an explicit match:
+    // it's the same thing submit()/IndividualSimulationService already treat as "no
+    // conversion" (and, for a native currency, FxEntryConversionService treats explicitly
+    // picking it the same way regardless).
+    this.form.get('inputCurrency')!.setValue(picked && picked !== working ? picked : null);
   }
 
   readonly currencySelection = computed((): string[] => [this.currentCurrency()].filter(Boolean) as string[]);
@@ -1850,29 +1856,31 @@ export class SimulatorComponent implements OnDestroy {
   // ── Formatting ─────────────────────────────────────────────────────────────
 
   /**
-   * Amount + currency, or an em dash when there is nothing to show yet. When `currency`
-   * is the engine's own result currency and a different display currency is picked
-   * (shell's switcher), the amount is converted via `fxRateMap` before formatting —
-   * reference amounts passed with `currency=''` (IRPP brackets, caps) are left alone. If
-   * `fxRateMap` doesn't have a rate for one of the two currencies (sync hasn't run for it
-   * yet), the amount is shown in its original currency rather than guessed.
+   * Amount + currency, or an em dash when there is nothing to show yet. `currency` is the
+   * engine's own result currency; reference amounts passed with `currency=''` (IRPP
+   * brackets, caps) are left alone.
    *
-   * Exception: when the picked display currency is the current country's own native
-   * currency (see `isNativeCurrencyForCurrentPays` — Tunisia's working currency "EUR" is
-   * itself a label for real TND, Egypt's "USD" for real EGP), the amount is only relabeled,
-   * never rate-converted: it already IS that real currency's figure.
+   * The engine's own currency isn't always the REAL currency the number is in: Tunisia's
+   * salaries are always paid and entered in TND, but the platform's working-currency label
+   * for Tunisia is "EUR" (a convention shared with the separate affaire/invoicing side,
+   * which legitimately bills Tunisia affaires in real EUR — payroll just reuses the same
+   * per-country `devise` field). `nativeCurrencyForCurrentPays()` is the REAL currency,
+   * when one is known; that — not the engine's raw label — is what a payroll figure is
+   * shown in and converted FROM. With nothing picked in the shell's switcher, that real
+   * currency is also the default shown (not the engine's "EUR" label), since that's what
+   * these numbers actually, truthfully are.
    */
   money(value: number | null | undefined, currency = '', decimals = 0): string {
     if (value == null || Number.isNaN(value)) return '—';
     let amount = value;
     let shown = currency;
-    const display = this.displayCurrency();
-    if (currency && display && currency !== display && currency === this.currency()) {
-      if (this.isNativeCurrencyForCurrentPays(display)) {
-        shown = display;
-      } else {
+    if (currency && currency === this.currency()) {
+      const trueCurrency = this.nativeCurrencyForCurrentPays() ?? currency;
+      const display = this.displayCurrency() ?? trueCurrency;
+      shown = trueCurrency;
+      if (display !== trueCurrency) {
         const rates = this.fxRateMap();
-        const fromRate = rates[currency];
+        const fromRate = rates[trueCurrency];
         const toRate = rates[display];
         if (fromRate != null && toRate != null) {
           amount = value * fromRate / toRate;
@@ -1895,10 +1903,9 @@ export class SimulatorComponent implements OnDestroy {
     53: 'EGP',  // Egypte
   };
 
-  private isNativeCurrencyForCurrentPays(currencyCode: string): boolean {
+  private nativeCurrencyForCurrentPays(): string | undefined {
     const paysId = this.result()?.paysId ?? this.selectedPaysId();
-    return paysId != null
-      && SimulatorComponent.NATIVE_CURRENCY_BY_PAYS_ID[paysId] === currencyCode;
+    return paysId != null ? SimulatorComponent.NATIVE_CURRENCY_BY_PAYS_ID[paysId] : undefined;
   }
 
   /** A rate stored as a decimal (0.0918) shown as a percentage (9,18 %). */
