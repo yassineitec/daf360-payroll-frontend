@@ -502,6 +502,61 @@
                 </div>
             }
             @case ('benefits') {
+            @case ('irpp') {
+                <!-- Tranches : Ajouter / Modifier / Supprimer ligne à ligne ; abattement et
+                     déductions : bouton Modifier de chaque bloc (une pop-up pour les deux). -->
+                <div class="ps-field-block flex flex-col gap-4" data-guide="adm-set-table">
+                  <daf-data-table [columns]="irppColumns()" [rows]="irppView()" [config]="irppTableConfig()" />
+                  <div class="grid gap-4 md:grid-cols-2">
+                    <section class="rounded-xl border border-outline-variant bg-surface-container-lowest px-6 py-4 flex flex-col gap-2">
+                      <div class="flex items-center justify-between gap-4">
+                        <p class="text-label-caps font-extrabold uppercase tracking-widest text-on-surface-variant m-0">
+                          {{ 'PAYROLL.PARAMETER_SETS.SECTION_ABATTEMENT' | translate }}
+                        </p>
+                        <daf-button
+                          [title]="'PAYROLL.ADMIN_HOME.EDIT' | translate"
+                          variant="secondary"
+                          [options]="{ iconStart: 'edit', size: 'sm' }"
+                          (onClick)="openDeductionsEditor(ps)" />
+                      </div>
+                      <div class="flex justify-between gap-4">
+                        <span>{{ 'PAYROLL.PARAMETER_SETS.ABATTEMENT_RATE' | translate }}</span>
+                        <span class="tabular-nums font-bold">{{ irppPercent(ps.abattementRatePct) }}</span>
+                      </div>
+                      <div class="flex justify-between gap-4">
+                        <span>{{ 'PAYROLL.PARAMETER_SETS.ABATTEMENT_CAP' | translate }}</span>
+                        <span class="tabular-nums font-bold">
+                          {{ ps.abattementAnnualCap != null ? irppAmount(ps.abattementAnnualCap) : ('PAYROLL.PARAMETER_SETS.UNCAPPED' | translate) }}
+                        </span>
+                      </div>
+                    </section>
+                    <section class="rounded-xl border border-outline-variant bg-surface-container-lowest px-6 py-4 flex flex-col gap-2">
+                      <div class="flex items-center justify-between gap-4">
+                        <p class="text-label-caps font-extrabold uppercase tracking-widest text-on-surface-variant m-0">
+                          {{ 'PAYROLL.PARAMETER_SETS.SECTION_FAMILY_DEDUCTION' | translate }}
+                        </p>
+                        <daf-button
+                          [title]="'PAYROLL.ADMIN_HOME.EDIT' | translate"
+                          variant="secondary"
+                          [options]="{ iconStart: 'edit', size: 'sm' }"
+                          (onClick)="openDeductionsEditor(ps)" />
+                      </div>
+                      <div class="flex justify-between gap-4">
+                        <span>{{ 'PAYROLL.PARAMETER_SETS.FAMILY_MARRIED_AMOUNT' | translate }}</span>
+                        <span class="tabular-nums font-bold">{{ irppAmount(ps.familyDeductionMarriedAmount) }}</span>
+                      </div>
+                      <div class="flex justify-between gap-4">
+                        <span>{{ 'PAYROLL.PARAMETER_SETS.FAMILY_PER_CHILD_AMOUNT' | translate }}</span>
+                        <span class="tabular-nums font-bold">{{ irppAmount(ps.familyDeductionPerChildAmount) }}</span>
+                      </div>
+                      <div class="flex justify-between gap-4">
+                        <span>{{ 'PAYROLL.PARAMETER_SETS.FAMILY_MAX_CHILDREN' | translate }}</span>
+                        <span class="tabular-nums font-bold">{{ ps.familyDeductionMaxChildren }}</span>
+                      </div>
+                    </section>
+                  </div>
+                </div>
+            }
                 <div class="ps-field-block">
                   <div class="ps-toolbar">
                     <daf-search-toolbar
@@ -821,6 +876,74 @@
       </ng-template>
 
       <ng-template #benefitEditorTpl>
+      <ng-template #bracketEditorTpl>
+        <div class="benefit-form">
+          <div class="benefit-form__grid">
+            <daf-form-field
+              [value]="bracketForm().lower ?? ''"
+              (valueChange)="patchBracket({ lower: numOrNull($event) })"
+              [options]="{ label: ('PAYROLL.PARAMETER_SETS.BRACKET_LOWER' | translate), type: 'number', align: 'end', required: true, fullWidth: true }" />
+            <daf-form-field
+              [value]="bracketForm().upper ?? ''"
+              (valueChange)="patchBracket({ upper: numOrNull($event) })"
+              [options]="{ label: ('PAYROLL.PARAMETER_SETS.BRACKET_UPPER' | translate), type: 'number', align: 'end', placeholder: ('PAYROLL.PARAMETER_SETS.BRACKET_UPPER_HINT' | translate), fullWidth: true }" />
+            <daf-form-field
+              [value]="bracketForm().ratePct ?? ''"
+              (valueChange)="patchBracket({ ratePct: numOrNull($event) })"
+              [options]="{ label: ('PAYROLL.PARAMETER_SETS.COL_RATE' | translate), type: 'number', align: 'end', suffixText: '%', required: true, fullWidth: true }" />
+          </div>
+          @if (bracketError()) {
+            <div class="admin-error-banner" role="alert">{{ bracketError() }}</div>
+          }
+          <app-admin-modal-footer
+            [saveLabel]="'PAYROLL.PARAMETER_SETS.SAVE' | translate"
+            [cancelLabel]="'PAYROLL.ADMIN_HOME.CANCEL' | translate"
+            [saving]="savingBracket()"
+            (save)="saveBracket()"
+            (cancel)="closeBracketEditor()" />
+        </div>
+      </ng-template>
+
+      <ng-template #deductionsEditorTpl>
+        <div class="benefit-form">
+          <app-admin-section-header [title]="'PAYROLL.PARAMETER_SETS.SECTION_ABATTEMENT' | translate" />
+          <div class="benefit-form__grid">
+            <daf-form-field
+              [value]="deductionsForm().ratePct"
+              (valueChange)="patchDeductions({ ratePct: numOrNull($event) ?? 0 })"
+              [options]="{ label: ('PAYROLL.PARAMETER_SETS.ABATTEMENT_RATE' | translate), type: 'number', align: 'end', suffixText: '%', fullWidth: true }" />
+            <daf-form-field
+              [value]="deductionsForm().cap ?? ''"
+              (valueChange)="patchDeductions({ cap: numOrNull($event) })"
+              [options]="{ label: ('PAYROLL.PARAMETER_SETS.ABATTEMENT_CAP' | translate), type: 'number', align: 'end', placeholder: ('PAYROLL.PARAMETER_SETS.UNCAPPED' | translate), fullWidth: true }" />
+          </div>
+          <app-admin-section-header [title]="'PAYROLL.PARAMETER_SETS.SECTION_FAMILY_DEDUCTION' | translate" />
+          <div class="benefit-form__grid">
+            <daf-form-field
+              [value]="deductionsForm().married"
+              (valueChange)="patchDeductions({ married: numOrNull($event) ?? 0 })"
+              [options]="{ label: ('PAYROLL.PARAMETER_SETS.FAMILY_MARRIED_AMOUNT' | translate), type: 'number', align: 'end', fullWidth: true }" />
+            <daf-form-field
+              [value]="deductionsForm().perChild"
+              (valueChange)="patchDeductions({ perChild: numOrNull($event) ?? 0 })"
+              [options]="{ label: ('PAYROLL.PARAMETER_SETS.FAMILY_PER_CHILD_AMOUNT' | translate), type: 'number', align: 'end', fullWidth: true }" />
+            <daf-form-field
+              [value]="deductionsForm().maxChildren"
+              (valueChange)="patchDeductions({ maxChildren: numOrNull($event) ?? 0 })"
+              [options]="{ label: ('PAYROLL.PARAMETER_SETS.FAMILY_MAX_CHILDREN' | translate), type: 'number', align: 'end', fullWidth: true }" />
+          </div>
+          @if (deductionsError()) {
+            <div class="admin-error-banner" role="alert">{{ deductionsError() }}</div>
+          }
+          <app-admin-modal-footer
+            [saveLabel]="'PAYROLL.PARAMETER_SETS.SAVE' | translate"
+            [cancelLabel]="'PAYROLL.ADMIN_HOME.CANCEL' | translate"
+            [saving]="savingDeductions()"
+            (save)="saveDeductions()"
+            (cancel)="closeDeductionsEditor()" />
+        </div>
+      </ng-template>
+
         <div class="benefit-form">
           <div class="benefit-form__grid">
             <daf-form-field
