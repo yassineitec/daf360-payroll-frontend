@@ -286,6 +286,8 @@ export class ParameterSetsComponent implements OnInit {
   private readonly fieldsEditorTpl    = viewChild<TemplateRef<unknown>>('fieldsEditorTpl');
   private readonly workflowConfirmTpl = viewChild<TemplateRef<unknown>>('workflowConfirmTpl');
   private readonly benefitEditorTpl   = viewChild<TemplateRef<unknown>>('benefitEditorTpl');
+  private readonly bracketEditorTpl   = viewChild<TemplateRef<unknown>>('bracketEditorTpl');
+  private readonly deductionsEditorTpl = viewChild<TemplateRef<unknown>>('deductionsEditorTpl');
   private chargesModalRef:   ModalRef | null = null;
   private rubriquesModalRef: ModalRef | null = null;
   private fieldsModalRef:    ModalRef | null = null;
@@ -440,6 +442,7 @@ export class ParameterSetsComponent implements OnInit {
       { id: 'charges',   label: this.t('PAYROLL.PARAMETER_SETS.TAB_CHARGES'),   icon: 'payments',     count: ps.socialChargeRates.length },
       { id: 'rubriques', label: this.t('PAYROLL.PARAMETER_SETS.TAB_RUBRIQUES'), icon: 'receipt_long', count: ps.rubriques.length },
       { id: 'benefits', label: this.t('PAYROLL.PARAMETER_SETS.TAB_BENEFITS'), icon: 'redeem', count: ps.benefits.length },
+      { id: 'irpp',     label: this.t('PAYROLL.PARAMETER_SETS.TAB_IRPP'),     icon: 'stacked_line_chart', count: this.irppScaleRows(ps).length },
     ];
   });
 
@@ -1520,12 +1523,14 @@ export class ParameterSetsComponent implements OnInit {
     const tab = this.detailTab();
     if (tab === 'rubriques') this.openRubriquesEditor(ps, 'new');
     else if (tab === 'benefits') this.openBenefitEditor(ps, null);
+    else if (tab === 'irpp') this.openBracketEditor(ps, null);
     else this.openChargesEditor(ps, 'new');
   }
 
   /** Éditeur complet (toutes les lignes) de l'onglet actif — ordre, saisie en masse. */
   editAllDetailRows(ps: ParameterSetDto): void {
     if (this.detailTab() === 'rubriques') this.openRubriquesEditor(ps);
+    else if (this.detailTab() === 'irpp') this.openFieldsEditor(ps);
     else this.openChargesEditor(ps);
   }
 
@@ -1995,6 +2000,260 @@ export class ParameterSetsComponent implements OnInit {
     return searchTableRows(this.benefitsRows(ps), columns, this.benefitsSearch());
   });
 
+  // ── Onglet « Barème IRPP » (lecture seule, tous statuts) : tranches, abattement et
+  //    déductions familiales — jusque-là visibles seulement dans l'éditeur des brouillons.
+
+  readonly irppColumns = computed<TableColumn[]>(() => [
+    { key: 'bracket', label: this.t('PAYROLL.PARAMETER_SETS.COL_BRACKET'), sortable: true,
+      sortAccessor: row => row['_lower'] as number },
+    { key: 'rate',    label: this.t('PAYROLL.PARAMETER_SETS.COL_RATE'), sortable: true,
+      sortAccessor: row => row['_rate'] as number },
+  ]);
+
+  /** Tranches JSON `{lower,upper,rate}` (alias `{min,max}`) triées ; taux décimal (≥ 1 lu
+   *  en %, comme le moteur). */
+  private scaleOf(ps: ParameterSetDto): IrppScaleBracket[] {
+    let raw: Array<Record<string, number | null>> = [];
+    try { raw = JSON.parse(ps.irppBrackets || '[]'); } catch { return []; }
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map(b => {
+        const lower = Number(b['lower'] ?? b['min'] ?? 0);
+        const up = b['upper'] ?? b['max'] ?? null;
+        const r = Number(b['rate'] ?? 0);
+        return { lower, upper: up == null ? null : Number(up), rate: r >= 1 ? r / 100 : r };
+      })
+      .sort((a, b) => a.lower - b.lower);
+  }
+
+  irppScaleRows(ps: ParameterSetDto): TableRow[] {
+    const fmt = (v: number) => v.toLocaleString(this.numberLocale, { maximumFractionDigits: 2 });
+    return this.scaleOf(ps).map((b, i) => ({
+      id: `irpp-${i}`,
+      _index: i,
+      bracket: b.upper == null
+        ? this.t('PAYROLL.PARAMETER_SETS.BRACKET_ABOVE', { lower: fmt(b.lower) })
+        : `${fmt(b.lower)} — ${fmt(b.upper)}`,
+      rate: `${fmt(b.rate * 100)} %`,
+      _lower: b.lower,
+      _rate: b.rate,
+    }));
+  }
+
+  readonly irppView = computed<TableRow[]>(() => {
+    const ps = this.detailSet();
+    return ps ? this.irppScaleRows(ps) : [];
+  });
+
+  readonly irppTableConfig = computed<TableConfig>(() => ({
+    ...this.readTableConfig('PAYROLL.PARAMETER_SETS.IRPP_EMPTY'),
+    actions: this.rowActions(i => this.openBracketEditor(this.detailSet()!, i), i => this.confirmDeleteBracket(i)),
+  }));
+
+  /** Corps complet de PUT /fields : le serveur remplace tout (barème, convergence,
+   *  déductions) — on repart du jeu tel quel et on ne change que ce qui est passé. */
+  private fieldsPayload(ps: ParameterSetDto, patch: Partial<ParameterSetDto>): Partial<ParameterSetDto> {
+    return {
+      irppBrackets:                  ps.irppBrackets,
+      convergenceTolerance:          ps.convergenceTolerance,
+      maxConvergenceIterations:      ps.maxConvergenceIterations,
+      calibrationThresholdPct:       ps.calibrationThresholdPct,
+      abattementRatePct:             ps.abattementRatePct ?? 0,
+      abattementAnnualCap:           ps.abattementAnnualCap,
+      familyDeductionMarriedAmount:  ps.familyDeductionMarriedAmount ?? 0,
+      familyDeductionPerChildAmount: ps.familyDeductionPerChildAmount ?? 0,
+      familyDeductionMaxChildren:    ps.familyDeductionMaxChildren ?? 0,
+      ...patch,
+    };
+  }
+
+  private scaleJson(list: IrppScaleBracket[]): string {
+    return JSON.stringify([...list].sort((a, b) => a.lower - b.lower)
+      .map(b => ({ lower: b.lower, upper: b.upper, rate: +b.rate.toFixed(6) })));
+  }
+
+  /** Une tranche ajoutée / modifiée ne doit ni chevaucher les autres ni créer une seconde
+   *  tranche ouverte (« et plus ») ; renvoie la clé d'erreur ou null. */
+  private bracketProblem(b: IrppScaleBracket, others: IrppScaleBracket[]): string | null {
+    if (!Number.isFinite(b.lower) || b.lower < 0) return 'PAYROLL.PARAMETER_SETS.ERR_BRACKET_LOWER';
+    if (b.upper != null && !(b.upper > b.lower)) return 'PAYROLL.PARAMETER_SETS.ERR_BRACKET_UPPER';
+    if (!Number.isFinite(b.rate) || b.rate < 0 || b.rate > 1) return 'PAYROLL.PARAMETER_SETS.ERR_BRACKET_RATE';
+    if (b.upper == null && others.some(o => o.upper == null)) return 'PAYROLL.PARAMETER_SETS.ERR_BRACKET_OPEN';
+    const end = (x: IrppScaleBracket) => x.upper ?? Infinity;
+    if (others.some(o => b.lower < end(o) && o.lower < end(b))) return 'PAYROLL.PARAMETER_SETS.ERR_BRACKET_OVERLAP';
+    return null;
+  }
+
+  private saveFieldsPatch(ps: ParameterSetDto, patch: Partial<ParameterSetDto>,
+                          onError: (msg: string) => void, onDone: () => void): void {
+    this.api.updateParameterSetFields(ps.id, this.fieldsPayload(ps, patch)).subscribe({
+      next: updated => { this.replaceSet(updated); onDone(); },
+      error: err => onError(err?.error?.detail ?? err?.error?.message ?? this.t('PAYROLL.PARAMETER_SETS.ERROR_SAVE_FIELDS')),
+    });
+  }
+
+  // ── Tranche : une pop-up par tranche (ajout / modification) ───────────────
+  // Saisie en unités du formulaire : taux en %, « jusqu'à » vide = dernière tranche.
+  readonly bracketForm   = signal<{ lower: number | null; upper: number | null; ratePct: number | null }>({ lower: null, upper: null, ratePct: null });
+  readonly bracketIndex  = signal<number | null>(null);
+  readonly bracketError  = signal<string | null>(null);
+  readonly savingBracket = signal(false);
+  private bracketSetId: number | null = null;
+  private bracketModalRef: ModalRef | null = null;
+
+  openBracketEditor(ps: ParameterSetDto, index: number | null): void {
+    const scale = this.scaleOf(ps);
+    const b = index == null ? null : scale[index];
+    // Nouvelle tranche : elle commence là où finit la dernière tranche bornée.
+    const lastEnd = scale.filter(x => x.upper != null).reduce((m, x) => Math.max(m, x.upper!), 0);
+    this.bracketForm.set(b
+      ? { lower: b.lower, upper: b.upper, ratePct: +(b.rate * 100).toFixed(4) }
+      : { lower: lastEnd, upper: null, ratePct: null });
+    this.bracketIndex.set(index);
+    this.bracketError.set(null);
+    this.bracketSetId = ps.id;
+    const tpl = this.bracketEditorTpl();
+    if (!tpl) return;
+    this.bracketModalRef = this.modalService.open({
+      title: this.t(index == null ? 'PAYROLL.PARAMETER_SETS.ADD_BRACKET_TITLE' : 'PAYROLL.PARAMETER_SETS.EDIT_BRACKET_TITLE'),
+      subtitle: this.itemTitle(ps),
+      icon: 'stacked_line_chart',
+      size: 'sm',
+      body: tpl,
+      closeOnBackdrop: false,
+    });
+  }
+
+  closeBracketEditor(): void {
+    this.bracketSetId = null;
+    this.bracketModalRef?.close();
+    this.bracketModalRef = null;
+  }
+
+  patchBracket(patch: Partial<{ lower: number | null; upper: number | null; ratePct: number | null }>): void {
+    this.bracketForm.update(f => ({ ...f, ...patch }));
+  }
+
+  /** Valeur d'un champ numérique : '' / null → null. */
+  numOrNull(v: unknown): number | null {
+    if (v === '' || v == null) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  saveBracket(): void {
+    const ps = this.selected();
+    if (!ps || ps.id !== this.bracketSetId || this.savingBracket()) return;
+    const f = this.bracketForm();
+    const index = this.bracketIndex();
+    const scale = this.scaleOf(ps);
+    const b: IrppScaleBracket = { lower: f.lower ?? NaN, upper: f.upper, rate: f.ratePct == null ? NaN : f.ratePct / 100 };
+    const others = scale.filter((_, i) => i !== index);
+    const problem = this.bracketProblem(b, others);
+    if (problem) { this.bracketError.set(this.t(problem)); return; }
+    this.bracketError.set(null);
+    this.savingBracket.set(true);
+    this.saveFieldsPatch(ps, { irppBrackets: this.scaleJson([...others, b]) },
+      msg => { this.bracketError.set(msg); this.savingBracket.set(false); },
+      () => { this.savingBracket.set(false); this.closeBracketEditor(); });
+  }
+
+  private confirmDeleteBracket(index: number): void {
+    const ps = this.detailSet();
+    const row = ps ? this.irppScaleRows(ps)[index] : null;
+    if (!ps || !row) return;
+    let deleting = false;
+    this.modalService.open({
+      title: this.t('PAYROLL.PARAMETER_SETS.DELETE_ROW_TITLE'),
+      body: this.t('PAYROLL.PARAMETER_SETS.DELETE_ROW_CONFIRM', { label: `${row['bracket']} · ${row['rate']}` }),
+      size: 'sm',
+      closeOnBackdrop: false,
+      buttons: [
+        { label: this.t('PAYROLL.ADMIN_HOME.CANCEL'), variant: 'secondary', action: r => r.close() },
+        {
+          label: this.t('PAYROLL.ADMIN_HOME.DELETE'), variant: 'primary',
+          action: r => {
+            if (deleting) return;
+            deleting = true;
+            this.saveFieldsPatch(ps, { irppBrackets: this.scaleJson(this.scaleOf(ps).filter((_, i) => i !== index)) },
+              msg => { deleting = false; r.close(); this.notification.error(msg); },
+              () => { this.notification.success(this.t('PAYROLL.PARAMETER_SETS.ROW_DELETED')); r.close(); });
+          },
+        },
+      ],
+    });
+  }
+
+  // ── Abattement & déductions familiales : une pop-up pour les deux blocs ───
+  readonly deductionsForm = signal({ ratePct: 0, cap: null as number | null, married: 0, perChild: 0, maxChildren: 0 });
+  readonly deductionsError  = signal<string | null>(null);
+  readonly savingDeductions = signal(false);
+  private deductionsSetId: number | null = null;
+  private deductionsModalRef: ModalRef | null = null;
+
+  openDeductionsEditor(ps: ParameterSetDto): void {
+    this.deductionsForm.set({
+      ratePct:     +(((ps.abattementRatePct ?? 0) * 100).toFixed(4)),
+      cap:         ps.abattementAnnualCap,
+      married:     ps.familyDeductionMarriedAmount ?? 0,
+      perChild:    ps.familyDeductionPerChildAmount ?? 0,
+      maxChildren: ps.familyDeductionMaxChildren ?? 0,
+    });
+    this.deductionsError.set(null);
+    this.deductionsSetId = ps.id;
+    const tpl = this.deductionsEditorTpl();
+    if (!tpl) return;
+    this.deductionsModalRef = this.modalService.open({
+      title: this.t('PAYROLL.PARAMETER_SETS.DEDUCTIONS_EDITOR_TITLE'),
+      subtitle: this.itemTitle(ps),
+      icon: 'calculate',
+      size: 'md',
+      body: tpl,
+      closeOnBackdrop: false,
+    });
+  }
+
+  closeDeductionsEditor(): void {
+    this.deductionsSetId = null;
+    this.deductionsModalRef?.close();
+    this.deductionsModalRef = null;
+  }
+
+  patchDeductions(patch: Partial<{ ratePct: number; cap: number | null; married: number; perChild: number; maxChildren: number }>): void {
+    this.deductionsForm.update(f => ({ ...f, ...patch }));
+  }
+
+  saveDeductions(): void {
+    const ps = this.selected();
+    if (!ps || ps.id !== this.deductionsSetId || this.savingDeductions()) return;
+    const f = this.deductionsForm();
+    const problem = f.ratePct < 0 || f.ratePct > 100 ? 'PAYROLL.PARAMETER_SETS.ERR_ABATTEMENT_RATE'
+      : (f.cap != null && f.cap < 0) || f.married < 0 || f.perChild < 0 ? 'PAYROLL.ADMIN_HOME.BENEFITS.ERR_NEGATIVE'
+      : f.maxChildren < 0 || !Number.isInteger(f.maxChildren) ? 'PAYROLL.PARAMETER_SETS.ERR_MAX_CHILDREN'
+      : null;
+    if (problem) { this.deductionsError.set(this.t(problem)); return; }
+    this.deductionsError.set(null);
+    this.savingDeductions.set(true);
+    this.saveFieldsPatch(ps, {
+      abattementRatePct:             f.ratePct / 100,
+      abattementAnnualCap:           f.cap,
+      familyDeductionMarriedAmount:  f.married,
+      familyDeductionPerChildAmount: f.perChild,
+      familyDeductionMaxChildren:    f.maxChildren,
+    },
+      msg => { this.deductionsError.set(msg); this.savingDeductions.set(false); },
+      () => { this.savingDeductions.set(false); this.closeDeductionsEditor(); });
+  }
+
+  /** Montant formaté (2 décimales max) pour les blocs abattement / déductions. */
+  irppAmount(v: number | null | undefined): string {
+    return v == null ? '—' : v.toLocaleString(this.numberLocale, { maximumFractionDigits: 2 });
+  }
+
+  irppPercent(v: number | null | undefined): string {
+    return `${((v ?? 0) * 100).toLocaleString(this.numberLocale, { maximumFractionDigits: 2 })} %`;
+  }
+
   readonly chargesView = computed<TableRow[]>(() => {
     const ps = this.detailSet();
     if (!ps) return [];
@@ -2387,6 +2646,9 @@ function positive(ctrl: AbstractControl): ValidationErrors | null {
  * seule dernière tranche, taux ≥ 0, tranches croissantes sans chevauchement. L'erreur porte
  * un code, traduit sous PAYROLL.ADMIN.ERR.IRPP.*.
  */
+/** Tranche du barème affiché / édité dans l'onglet « Barème IRPP » (taux décimal). */
+interface IrppScaleBracket { lower: number; upper: number | null; rate: number; }
+
 function irppBracketsValidator(ctrl: AbstractControl): ValidationErrors | null {
   const raw = (ctrl.value ?? '').toString().trim();
   if (!raw) return null;                       // vide : laissé à `required`

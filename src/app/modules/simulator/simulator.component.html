@@ -855,6 +855,44 @@
             [rows]="filteredIrppRows()"
             [config]="resultTableConfig()" />
         }
+          <!-- Du net imposable à la base IRPP : abattement et déductions, invisibles ailleurs. -->
+          @if (irppBaseSteps(); as s) {
+            <section class="flex flex-col gap-3">
+              <p class="text-label-caps font-extrabold uppercase tracking-widest text-on-surface-variant m-0">
+                {{ 'PAYROLL.SIMULATOR.DETAIL.IRPP_BASE.TITLE' | translate }}
+              </p>
+              <div class="rounded-xl border border-outline-variant bg-surface-container-lowest px-6 py-4 flex flex-col gap-2 text-body-md">
+                <div class="flex justify-between gap-4">
+                  <span>{{ 'PAYROLL.SIMULATOR.DETAIL.IRPP_BASE.ANNUAL' | translate: { monthly: money(s.monthly, '', 2) } }}</span>
+                  <span class="tabular-nums">{{ money(s.annual, '', 2) }}</span>
+                </div>
+                <div class="flex justify-between gap-4">
+                  <span>
+                    @if (s.cap != null) {
+                      {{ 'PAYROLL.SIMULATOR.DETAIL.IRPP_BASE.ABATTEMENT_CAPPED' | translate: { rate: percent(s.rate), cap: money(s.cap, '', 0) } }}
+                    } @else {
+                      {{ 'PAYROLL.SIMULATOR.DETAIL.IRPP_BASE.ABATTEMENT' | translate: { rate: percent(s.rate) } }}
+                    }
+                  </span>
+                  <span class="tabular-nums">− {{ money(s.abattement, '', 2) }}</span>
+                </div>
+                @if (s.family != null) {
+                  <div class="flex justify-between gap-4">
+                    <span>{{ 'PAYROLL.SIMULATOR.DETAIL.IRPP_BASE.FAMILY' | translate }}</span>
+                    <span class="tabular-nums">− {{ money(s.family, '', 2) }}</span>
+                  </div>
+                  <div class="flex justify-between gap-4 border-t border-outline-variant pt-2 font-bold">
+                    <span>{{ 'PAYROLL.SIMULATOR.DETAIL.IRPP_BASE.BASE' | translate }}</span>
+                    <span class="tabular-nums">{{ money(s.base, '', 0) }}</span>
+                  </div>
+                }
+                <div class="flex justify-between gap-4 text-on-surface-variant">
+                  <span>{{ 'PAYROLL.SIMULATOR.DETAIL.IRPP_BASE.IRPP' | translate }}</span>
+                  <span class="tabular-nums">{{ money(s.irppAnnual, '', 2) }} · {{ 'PAYROLL.SIMULATOR.DETAIL.IRPP_BASE.MONTHLY' | translate: { amount: money(s.irppMonthly, '', 2) } }}</span>
+                </div>
+              </div>
+            </section>
+          }
       </div>
     </div>
   </div>

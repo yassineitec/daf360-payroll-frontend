@@ -542,6 +542,65 @@ export class SimulatorComponent implements OnDestroy {
       return this.t('PAYROLL.SIMULATOR.BLOCKING.AMOUNT_REQUIRED');
     }
     if (Number(amount) <= 0) return this.t('PAYROLL.SIMULATOR.BLOCKING.AMOUNT_POSITIVE');
+  /** IRPP annuel sur une base — même règle que `IrppCalculatorService` (taux ≥ 1 lus en %). */
+  private annualIrpp(brackets: IrppBracketRow[], base: number): number {
+    let total = 0;
+    for (const b of brackets) {
+      if (base <= b.lower) break;
+      const top = b.upper == null ? base : Math.min(base, b.upper);
+      const rate = b.rate >= 1 ? b.rate / 100 : b.rate;
+      total += Math.max(top - b.lower, 0) * rate;
+    }
+    return total;
+  }
+
+  /**
+   * Passage du net imposable mensuel à la base IRPP annuelle, comme le moteur
+   * (`PayrollSimulatorService`) : × 12 − abattement (plafonné) − déductions familiales, arrondi
+   * à l'unité supérieure. La situation familiale n'étant pas enregistrée avec la simulation, la
+   * déduction est retrouvée en cherchant la combinaison (marié, enfants) qui redonne l'IRPP
+   * enregistré. Rien n'est affiché si aucune ne colle (jeu modifié depuis le calcul, etc.) ;
+   * si plusieurs collent (IRPP nul…), la ligne déductions et la base finale sont omises.
+   */
+  readonly irppBaseSteps = computed(() => {
+    const r = this.result();
+    const ps = this.usedPs();
+    const brackets = this.usedIrppBrackets();
+    if (!r || !ps || !brackets.length || r.taxableBase == null || r.irppAmount == null) return null;
+
+    const annual = r.taxableBase * 12;
+    const rate = ps.abattementRatePct ?? 0;
+    let abattement = Math.max(annual * rate, 0);
+    if (ps.abattementAnnualCap != null) abattement = Math.min(abattement, ps.abattementAnnualCap);
+    const afterAbattement = annual - abattement;
+
+    const married = ps.familyDeductionMarriedAmount ?? 0;
+    const perChild = ps.familyDeductionPerChildAmount ?? 0;
+    const maxChildren = ps.familyDeductionMaxChildren ?? 0;
+    const target = r.irppAmount * 12;
+    const matches = new Set<number>();
+    for (const m of married > 0 ? [0, married] : [0]) {
+      for (let k = 0; k <= (perChild > 0 ? maxChildren : 0); k++) {
+        const family = m + k * perChild;
+        const base = Math.ceil(Math.max(afterAbattement - family, 0));
+        if (Math.abs(this.annualIrpp(brackets, base) - target) < 0.1) matches.add(family);
+      }
+    }
+    if (!matches.size) return null;
+    const family = matches.size === 1 ? [...matches][0] : null;
+    return {
+      annual,
+      monthly: r.taxableBase,
+      rate,
+      cap: ps.abattementAnnualCap,
+      abattement,
+      family,
+      base: family == null ? null : Math.ceil(Math.max(afterAbattement - family, 0)),
+      irppAnnual: target,
+      irppMonthly: r.irppAmount,
+    };
+  });
+
     return null;
   });
 
