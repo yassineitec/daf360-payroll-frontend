@@ -28,6 +28,7 @@ import {
   type TableConfig,
   type TableColumn,
   type TableRow,
+  MultiDatePickerComponent,
 } from '@khalilrebhiitec/daf360';
 import { PayrollApiService, BenefitCatalogueDto, PaysDto, FxRateDto } from '../../core/payroll-api.service';
 import { EmployeeProfileDetail, HrProfileService, HrContractType, contractTypeLabel } from '../../core/hr-profile.service';
@@ -39,6 +40,7 @@ import {
 } from '../../core/payroll-nav';
 import {
   EmployeeConfigService, EmployeePayrollConfigDto, EmployeePayrollBonusDto, EmployeePayrollConfigHistoryDto,
+  toEditableConfig,
 } from './employee-config.service';
 import { recallEmployee } from './employee-config-employee';
 import { PageGuideComponent } from '../../shared/guide/page-guide.component';
@@ -89,6 +91,7 @@ const GUIDE_STEPS: GuideStep[] = [
     ButtonComponent, CardComponent, CheckboxComponent, DataTableComponent, FormFieldComponent,
     EmployeeDetailsCardComponent, MetricCardComponent, PageComponent, PageHeaderComponent, SearchToolbarComponent, SectionCardComponent,
     SectionTitleComponent, SelectComponent, SkeletonComponent, TabsComponent, PageGuideComponent,
+    MultiDatePickerComponent,
   ],
   templateUrl: './employee-config.component.html',
   styleUrl: './employee-config.component.scss',
@@ -416,6 +419,7 @@ export class EmployeeConfigComponent implements OnInit {
     // Picking back the native/working currency is treated as null, not an explicit match —
     // same "no conversion" convention the backend already uses.
     this.config.set({ ...cfg, inputCurrency: picked && picked !== working ? picked : null });
+    this.scheduleNet();
   }
 
   // ── État ───────────────────────────────────────────────────────────────
@@ -431,23 +435,42 @@ export class EmployeeConfigComponent implements OnInit {
     return [...c.selectedBenefitCodes].sort().join(',');
   }
 
-  /** Pays, contrat, avantages ou situation familiale modifiés — ce qui change le calcul du
-   *  net côté serveur. */
-  private readonly calcInputsChanged = computed(() => {
-    const a = this.config(), b = this.savedConfig();
-    if (!a || !b) return false;
-    return a.paysId !== b.paysId || a.contractType !== b.contractType
-      || a.isMarried !== b.isMarried || a.childrenCount !== b.childrenCount
-      || EmployeeConfigComponent.benefitKey(a) !== EmployeeConfigComponent.benefitKey(b);
-  });
-
+  /** Modifications non enregistrées. La situation familiale n'en fait pas partie : elle est
+   *  lue sur la fiche RH, pas éditée ici. */
   readonly dirty = computed(() => {
     const a = this.config(), b = this.savedConfig();
     if (!a || !b) return false;
-    return this.calcInputsChanged()
-      || a.currentGrossSalary !== b.currentGrossSalary || a.currentNetSalary !== b.currentNetSalary;
+    return a.paysId !== b.paysId || a.contractType !== b.contractType
+      || EmployeeConfigComponent.benefitKey(a) !== EmployeeConfigComponent.benefitKey(b)
+      || a.currentGrossSalary !== b.currentGrossSalary || a.inputCurrency !== b.inputCurrency;
   });
+
+  /** « Marié(e) » / « Non marié(e) » — situation familiale lue sur la fiche RH. */
+  readonly familyMarriedText = computed(() =>
+    this.t(this.config()?.isMarried ? 'PAYROLL.EMPLOYEE_CONFIG.MARRIED_YES' : 'PAYROLL.EMPLOYEE_CONFIG.MARRIED_NO'));
+
+  readonly familyHint = computed(() =>
+    this.t(this.config()?.familyFromHr === false
+      ? 'PAYROLL.EMPLOYEE_CONFIG.FAMILY_HR_UNAVAILABLE'
+      : 'PAYROLL.EMPLOYEE_CONFIG.FAMILY_FROM_HR'));
   readonly reason = signal('');
+
+  /** Date d'effet du salaire saisi (yyyy-MM-dd), aujourd'hui par défaut — pour information :
+   *  le calcul de paie utilise toujours la dernière configuration enregistrée (payroll V37). */
+  readonly effectiveDate = signal(EmployeeConfigComponent.todayIso());
+
+  private static todayIso(d: Date = new Date()): string {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  effectiveDateValue(): Date | null {
+    const v = this.effectiveDate();
+    return v ? new Date(v + 'T00:00:00') : null;
+  }
+
+  onEffectiveDate(v: Date | Date[] | null): void {
+    this.effectiveDate.set(v && !Array.isArray(v) ? EmployeeConfigComponent.todayIso(v) : '');
+  }
   /** Enregistrement tenté sans motif : l'erreur s'affiche sous le champ. */
   readonly reasonTried = signal(false);
   readonly reasonError = computed(() =>
@@ -504,17 +527,15 @@ export class EmployeeConfigComponent implements OnInit {
   });
 
   // ── Net calculé automatiquement à partir du brut ──────────────────────────
-  // Le net n'est plus saisi : il est recalculé (après une courte pause de frappe) à chaque
-  // changement du brut, par le serveur. ⚠ Le serveur calcule avec le pays, le contrat et les
-  // avantages ENREGISTRÉS : après un enregistrement qui les change, le net est recalculé et
-  // réenregistré (voir `save`).
+  // Le net n'est pas saisi : le moteur de paie le calcule (sans rien enregistrer) avec le
+  // pays, le contrat et le brut AFFICHÉS, après une courte pause, dès que l'un d'eux change.
+  // À l'enregistrement, le serveur le recalcule lui-même à partir du brut enregistré.
 
   private grossTimer: ReturnType<typeof setTimeout> | null = null;
 
-  /** Aide sous le net : comment il est obtenu, ou pourquoi il n'est pas encore à jour. */
+  /** Aide sous le net : comment il est obtenu. */
   readonly netHint = computed(() => {
-    if (this.savedConfig()?.paysId == null) return this.t('PAYROLL.EMPLOYEE_CONFIG.NET_NEEDS_PAYS');
-    if (this.calcInputsChanged()) return this.t('PAYROLL.EMPLOYEE_CONFIG.NET_AFTER_SAVE');
+    if (this.config()?.paysId == null) return this.t('PAYROLL.EMPLOYEE_CONFIG.NET_NEEDS_PAYS');
     return this.t('PAYROLL.EMPLOYEE_CONFIG.NET_AUTO_HINT');
   });
 
@@ -736,7 +757,8 @@ export class EmployeeConfigComponent implements OnInit {
     this.loading.set(true);
     this.loadError.set(null);
     this.svc.get(userId).subscribe({
-      next: cfg => {
+      next: dto => {
+        const cfg = toEditableConfig(dto);
         this.config.set(cfg);
         this.savedConfig.set(cfg);
         this.loading.set(false);
@@ -799,21 +821,13 @@ export class EmployeeConfigComponent implements OnInit {
     this.config.set({ ...cfg, paysId, selectedBenefitCodes: [] });
     this.loadBenefitsFor(paysId);
     this.loadContractTypesFor(paysId);
+    this.scheduleNet();
   }
 
   onContractTypeChange(contractType: string): void {
     const cfg = this.config();
     if (cfg) this.config.set({ ...cfg, contractType });
-  }
-
-  onMarriedChange(isMarried: boolean): void {
-    const cfg = this.config();
-    if (cfg) this.config.set({ ...cfg, isMarried });
-  }
-
-  onChildrenCountChange(childrenCount: number | null): void {
-    const cfg = this.config();
-    if (cfg) this.config.set({ ...cfg, childrenCount: childrenCount ?? 0 });
+    this.scheduleNet();
   }
 
   /** Brut saisi → net recalculé automatiquement après une courte pause de frappe. */
@@ -821,38 +835,42 @@ export class EmployeeConfigComponent implements OnInit {
     const cfg = this.config();
     if (!cfg) return;
     this.config.set({ ...cfg, currentGrossSalary });
+    this.scheduleNet();
+  }
+
+  /** Recalcul du net après une courte pause (brut, devise, pays ou contrat changé). */
+  private scheduleNet(): void {
     if (this.grossTimer) clearTimeout(this.grossTimer);
-    if (currentGrossSalary == null) {
-      this.config.set({ ...this.config()!, currentNetSalary: null });
+    const cfg = this.config();
+    if (!cfg) return;
+    if (cfg.currentGrossSalary == null || cfg.currentGrossSalary <= 0) {
+      this.config.set({ ...cfg, currentNetSalary: null });
       return;
     }
     this.grossTimer = setTimeout(() => this.calculateNet(), 600);
   }
 
-  /** Net du brut courant, par le serveur — avec la configuration ENREGISTRÉE (pays, contrat,
-   *  avantages). `then` reçoit le net obtenu. */
-  calculateNet(then?: (net: number) => void, otherwise?: () => void): void {
+  /** Net du brut affiché, par le moteur de paie — avec le pays et le contrat AFFICHÉS
+   *  (pas forcément enregistrés). Rien n'est enregistré. */
+  calculateNet(): void {
     const cfg = this.config();
-    if (cfg === null || cfg.currentGrossSalary == null || this.savedConfig()?.paysId == null) { otherwise?.(); return; }
-    const gross = cfg.currentGrossSalary;
+    if (cfg === null || cfg.currentGrossSalary == null || cfg.currentGrossSalary <= 0 || cfg.paysId == null) return;
+    const inputs = EmployeeConfigComponent.netInputsKey(cfg);
     this.calculatingNet.set(true);
-    this.svc.calculateNet(this.userId, gross, cfg.inputCurrency).subscribe({
+    this.svc.calculateNet(this.userId, cfg.currentGrossSalary, cfg.inputCurrency, cfg.paysId, cfg.contractType).subscribe({
       next: res => {
         this.calculatingNet.set(false);
-        // Relit la config courante : l'utilisateur a pu modifier un autre champ entre-temps,
-        // et un brut changé depuis rend ce net périmé.
+        // Relit la config courante : un brut / une devise / un pays / un contrat changé
+        // entre-temps rend ce net périmé (un autre calcul est déjà programmé).
         const current = this.config();
-        if (current && current.currentGrossSalary === gross) {
+        if (current && EmployeeConfigComponent.netInputsKey(current) === inputs) {
           this.config.set({ ...current, currentNetSalary: res.netInHand });
-          then?.(res.netInHand);
-        } else {
-          otherwise?.();
         }
       },
-      error: () => {
+      error: err => {
         this.calculatingNet.set(false);
-        this.notify.error(this.t('PAYROLL.EMPLOYEE_CONFIG.CALCULATE_ERROR'));
-        otherwise?.();
+        const body = (err as { error?: { detail?: string } } | null)?.error;
+        this.notify.error(body?.detail ?? this.t('PAYROLL.EMPLOYEE_CONFIG.CALCULATE_ERROR'));
       },
     });
   }
@@ -928,6 +946,10 @@ export class EmployeeConfigComponent implements OnInit {
     this.configModalRef = null;
   }
 
+  private static netInputsKey(c: EmployeePayrollConfigDto): string {
+    return [c.currentGrossSalary, c.inputCurrency, c.paysId, c.contractType].join('|');
+  }
+
   /** Revient à la dernière version enregistrée (référentiels du pays rechargés si besoin). */
   resetConfig(): void {
     const saved = this.savedConfig();
@@ -957,9 +979,8 @@ export class EmployeeConfigComponent implements OnInit {
 
   /**
    * Enregistre la configuration. Sans motif : l'erreur s'affiche sous le champ (le bouton
-   * n'est plus grisé sans explication). Si pays, contrat ou avantages ont changé, le net est
-   * ensuite recalculé avec la nouvelle configuration et, s'il a bougé, réenregistré avec le
-   * même motif — le serveur ne calcule qu'avec la configuration enregistrée.
+   * n'est plus grisé sans explication). Le net enregistré est recalculé par le serveur à
+   * partir du brut enregistré — plus de second enregistrement « net recalculé ».
    */
   save(): void {
     const cfg = this.config();
@@ -967,41 +988,63 @@ export class EmployeeConfigComponent implements OnInit {
     // Contrat sans règles de paie dans le pays : bloqué (le message est sous le select).
     if (this.contractUnpriced()) { this.saveError.set(this.contractError()); return; }
     if (this.reason().trim() === '') { this.reasonTried.set(true); return; }
-    if ((cfg.currentGrossSalary ?? 0) < 0 || (cfg.currentNetSalary ?? 0) < 0) {
+    if ((cfg.currentGrossSalary ?? 0) < 0) {
       this.saveError.set(this.t('PAYROLL.EMPLOYEE_CONFIG.NEGATIVE_SALARY'));
       return;
     }
-    const recalc = this.calcInputsChanged() && cfg.currentGrossSalary != null;
-    const reason = this.reason().trim();
+    if (this.grossTimer) clearTimeout(this.grossTimer);
     this.saveError.set(null);
     this.saving.set(true);
-    this.upsert(cfg, reason, updated => {
-      if (!recalc) { this.afterSave(); return; }
-      this.calculateNet(
-        net => {
-          if (net === updated.currentNetSalary) { this.afterSave(); return; }
-          this.upsert({ ...this.config()!, currentNetSalary: net },
-            `${reason} ${this.t('PAYROLL.EMPLOYEE_CONFIG.NET_RECALC_SUFFIX')}`, () => this.afterSave());
-        },
-        // Recalcul impossible (erreur déjà signalée) : l'enregistrement principal est fait.
-        () => this.afterSave(),
-      );
-    });
+    this.upsert(cfg, this.reason().trim(), () => this.afterSave());
   }
 
   private upsert(cfg: EmployeePayrollConfigDto, reason: string, done: (u: EmployeePayrollConfigDto) => void): void {
+    // Payroll V38: an employee who already has a salary — the change goes to the Country
+    // Director (finance's approval queue) and applies only once approved. The first salary
+    // is saved directly (its cost was approved at hiring).
+    const saved = this.savedConfig();
+    if (saved?.updatedAt != null && saved.currentGrossSalary != null) {
+      this.svc.submitSalaryChange(this.userId, {
+        paysId: cfg.paysId!,
+        contractType: cfg.contractType,
+        selectedBenefitCodes: cfg.selectedBenefitCodes,
+        grossSalary: cfg.currentGrossSalary ?? 0,
+        inputCurrency: cfg.inputCurrency,
+        effectiveDate: this.effectiveDate() || null,
+        reason,
+      }).subscribe({
+        next: () => {
+          this.effectiveDate.set(EmployeeConfigComponent.todayIso());
+          this.saving.set(false);
+          this.reason.set('');
+          this.reasonTried.set(false);
+          // Nothing applied yet: the page shows the saved configuration again.
+          this.config.set(saved);
+          this.notify.success(this.t('PAYROLL.EMPLOYEE_CONFIG.SUBMITTED_FOR_APPROVAL'));
+          this.configModalRef?.close();
+          this.configModalRef = null;
+        },
+        error: err => {
+          const body = (err as { error?: { detail?: string; message?: string } } | null)?.error;
+          this.saving.set(false);
+          this.saveError.set(body?.detail ?? body?.message ?? this.t('PAYROLL.EMPLOYEE_CONFIG.SAVE_ERROR'));
+        },
+      });
+      return;
+    }
     this.svc.upsert(this.userId, {
       paysId: cfg.paysId!,
       contractType: cfg.contractType,
       selectedBenefitCodes: cfg.selectedBenefitCodes,
       currentGrossSalary: cfg.currentGrossSalary,
       currentNetSalary: cfg.currentNetSalary,
-      isMarried: cfg.isMarried,
-      childrenCount: cfg.childrenCount,
       reason,
       inputCurrency: cfg.inputCurrency,
+      effectiveDate: this.effectiveDate() || null,
     }).subscribe({
-      next: updated => {
+      next: dto => {
+        this.effectiveDate.set(EmployeeConfigComponent.todayIso());
+        const updated = toEditableConfig(dto);
         this.config.set(updated);
         this.savedConfig.set(updated);
         done(updated);

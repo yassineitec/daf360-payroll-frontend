@@ -41,6 +41,7 @@ import {
 } from '@khalilrebhiitec/daf360';
 import { PayrollApiService, type PaysDto } from '../../core/payroll-api.service';
 import { rememberEmployee } from './engine-results-employee';
+import { EmployeeConfigService } from '../employee-config/employee-config.service';
 import { TableSort, delegatedSort, tableTools, toTableSort } from '../../shared/table-tools';
 import { EngineResultsListStateService } from './engine-results-list-state.service';
 import { PaysNamesService } from '../../core/pays-names.service';
@@ -90,6 +91,7 @@ export class EngineResultsListComponent implements OnInit {
   private readonly engineApi = inject(PayrollEngineService);
   private readonly currency  = inject(CurrencyService);
   private readonly payrollApi = inject(PayrollApiService);
+  private readonly employeeConfigs = inject(EmployeeConfigService);
   private readonly router    = inject(Router);
   private readonly route     = inject(ActivatedRoute);
   private readonly translate = inject(TranslateService);
@@ -803,10 +805,14 @@ export class EngineResultsListComponent implements OnInit {
     return [...years].sort((a, b) => b - a).map(y => ({ value: String(y), label: String(y) }));
   });
 
-  /** Contrat appliqué à un collaborateur, ou `null` si son contrat n'est pas tarifé. */
+  /** userId → contrat de la configuration paie enregistrée. */
+  private readonly batchSavedContracts = signal<Record<number, string>>({});
+
+  /** Contrat appliqué à un collaborateur — celui de sa configuration paie enregistrée, sinon
+   *  celui de sa fiche RH — ou `null` si ce contrat n'est pas tarifé. */
   private batchContractOf(e: EmployeeListItem): string | null {
     const types = this.batchContracts();
-    const code = e.contractType?.trim().toUpperCase();
+    const code = (this.batchSavedContracts()[e.userId] ?? e.contractType)?.trim().toUpperCase();
     const hr = code ? (EngineResultsListComponent.LEGACY_CONTRACT[code] ?? code) : 'CDI';
     return types.includes(hr) ? hr : null;
   }
@@ -902,6 +908,7 @@ export class EngineResultsListComponent implements OnInit {
     this.batchFinished.set(false);
     this.batchFailures.set([]);
     this.batchStaff.set([]);
+    this.batchSavedContracts.set({});
     this.batchDoneIds.set(new Set());
     this.batchContracts.set([]);
     this.batchPsMissing.set(false);
@@ -910,15 +917,26 @@ export class EngineResultsListComponent implements OnInit {
     const y = this.batchYear(), m = this.batchMonth();
     const first = `${y}-${String(m).padStart(2, '0')}-01`;
     const last = `${y}-${String(m).padStart(2, '0')}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+    const staffWithSaved$ = this.hrService.listEmployees({ paysId, page: 0, size: ALL_EMPLOYEES, sort: 'fullName,asc' }).pipe(
+      map(p => p.content ?? []),
+      catchError(() => of([] as EmployeeListItem[])),
+      // Contrats des configurations paie enregistrées : prioritaires sur la fiche RH (même
+      // contrat que le net affiché dans « Salaires des collaborateurs »).
+      switchMap(staff => staff.length === 0
+        ? of({ staff, saved: {} as Record<number, string> })
+        : this.employeeConfigs.getSavedContractTypes(staff.map(e => e.userId)).pipe(
+            catchError(() => of({} as Record<number, string>)),
+            map(saved => ({ staff, saved })))),
+    );
     forkJoin({
-      staff: this.hrService.listEmployees({ paysId, page: 0, size: ALL_EMPLOYEES, sort: 'fullName,asc' })
-        .pipe(map(p => p.content ?? []), catchError(() => of([] as EmployeeListItem[]))),
+      staff: staffWithSaved$,
       done: this.engineApi.getEmployeesWithResults({ paysId, from: first, to: last })
         .pipe(catchError(() => of([] as number[]))),
       ps: this.payrollApi.getActiveParameterSet(paysId).pipe(catchError(() => of(null))),
     }).subscribe(r => {
       if (seq !== this.prepSeq) return;
-      this.batchStaff.set(r.staff);
+      this.batchStaff.set(r.staff.staff);
+      this.batchSavedContracts.set(r.staff.saved);
       this.batchDoneIds.set(new Set(r.done));
       this.batchContracts.set([...new Set((r.ps?.socialChargeRates ?? []).map(x => x.contractType))]);
       this.batchPsMissing.set(!r.ps);

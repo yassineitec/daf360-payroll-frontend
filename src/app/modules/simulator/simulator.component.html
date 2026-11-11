@@ -436,7 +436,7 @@
                 <div class="flex flex-col sm:flex-row gap-6">
                   <div class="flex-1 min-w-0 flex items-end">
                     <daf-checkbox
-                      [options]="{ label: 'PAYROLL.SIMULATOR.STEP2.IS_MARRIED' | translate }"
+                      [options]="{ label: 'PAYROLL.SIMULATOR.STEP2.IS_MARRIED' | translate, disabled: employeeFamily() === 'hr' || employeeFamily() === 'loading' }"
                       [checked]="boolFieldValue('isMarried')"
                       (checkedChange)="setBoolField('isMarried', $event)"
                     />
@@ -447,12 +447,20 @@
                         label: 'PAYROLL.SIMULATOR.STEP2.CHILDREN_COUNT' | translate,
                         type: 'number',
                         align: 'end',
+                        readonly: employeeFamily() === 'hr' || employeeFamily() === 'loading',
                       }"
                       [value]="fieldValue('children')"
                       (valueChange)="setFieldValue('children', $event)"
                     />
                   </div>
                 </div>
+                <!-- Employé : situation familiale reprise de son dossier RH (le serveur applique la
+                     même règle) ; candidat : saisie libre. -->
+                @if (employeeFamily(); as fam) {
+                  <p class="text-[12px] text-on-surface-variant">
+                    {{ ('PAYROLL.SIMULATOR.STEP2.FAMILY_' + (fam === 'hr' ? 'FROM_HR' : fam === 'loading' ? 'LOADING' : 'UNKNOWN')) | translate }}
+                  </p>
+                }
               </div>
             }
 

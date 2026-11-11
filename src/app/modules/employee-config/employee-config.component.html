@@ -165,7 +165,7 @@
              recherche avec « Ajouter une prime » à droite, tableau, pop-up d'ajout. Chaque
              ajout / suppression est enregistré immédiatement. ══ -->
         @case ('bonuses') {
-          <p class="ec-hint">{{ 'PAYROLL.EMPLOYEE_CONFIG.BONUSES_HINT' | translate }}</p>
+          <p class="ec-hint">{{ 'PAYROLL.EMPLOYEE_CONFIG.BONUSES_HINT' | translate }} {{ 'PAYROLL.EMPLOYEE_CONFIG.BONUSES_NOT_IN_PAYSLIP' | translate }}</p>
           <daf-search-toolbar data-guide="ec-detail-bonuses"
             [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
             [value]="bonusSearch()" [debounce]="200" (valueChange)="bonusSearch.set($event)"
@@ -274,20 +274,19 @@
                 }
               </div>
   
-              <!-- 3. Situation familiale — alimente la déduction IRPP « marié »/« par enfant »
-                   configurée sur le jeu de paramètres actif du pays (0 par défaut = aucun effet). -->
+              <!-- 3. Situation familiale — alimente la déduction IRPP « marié »/« par enfant ».
+                   Lue sur la fiche RH (source de vérité), en lecture seule ici : elle se
+                   modifie dans le dossier du collaborateur côté RH. -->
               <div class="ec-block" data-guide="ec-detail-family">
                 <daf-section-title [title]="'PAYROLL.EMPLOYEE_CONFIG.FAMILY_SECTION' | translate" />
                 <div class="field-row">
-                  <daf-checkbox
-                    [options]="{ label: 'PAYROLL.EMPLOYEE_CONFIG.IS_MARRIED' | translate }"
-                    [checked]="cfg.isMarried"
-                    (checkedChange)="onMarriedChange($event)">
-                  </daf-checkbox>
                   <daf-form-field
-                    [options]="{ label: 'PAYROLL.EMPLOYEE_CONFIG.CHILDREN_COUNT' | translate, type: 'number', align: 'end', placeholder: '0', fullWidth: true }"
-                    [value]="cfg.childrenCount"
-                    (valueChange)="onChildrenCountChange(toNumber($event))">
+                    [options]="{ label: 'PAYROLL.EMPLOYEE_CONFIG.IS_MARRIED' | translate, fullWidth: true, readonly: true, hint: familyHint() }"
+                    [value]="familyMarriedText()">
+                  </daf-form-field>
+                  <daf-form-field
+                    [options]="{ label: 'PAYROLL.EMPLOYEE_CONFIG.CHILDREN_COUNT' | translate, type: 'number', align: 'end', fullWidth: true, readonly: true }"
+                    [value]="cfg.childrenCount">
                   </daf-form-field>
                 </div>
                 @if (hrFamilyDiff(); as diff) {
@@ -299,6 +298,7 @@
               <div class="ec-block" data-guide="ec-detail-benefits">
                 <daf-section-title [title]="('PAYROLL.EMPLOYEE_CONFIG.BENEFITS' | translate) + (benefits().length ? ' · ' + selectedBenefitCount() + ' / ' + benefits().length : '')" />
                 @if (benefits().length) {
+                  <p class="ec-hint">{{ 'PAYROLL.EMPLOYEE_CONFIG.BENEFITS_INFO_ONLY' | translate }}</p>
                   <div class="ec-benefits">
                     @for (b of benefits(); track b.benefitCode) {
                       <daf-checkbox
@@ -319,6 +319,10 @@
                    sur « Enregistrer » (le bouton n'est plus grisé sans explication). -->
               <div class="ec-block" data-guide="ec-detail-reason">
                 <daf-section-title [title]="'PAYROLL.EMPLOYEE_CONFIG.SECTION_REASON' | translate" />
+                <daf-multi-date-picker
+                  [config]="{ label: ('PAYROLL.EMPLOYEE_CONFIG.EFFECTIVE_DATE' | translate), selectionMode: 'single', required: true }"
+                  [value]="effectiveDateValue()" (valueChange)="onEffectiveDate($event)" />
+                <p class="ec-hint">{{ 'PAYROLL.EMPLOYEE_CONFIG.EFFECTIVE_DATE_HINT' | translate }}</p>
                 <daf-form-field
                   [options]="{ label: 'PAYROLL.EMPLOYEE_CONFIG.REASON' | translate, type: 'textarea', rows: 2, required: true, fullWidth: true, placeholder: 'PAYROLL.EMPLOYEE_CONFIG.REASON_PLACEHOLDER' | translate, hint: 'PAYROLL.EMPLOYEE_CONFIG.REASON_HINT' | translate, error: reasonError() }"
                   [value]="reason()"

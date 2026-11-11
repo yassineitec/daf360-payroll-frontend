@@ -13,6 +13,7 @@ import { PayrollApiService, PaysDto } from '../../core/payroll-api.service';
 import { CurrencyService } from '../../core/currency.service';
 import { EmployeeProfileDetail, HrProfileService, contractTypeLabel } from '../../core/hr-profile.service';
 import { recallEmployee } from './engine-results-employee';
+import { EmployeeConfigService } from '../employee-config/employee-config.service';
 import { EngineResultDetailComponent } from './engine-result-detail.component';
 import { PageGuideComponent } from '../../shared/guide/page-guide.component';
 import type { GuideStep } from '../../shared/guide/page-guide.types';
@@ -694,6 +695,16 @@ export class EngineResultsComponent {
     : this.calcPsMissing()         ? this.t('PAYROLL.ENGINE_RUN.CONTRACT_NO_PS')
     :                                this.t('PAYROLL.ENGINE_RUN.CONTRACT_PLACEHOLDER'));
 
+  private readonly employeeConfigs = inject(EmployeeConfigService);
+
+  /** Contrat de la configuration paie ENREGISTRÉE (« Salaires des collaborateurs ») — celui
+   *  avec lequel le net de cette configuration a été calculé ; `null` si jamais enregistrée
+   *  ou sans droit de lecture de la configuration. */
+  private readonly savedContract = signal<string | null>(null);
+  /** Contrat proposé avant de connaître celui de la configuration enregistrée : s'il est
+   *  toujours sélectionné à l'arrivée de ce dernier, l'utilisateur n'en a pas choisi d'autre. */
+  private calcDefaultBeforeSaved = '';
+
   /** Contrat de la fiche RH, en code de la paie (« CDI », « CIVP »…). */
   private readonly hrContract = computed(() => {
     const code = (this.profile()?.contractType ?? this.employee()?.contractType)?.trim().toUpperCase();
@@ -761,6 +772,18 @@ export class EngineResultsComponent {
     // Pays du collaborateur (liste), sinon celui de ses résultats.
     const paysId = paysOverride ?? this.employee()?.paysId ?? this.results().find(r => r.paysId != null)?.paysId ?? null;
     this.calcPaysId.set(null);
+    this.savedContract.set(null);
+    this.employeeConfigs.getSavedContractTypes([this.employeeId])
+      .pipe(catchError(() => of({} as Record<number, string>)))
+      .subscribe(map => {
+        const saved = map[this.employeeId]?.trim().toUpperCase() ?? null;
+        this.savedContract.set(saved);
+        // Contrats déjà chargés et contrat encore celui proposé par défaut : on bascule sur
+        // celui de la configuration enregistrée s'il est tarifé.
+        if (saved && this.calcContracts().includes(saved) && this.calcContract() === this.calcDefaultBeforeSaved) {
+          this.calcContract.set(saved);
+        }
+      });
     this.onCalcPaysChange(paysId != null ? [String(paysId)] : []);
     if (!this.calcPaysList().length) {
       this.payrollApi.listPayrollPays().pipe(catchError(() => of([] as PaysDto[])))
@@ -801,9 +824,13 @@ export class EngineResultsComponent {
       this.calcContracts.set(types);
       this.calcPsMissing.set(!ps);
       this.calcContractsLoading.set(false);
-      // Contrat de la fiche RH s'il est tarifé, sinon CDI, sinon le premier.
+      // Contrat de la configuration paie enregistrée s'il est tarifé (même contrat que le net
+      // affiché dans « Salaires des collaborateurs »), sinon celui de la fiche RH, sinon CDI,
+      // sinon le premier.
+      const saved = this.savedContract();
       const hr = this.hrContract();
-      this.calcContract.set(hr && types.includes(hr) ? hr : types.includes('CDI') ? 'CDI' : types[0] ?? '');
+      this.calcDefaultBeforeSaved = hr && types.includes(hr) ? hr : types.includes('CDI') ? 'CDI' : types[0] ?? '';
+      this.calcContract.set(saved && types.includes(saved) ? saved : this.calcDefaultBeforeSaved);
     });
   }
 

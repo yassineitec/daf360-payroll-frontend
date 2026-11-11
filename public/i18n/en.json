@@ -449,7 +449,10 @@
         "WORKING_DAYS": "Days worked / month",
         "WORKING_DAYS_SUFFIX": "d",
         "IS_MARRIED": "Married",
-        "CHILDREN_COUNT": "Number of dependent children"
+        "CHILDREN_COUNT": "Number of dependent children",
+        "FAMILY_FROM_HR": "Family situation taken from the employee's HR file — change it in their file.",
+        "FAMILY_LOADING": "Reading the employee's HR file…",
+        "FAMILY_UNKNOWN": "HR file unreadable: enter the family situation (the server uses the HR file if it can read it)."
       },
 
       "STEP3": {
@@ -554,11 +557,15 @@
     "EMPLOYEE_CONFIG": {
       "TITLE": "Employee salaries",
       "REASON_REQUIRED": "Enter the reason for the change to save.",
-      "NET_AUTO_HINT": "Calculated automatically from the gross, with the country's payroll rules in force.",
-      "NET_AFTER_SAVE": "Country, contract or benefits changed: the net will be recalculated on save.",
-      "NET_NEEDS_PAYS": "Save the employee's country first: the net will then be calculated automatically.",
+      "NET_AUTO_HINT": "Calculated automatically by the payroll engine from the gross: this is the payslip net. The gross is the monthly base salary.",
+      "NET_NEEDS_PAYS": "Pick the employee's country first: the net will then be calculated automatically.",
       "NET_CALCULATING": "Calculating the net…",
-      "NET_RECALC_SUFFIX": "(net recalculated)",
+      "MARRIED_YES": "Yes",
+      "MARRIED_NO": "No",
+      "FAMILY_FROM_HR": "Taken from the employee's HR record — change it in their HR file.",
+      "FAMILY_HR_UNAVAILABLE": "HR record unreachable: last known situation shown.",
+      "BENEFITS_INFO_ONLY": "For information only: benefits in kind are not included in the net or the payslip.",
+      "BONUSES_NOT_IN_PAYSLIP": "Bonuses are recorded for reference: they are not included in the payroll calculation.",
       "CONTRACT_FROM_HR": "Taken from the employee's HR record",
       "CONTRACT_HR_DIFFERS": "Differs from the HR record contract ({{contract}})",
       "CONTRACT_NOT_PRICED": "The contract \"{{contract}}\" has no payroll rules in this country: it cannot be saved. Allowed contracts: {{allowed}}.",
@@ -631,6 +638,9 @@
       "CONFIG_MISSING": "To configure",
       "CONFIG_TITLE": "Payroll configuration",
       "REASON_HINT": "Required to save — kept in the change history.",
+      "EFFECTIVE_DATE": "Effective date",
+      "EFFECTIVE_DATE_HINT": "Date the salary applies from. For information: payroll runs always use the latest saved configuration.",
+      "SUBMITTED_FOR_APPROVAL": "Change submitted to the Country Director: it applies once approved (finance's approval queue).",
       "SECTION_ASSIGNMENT": "Assignment",
       "SECTION_REASON": "Reason for the change",
       "SELECT_CONTRACT": "Select a contract…",

@@ -449,7 +449,10 @@
         "WORKING_DAYS": "Jours travaillés / mois",
         "WORKING_DAYS_SUFFIX": "j",
         "IS_MARRIED": "Marié(e)",
-        "CHILDREN_COUNT": "Nombre d'enfants à charge"
+        "CHILDREN_COUNT": "Nombre d'enfants à charge",
+        "FAMILY_FROM_HR": "Situation familiale reprise du dossier RH de l'employé — à modifier dans son dossier.",
+        "FAMILY_LOADING": "Lecture du dossier RH de l'employé…",
+        "FAMILY_UNKNOWN": "Dossier RH illisible : saisissez la situation familiale (le serveur utilisera le dossier RH s'il le lit)."
       },
 
       "STEP3": {
@@ -554,11 +557,15 @@
     "EMPLOYEE_CONFIG": {
       "TITLE": "Salaires des collaborateurs",
       "REASON_REQUIRED": "Indiquez le motif du changement pour enregistrer.",
-      "NET_AUTO_HINT": "Calculé automatiquement à partir du brut, avec les règles de paie en vigueur du pays.",
-      "NET_AFTER_SAVE": "Pays, contrat ou avantages modifiés : le net sera recalculé à l’enregistrement.",
-      "NET_NEEDS_PAYS": "Enregistrez d’abord le pays du collaborateur : le net sera ensuite calculé automatiquement.",
+      "NET_AUTO_HINT": "Calculé automatiquement par le moteur de paie à partir du brut : c'est le net du bulletin. Le brut est le salaire de base mensuel.",
+      "NET_NEEDS_PAYS": "Choisissez d’abord le pays du collaborateur : le net sera ensuite calculé automatiquement.",
       "NET_CALCULATING": "Calcul du net…",
-      "NET_RECALC_SUFFIX": "(net recalculé)",
+      "MARRIED_YES": "Oui",
+      "MARRIED_NO": "Non",
+      "FAMILY_FROM_HR": "Repris de la fiche RH du collaborateur — à modifier dans son dossier RH.",
+      "FAMILY_HR_UNAVAILABLE": "Fiche RH injoignable : dernière situation connue affichée.",
+      "BENEFITS_INFO_ONLY": "À titre indicatif : les avantages en nature ne sont pas inclus dans le net ni dans le bulletin.",
+      "BONUSES_NOT_IN_PAYSLIP": "Les primes sont enregistrées pour mémoire : elles ne sont pas incluses dans le calcul de paie.",
       "CONTRACT_FROM_HR": "Repris de la fiche RH du collaborateur",
       "CONTRACT_HR_DIFFERS": "Différent du contrat de la fiche RH ({{contract}})",
       "CONTRACT_NOT_PRICED": "Le contrat « {{contract}} » n'a pas de règles de paie dans ce pays : il ne peut pas être enregistré. Contrats possibles : {{allowed}}.",
@@ -631,6 +638,9 @@
       "CONFIG_MISSING": "À configurer",
       "CONFIG_TITLE": "Configuration de paie",
       "REASON_HINT": "Obligatoire pour enregistrer — conservé dans l'historique des modifications.",
+      "EFFECTIVE_DATE": "Date d'effet",
+      "EFFECTIVE_DATE_HINT": "Date à partir de laquelle le salaire s'applique. Pour information : le calcul de paie utilise toujours la dernière configuration enregistrée.",
+      "SUBMITTED_FOR_APPROVAL": "Modification soumise au Directeur Pays : elle s'appliquera après son approbation (file d'approbation de la finance).",
       "SECTION_ASSIGNMENT": "Affectation",
       "SECTION_REASON": "Motif du changement",
       "SELECT_CONTRACT": "Sélectionner un contrat…",

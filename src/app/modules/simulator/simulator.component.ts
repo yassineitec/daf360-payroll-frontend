@@ -913,7 +913,47 @@ export class SimulatorComponent implements OnDestroy {
         if (seq !== this.employeesSeq) return;   // réponse dépassée (pays changé entre-temps)
         this.employeesOfPays.set(page?.content ?? []);
         this.employeesLoading.set(false);
+        // Simulation rouverte : l'employé était déjà choisi avant que la liste n'arrive.
+        this.refreshEmployeeFamily();
       });
+  }
+
+  // ── Situation familiale d'un employé (dossier RH) ─────────────────────────
+  /** 'hr' = reprise du dossier RH (champs en lecture seule) ; 'loading' ; 'unknown' = dossier
+   *  illisible, saisie libre ; null = pas d'employé choisi (candidat). Le serveur applique la
+   *  même règle : pour un employé, la situation du dossier RH l'emporte sur la saisie. */
+  readonly employeeFamily = signal<'hr' | 'loading' | 'unknown' | null>(null);
+  private familySeq = 0;
+
+  private refreshEmployeeFamily(): void {
+    const seq = ++this.familySeq;
+    const userId = this.form.get('profileUserId')!.value as number | null;
+    if (userId == null) { this.employeeFamily.set(null); return; }
+    const profileId = this.employeesOfPays().find(e => e.userId === userId)?.profileId ?? null;
+    if (profileId == null) {
+      // Liste pas encore chargée : rappelé à son arrivée (loadEmployees).
+      this.employeeFamily.set(this.employeesLoading() ? 'loading' : 'unknown');
+      return;
+    }
+    this.employeeFamily.set('loading');
+    this.hrProfiles.getProfile(profileId)
+      .pipe(catchError(() => of(null)), takeUntil(this.destroy$))
+      .subscribe(p => {
+        if (seq !== this.familySeq) return;
+        if (!p) { this.employeeFamily.set('unknown'); return; }
+        this.form.patchValue({
+          isMarried: SimulatorComponent.isMarried(p.maritalStatus),
+          children: Math.max(p.numberOfChildren ?? 0, 0),
+        });
+        this.employeeFamily.set('hr');
+      });
+  }
+
+  /** Code MARRIED de la liste RH, ou anciennes saisies libres (« Marié », « Mariée »). */
+  private static isMarried(status: string | null | undefined): boolean {
+    if (!status) return false;
+    const s = status.trim().normalize('NFD').replace(/\p{M}/gu, '').toUpperCase();
+    return s === 'MARRIED' || s.startsWith('MARIE');
   }
 
   readonly paysSelection       = computed(() => this.selectionOf('paysId'));
@@ -1515,6 +1555,11 @@ export class SimulatorComponent implements OnDestroy {
     this.form.valueChanges
       .pipe(takeUntil(this.destroy$))
       .subscribe(() => this.formValue.set(this.form.getRawValue()));
+
+    // Employé choisi → sa situation familiale est reprise de son dossier RH.
+    this.form.get('profileUserId')!.valueChanges
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => this.refreshEmployeeFamily());
 
     this.form.get('paysId')!.valueChanges
       .pipe(takeUntil(this.destroy$))
