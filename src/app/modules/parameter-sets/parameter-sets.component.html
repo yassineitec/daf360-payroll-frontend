@@ -501,7 +501,6 @@
                     [config]="rubriquesTableConfig()" />
                 </div>
             }
-            @case ('benefits') {
             @case ('irpp') {
                 <!-- Tranches : Ajouter / Modifier / Supprimer ligne à ligne ; abattement et
                      déductions : bouton Modifier de chaque bloc (une pop-up pour les deux). -->
@@ -557,6 +556,7 @@
                   </div>
                 </div>
             }
+            @case ('benefits') {
                 <div class="ps-field-block">
                   <div class="ps-toolbar">
                     <daf-search-toolbar

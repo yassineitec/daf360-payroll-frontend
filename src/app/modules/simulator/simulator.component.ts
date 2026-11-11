@@ -542,6 +542,9 @@ export class SimulatorComponent implements OnDestroy {
       return this.t('PAYROLL.SIMULATOR.BLOCKING.AMOUNT_REQUIRED');
     }
     if (Number(amount) <= 0) return this.t('PAYROLL.SIMULATOR.BLOCKING.AMOUNT_POSITIVE');
+    return null;
+  });
+
   /** IRPP annuel sur une base — même règle que `IrppCalculatorService` (taux ≥ 1 lus en %). */
   private annualIrpp(brackets: IrppBracketRow[], base: number): number {
     let total = 0;
@@ -599,9 +602,6 @@ export class SimulatorComponent implements OnDestroy {
       irppAnnual: target,
       irppMonthly: r.irppAmount,
     };
-  });
-
-    return null;
   });
 
   // ── Result-derived state ───────────────────────────────────────────────────
