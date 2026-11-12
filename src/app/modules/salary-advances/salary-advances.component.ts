@@ -21,8 +21,26 @@ import {
 import { tableTools } from '../../shared/table-tools';
 import { PaysNamesService } from '../../core/pays-names.service';
 import { UserStore } from '../../core/user.store';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import type { GuideStep } from '../../shared/guide/page-guide.types';
 
 type TabKey = 'payout' | 'deductions' | 'followup';
+
+/** Guide de la page — `target` = un `data-guide` du gabarit, `tab` = l'onglet montré. */
+const guideStep = (key: string, icon: string, target?: string, tab?: TabKey): GuideStep => ({
+  icon, titleKey: `GUIDE.SALARY_ADVANCES.${key}_TITLE`, textKey: `GUIDE.SALARY_ADVANCES.${key}_TEXT`, target, tab,
+});
+const GUIDE_STEPS: GuideStep[] = [
+  guideStep('WELCOME',    'payments'),
+  guideStep('RULES',      'tune',            'adv-rules'),
+  guideStep('KPIS',       'monitoring',      'adv-kpis'),
+  guideStep('TABS',       'tab',             'adv-tabs'),
+  guideStep('PAYOUT',     'account_balance', 'adv-panel', 'payout'),
+  guideStep('PAY',        'send_money',      'adv-panel', 'payout'),
+  guideStep('MONTH',      'calendar_month',  'adv-month', 'deductions'),
+  guideStep('DEDUCTIONS', 'receipt_long',    'adv-panel', 'deductions'),
+  guideStep('FOLLOWUP',   'list_alt',        'adv-panel', 'followup'),
+];
 
 const ADVANCE_VARIANT: Record<AdvanceStatus, BadgeVariant> = {
   PENDING_FINANCE: 'warning', APPROVED: 'info', REPAYING: 'success',
@@ -57,7 +75,7 @@ const MAX_MONTHS_AHEAD = 3;
   imports: [
     PageComponent, PageHeaderComponent, MetricCardComponent, TabsComponent, SearchToolbarComponent,
     SelectComponent, DataTableComponent, DafCellDirective, FormFieldComponent, ButtonComponent, AccordionCardComponent,
-    StatusBadgeComponent,
+    StatusBadgeComponent, PageGuideComponent,
     TranslatePipe,
   ],
   templateUrl: './salary-advances.component.html',
@@ -498,6 +516,25 @@ export class SalaryAdvancesComponent implements OnInit {
    *  (même code que la route /payroll/admin) — les règles ne se modifient plus qu'à cet endroit. */
   readonly canOpenRules = computed(() => this.userStore.hasPermission('PAYROLL_VIEW_PARAMSET'));
 
+  // ── Guide (« Aide & guides ») ─────────────────────────────────────────────
+
+  /** Sans le droit d'ouvrir l'administration, pas de bouton « Règles des avances » à montrer. */
+  readonly guideSteps = computed(() =>
+    GUIDE_STEPS.filter(s => s.target !== 'adv-rules' || this.canOpenRules()));
+
+  /** L'onglet de l'utilisateur, rendu à la fermeture du guide (qui ouvre ceux qu'il explique). */
+  private tabBeforeGuide: TabKey | null = null;
+
+  onGuideTab(tab: string): void {
+    this.tabBeforeGuide ??= this.activeTab();
+    this.activeTab.set(tab as TabKey);
+  }
+
+  onGuideClosed(): void {
+    if (this.tabBeforeGuide) this.activeTab.set(this.tabBeforeGuide);
+    this.tabBeforeGuide = null;
+  }
+
   openRules(): void {
     this.router.navigate(['/payroll/admin'], { queryParams: { tab: 'advance-rules' } });
   }
@@ -506,6 +543,10 @@ export class SalaryAdvancesComponent implements OnInit {
     this.svc.get(a.id).pipe(catchError(() => of(a))).subscribe(full => {
       this.selected.set(full);
       this.modal.open({
+        resizable: true,
+        maximizable: true,
+        minWidth: '360px',
+        minHeight: '260px',
         title: full.employeeName ?? `AVS-${full.id}`,
         subtitle: `AVS-${full.id} · ${this.money(full.amount, full.currency)}`,
         icon: 'payments',
@@ -525,6 +566,10 @@ export class SalaryAdvancesComponent implements OnInit {
     this.modalError.set(null);
     const t = (k: string) => this.translate.instant(k);
     this.modalRef = this.modal.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: t('PAYROLL.SALARY_ADVANCES.PAYOUT.TITLE'),
       icon: 'account_balance',
       body: this.payoutTpl,
@@ -594,6 +639,10 @@ export class SalaryAdvancesComponent implements OnInit {
     this.modalError.set(null);
     const t = (k: string) => this.translate.instant(k);
     this.modalRef = this.modal.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: t(kind === 'skip' ? 'PAYROLL.SALARY_ADVANCES.ACTIONS.SKIP' : 'PAYROLL.SALARY_ADVANCES.ACTIONS.WAIVE'),
       body: this.noteTpl,
       size: 'md',

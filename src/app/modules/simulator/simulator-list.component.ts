@@ -43,6 +43,21 @@ import { readBlobError, saveBlob } from '../../shared/blob-download';
 import { TableSort, delegatedSort, tableTools, toTableSort } from '../../shared/table-tools';
 import { PAYROLL_SIMULATOR_PERMISSIONS } from '../../core/payroll-nav';
 import { SimulatorListStateService } from './simulator-list-state.service';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import type { GuideStep } from '../../shared/guide/page-guide.types';
+
+/** Guide de la page — `target` = un `data-guide` du gabarit. */
+const guideStep = (key: string, icon: string, target?: string): GuideStep => ({
+  icon, titleKey: `GUIDE.SIMULATOR.${key}_TITLE`, textKey: `GUIDE.SIMULATOR.${key}_TEXT`, target,
+});
+const GUIDE_STEPS: GuideStep[] = [
+  guideStep('WELCOME',    'calculate'),
+  guideStep('NEW',        'add',          'sim-list-new'),
+  guideStep('KPIS',       'monitoring',   'sim-list-kpis'),
+  guideStep('TOOLBAR',    'filter_list',  'sim-list-toolbar'),
+  guideStep('RESULTS',    'table_rows',   'sim-list-results'),
+  guideStep('PAGINATION', 'last_page',    'sim-list-pagination'),
+];
 
 /**
  * `/payroll/simulator` — liste des simulations individuelles, même squelette que les listes
@@ -63,6 +78,7 @@ import { SimulatorListStateService } from './simulator-list-state.service';
     TranslatePipe,
     ButtonComponent, DataTableComponent, EntityCardComponent, FieldMessageComponent, MetricCardComponent,
     PageComponent, PageHeaderComponent, PaginationComponent, SearchToolbarComponent, SkeletonComponent,
+    PageGuideComponent,
   ],
   templateUrl: './simulator-list.component.html',
 })
@@ -91,6 +107,8 @@ export class SimulatorListComponent implements OnInit {
     this.translate.currentLang() === 'en' ? 'en-US' : 'fr-FR');
 
   readonly canCreate = computed(() => this.perms.hasAny(PAYROLL_SIMULATOR_PERMISSIONS));
+
+  readonly guideSteps = GUIDE_STEPS;
 
   // ── État ───────────────────────────────────────────────────────────────────
   /** Premier chargement seulement : squelette de page de la lib (`daf-page [loading]`). */

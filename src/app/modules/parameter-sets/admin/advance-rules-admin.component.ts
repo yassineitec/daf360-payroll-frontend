@@ -312,6 +312,10 @@ export class AdvanceRulesAdminComponent implements OnInit {
     this.error.set(null);
     this.submitted.set(false);
     this.modalRef = this.modal.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t(p ? 'PAYROLL.SALARY_ADVANCES.RULES.EDIT' : 'PAYROLL.SALARY_ADVANCES.RULES.ADD'),
       icon: 'tune',
       body: this.policyTpl(),

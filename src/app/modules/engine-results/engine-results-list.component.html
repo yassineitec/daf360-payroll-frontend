@@ -1,10 +1,16 @@
 <daf-page>
-  <daf-page-header
+  <daf-page-header data-guide="res-list-header"
     [title]="'PAYROLL.ENGINE_RESULTS.TITLE' | translate"
     [subtitle]="'PAYROLL.ENGINE_RESULTS.LIST_SUBTITLE' | translate">
+    <!-- Export Excel de la liste filtrée entière (toutes les pages), voir `exportXlsx()`. -->
+    <daf-button pageActions
+      [options]="{ variant: 'secondary', iconStart: 'table_view',
+                   loading: exportingXlsx(), disabled: totalElements() === 0 || exportingXlsx(),
+                   label: ((exportingXlsx() ? 'PAYROLL.ENGINE_RUN.EXPORTING' : 'PAYROLL.ENGINE_RESULTS.EXPORT_XLSX') | translate) }"
+      (onClick)="exportXlsx()" />
     <!-- Calcul groupé de la paie d'un pays pour un mois (pop-up, voir `openBatch()`). -->
     @if (canRunEngine()) {
-      <daf-button pageActions
+      <daf-button pageActions data-guide="res-list-batch"
         [options]="{ variant: 'teal', iconStart: 'calculate', label: ('PAYROLL.ENGINE_RESULTS.BATCH_BUTTON' | translate) }"
         (onClick)="openBatch()" />
     }
@@ -25,6 +31,7 @@
         }
       </p>
       <section
+        data-guide="res-list-kpis"
         class="kpi-row transition-opacity"
         [class.opacity-60]="kpiLoading()"
         [attr.aria-busy]="kpiLoading()">
@@ -36,7 +43,7 @@
 
     <!-- ── Recherche (nom / matricule), filtre pays et bascule carte-tableau — tout
          côté serveur, voir `load()`. ─────────────────────────────────────────── -->
-    <daf-search-toolbar
+    <daf-search-toolbar data-guide="res-list-toolbar"
       [placeholder]="'PAYROLL.ENGINE_RESULTS.SEARCH_EMPLOYEE_PLACEHOLDER' | translate"
       [value]="searchText()"
       (valueChange)="onSearchTextChange($event)"
@@ -58,7 +65,7 @@
         <p class="empty-state">{{ 'PAYROLL.COMMON.LOADING' | translate }}</p>
       </daf-card>
     } @else {
-      <div [class.is-loading]="loading()">
+      <div data-guide="res-list-results" [class.is-loading]="loading()">
         @if (viewMode() === 'grid') {
           <div class="grid grid-cols-3 gap-5 same-height-cards">
             @for (card of employeeCards(); track card.id) {
@@ -85,7 +92,7 @@
         }
       </div>
 
-      <daf-pagination
+      <daf-pagination data-guide="res-list-pagination"
         [currentPage]="page()"
         [totalPages]="totalPages()"
         [totalElements]="totalElements()"
@@ -102,6 +109,8 @@
     }
   </div>
 </daf-page>
+
+<app-page-guide storageKey="engine-results" [steps]="guideSteps()" />
 
 <!-- Formulaire « Calculer la paie du pays » (pop-up). Les boutons sont ici, pas dans le pied
      de la pop-up : ceux-là ne sont pas réactifs (grisés pendant le calcul, « Fermer » à la fin). -->

@@ -153,6 +153,14 @@ export const routes: Routes = [
           import('./modules/candidate-simulation/candidate-simulation.routes').then(m => m.CANDIDATE_SIMULATION_ROUTES),
       },
 
+      // « Aide & guides » : FAQ, documentation et guides des pages paie (même page que RH et
+      // Finance). Ouverte à tous — elle ne montre que les pages que l'utilisateur peut voir.
+      {
+        path: 'aide',
+        loadComponent: () =>
+          import('./modules/help/help.component').then(m => m.HelpComponent),
+      },
+
       // Landing route — resolved, not a static `redirectTo: 'simulator'`, so a user who
       // only holds the admin codes isn't bounced to /forbidden by the link the shell just
       // offered them. See `core/payroll-landing.guard.ts`.

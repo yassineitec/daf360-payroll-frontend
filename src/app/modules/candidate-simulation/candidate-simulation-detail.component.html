@@ -23,14 +23,14 @@
     <!-- ══ COLONNE GAUCHE ═══════════════════════════════════════════════════ -->
     <div class="detail-aside">
       <div class="detail-aside__sticky">
-        <daf-page-header
+        <daf-page-header data-guide="cand-detail-header"
           size="md"
           [title]="candidateName()"
           [titleWrap]="true"
           [badges]="headerBadges()"
           [breadcrumbs]="breadcrumbs()" />
 
-        <daf-section-card>
+        <daf-section-card data-guide="cand-detail-identity">
           <div class="dp-card">
             <section class="dp-block">
               <daf-section-title [title]="'PAYROLL.CANDIDATE_SIMULATION.DETAIL.CANDIDATE_BLOCK' | translate" />
@@ -49,7 +49,7 @@
         <!-- Actions rapides — même carte que la fiche simulateur. Le retour à la liste passe
              par le fil d'Ariane. Chaque action selon ses droits ; sans aucune, pas de carte. -->
         @if ((canOpenSimulator && latest()?.snap?.id) || canOpenRhCandidate) {
-          <daf-section-card>
+          <daf-section-card data-guide="cand-detail-actions">
             <div class="flex flex-col gap-3 bg-surface-container p-6">
               <daf-section-title [title]="'PAYROLL.CANDIDATE_SIMULATION.DETAIL.QUICK_TITLE' | translate" />
               @if (canOpenSimulator && latest()?.snap?.id) {
@@ -94,7 +94,7 @@
       } @else {
 
         <!-- ── KPI de la dernière soumission — en haut ───────────────────── -->
-        <div class="kpi-row">
+        <div class="kpi-row" data-guide="cand-detail-kpis">
           @for (k of kpis(); track k.label) {
             <daf-metric-card class="kpi-cell" [label]="k.label" [value]="k.value" [delta]="k.delta" [options]="k.options" />
           }
@@ -103,7 +103,7 @@
         <!-- ── Fil de la négociation — une étape par proposition, la plus ancienne d'abord :
              ce que la RH a proposé, ce que le candidat demandait, la réponse de la DAF. Un clic
              ouvre le même détail que le tableau. Pastilles `daf-badge` de la lib. ── -->
-        <section class="timeline">
+        <section class="timeline" data-guide="cand-detail-timeline">
           <daf-section-title [title]="'PAYROLL.CANDIDATE_SIMULATION.DETAIL.TIMELINE_TITLE' | translate" />
           <ol class="timeline__list">
             @for (step of negotiation(); track step.id; let last = $last) {
@@ -216,3 +216,5 @@
     }
   </ng-template>
 </daf-page>
+
+<app-page-guide storageKey="candidate-detail" [steps]="guideSteps()" />

@@ -426,6 +426,10 @@ export class BenefitsCatalogueAdminComponent implements OnInit {
     this.form.set(index == null ? blankBenefit() : { ...list[index] });
     this.error.set(null);
     this.modalRef = this.modal.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t(index == null ? 'PAYROLL.ADMIN_HOME.BENEFITS.ADD' : 'PAYROLL.ADMIN_HOME.BENEFITS.EDIT_TITLE'),
       icon: 'redeem',
       body: this.benefitTpl(),
@@ -458,6 +462,10 @@ export class BenefitsCatalogueAdminComponent implements OnInit {
     const b = (this.currentSet()?.benefits ?? [])[index];
     if (!b) return;
     this.modal.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t('PAYROLL.ADMIN_HOME.BENEFITS.DELETE_TITLE'),
       body: this.t('PAYROLL.ADMIN_HOME.BENEFITS.DELETE_CONFIRM', { code: b.benefitCode, label: b.benefitLabelFr }),
       size: 'sm',

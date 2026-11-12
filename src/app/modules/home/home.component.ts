@@ -5,6 +5,26 @@ import { CardComponent, PageComponent, PageHeaderComponent } from '@khalilrebhii
 import type { CardOptions } from '@khalilrebhiitec/daf360';
 import { UserStore } from '../../core/user.store';
 import { PAYROLL_NAV_DEFS } from '../../core/payroll-nav';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import type { GuideStep } from '../../shared/guide/page-guide.types';
+
+/**
+ * Guide de la page. `target` = un `data-guide` du gabarit (ou du shell : la bulle
+ * d'assistant, « Aide & guides ») ; `selector` = un élément de la lib (la bulle des devises).
+ */
+const step = (key: string, icon: string, target?: string, selector?: string): GuideStep => ({
+  icon, titleKey: `GUIDE.HOME.${key}_TITLE`, textKey: `GUIDE.HOME.${key}_TEXT`, target, selector,
+});
+const GUIDE_STEPS: GuideStep[] = [
+  step('WELCOME',    'waving_hand'),
+  step('MODULES',    'apps',      'home-modules'),
+  step('SIMULATION', 'calculate', 'home-card-simulator'),
+  step('RUN',        'payments',  'home-card-engine-results'),
+  step('SETTINGS',   'settings',  'home-card-admin'),
+  step('CURRENCY',   'currency_exchange', 'currency-switch'),
+  step('CHAT',       'chat',      'help-chat'),
+  step('HELP',       'help',      'help-center'),
+];
 
 interface ModuleCard {
   id:      string;
@@ -48,7 +68,7 @@ const MODULE_TONE: Record<string, Tone> = {
   selector: 'app-payroll-home',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, PageComponent, PageHeaderComponent, CardComponent],
+  imports: [TranslatePipe, PageComponent, PageHeaderComponent, CardComponent, PageGuideComponent],
   templateUrl: './home.component.html',
 })
 export class HomeComponent {
@@ -56,6 +76,8 @@ export class HomeComponent {
   private readonly router         = inject(Router);
   private readonly activatedRoute = inject(ActivatedRoute);
   private readonly translate      = inject(TranslateService);
+
+  readonly guideSteps = GUIDE_STEPS;
 
   readonly firstName = computed(() => (this.userStore.currentUser()?.fullName ?? '').split(' ')[0]);
 

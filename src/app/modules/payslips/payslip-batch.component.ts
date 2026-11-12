@@ -48,6 +48,26 @@ import { saveBlob } from '../../shared/blob-download';
 import { flagDataUri } from '../../shared/country-flags';
 import { PaysNamesService } from '../../core/pays-names.service';
 import { MONTH_KEYS, PayslipHistoryStore, batchCounts } from './payslip-history';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import type { GuideStep } from '../../shared/guide/page-guide.types';
+
+/** Guide de la page — `target` = un `data-guide` du gabarit. */
+const guideStep = (page: string, key: string, icon: string, target?: string): GuideStep => ({
+  icon, titleKey: `GUIDE.${page}.${key}_TITLE`, textKey: `GUIDE.${page}.${key}_TEXT`, target,
+});
+const NEW_GUIDE_STEPS: GuideStep[] = [
+  guideStep('PAYSLIP_NEW', 'WELCOME', 'cloud_upload',   'ps-new-header'),
+  guideStep('PAYSLIP_NEW', 'PERIOD',  'calendar_month', 'ps-new-period'),
+  guideStep('PAYSLIP_NEW', 'FILE',    'picture_as_pdf', 'ps-new-file'),
+  guideStep('PAYSLIP_NEW', 'SUBMIT',  'send',           'ps-new-actions'),
+];
+const REPORT_GUIDE_STEPS: GuideStep[] = [
+  guideStep('PAYSLIP_REPORT', 'WELCOME', 'summarize',    'ps-rep-header'),
+  guideStep('PAYSLIP_REPORT', 'DETAILS', 'contact_page', 'ps-rep-details'),
+  guideStep('PAYSLIP_REPORT', 'ACTIONS', 'bolt',         'ps-rep-actions'),
+  guideStep('PAYSLIP_REPORT', 'KPIS',    'monitoring',   'ps-rep-kpis'),
+  guideStep('PAYSLIP_REPORT', 'TABLE',   'table_rows',   'ps-rep-table'),
+];
 
 const MAX_SIZE_MB = 50;
 
@@ -78,6 +98,7 @@ type PageOutcome = 'FILED' | 'NOT_FILED' | 'UNIDENTIFIED' | 'UNKNOWN_MATRICULE' 
     ButtonComponent, CardComponent, DafCellDirective, DataTableComponent, FileUploadComponent,
     MetricCardComponent, PageComponent, PageHeaderComponent, SectionCardComponent, SectionTitleComponent,
     LoadingComponent, PaginationComponent, SearchToolbarComponent, SelectComponent, StatusBadgeComponent,
+    PageGuideComponent,
   ],
   templateUrl: './payslip-batch.component.html',
   styleUrl: './payslip-batch.component.scss',
@@ -130,6 +151,12 @@ export class PayslipBatchComponent implements OnInit {
   readonly isNew   = computed(() => this.routeId() === 'new');
   readonly entry   = computed(() => this.isNew() ? null : this.store.find(this.routeId()));
   readonly result  = computed(() => this.entry()?.result ?? null);
+
+  /** Guides (« Aide & guides ») : l'import, et le rapport — réduit à la présentation quand le lot est introuvable. */
+  readonly newGuideSteps = NEW_GUIDE_STEPS;
+  readonly reportGuideSteps = computed(() => this.result()
+    ? REPORT_GUIDE_STEPS
+    : [{ ...REPORT_GUIDE_STEPS[0], target: 'ps-new-header' }]);
 
   ngOnInit(): void {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(p => {
@@ -384,6 +411,10 @@ export class PayslipBatchComponent implements OnInit {
       }),
     ].join(' ');
     this.modalService.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t('PAYROLL.PAYSLIPS.CONFIRM.TITLE'),
       icon: 'cloud_upload',
       size: 'sm',
@@ -438,6 +469,10 @@ export class PayslipBatchComponent implements OnInit {
     if (!tpl) return;
     this.processingPages.set(this.detectedPages());
     this.processingModalRef = this.modalService.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title:           this.t('PAYROLL.PAYSLIPS.PROCESSING_MODAL.TITLE'),
       icon:            'cloud_upload',
       size:            'sm',

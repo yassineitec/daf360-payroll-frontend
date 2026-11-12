@@ -7,18 +7,22 @@ import { filter, map } from 'rxjs';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslateService } from '@ngx-translate/core';
 import { RadialMenuComponent, SideNavComponent } from '@khalilrebhiitec/daf360';
+import { HelpCenterComponent } from '../shared/guide/help-center.component';
+import { GuideHintComponent } from '../shared/guide/guide-hint.component';
+import { HelpChatComponent } from '../shared/guide/help-chat.component';
 import type { NavItem, RadialMenuConfig, RadialMenuItem, SideNavConfig } from '@khalilrebhiitec/daf360';
 import { UserStore } from '../core/user.store';
+import { CURRENCY_GLYPHS, CurrencyService, SUPPORTED_CURRENCIES } from '../core/currency.service';
 import { RemoteStylesService } from '../core/remote-styles.service';
 import { PAYROLL_NAV_DEFS, activeNavRoute, type PayrollNavDef } from '../core/payroll-nav';
-import { CURRENCY_GLYPHS, CurrencyService, SUPPORTED_CURRENCIES } from '../core/currency.service';
 import { environment } from '../../environments/environment';
+import { CurrencySwitchComponent } from './currency-switch.component';
 
 @Component({
   selector: 'app-payroll-shell',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, SideNavComponent, RadialMenuComponent],
+  imports: [RouterOutlet, SideNavComponent, RadialMenuComponent, HelpCenterComponent, GuideHintComponent, HelpChatComponent, CurrencySwitchComponent],
   templateUrl: './payroll-shell.component.html',
   styleUrl: './payroll-shell.component.scss',
 })

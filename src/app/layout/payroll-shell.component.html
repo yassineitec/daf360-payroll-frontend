@@ -2,19 +2,35 @@
   [items]="navItems()"
   [config]="sideNavConfig()"
   [activeRoute]="activeRoute()"
-  (itemClick)="onNavClick($event)" />
+  (itemClick)="onNavClick($event)">
+  <!-- Bas de la barre latérale (ordinateur) : la devise d'affichage, puis « Aide & guides ».
+       Dans l'emplacement de pied du rail (lib 5.13.0) : la liste défile au-dessus, pas dessous. -->
+  <app-help-center dafSideNavFooter>
+    <app-currency-switch />
+  </app-help-center>
+</daf-side-nav>
 
 <main class="shell-content">
   <router-outlet />
 </main>
 
-<!-- Display-currency switcher — daf-radial-menu in picker mode, same as finance's shell:
-     the FAB shows the currency in force and fans the alternatives out on hover/tap.
-     At the shell root, not inside <main>: the menu is position: fixed, and an ancestor
-     with a transform/filter/backdrop-filter would become its containing block and pin
-     it to that box instead of the viewport. -->
-<daf-radial-menu
-  [items]="currencyItems()"
-  [config]="currencyMenuConfig()"
-  [active]="currentCurrency() ?? ''"
-  (itemClick)="onCurrencyPick($event)" />
+<!-- Devise d'affichage, mobile seulement — comme Finance : daf-radial-menu en mode sélecteur
+     (la bulle montre la devise en vigueur et déploie les autres au toucher). À partir de
+     40rem la devise est la ligne app-currency-switch du bas de la barre latérale, ci-dessous ;
+     l'enveloppe .mobile-only cache la bulle (display: none cache aussi sa racine fixed).
+     À la racine du shell, pas dans <main> : le menu est en position: fixed, et un ancêtre
+     avec transform/filter/backdrop-filter deviendrait son bloc conteneur. -->
+<div class="mobile-only">
+  <daf-radial-menu
+    [items]="currencyItems()"
+    [config]="currencyMenuConfig()"
+    [active]="currentCurrency() ?? ''"
+    (itemClick)="onCurrencyPick($event)" />
+</div>
+
+<!-- « Première visite ? » : propose le guide d'une page la première fois qu'on l'ouvre. -->
+<app-guide-hint />
+
+<!-- Assistant d'aide, bulle façon Messenger : seule dans le coin sur ordinateur, au-dessus
+     de la bulle des devises sur mobile. -->
+<app-help-chat />

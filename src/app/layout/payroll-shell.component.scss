@@ -4,6 +4,14 @@
   display: block;
 }
 
+// Bulle des devises : mobile seulement (le rail devient la barre du bas sous 40rem, même
+// seuil que daf-side-nav). En CSS de composant et non `sm:hidden` : le styles.css de la
+// paie ne passe pas par Tailwind, une classe absente du shell n'aurait aucun effet.
+.mobile-only {
+  display: contents;
+  @media (min-width: 40rem) { display: none; }
+}
+
 .shell-content {
   margin-left: var(--shell-sidebar-w);
   height:      calc(100vh - var(--shell-header-h));

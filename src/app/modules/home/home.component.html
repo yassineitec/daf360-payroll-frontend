@@ -9,9 +9,9 @@
       : ('PAYROLL.HOME.GREETING_ANONYMOUS' | translate)" />
 
   @if (moduleCards().length) {
-    <section style="display:flex; flex-wrap:wrap; gap:1.5rem; align-items:stretch">
+    <section data-guide="home-modules" style="display:flex; flex-wrap:wrap; gap:1.5rem; align-items:stretch">
       @for (m of moduleCards(); track m.id) {
-        <daf-card
+        <daf-card [attr.data-guide]="'home-card-' + m.id"
           style="flex:0 1 calc(25% - 18px); min-width:220px; height:auto; display:flex; flex-direction:column"
           [options]="m.options"
           (cardClick)="navigateTo(m.route)" />
@@ -24,3 +24,8 @@
   }
 
 </daf-page>
+
+<!-- Guide de la page, lancé par « Aide & guides » ou la bulle « Première visite ? ». Ses étapes
+     visent les data-guide ci-dessus (une carte absente faute de droits : étape centrée), la
+     bulle des devises (élément de la lib), la bulle d'assistant et « Aide & guides ». -->
+<app-page-guide storageKey="home" [steps]="guideSteps" />

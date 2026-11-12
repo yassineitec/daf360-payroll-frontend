@@ -15,7 +15,7 @@
     [title]="'PAYROLL.SIMULATOR.LIST.TITLE' | translate"
     [subtitle]="'PAYROLL.SIMULATOR.LIST.SUBTITLE' | translate">
     @if (canCreate()) {
-      <daf-button pageActions
+      <daf-button pageActions data-guide="sim-list-new"
         [options]="{ variant: 'teal', label: ('PAYROLL.SIMULATOR.LIST.NEW_BTN' | translate), iconStart: 'add' }"
         (onClick)="newSimulation()" />
     }
@@ -25,7 +25,7 @@
        affichée), aucune tuile cliquable : le filtrage passe par le panneau Filtres. Ordre
        de lecture d'un financier : coefficient de charge, fourchette du coût employeur,
        volume du mois (avec la répartition candidats / collaborateurs), fiabilité. -->
-  <section class="grid grid-cols-4 gap-2 sm:gap-6 transition-opacity" [class.opacity-60]="loading()">
+  <section data-guide="sim-list-kpis" class="grid grid-cols-4 gap-2 sm:gap-6 transition-opacity" [class.opacity-60]="loading()">
     <daf-metric-card
       [label]="'PAYROLL.SIMULATOR.LIST.KPI.AVG_RATIO' | translate"
       [value]="kpiAvgRatio()"
@@ -48,7 +48,7 @@
       [options]="kpiPartialOptions()" />
   </section>
 
-  <daf-search-toolbar
+  <daf-search-toolbar data-guide="sim-list-toolbar"
     [placeholder]="'PAYROLL.SIMULATOR.LIST.SEARCH' | translate"
     [value]="searchText()"
     [debounce]="300"
@@ -66,7 +66,7 @@
   }
 
   <!-- Page suivante / nouveau filtre en vol : le contenu reste affiché, estompé. -->
-  <div class="transition-opacity" [class.opacity-60]="loading() && rows().length > 0">
+  <div data-guide="sim-list-results" class="transition-opacity" [class.opacity-60]="loading() && rows().length > 0">
     @if (viewMode() === 'grid') {
       <!-- Vue cartes — même grille que /finance/affaires (`affaires-cards-section`) :
            3 colonnes fixes, `gap-5`, cartes `glass` sans avatar, squelettes de 248 px au
@@ -106,7 +106,7 @@
     }
   </div>
 
-  <daf-pagination
+  <daf-pagination data-guide="sim-list-pagination"
     [currentPage]="page()"
     [totalPages]="totalPages()"
     [totalElements]="totalElements()"
@@ -121,3 +121,5 @@
     (pageSizeChange)="onPageSize($event)" />
 
 </daf-page>
+
+<app-page-guide storageKey="simulator" [steps]="guideSteps" />

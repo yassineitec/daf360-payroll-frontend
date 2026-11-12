@@ -395,6 +395,10 @@ export class PayrollAuditAdminComponent implements OnInit {
   openDetailModal(entry: AuditEntryDto): void {
     this.activeEntry.set(entry);
     this.modalRef = this.modal.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t('PAYROLL.ADMIN_HOME.AUDIT.DETAIL_TITLE'),
       body: this.detailTpl,
       size: 'lg',
@@ -405,6 +409,10 @@ export class PayrollAuditAdminComponent implements OnInit {
   openGroupModal(members: AuditEntryDto[]): void {
     this.activeGroup.set(members);
     this.modalRef = this.modal.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t('PAYROLL.ADMIN_HOME.AUDIT.GROUP_MODAL_TITLE'),
       body: this.groupTpl,
       size: 'lg',

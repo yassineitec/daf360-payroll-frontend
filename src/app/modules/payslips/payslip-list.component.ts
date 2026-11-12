@@ -26,6 +26,21 @@ import { PaysNamesService } from '../../core/pays-names.service';
 import { dayRange, distinctSorted, inDayRange, pickValue, rangeSeed } from '../../shared/filter-utils';
 import { searchTableRows, tableTools } from '../../shared/table-tools';
 import { MONTH_KEYS, PayslipHistoryEntry, PayslipHistoryStore, batchCounts, periodKey } from './payslip-history';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import type { GuideStep } from '../../shared/guide/page-guide.types';
+
+/** Guide de la page — `target` = un `data-guide` du gabarit. */
+const guideStep = (page: string, key: string, icon: string, target?: string): GuideStep => ({
+  icon, titleKey: `GUIDE.${page}.${key}_TITLE`, textKey: `GUIDE.${page}.${key}_TEXT`, target,
+});
+const GUIDE_STEPS: GuideStep[] = [
+  guideStep('PAYSLIPS', 'WELCOME', 'folder_shared', 'ps-list-header'),
+  guideStep('PAYSLIPS', 'NEW',     'add',           'ps-list-new'),
+  guideStep('PAYSLIPS', 'KPIS',    'monitoring',    'ps-list-kpis'),
+  guideStep('PAYSLIPS', 'NOTE',    'info',          'ps-list-note'),
+  guideStep('PAYSLIPS', 'TOOLBAR', 'filter_list',   'ps-list-toolbar'),
+  guideStep('PAYSLIPS', 'RESULTS', 'table_rows',    'ps-list-results'),
+];
 
 type StatusFilter = 'ALL' | 'SUCCESS' | 'PARTIAL';
 
@@ -45,12 +60,13 @@ type StatusFilter = 'ALL' | 'SUCCESS' | 'PARTIAL';
   imports: [
     TranslatePipe,
     ButtonComponent, DafCellDirective, DataTableComponent, EntityCardComponent, MetricCardComponent,
-    PageComponent, PageHeaderComponent, SearchToolbarComponent,
+    PageComponent, PageHeaderComponent, SearchToolbarComponent, PageGuideComponent,
   ],
   templateUrl: './payslip-list.component.html',
   styleUrl: './payslip-batch.component.scss',
 })
 export class PayslipListComponent {
+  readonly guideSteps = GUIDE_STEPS;
   private readonly router    = inject(Router);
   private readonly route     = inject(ActivatedRoute);
   private readonly store     = inject(PayslipHistoryStore);

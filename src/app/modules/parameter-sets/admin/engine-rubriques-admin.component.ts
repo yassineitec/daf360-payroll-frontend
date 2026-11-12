@@ -746,6 +746,10 @@ export class EngineRubriquesAdminComponent implements OnInit {
     this.form.set(r ? toRequest(r) : { ...blankRubrique(), displayOrder: next });
     this.error.set(null);
     this.modalRef = this.modal.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: r
         ? this.t(this.readOnly() ? 'PAYROLL.ADMIN_HOME.RUBRIQUES.VIEW_TITLE' : 'PAYROLL.ADMIN_HOME.RUBRIQUES.EDIT_TITLE',
             { label: this.rubriqueName(r) })

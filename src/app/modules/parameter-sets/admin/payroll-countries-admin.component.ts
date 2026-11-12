@@ -369,6 +369,10 @@ export class PayrollCountriesAdminComponent implements OnInit {
       : blankCountry());
     this.error.set(null);
     this.modalRef = this.modal.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: c
         ? this.t('PAYROLL.ADMIN_HOME.COUNTRIES.EDIT_TITLE', { pays: c.paysLabel ?? `#${c.paysId}` })
         : this.t('PAYROLL.ADMIN_HOME.COUNTRIES.ADD'),

@@ -7,11 +7,11 @@
 -->
 <daf-page [kpis]="4" headerSize="md">
 
-  <daf-page-header
+  <daf-page-header data-guide="ps-list-header"
     [title]="'PAYROLL.PAYSLIPS.TITLE' | translate"
     [subtitle]="'PAYROLL.PAYSLIPS.SUBTITLE' | translate"
     size="md">
-    <daf-button pageActions
+    <daf-button pageActions data-guide="ps-list-new"
       [options]="{ variant: 'teal', label: ('PAYROLL.PAYSLIPS.LIST.NEW_BTN' | translate), iconStart: 'add' }"
       (onClick)="newBatch()" />
   </daf-page-header>
@@ -19,7 +19,7 @@
   <!-- KPI — sur le dernier lot de chaque pays + mois (un mois relancé ne compte qu'une fois).
        Tuiles de RÉSULTAT, aucune cliquable : les lots à vérifier se filtrent dans le panneau.
        D'abord la question qu'on se pose : quel mois est distribué, et à quel point. -->
-  <section class="grid grid-cols-4 gap-2 sm:gap-6">
+  <section data-guide="ps-list-kpis" class="grid grid-cols-4 gap-2 sm:gap-6">
     <daf-metric-card
       [label]="'PAYROLL.PAYSLIPS.LIST.KPI.LAST_PERIOD' | translate"
       [value]="kpiLastPeriod()" [delta]="kpiLastPeriodDelta()" [options]="kpiLastPeriodOptions()" />
@@ -35,12 +35,12 @@
   </section>
 
   <!-- Le journal ne vit que dans ce navigateur (le service RH ne garde pas les lots). -->
-  <div class="notice notice--info" role="note">
+  <div data-guide="ps-list-note" class="notice notice--info" role="note">
     <span class="material-symbols-outlined notice__icon" aria-hidden="true">info</span>
     <span>{{ 'PAYROLL.PAYSLIPS.LIST.BROWSER_NOTE' | translate }}</span>
   </div>
 
-  <daf-search-toolbar
+  <daf-search-toolbar data-guide="ps-list-toolbar"
     [placeholder]="'PAYROLL.PAYSLIPS.LIST.SEARCH' | translate"
     [value]="search()" [debounce]="200" (valueChange)="search.set($event)"
     [filterFields]="filterFields()"
@@ -53,7 +53,7 @@
     [table]="viewMode() === 'list' ? historyTable : null" />
 
   @if (viewMode() === 'grid') {
-    <div class="grid grid-cols-3 gap-5">
+    <div data-guide="ps-list-results" class="grid grid-cols-3 gap-5">
       @for (card of cards(); track card.id) {
         <daf-entity-card
           [options]="card.options"
@@ -81,7 +81,7 @@
 
   <!-- Toujours rendu (masqué en vue cartes) : la barre a besoin de la référence du tableau
        pour ses outils (réinitialiser, colonnes) dès qu'on bascule en vue tableau. -->
-  <div [hidden]="viewMode() !== 'list'">
+  <div data-guide="ps-list-results" [hidden]="viewMode() !== 'list'">
     <daf-data-table
       #historyTable
       [columns]="columns()"
@@ -97,3 +97,5 @@
     </daf-data-table>
   </div>
 </daf-page>
+
+<app-page-guide storageKey="payslips" [steps]="guideSteps" />

@@ -174,6 +174,18 @@ export interface KpiHistoryDto {
   computedAt: string;
 }
 
+/** Ligne de l'export Excel de la liste des collaborateurs (`exportEmployeesXlsx`). */
+export interface EmployeeExportRow {
+  /** userId RH = `employeeId` des résultats de paie : le serveur y ajoute les cumuls de paie. */
+  userId: number;
+  fullName: string;
+  employeeId: string | null;
+  department: string | null;
+  contract: string | null;
+  pays: string | null;
+  status: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class PayrollEngineService {
   private readonly base = environment.payrollApiUrl + '/api/payroll/engine';
@@ -279,6 +291,15 @@ export class PayrollEngineService {
    *  du tableau (recherche, filtres et tri appliqués). */
   exportResultsHistoryXlsx(employeeId: number, resultIds: number[], lang: string): Observable<Blob> {
     return this.http.post(`${this.base}/results/employee/${employeeId}/export.xlsx`, { ids: resultIds.map(String) },
+      { params: { lang }, responseType: 'blob' });
+  }
+
+  /** Liste des collaborateurs de `/payroll/engine-results` en Excel : le service paie ne lit
+   *  pas l'annuaire RH, le front envoie donc les lignes filtrées (toutes les pages, dans l'ordre
+   *  du tri, libellés traduits) et le serveur les met en forme. */
+  exportEmployeesXlsx(rows: EmployeeExportRow[], lang: string,
+                      period: { from: string | null; to: string | null } = { from: null, to: null }): Observable<Blob> {
+    return this.http.post(`${this.base}/results/employees/export.xlsx`, { rows, ...period },
       { params: { lang }, responseType: 'blob' });
   }
 

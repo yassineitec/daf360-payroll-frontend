@@ -431,6 +431,8 @@ export class HelpFaqAdminComponent {
     this.lang.set('fr');
     this.modalError.set(null);
     this.modalRef = this.modal.open({
+      minWidth: '360px',
+      minHeight: '260px',
       title, icon: 'smart_toy', body: this.bodyTpl(), width: '720px',
       closeOnBackdrop: false, resizable: true, maximizable: true,
     });
@@ -476,6 +478,10 @@ export class HelpFaqAdminComponent {
   askDelete(e: HelpFaqEntry): void {
     this.deleteTarget.set(e);
     this.modalRef = this.modal.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.translate.instant('PAYROLL.ADMIN_HOME.HELP_FAQ.deleteTitle'), icon: 'delete', size: 'sm', body: this.deleteTpl(),
     });
   }

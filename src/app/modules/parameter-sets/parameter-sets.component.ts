@@ -84,6 +84,8 @@ interface IrppRow { upper: number | null; ratePct: number | null; }
 
 /** Étapes du circuit de validation : soumission, approbation Directeur Pays, approbation DAF. */
 type WorkflowStep = 'submit' | 'hr' | 'finance';
+/** Réglage IRPP modifiable sur place dans l'onglet « Vue d'ensemble ». */
+type SettingKey = 'ratePct' | 'cap' | 'married' | 'perChild' | 'maxChildren';
 
 type ParamSetsSection = 'create' | 'list' | 'countries' | 'engine-params' | 'rubriques' | 'benefits' | 'advance-rules' | 'audit' | 'help-faq';
 
@@ -420,6 +422,12 @@ export class ParameterSetsComponent implements OnInit {
     return SECTION_GUIDES[tab] ?? [];
   });
   readonly detailTab = signal<string>('charges');
+  /** Sous-onglets de « Barème IRPP » : les tranches, puis les réglages (abattement, déductions). */
+  readonly irppSubTab = signal<string>('scale');
+  readonly irppSubTabs = computed(() => [
+    { id: 'scale',    label: this.t('PAYROLL.PARAMETER_SETS.SUBTAB_IRPP_SCALE'),    icon: 'stacked_line_chart', count: this.irppView().length },
+    { id: 'settings', label: this.t('PAYROLL.PARAMETER_SETS.SUBTAB_IRPP_SETTINGS'), icon: 'tune', count: this.settingRows().length },
+  ]);
 
   readonly detailSet = computed(() => {
     const id = this.openSetId();
@@ -1233,6 +1241,10 @@ export class ParameterSetsComponent implements OnInit {
     const tpl = this.chargesEditorTpl();
     if (!tpl) return;
     this.chargesModalRef = this.modalService.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t(focus === 'new' ? 'PAYROLL.PARAMETER_SETS.ADD_CHARGE_TITLE'
         : focus != null ? 'PAYROLL.PARAMETER_SETS.EDIT_CHARGE_TITLE'
         : 'PAYROLL.PARAMETER_SETS.CHARGES_EDITOR_MODAL_TITLE'),
@@ -1274,6 +1286,10 @@ export class ParameterSetsComponent implements OnInit {
     const tpl = this.fieldsEditorTpl();
     if (!tpl) return;
     this.fieldsModalRef = this.modalService.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t('PAYROLL.PARAMETER_SETS.FIELDS_EDITOR_MODAL_TITLE'),
       subtitle: this.itemTitle(ps),
       icon: 'calculate',
@@ -1390,6 +1406,10 @@ export class ParameterSetsComponent implements OnInit {
     const tpl = this.rubriquesEditorTpl();
     if (!tpl) return;
     this.rubriquesModalRef = this.modalService.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t(focus === 'new' ? 'PAYROLL.PARAMETER_SETS.ADD_RUBRIQUE_TITLE'
         : focus != null ? 'PAYROLL.PARAMETER_SETS.EDIT_RUBRIQUE_TITLE'
         : 'PAYROLL.PARAMETER_SETS.RUBRIQUES_EDITOR_MODAL_TITLE'),
@@ -1530,6 +1550,7 @@ export class ParameterSetsComponent implements OnInit {
   /** Éditeur complet (toutes les lignes) de l'onglet actif — ordre, saisie en masse. */
   editAllDetailRows(ps: ParameterSetDto): void {
     if (this.detailTab() === 'rubriques') this.openRubriquesEditor(ps);
+    else if (this.detailTab() === 'irpp' && this.irppSubTab() === 'settings') this.openDeductionsEditor(ps);
     else if (this.detailTab() === 'irpp') this.openFieldsEditor(ps);
     else this.openChargesEditor(ps);
   }
@@ -1579,6 +1600,10 @@ export class ParameterSetsComponent implements OnInit {
     if (!label) return;
     let deleting = false;
     this.modalService.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t('PAYROLL.PARAMETER_SETS.DELETE_ROW_TITLE'),
       body: this.t('PAYROLL.PARAMETER_SETS.DELETE_ROW_CONFIRM', { label }),
       size: 'sm',
@@ -1652,6 +1677,10 @@ export class ParameterSetsComponent implements OnInit {
     const tpl = this.benefitEditorTpl();
     if (!tpl) return;
     this.benefitModalRef = this.modalService.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t(index == null ? 'PAYROLL.PARAMETER_SETS.ADD_BENEFIT_TITLE' : 'PAYROLL.PARAMETER_SETS.EDIT_BENEFIT_TITLE'),
       subtitle: this.itemTitle(ps),
       icon: 'redeem',
@@ -1732,6 +1761,10 @@ export class ParameterSetsComponent implements OnInit {
     this.pendingWorkflow.set({ step, ps });
     this.workflowError.set(null);
     this.workflowModalRef = this.modalService.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t(this.workflowLabel(step)),
       icon: step === 'submit' ? 'send' : 'verified',
       body: tpl,
@@ -2115,6 +2148,10 @@ export class ParameterSetsComponent implements OnInit {
     const tpl = this.bracketEditorTpl();
     if (!tpl) return;
     this.bracketModalRef = this.modalService.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t(index == null ? 'PAYROLL.PARAMETER_SETS.ADD_BRACKET_TITLE' : 'PAYROLL.PARAMETER_SETS.EDIT_BRACKET_TITLE'),
       subtitle: this.itemTitle(ps),
       icon: 'stacked_line_chart',
@@ -2164,6 +2201,10 @@ export class ParameterSetsComponent implements OnInit {
     if (!ps || !row) return;
     let deleting = false;
     this.modalService.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t('PAYROLL.PARAMETER_SETS.DELETE_ROW_TITLE'),
       body: this.t('PAYROLL.PARAMETER_SETS.DELETE_ROW_CONFIRM', { label: `${row['bracket']} · ${row['rate']}` }),
       size: 'sm',
@@ -2204,6 +2245,10 @@ export class ParameterSetsComponent implements OnInit {
     const tpl = this.deductionsEditorTpl();
     if (!tpl) return;
     this.deductionsModalRef = this.modalService.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t('PAYROLL.PARAMETER_SETS.DEDUCTIONS_EDITOR_TITLE'),
       subtitle: this.itemTitle(ps),
       icon: 'calculate',
@@ -2243,6 +2288,145 @@ export class ParameterSetsComponent implements OnInit {
     },
       msg => { this.deductionsError.set(msg); this.savingDeductions.set(false); },
       () => { this.savingDeductions.set(false); this.closeDeductionsEditor(); });
+  }
+
+  // ── Barème IRPP › sous-onglet « Réglages » ──────────────────────────────────────────────
+  // Même présentation que les autres onglets (et que /rh/admin) : recherche + tableau, ✎ sur
+  // une ligne → pop-up pour CE réglage seul ; « Tout modifier » → pop-up des cinq réglages.
+
+  /** Une ligne de réglage : valeur affichée, et valeur à éditer (unités du formulaire). */
+  readonly settingRows = computed(() => {
+    const ps = this.detailSet();
+    if (!ps) return [];
+    const cur = this.setDevise(ps);
+    const money = (v: number | null | undefined) => v == null ? '—' : `${this.irppAmount(v)} ${cur}`.trim();
+    const rows: { key: SettingKey; group: string; label: string; hint: string; display: string; edit: number | null; unit: string; warn?: string }[] = [
+      { key: 'ratePct', group: 'ABATTEMENT', label: this.t('PAYROLL.PARAMETER_SETS.ABATTEMENT_RATE'),
+        hint: this.t('PAYROLL.PARAMETER_SETS.SETTING_RATE_HINT'),
+        display: this.irppPercent(ps.abattementRatePct), edit: +(((ps.abattementRatePct ?? 0) * 100).toFixed(4)), unit: '%' },
+      { key: 'cap', group: 'ABATTEMENT', label: this.t('PAYROLL.PARAMETER_SETS.ABATTEMENT_CAP'),
+        hint: this.t('PAYROLL.PARAMETER_SETS.SETTING_CAP_HINT'),
+        display: ps.abattementAnnualCap != null ? money(ps.abattementAnnualCap) : this.t('PAYROLL.PARAMETER_SETS.UNCAPPED'),
+        edit: ps.abattementAnnualCap, unit: cur },
+      { key: 'married', group: 'FAMILY', label: this.t('PAYROLL.PARAMETER_SETS.FAMILY_MARRIED_AMOUNT'),
+        hint: this.t('PAYROLL.PARAMETER_SETS.SETTING_MARRIED_HINT'),
+        display: money(ps.familyDeductionMarriedAmount ?? 0), edit: ps.familyDeductionMarriedAmount ?? 0, unit: cur },
+      { key: 'perChild', group: 'FAMILY', label: this.t('PAYROLL.PARAMETER_SETS.FAMILY_PER_CHILD_AMOUNT'),
+        hint: this.t('PAYROLL.PARAMETER_SETS.SETTING_PER_CHILD_HINT'),
+        display: money(ps.familyDeductionPerChildAmount ?? 0), edit: ps.familyDeductionPerChildAmount ?? 0, unit: cur },
+      { key: 'maxChildren', group: 'FAMILY', label: this.t('PAYROLL.PARAMETER_SETS.FAMILY_MAX_CHILDREN'),
+        hint: this.t('PAYROLL.PARAMETER_SETS.SETTING_MAX_CHILDREN_HINT'),
+        display: String(ps.familyDeductionMaxChildren || 0), edit: ps.familyDeductionMaxChildren || 0, unit: '',
+        // Moteur : un maximum vide ou à 0 ne compte AUCUN enfant (PayrollSimulatorService).
+        warn: !ps.familyDeductionMaxChildren && ps.familyDeductionPerChildAmount
+          ? this.t('PAYROLL.PARAMETER_SETS.FAMILY_NO_CHILD_COUNTED') : undefined },
+    ];
+    return rows;
+  });
+
+  readonly settingsSearch = signal('');
+
+  readonly settingsColumns = computed<TableColumn[]>(() => [
+    { key: 'label', label: this.t('PAYROLL.PARAMETER_SETS.COL_SETTING'), sortable: true },
+    { key: 'group', label: this.t('PAYROLL.PARAMETER_SETS.COL_SETTING_GROUP'), sortable: true },
+    { key: 'display', label: this.t('PAYROLL.PARAMETER_SETS.COL_VALUE'), sortable: true,
+      sortAccessor: row => row['_edit'] as number },
+    { key: 'hint', label: this.t('PAYROLL.PARAMETER_SETS.COL_DESCRIPTION') },
+  ]);
+
+  readonly settingsView = computed<TableRow[]>(() => {
+    const rows: TableRow[] = this.settingRows().map((r, i) => ({
+      id: `setting-${r.key}`,
+      _index: i,
+      _edit: r.edit ?? 0,
+      label: r.label,
+      group: this.t(r.group === 'ABATTEMENT' ? 'PAYROLL.PARAMETER_SETS.SECTION_ABATTEMENT' : 'PAYROLL.PARAMETER_SETS.SECTION_FAMILY_DEDUCTION'),
+      display: r.display,
+      hint: r.warn ? `${r.hint} ⚠ ${r.warn}` : r.hint,
+    }));
+    return searchTableRows(rows, this.settingsColumns(), this.settingsSearch());
+  });
+
+  readonly settingsTableConfig = computed<TableConfig>(() => ({
+    ...this.readTableConfig('PAYROLL.ADMIN_HOME.NO_RESULT'),
+    // Pas de suppression : ces cinq réglages existent toujours, on ne fait que les modifier.
+    actions: this.detailSet()
+      ? [{ id: 'edit', icon: 'edit', tooltip: this.t('PAYROLL.ADMIN_HOME.EDIT'),
+           onClick: (row: TableRow) => this.startSettingEdit(this.settingRows()[row['_index'] as number]?.key) }]
+      : [],
+  }));
+
+  readonly editingSetting = signal<SettingKey | null>(null);
+  readonly settingDraft   = signal<string>('');
+  readonly settingError   = signal<string | null>(null);
+  readonly savingSetting  = signal(false);
+  private readonly settingEditorTpl = viewChild<TemplateRef<unknown>>('settingEditorTpl');
+  private settingModalRef: ModalRef | null = null;
+
+  /** Réglage en cours d'édition (libellé, aide, unité) — pour la pop-up. */
+  readonly editingSettingRow = computed(() => this.settingRows().find(r => r.key === this.editingSetting()) ?? null);
+
+  startSettingEdit(key: SettingKey | undefined): void {
+    const ps = this.detailSet();
+    const row = this.settingRows().find(r => r.key === key);
+    const tpl = this.settingEditorTpl();
+    if (!ps || !row || !tpl || this.savingSetting()) return;
+    this.editingSetting.set(row.key);
+    this.settingDraft.set(row.edit == null ? '' : String(row.edit));
+    this.settingError.set(null);
+    this.settingModalRef = this.modalService.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '220px',
+      title: row.label,
+      subtitle: this.itemTitle(ps),
+      icon: 'tune',
+      size: 'sm',
+      body: tpl,
+      closeOnBackdrop: false,
+    });
+  }
+
+  cancelSettingEdit(): void {
+    if (this.savingSetting()) return;
+    this.editingSetting.set(null);
+    this.settingError.set(null);
+    this.settingModalRef?.close();
+    this.settingModalRef = null;
+  }
+
+  /** Enregistre le seul réglage en cours d'édition — mêmes contrôles que « Tout modifier ». */
+  commitSettingEdit(): void {
+    const ps = this.detailSet();
+    const key = this.editingSetting();
+    if (!ps || !key || this.savingSetting()) return;
+    const raw = this.settingDraft().trim().replace(',', '.');
+    const v = raw === '' ? null : Number(raw);
+    if (v != null && !Number.isFinite(v)) { this.settingError.set(this.t('PAYROLL.PARAMETER_SETS.SETTING_NOT_NUMBER')); return; }
+    // Seul le plafond accepte le vide (= aucun plafond) ; les autres repassent à 0.
+    const n = v ?? 0;
+    const problem =
+        key === 'ratePct' && (n < 0 || n > 100) ? 'PAYROLL.PARAMETER_SETS.ERR_ABATTEMENT_RATE'
+      : key === 'maxChildren' && (n < 0 || !Number.isInteger(n)) ? 'PAYROLL.PARAMETER_SETS.ERR_MAX_CHILDREN'
+      : n < 0 ? 'PAYROLL.ADMIN_HOME.BENEFITS.ERR_NEGATIVE'
+      : null;
+    if (problem) { this.settingError.set(this.t(problem)); return; }
+    const patch: Partial<ParameterSetDto> =
+        key === 'ratePct'  ? { abattementRatePct: n / 100 }
+      : key === 'cap'      ? { abattementAnnualCap: v }
+      : key === 'married'  ? { familyDeductionMarriedAmount: n }
+      : key === 'perChild' ? { familyDeductionPerChildAmount: n }
+      :                      { familyDeductionMaxChildren: n };
+    this.settingError.set(null);
+    this.savingSetting.set(true);
+    this.saveFieldsPatch(ps, patch,
+      msg => { this.settingError.set(msg); this.savingSetting.set(false); },
+      () => {
+        this.savingSetting.set(false);
+        this.cancelSettingEdit();
+        this.notification.success(this.t('PAYROLL.PARAMETER_SETS.SETTING_SAVED'));
+      });
   }
 
   /** Montant formaté (2 décimales max) pour les blocs abattement / déductions. */
@@ -2428,6 +2612,11 @@ export class ParameterSetsComponent implements OnInit {
   // du formulaire de création ou celui du jeu ouvert dans une pop-up.
   private deviseOf(paysId: number | null | undefined): string {
     return this.paysList().find(p => p.id === paysId)?.devise ?? '';
+  }
+
+  /** Devise du pays d'un jeu — montants des blocs abattement / déductions. */
+  setDevise(ps: { paysId?: number | null }): string {
+    return this.deviseOf(ps.paysId);
   }
 
   /** Devise du pays choisi dans le formulaire "Nouveau jeu". */

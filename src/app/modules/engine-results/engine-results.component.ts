@@ -790,6 +790,10 @@ export class EngineResultsComponent {
         .subscribe(list => this.calcPaysList.set(list));
     }
     this.calcRef = this.modal.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t('PAYROLL.ENGINE_RESULTS.CALC_TITLE'),
       subtitle: this.employeeName(),
       icon: 'calculate',
