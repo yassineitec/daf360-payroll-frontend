@@ -556,7 +556,7 @@
       "REASON_REQUIRED": "Enter the reason for the change to save.",
       "NET_AUTO_HINT": "Enter the gross or the net: the other is calculated automatically with the country's payroll rules in force.",
       "NET_AFTER_SAVE": "Country, contract or benefits changed: the net will be recalculated on save.",
-      "NET_NEEDS_PAYS": "Save the employee's country first: the net will then be calculated automatically.",
+      "NET_NEEDS_PAYS": "Choose the employee's country: the gross and net will then be calculated automatically.",
       "NET_CALCULATING": "Calculating the net…",
       "GROSS_CALCULATING": "Calculating the gross from the net…",
       "GROSS_CALC_ERROR": "Could not calculate the gross from this net.",

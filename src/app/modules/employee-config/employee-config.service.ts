@@ -58,6 +58,15 @@ export interface CalculateNetResponse {
   netInHand: number;
 }
 
+/** `CalculationFormValues` de daf360-payroll-service : ce que le formulaire affiche. */
+export interface CalculationFormValues {
+  paysId: number | null;
+  contractType: string | null;
+  selectedBenefitCodes: string[];
+  isMarried: boolean;
+  childrenCount: number;
+}
+
 /** `grossSalary` dans la devise de saisie ; `netInHand` dans la devise de travail, comme
  *  `CalculateNetResponse`. */
 export interface CalculateGrossResponse {
@@ -113,13 +122,17 @@ export class EmployeeConfigService {
     return this.http.get<EmployeePayrollConfigHistoryDto[]>(`${this.base}/${profileUserId}/history`);
   }
 
-  calculateNet(profileUserId: number, grossSalary: number, inputCurrency?: string | null): Observable<CalculateNetResponse> {
-    return this.http.post<CalculateNetResponse>(`${this.base}/${profileUserId}/calculate-net`, { grossSalary, inputCurrency });
+  /** `form` : valeurs affichées (pas forcément enregistrées) — le serveur calcule avec elles,
+   *  sinon avec la configuration enregistrée. */
+  calculateNet(profileUserId: number, grossSalary: number, inputCurrency?: string | null,
+               form?: CalculationFormValues): Observable<CalculateNetResponse> {
+    return this.http.post<CalculateNetResponse>(`${this.base}/${profileUserId}/calculate-net`, { grossSalary, inputCurrency, form });
   }
 
   /** Calcul inverse : net saisi (devise de saisie) → brut dans cette même devise. */
-  calculateGross(profileUserId: number, netSalary: number, inputCurrency?: string | null): Observable<CalculateGrossResponse> {
-    return this.http.post<CalculateGrossResponse>(`${this.base}/${profileUserId}/calculate-gross`, { netSalary, inputCurrency });
+  calculateGross(profileUserId: number, netSalary: number, inputCurrency?: string | null,
+                 form?: CalculationFormValues): Observable<CalculateGrossResponse> {
+    return this.http.post<CalculateGrossResponse>(`${this.base}/${profileUserId}/calculate-gross`, { netSalary, inputCurrency, form });
   }
 
   getBonuses(profileUserId: number): Observable<EmployeePayrollBonusDto[]> {

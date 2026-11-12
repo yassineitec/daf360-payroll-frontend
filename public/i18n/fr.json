@@ -556,7 +556,7 @@
       "REASON_REQUIRED": "Indiquez le motif du changement pour enregistrer.",
       "NET_AUTO_HINT": "Saisissez le brut ou le net : l’autre est calculé automatiquement avec les règles de paie en vigueur du pays.",
       "NET_AFTER_SAVE": "Pays, contrat ou avantages modifiés : le net sera recalculé à l’enregistrement.",
-      "NET_NEEDS_PAYS": "Enregistrez d’abord le pays du collaborateur : le net sera ensuite calculé automatiquement.",
+      "NET_NEEDS_PAYS": "Choisissez le pays du collaborateur : le brut et le net seront ensuite calculés automatiquement.",
       "NET_CALCULATING": "Calcul du net…",
       "GROSS_CALCULATING": "Calcul du brut à partir du net…",
       "GROSS_CALC_ERROR": "Impossible de calculer le brut à partir de ce net.",

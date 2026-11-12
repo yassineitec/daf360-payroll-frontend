@@ -39,6 +39,7 @@ import {
 } from '../../core/payroll-nav';
 import {
   EmployeeConfigService, EmployeePayrollConfigDto, EmployeePayrollBonusDto, EmployeePayrollConfigHistoryDto,
+  type CalculationFormValues,
 } from './employee-config.service';
 import { recallEmployee } from './employee-config-employee';
 import { PageGuideComponent } from '../../shared/guide/page-guide.component';
@@ -517,8 +518,8 @@ export class EmployeeConfigComponent implements OnInit {
 
   /** Aide sous le net : comment il est obtenu, ou pourquoi il n'est pas encore à jour. */
   readonly netHint = computed(() => {
-    if (this.savedConfig()?.paysId == null) return this.t('PAYROLL.EMPLOYEE_CONFIG.NET_NEEDS_PAYS');
-    if (this.calcInputsChanged()) return this.t('PAYROLL.EMPLOYEE_CONFIG.NET_AFTER_SAVE');
+    // Le calcul suit le formulaire : seul un pays non choisi l'empêche.
+    if (this.config()?.paysId == null) return this.t('PAYROLL.EMPLOYEE_CONFIG.NET_NEEDS_PAYS');
     if (this.grossApproximate()) return this.t('PAYROLL.EMPLOYEE_CONFIG.GROSS_NOT_CONVERGED');
     return this.t('PAYROLL.EMPLOYEE_CONFIG.NET_AUTO_HINT');
   });
@@ -805,21 +806,57 @@ export class EmployeeConfigComponent implements OnInit {
     this.config.set({ ...cfg, paysId, selectedBenefitCodes: [] });
     this.loadBenefitsFor(paysId);
     this.loadContractTypesFor(paysId);
+    this.scheduleNetRecalc();
   }
 
   onContractTypeChange(contractType: string): void {
     const cfg = this.config();
     if (cfg) this.config.set({ ...cfg, contractType });
+    this.scheduleNetRecalc();
   }
 
   onMarriedChange(isMarried: boolean): void {
     const cfg = this.config();
     if (cfg) this.config.set({ ...cfg, isMarried });
+    this.scheduleNetRecalc();
   }
 
   onChildrenCountChange(childrenCount: number | null): void {
     const cfg = this.config();
     if (cfg) this.config.set({ ...cfg, childrenCount: childrenCount ?? 0 });
+    this.scheduleNetRecalc();
+  }
+
+  /** Ce que le formulaire AFFICHE (pas forcément enregistré) : le serveur calcule avec,
+   *  dès la première saisie — plus besoin d'enregistrer le pays avant. */
+  private formValues(cfg: EmployeePayrollConfigDto): CalculationFormValues {
+    return {
+      paysId: cfg.paysId,
+      contractType: cfg.contractType,
+      selectedBenefitCodes: cfg.selectedBenefitCodes,
+      isMarried: cfg.isMarried,
+      childrenCount: cfg.childrenCount,
+    };
+  }
+
+  /** Empreinte des entrées du calcul : une réponse arrivée après leur changement est périmée. */
+  private formKey(cfg: EmployeePayrollConfigDto): string {
+    return JSON.stringify({ ...this.formValues(cfg), b: EmployeeConfigComponent.benefitKey(cfg), c: cfg.inputCurrency });
+  }
+
+  /** Pays, contrat, avantage ou situation familiale changé : le net suit le brut affiché. */
+  private scheduleNetRecalc(): void {
+    if (this.config()?.currentGrossSalary == null) return;
+    if (this.netTimer) clearTimeout(this.netTimer);
+    this.netTyped = null;
+    if (this.grossTimer) clearTimeout(this.grossTimer);
+    this.grossTimer = setTimeout(() => this.calculateNet(), 600);
+  }
+
+  /** Calcul possible : un pays choisi, et un contrat qui a des règles de paie dans ce pays
+   *  (sinon le message est déjà sous le select du contrat). */
+  private canCalculate(cfg: EmployeePayrollConfigDto | null): cfg is EmployeePayrollConfigDto {
+    return cfg !== null && cfg.paysId != null && !this.contractUnpriced();
   }
 
   /** Brut saisi → net recalculé automatiquement après une courte pause de frappe. */
@@ -852,18 +889,19 @@ export class EmployeeConfigComponent implements OnInit {
     this.netTimer = setTimeout(() => this.calculateGross(net), 600);
   }
 
-  /** Brut donnant le net saisi, par le serveur (calcul inverse, configuration ENREGISTRÉE).
-   *  Le net affiché devient celui que le moteur obtient avec ce brut. */
+  /** Brut donnant le net saisi, par le serveur (calcul inverse), avec les valeurs du
+   *  formulaire. Le net affiché devient celui que le moteur obtient avec ce brut. */
   private calculateGross(net: number): void {
     const cfg = this.config();
-    if (cfg === null || this.savedConfig()?.paysId == null) return;
+    if (!this.canCalculate(cfg)) return;
+    const key = this.formKey(cfg);
     this.calculatingGross.set(true);
-    this.svc.calculateGross(this.userId, net, cfg.inputCurrency).subscribe({
+    this.svc.calculateGross(this.userId, net, cfg.inputCurrency, this.formValues(cfg)).subscribe({
       next: res => {
         this.calculatingGross.set(false);
-        // Net modifié entre-temps, ou brut saisi depuis : réponse périmée.
+        // Net modifié entre-temps, brut saisi depuis, ou formulaire changé : réponse périmée.
         const current = this.config();
-        if (!current || this.netTyped !== net) return;
+        if (!current || this.netTyped !== net || this.formKey(current) !== key) return;
         this.config.set({ ...current, currentGrossSalary: res.grossSalary, currentNetSalary: res.netInHand });
         this.grossApproximate.set(!res.convergenceOk);
       },
@@ -874,20 +912,21 @@ export class EmployeeConfigComponent implements OnInit {
     });
   }
 
-  /** Net du brut courant, par le serveur — avec la configuration ENREGISTRÉE (pays, contrat,
-   *  avantages). `then` reçoit le net obtenu. */
+  /** Net du brut courant, par le serveur — avec les valeurs du formulaire (pays, contrat,
+   *  avantages, situation familiale). `then` reçoit le net obtenu. */
   calculateNet(then?: (net: number) => void, otherwise?: () => void): void {
     const cfg = this.config();
-    if (cfg === null || cfg.currentGrossSalary == null || this.savedConfig()?.paysId == null) { otherwise?.(); return; }
+    if (!this.canCalculate(cfg) || cfg.currentGrossSalary == null) { otherwise?.(); return; }
     const gross = cfg.currentGrossSalary;
+    const key = this.formKey(cfg);
     this.calculatingNet.set(true);
-    this.svc.calculateNet(this.userId, gross, cfg.inputCurrency).subscribe({
+    this.svc.calculateNet(this.userId, gross, cfg.inputCurrency, this.formValues(cfg)).subscribe({
       next: res => {
         this.calculatingNet.set(false);
-        // Relit la config courante : l'utilisateur a pu modifier un autre champ entre-temps,
-        // et un brut changé depuis rend ce net périmé.
+        // Relit la config courante : un brut ou un champ du calcul changé depuis rend ce
+        // net périmé (un nouveau calcul est alors déjà programmé).
         const current = this.config();
-        if (current && current.currentGrossSalary === gross) {
+        if (current && current.currentGrossSalary === gross && this.formKey(current) === key) {
           this.config.set({ ...current, currentNetSalary: res.netInHand });
           then?.(res.netInHand);
         } else {
@@ -998,6 +1037,7 @@ export class EmployeeConfigComponent implements OnInit {
       ? cfg.selectedBenefitCodes.filter(c => c !== code)
       : [...cfg.selectedBenefitCodes, code];
     this.config.set({ ...cfg, selectedBenefitCodes: selected });
+    this.scheduleNetRecalc();
   }
 
   /**
