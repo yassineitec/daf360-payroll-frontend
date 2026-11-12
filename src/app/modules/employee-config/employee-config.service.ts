@@ -58,6 +58,14 @@ export interface CalculateNetResponse {
   netInHand: number;
 }
 
+/** `grossSalary` dans la devise de saisie ; `netInHand` dans la devise de travail, comme
+ *  `CalculateNetResponse`. */
+export interface CalculateGrossResponse {
+  grossSalary: number;
+  netInHand: number;
+  convergenceOk: boolean;
+}
+
 export interface EmployeePayrollBonusDto {
   id: number;
   profileUserId: number;
@@ -107,6 +115,11 @@ export class EmployeeConfigService {
 
   calculateNet(profileUserId: number, grossSalary: number, inputCurrency?: string | null): Observable<CalculateNetResponse> {
     return this.http.post<CalculateNetResponse>(`${this.base}/${profileUserId}/calculate-net`, { grossSalary, inputCurrency });
+  }
+
+  /** Calcul inverse : net saisi (devise de saisie) → brut dans cette même devise. */
+  calculateGross(profileUserId: number, netSalary: number, inputCurrency?: string | null): Observable<CalculateGrossResponse> {
+    return this.http.post<CalculateGrossResponse>(`${this.base}/${profileUserId}/calculate-gross`, { netSalary, inputCurrency });
   }
 
   getBonuses(profileUserId: number): Observable<EmployeePayrollBonusDto[]> {

@@ -503,18 +503,23 @@ export class EmployeeConfigComponent implements OnInit {
       : this.t('PAYROLL.EMPLOYEE_CONFIG.CONTRACT_NO_RULES', { contract });
   });
 
-  // ── Net calculé automatiquement à partir du brut ──────────────────────────
-  // Le net n'est plus saisi : il est recalculé (après une courte pause de frappe) à chaque
-  // changement du brut, par le serveur. ⚠ Le serveur calcule avec le pays, le contrat et les
-  // avantages ENREGISTRÉS : après un enregistrement qui les change, le net est recalculé et
-  // réenregistré (voir `save`).
+  // ── Brut ⇄ net calculés l'un de l'autre ───────────────────────────────────
+  // Brut saisi → net recalculé ; net saisi → brut recalculé (calcul inverse du moteur), après
+  // une courte pause de frappe, par le serveur. Le brut reste la valeur de référence enregistrée.
+  // ⚠ Le serveur calcule avec le pays, le contrat et les avantages ENREGISTRÉS : après un
+  // enregistrement qui les change, le net est recalculé et réenregistré (voir `save`).
 
   private grossTimer: ReturnType<typeof setTimeout> | null = null;
+  private netTimer: ReturnType<typeof setTimeout> | null = null;
+  readonly calculatingGross = signal(false);
+  /** Le moteur n'a pas atteint exactement le net saisi : brut approché. */
+  readonly grossApproximate = signal(false);
 
   /** Aide sous le net : comment il est obtenu, ou pourquoi il n'est pas encore à jour. */
   readonly netHint = computed(() => {
     if (this.savedConfig()?.paysId == null) return this.t('PAYROLL.EMPLOYEE_CONFIG.NET_NEEDS_PAYS');
     if (this.calcInputsChanged()) return this.t('PAYROLL.EMPLOYEE_CONFIG.NET_AFTER_SAVE');
+    if (this.grossApproximate()) return this.t('PAYROLL.EMPLOYEE_CONFIG.GROSS_NOT_CONVERGED');
     return this.t('PAYROLL.EMPLOYEE_CONFIG.NET_AUTO_HINT');
   });
 
@@ -729,6 +734,7 @@ export class EmployeeConfigComponent implements OnInit {
     this.destroyRef.onDestroy(() => {
       window.removeEventListener('beforeunload', beforeUnload);
       if (this.grossTimer) clearTimeout(this.grossTimer);
+      if (this.netTimer) clearTimeout(this.netTimer);
     });
   }
 
@@ -822,11 +828,50 @@ export class EmployeeConfigComponent implements OnInit {
     if (!cfg) return;
     this.config.set({ ...cfg, currentGrossSalary });
     if (this.grossTimer) clearTimeout(this.grossTimer);
+    // La saisie du brut prend la main sur un calcul net → brut en attente.
+    if (this.netTimer) clearTimeout(this.netTimer);
+    this.netTyped = null;
+    this.grossApproximate.set(false);
     if (currentGrossSalary == null) {
       this.config.set({ ...this.config()!, currentNetSalary: null });
       return;
     }
     this.grossTimer = setTimeout(() => this.calculateNet(), 600);
+  }
+
+  /** Dernier net saisi (devise affichée) — sert à ignorer une réponse périmée. */
+  private netTyped: number | null = null;
+
+  /** Net saisi → brut recalculé automatiquement après une courte pause de frappe. */
+  onNetSalaryChange(net: number | null): void {
+    if (this.netTimer) clearTimeout(this.netTimer);
+    // La saisie du net prend la main sur un calcul brut → net en attente.
+    if (this.grossTimer) clearTimeout(this.grossTimer);
+    this.netTyped = net;
+    if (net == null || net <= 0) return;
+    this.netTimer = setTimeout(() => this.calculateGross(net), 600);
+  }
+
+  /** Brut donnant le net saisi, par le serveur (calcul inverse, configuration ENREGISTRÉE).
+   *  Le net affiché devient celui que le moteur obtient avec ce brut. */
+  private calculateGross(net: number): void {
+    const cfg = this.config();
+    if (cfg === null || this.savedConfig()?.paysId == null) return;
+    this.calculatingGross.set(true);
+    this.svc.calculateGross(this.userId, net, cfg.inputCurrency).subscribe({
+      next: res => {
+        this.calculatingGross.set(false);
+        // Net modifié entre-temps, ou brut saisi depuis : réponse périmée.
+        const current = this.config();
+        if (!current || this.netTyped !== net) return;
+        this.config.set({ ...current, currentGrossSalary: res.grossSalary, currentNetSalary: res.netInHand });
+        this.grossApproximate.set(!res.convergenceOk);
+      },
+      error: () => {
+        this.calculatingGross.set(false);
+        this.notify.error(this.t('PAYROLL.EMPLOYEE_CONFIG.GROSS_CALC_ERROR'));
+      },
+    });
   }
 
   /** Net du brut courant, par le serveur — avec la configuration ENREGISTRÉE (pays, contrat,
