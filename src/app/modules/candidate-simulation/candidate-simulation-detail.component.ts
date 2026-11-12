@@ -31,6 +31,21 @@ import {
 import { PayrollApiService, ParameterSetDto, parseRubriquesApplied } from '../../core/payroll-api.service';
 import { PAYROLL_SIMULATOR_PERMISSIONS } from '../../core/payroll-nav';
 import { PaysNamesService } from '../../core/pays-names.service';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import type { GuideStep } from '../../shared/guide/page-guide.types';
+
+/** Guide de la page — `target` = un `data-guide` du gabarit. */
+const guideStep = (key: string, icon: string, target?: string): GuideStep => ({
+  icon, titleKey: `GUIDE.CANDIDATE_DETAIL.${key}_TITLE`, textKey: `GUIDE.CANDIDATE_DETAIL.${key}_TEXT`, target,
+});
+const GUIDE_STEPS: GuideStep[] = [
+  guideStep('WELCOME',  'person',     'cand-detail-header'),
+  guideStep('IDENTITY', 'badge',      'cand-detail-identity'),
+  guideStep('ACTIONS',  'bolt',       'cand-detail-actions'),
+  guideStep('KPIS',     'monitoring', 'cand-detail-kpis'),
+  guideStep('TIMELINE', 'timeline',   'cand-detail-timeline'),
+  guideStep('DETAIL',   'receipt_long', 'cand-detail-timeline'),
+];
 import { CandidateSimulationListStateService } from './candidate-simulation-list-state.service';
 
 type Status = CandidateCostApprovalDto['status'];
@@ -65,7 +80,7 @@ interface Kpi { label: string; value: string; delta: MetricDelta | null; options
   imports: [
     TranslatePipe,
     AccordionCardComponent, ButtonComponent, CardComponent, MetricCardComponent, PageComponent, PageHeaderComponent,
-    SectionCardComponent, SectionTitleComponent, StatusBadgeComponent,
+    SectionCardComponent, SectionTitleComponent, StatusBadgeComponent, PageGuideComponent,
   ],
   templateUrl: './candidate-simulation-detail.component.html',
   styleUrl: './candidate-simulation-detail.component.scss',
@@ -235,6 +250,16 @@ export class CandidateSimulationDetailComponent {
       }),
   );
   readonly latest  = computed(() => this.rounds().at(-1) ?? null);
+
+  /** Guide : sans proposition, ni indicateurs ni fil à présenter ; sans action permise,
+   *  pas de carte « Actions rapides ». */
+  readonly guideSteps = computed(() => {
+    const hasRounds = this.rounds().length > 0 && !this.error();
+    const hasActions = (this.canOpenSimulator && !!this.latest()?.snap?.id) || this.canOpenRhCandidate;
+    return GUIDE_STEPS.filter(s =>
+      (s.target !== 'cand-detail-actions' || hasActions) &&
+      (hasRounds || (s.target !== 'cand-detail-kpis' && s.target !== 'cand-detail-timeline')));
+  });
   readonly previous = computed(() => this.rounds().at(-2) ?? null);
   readonly selected = computed(() =>
     this.rounds().find(r => r.sim.id === this.selectedId()) ?? this.latest());
@@ -613,6 +638,10 @@ export class CandidateSimulationDetailComponent {
     }
     // La personne en titre ; « Proposition n° · date · type · contrat » en sous-titre.
     this.detailModalRef = this.modalService.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title:    this.candidateName(),
       subtitle: this.modalSubtitle(r),
       icon:     'request_quote',

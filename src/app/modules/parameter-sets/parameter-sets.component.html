@@ -4,13 +4,13 @@
 @if (activeTab() === null) {
   <!-- Titre + entité à gauche ; à droite « Changer de pays » (`daf-select` de la lib), comme
        /rh/admin — administrateurs seulement, et seulement s'il y a plus d'un pays. -->
-  <div class="ps-home-header">
+  <div class="ps-home-header" data-guide="adm-home-header">
     <div class="ps-home-header__text">
       <h2 class="ps-home-title">{{ 'PAYROLL.ADMIN_HOME.TITLE' | translate }}</h2>
       <p class="ps-home-sub">{{ 'PAYROLL.ADMIN_HOME.ENTITY' | translate: { pays: currentPays() } }}</p>
     </div>
     @if (canSwitchPays()) {
-      <div class="ps-home-pays">
+      <div class="ps-home-pays" data-guide="adm-home-pays">
         <daf-select
           [options]="paysOptions()"
           [selected]="listPaysId() ? ['' + listPaysId()] : []"
@@ -27,7 +27,7 @@
        (souris ou focus clavier, Échap pour fermer) comme `daf-metric-card` — pas de glyphe,
        la tuile est petite et entièrement cliquable. Description seule : pas de titre, il
        redirait celui de la carte juste au-dessus. -->
-  <section class="ps-home-cards">
+  <section class="ps-home-cards" data-guide="adm-home-cards">
     @for (card of cards(); track card.key) {
       <div
         #cardAnchor
@@ -79,7 +79,7 @@
       <!-- Taux et barèmes, Éléments du bulletin : le choix du pays en haut à droite de la page,
            sur la ligne du fil d'Ariane ; il pilote la section ouverte (son pays, sa mémoire). -->
       @if (headerPaysSection(); as sec) {
-        <div pageActions class="ps-header-pays">
+        <div pageActions class="ps-header-pays" data-guide="adm-header-pays">
           <daf-select
             [options]="sec.paysOptions()"
             [selected]="sec.paysId() ? ['' + sec.paysId()] : []"
@@ -99,6 +99,7 @@
     @case ('benefits')      { <app-benefits-catalogue-admin /> }
     @case ('advance-rules') { <app-advance-rules-admin /> }
     @case ('audit')         { <app-payroll-audit-admin /> }
+    @case ('help-faq')      { <app-help-faq-admin /> }
 
     <!-- ══════════════════════════ Onglet "Nouveau jeu" ══════════════════════════ -->
     @case ('create') {
@@ -107,10 +108,10 @@
              et « Partir des règles en vigueur » + barème IRPP ; charges sociales ; motif ;
              paramètres avancés (repliés) ; circuit de validation et bouton « Enregistrer le
              brouillon », qui ouvre ensuite la fiche du brouillon. -->
-        <app-admin-section-header
+        <app-admin-section-header data-guide="adm-create-header"
           [title]="'PAYROLL.ADMIN_HOME.NEW_RULES' | translate"
           [subtitle]="'PAYROLL.ADMIN.SUBTITLE' | translate" />
-        <daf-card [options]="{ variant: 'default', padding: 'lg', radius: 'xl' }" [formGroup]="newSetForm">
+        <daf-card data-guide="adm-create-form" [options]="{ variant: 'default', padding: 'lg', radius: 'xl' }" [formGroup]="newSetForm">
          <div class="ps-form">
 
           <div class="field-row">
@@ -326,7 +327,7 @@
         <!-- Paramètres techniques du moteur — repliés (`daf-accordion-card` de la lib) : valeurs
              par défaut, ou celles des règles en vigueur quand on les recopie. Ouverts d'office
              si l'un d'eux est en erreur après une tentative de création. -->
-        <daf-accordion-card
+        <daf-accordion-card data-guide="adm-create-advanced"
           [options]="{
             title: ('PAYROLL.ADMIN.ADVANCED_TITLE' | translate),
             subtitle: ('PAYROLL.ADMIN.ADVANCED_SUBTITLE' | translate),
@@ -399,7 +400,7 @@
         @if (newSetError()) {
           <div class="admin-error-banner" role="alert">{{ newSetError() }}</div>
         }
-        <div class="form-actions">
+        <div class="form-actions" data-guide="adm-create-actions">
           <daf-button
             [label]="'PAYROLL.ADMIN_HOME.CANCEL' | translate"
             variant="secondary"
@@ -426,7 +427,7 @@
           <!-- En-tête de section comme les autres sections : version, statut, approbations
                (Directeur Pays / DAF) et, à droite, l'étape suivante du circuit de validation
                (bouton vert, confirmation avant envoi). -->
-          <app-admin-section-header [title]="itemTitle(ps)" [subtitle]="approvalLine(ps)">
+          <app-admin-section-header data-guide="adm-set-header" [title]="itemTitle(ps)" [subtitle]="approvalLine(ps)">
             <daf-badge
               [label]="statusLabel(ps)"
               [options]="{ variant: setStatusVariant(ps), size: 'sm', dot: true }" />
@@ -448,7 +449,7 @@
 
           <!-- Onglets + actions de l'onglet à droite (le « Ajouter » des sections RH) ; tous
                les statuts se modifient (brouillon, soumis, actif, archivé). -->
-          <div class="ps-detail-tabs">
+          <div class="ps-detail-tabs" data-guide="adm-set-tabs">
             <div class="ps-detail-tabs__tabs">
               <daf-tabs [tabs]="detailTabs()" [(active)]="detailTab" [tabsLabel]="itemTitle(ps)" [idPrefix]="'parameter-set-detail-tabs'" />
             </div>
@@ -468,16 +469,19 @@
                     [options]="{ iconStart: 'edit_note', size: 'sm' }"
                     (onClick)="editAllDetailRows(ps)" />
                 }
-                <daf-button class="admin-desktop-only"
-                  [label]="'PAYROLL.PARAMETER_SETS.ADD_ROW' | translate"
-                  variant="teal"
-                  [options]="{ iconStart: 'add' }"
-                  (onClick)="addDetailRow(ps)" />
-                <daf-button class="admin-mobile-only"
-                  [title]="'PAYROLL.PARAMETER_SETS.ADD_ROW' | translate"
-                  variant="teal"
-                  [options]="{ iconStart: 'add', size: 'sm' }"
-                  (onClick)="addDetailRow(ps)" />
+                <!-- Réglages IRPP : pas de ligne à ajouter, seulement à modifier. -->
+                @if (!(detailTab() === 'irpp' && irppSubTab() === 'settings')) {
+                  <daf-button class="admin-desktop-only"  
+                    [label]="'PAYROLL.PARAMETER_SETS.ADD_ROW' | translate"  
+                    variant="teal"  
+                    [options]="{ iconStart: 'add' }"  
+                    (onClick)="addDetailRow(ps)" />  
+                  <daf-button class="admin-mobile-only"  
+                    [title]="'PAYROLL.PARAMETER_SETS.ADD_ROW' | translate"  
+                    variant="teal"  
+                    [options]="{ iconStart: 'add', size: 'sm' }"  
+                    (onClick)="addDetailRow(ps)" />  
+                  }
               </div>
           </div>
 
@@ -488,7 +492,7 @@
                les lignes, et porte à droite réinitialiser + choix des colonnes (`[table]`). -->
           @switch (detailTab()) {
             @case ('rubriques') {
-                <div class="ps-field-block">
+                <div class="ps-field-block" data-guide="adm-set-table">
                   <div class="ps-toolbar">
                     <daf-search-toolbar
                       [card]="false"
@@ -501,63 +505,29 @@
                     [config]="rubriquesTableConfig()" />
                 </div>
             }
-            @case ('benefits') {
             @case ('irpp') {
-                <!-- Tranches : Ajouter / Modifier / Supprimer ligne à ligne ; abattement et
-                     déductions : bouton Modifier de chaque bloc (une pop-up pour les deux). -->
-                <div class="ps-field-block flex flex-col gap-4" data-guide="adm-set-table">
-                  <daf-data-table [columns]="irppColumns()" [rows]="irppView()" [config]="irppTableConfig()" />
-                  <div class="grid gap-4 md:grid-cols-2">
-                    <section class="rounded-xl border border-outline-variant bg-surface-container-lowest px-6 py-4 flex flex-col gap-2">
-                      <div class="flex items-center justify-between gap-4">
-                        <p class="text-label-caps font-extrabold uppercase tracking-widest text-on-surface-variant m-0">
-                          {{ 'PAYROLL.PARAMETER_SETS.SECTION_ABATTEMENT' | translate }}
-                        </p>
-                        <daf-button
-                          [title]="'PAYROLL.ADMIN_HOME.EDIT' | translate"
-                          variant="secondary"
-                          [options]="{ iconStart: 'edit', size: 'sm' }"
-                          (onClick)="openDeductionsEditor(ps)" />
-                      </div>
-                      <div class="flex justify-between gap-4">
-                        <span>{{ 'PAYROLL.PARAMETER_SETS.ABATTEMENT_RATE' | translate }}</span>
-                        <span class="tabular-nums font-bold">{{ irppPercent(ps.abattementRatePct) }}</span>
-                      </div>
-                      <div class="flex justify-between gap-4">
-                        <span>{{ 'PAYROLL.PARAMETER_SETS.ABATTEMENT_CAP' | translate }}</span>
-                        <span class="tabular-nums font-bold">
-                          {{ ps.abattementAnnualCap != null ? irppAmount(ps.abattementAnnualCap) : ('PAYROLL.PARAMETER_SETS.UNCAPPED' | translate) }}
-                        </span>
-                      </div>
-                    </section>
-                    <section class="rounded-xl border border-outline-variant bg-surface-container-lowest px-6 py-4 flex flex-col gap-2">
-                      <div class="flex items-center justify-between gap-4">
-                        <p class="text-label-caps font-extrabold uppercase tracking-widest text-on-surface-variant m-0">
-                          {{ 'PAYROLL.PARAMETER_SETS.SECTION_FAMILY_DEDUCTION' | translate }}
-                        </p>
-                        <daf-button
-                          [title]="'PAYROLL.ADMIN_HOME.EDIT' | translate"
-                          variant="secondary"
-                          [options]="{ iconStart: 'edit', size: 'sm' }"
-                          (onClick)="openDeductionsEditor(ps)" />
-                      </div>
-                      <div class="flex justify-between gap-4">
-                        <span>{{ 'PAYROLL.PARAMETER_SETS.FAMILY_MARRIED_AMOUNT' | translate }}</span>
-                        <span class="tabular-nums font-bold">{{ irppAmount(ps.familyDeductionMarriedAmount) }}</span>
-                      </div>
-                      <div class="flex justify-between gap-4">
-                        <span>{{ 'PAYROLL.PARAMETER_SETS.FAMILY_PER_CHILD_AMOUNT' | translate }}</span>
-                        <span class="tabular-nums font-bold">{{ irppAmount(ps.familyDeductionPerChildAmount) }}</span>
-                      </div>
-                      <div class="flex justify-between gap-4">
-                        <span>{{ 'PAYROLL.PARAMETER_SETS.FAMILY_MAX_CHILDREN' | translate }}</span>
-                        <span class="tabular-nums font-bold">{{ ps.familyDeductionMaxChildren }}</span>
-                      </div>
-                    </section>
-                  </div>
+                <!-- Deux sous-onglets : les tranches du barème, puis les réglages appliqués avant
+                     le barème (abattement, déductions familiales). -->
+                <div class="ps-field-block" data-guide="adm-set-table">
+                  <daf-tabs [tabs]="irppSubTabs()" [(active)]="irppSubTab" [tabsLabel]="'PAYROLL.PARAMETER_SETS.TAB_IRPP' | translate" [idPrefix]="'parameter-set-irpp-tabs'" />
+                  @if (irppSubTab() === 'settings') {
+                    <div class="ps-toolbar">
+                      <daf-search-toolbar
+                        [card]="false"
+                        [showFilter]="false"
+                        [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
+                        [value]="settingsSearch()" [debounce]="200" (valueChange)="settingsSearch.set($event)"
+                        [table]="settingsTable" />
+                    </div>
+                    <daf-data-table #settingsTable [columns]="settingsColumns()" [rows]="settingsView()"
+                      [config]="settingsTableConfig()" />
+                  } @else {
+                    <daf-data-table [columns]="irppColumns()" [rows]="irppView()" [config]="irppTableConfig()" />
+                  }
                 </div>
             }
-                <div class="ps-field-block">
+            @case ('benefits') {
+                <div class="ps-field-block" data-guide="adm-set-table">
                   <div class="ps-toolbar">
                     <daf-search-toolbar
                       [card]="false"
@@ -571,7 +541,7 @@
                 </div>
             }
             @default {
-                <div class="ps-field-block">
+                <div class="ps-field-block" data-guide="adm-set-table">
                   <div class="ps-toolbar">
                     <daf-search-toolbar
                       [card]="false"
@@ -589,12 +559,12 @@
           <!-- En-tête de section comme /rh/admin : titre (avec le nombre de jeux) et aide ; puis,
                sur toute la largeur dans un bandeau blanc, la recherche + le bouton filtre (PAYS et
                statut) — toujours affichés, même vides : c'est ici que le pays se choisit. -->
-          <app-admin-section-header
+          <app-admin-section-header data-guide="adm-rules-header"
             [title]="'PAYROLL.ADMIN_HOME.CARDS.RULES_COUNT' | translate: { count: filteredParamSets().length }"
             [subtitle]="'PAYROLL.PARAMETER_SETS.SUBTITLE' | translate" />
           <!-- « + Nouvelles règles » projeté DANS la barre, à droite, comme le bouton
                « Nouveau » des sections de /rh/admin. -->
-          <div class="ps-toolbar">
+          <div class="ps-toolbar" data-guide="adm-rules-toolbar">
             <daf-search-toolbar
               [card]="false"
               [placeholder]="'PAYROLL.PARAMETER_SETS.SEARCH_PLACEHOLDER' | translate"
@@ -623,7 +593,7 @@
             <div class="admin-empty"><p>{{ emptyMessage() }}</p></div>
           } @else {
             <div class="admin-table-scroll">
-              <daf-data-table #setTable [columns]="setColumns()" [rows]="setPager.rows()" [config]="setTableConfig()"
+              <daf-data-table data-guide="adm-rules-table" #setTable [columns]="setColumns()" [rows]="setPager.rows()" [config]="setTableConfig()"
                 (sortChange)="setPager.onSort($event)" (resetClick)="setPager.onSort(null)" />
             </div>
             <app-admin-table-footer
@@ -875,7 +845,6 @@
         </div>
       </ng-template>
 
-      <ng-template #benefitEditorTpl>
       <ng-template #bracketEditorTpl>
         <div class="benefit-form">
           <div class="benefit-form__grid">
@@ -902,6 +871,32 @@
             (save)="saveBracket()"
             (cancel)="closeBracketEditor()" />
         </div>
+      </ng-template>
+
+      <!-- Pop-up d'un seul réglage IRPP (✎ d'une ligne de l'onglet « Réglages IRPP »). -->
+      <ng-template #settingEditorTpl>
+        @if (editingSettingRow(); as row) {
+          <div class="benefit-form" (keydown.enter)="commitSettingEdit()">
+            <daf-form-field
+              [value]="settingDraft()"
+              (valueChange)="settingDraft.set($event == null ? '' : '' + $event)"
+              [options]="{
+                label: row.label, hint: row.hint, type: 'number', align: 'end', fullWidth: true,
+                suffixText: row.unit,
+                placeholder: row.key === 'cap' ? ('PAYROLL.PARAMETER_SETS.UNCAPPED' | translate) : '0',
+                disabled: savingSetting()
+              }" />
+            @if (settingError()) {
+              <div class="admin-error-banner" role="alert">{{ settingError() }}</div>
+            }
+            <app-admin-modal-footer
+              [saveLabel]="'PAYROLL.PARAMETER_SETS.SAVE' | translate"
+              [cancelLabel]="'PAYROLL.ADMIN_HOME.CANCEL' | translate"
+              [saving]="savingSetting()"
+              (save)="commitSettingEdit()"
+              (cancel)="cancelSettingEdit()" />
+          </div>
+        }
       </ng-template>
 
       <ng-template #deductionsEditorTpl>
@@ -944,6 +939,7 @@
         </div>
       </ng-template>
 
+      <ng-template #benefitEditorTpl>
         <div class="benefit-form">
           <div class="benefit-form__grid">
             <daf-form-field
@@ -1234,3 +1230,5 @@
 </daf-page>
 </div>
 }
+
+<app-page-guide [storageKey]="guideKey()" [steps]="guideSteps()" />

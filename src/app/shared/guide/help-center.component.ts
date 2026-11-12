@@ -241,6 +241,10 @@ export class HelpCenterComponent {
     const p = this.page();
     this.pickingVideo.set(false);
     this.ref = this.modal.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: t('GUIDE.HELP_CENTER'),
       subtitle: p ? t('GUIDE.MENU.TITLE', { page: t(p.labelKey) }) : t('GUIDE.MENU.NO_PAGE'),
       icon: 'help',
@@ -286,6 +290,9 @@ export class HelpCenterComponent {
     this.close();
     this.playing.set(video);
     this.modal.open({
+      resizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.translate.instant(video.titleKey) as string,
       subtitle: this.translate.instant('GUIDE.CENTER.MINUTES', { count: video.minutes }) as string,
       icon: 'play_circle',

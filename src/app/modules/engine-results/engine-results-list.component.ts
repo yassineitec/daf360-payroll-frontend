@@ -43,7 +43,23 @@ import { PayrollApiService, type PaysDto } from '../../core/payroll-api.service'
 import { rememberEmployee } from './engine-results-employee';
 import { TableSort, delegatedSort, tableTools, toTableSort } from '../../shared/table-tools';
 import { EngineResultsListStateService } from './engine-results-list-state.service';
+import { readBlobError, saveBlob } from '../../shared/blob-download';
 import { PaysNamesService } from '../../core/pays-names.service';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import type { GuideStep } from '../../shared/guide/page-guide.types';
+
+/** Guide de la page — `target` = un `data-guide` du gabarit. */
+const guideStep = (key: string, icon: string, target?: string): GuideStep => ({
+  icon, titleKey: `GUIDE.ENGINE_RESULTS.${key}_TITLE`, textKey: `GUIDE.ENGINE_RESULTS.${key}_TEXT`, target,
+});
+const GUIDE_STEPS: GuideStep[] = [
+  guideStep('WELCOME',    'account_balance_wallet', 'res-list-header'),
+  guideStep('BATCH',      'calculate',              'res-list-batch'),
+  guideStep('KPIS',       'monitoring',             'res-list-kpis'),
+  guideStep('TOOLBAR',    'filter_list',            'res-list-toolbar'),
+  guideStep('RESULTS',    'groups',                 'res-list-results'),
+  guideStep('PAGINATION', 'last_page',              'res-list-pagination'),
+];
 
 /** Return shape of `total()` — the summed amount plus whether it relied on a fallback rate. */
 interface TotalResult { value: number; approximate: boolean; }
@@ -76,7 +92,7 @@ const ALL_EMPLOYEES = 2000;
     CommonModule, TranslatePipe,
     ButtonComponent, CardComponent, CheckboxComponent, DataTableComponent, EntityCardComponent,
     FormFieldComponent, MetricCardComponent, PageComponent, PageHeaderComponent, PaginationComponent,
-    SearchToolbarComponent, SelectComponent,
+    SearchToolbarComponent, SelectComponent, PageGuideComponent,
   ],
   templateUrl: './engine-results-list.component.html',
   styleUrl: './engine-results-list.component.scss',
@@ -458,11 +474,10 @@ export class EngineResultsListComponent implements OnInit {
    *  requête dépassée sont ignorées (`seq`), pour qu'une frappe rapide ne ré-affiche
    *  pas une page plus ancienne arrivée en retard. */
   private seq = 0;
-  load(): void {
-    const current = ++this.seq;
-    this.loading.set(true);
-    this.error.set(null);
-    const query = {
+
+  /** Recherche, filtres RH et tri courants — paramètres de `listEmployees`. */
+  private employeeQuery() {
+    return {
       search: this.searchText(),
       paysId: this.paysFilter(),
       status: this.statusFilter() ?? undefined,
@@ -470,25 +485,38 @@ export class EngineResultsListComponent implements OnInit {
       contract: this.contractFilter(),
       sort: this.employeeSortParam(),
     };
+  }
+
+  /** Tout le périmètre filtré (toutes les pages), dans l'ordre du tri, Période et
+   *  Collaborateurs recoupés — la liste complète que la pagination découpe. */
+  private allFilteredEmployees(): Observable<EmployeeListItem[]> {
+    return this.allowedIds().pipe(
+      switchMap(ids => this.hrService.listEmployees({ ...this.employeeQuery(), page: 0, size: ALL_EMPLOYEES }).pipe(
+        map(p => (p.content ?? []).filter(e => !ids || ids.has(e.userId))),
+      )),
+    );
+  }
+
+  load(): void {
+    const current = ++this.seq;
+    this.loading.set(true);
+    this.error.set(null);
     const size = this.pageSize();
     // Sans Période ni Collaborateurs : pagination serveur, comme avant. Avec : le service RH
     // ne sait pas filtrer sur une liste d'identifiants, donc tout le périmètre (autres
     // filtres et tri appliqués côté RH) est demandé d'un coup, recoupé avec les userId admis,
     // puis découpé en pages ici.
     const page$: Observable<ListPage> = !this.isRestricted()
-      ? this.hrService.listEmployees({ ...query, page: this.page(), size })
-      : this.allowedIds().pipe(
-          switchMap(ids => this.hrService.listEmployees({ ...query, page: 0, size: ALL_EMPLOYEES }).pipe(
-            map(p => {
-              const all = (p.content ?? []).filter(e => !ids || ids.has(e.userId));
-              const start = this.page() * size;
-              return {
-                content: all.slice(start, start + size),
-                totalElements: all.length,
-                totalPages: Math.ceil(all.length / size),
-              };
-            }),
-          )),
+      ? this.hrService.listEmployees({ ...this.employeeQuery(), page: this.page(), size })
+      : this.allFilteredEmployees().pipe(
+          map(all => {
+            const start = this.page() * size;
+            return {
+              content: all.slice(start, start + size),
+              totalElements: all.length,
+              totalPages: Math.ceil(all.length / size),
+            };
+          }),
         );
     page$.subscribe({
       next: p => {
@@ -510,6 +538,39 @@ export class EngineResultsListComponent implements OnInit {
         this.employees.set([]);
         this.error.set(e?.error?.message ?? this.t('PAYROLL.ENGINE_RESULTS.ERROR_EMPLOYEES'));
         this.loading.set(false);
+      },
+    });
+  }
+
+  // ── « Exporter Excel » : la liste filtrée entière (toutes les pages), générée par le serveur ──
+  readonly exportingXlsx = signal(false);
+
+  exportXlsx(): void {
+    if (this.exportingXlsx() || this.totalElements() === 0) return;
+    this.exportingXlsx.set(true);
+    const lang = this.translate.currentLang() || 'fr';
+    // Filtre « Période » : le serveur cumule la paie de chaque collaborateur sur ses mois ;
+    // sans filtre, sur son année la plus récente (comme sa page historique).
+    const [from, to] = this.periodBounds();
+    this.allFilteredEmployees().pipe(
+      switchMap(list => this.engineApi.exportEmployeesXlsx(list.map(e => ({
+        userId:     e.userId,
+        fullName:   e.fullName,
+        employeeId: e.employeeId ?? null,
+        department: e.department ?? null,
+        contract:   e.contractType ? this.contractLabel(e.contractType) : null,
+        pays:       e.paysLabel ?? null,
+        status:     e.lifecycleStatus ? this.lifecycleLabel(e.lifecycleStatus) : null,
+      })), lang, { from, to })),
+    ).subscribe({
+      next: blob => {
+        this.exportingXlsx.set(false);
+        const day = new Date().toISOString().slice(0, 10);
+        saveBlob(blob, `${lang.startsWith('en') ? 'Payroll_employees' : 'Collaborateurs_paie'}_${day}.xlsx`);
+      },
+      error: err => {
+        this.exportingXlsx.set(false);
+        readBlobError(err, this.t('PAYROLL.ENGINE_RESULTS.EXPORT_ERROR')).then(msg => this.notification.error(msg));
       },
     });
   }
@@ -757,6 +818,8 @@ export class EngineResultsListComponent implements OnInit {
   private readonly userStore    = inject(UserStore);
   /** Calcul groupé réservé à qui peut lancer le moteur (même droit que `POST /engine/run`). */
   readonly canRunEngine = computed(() => this.userStore.hasPermission('PAYROLL_RUN_ENGINE'));
+  /** Guide (« Aide & guides ») : sans le droit de lancer le moteur, pas de bouton de calcul groupé à montrer. */
+  readonly guideSteps = computed(() => GUIDE_STEPS.filter(s => s.target !== 'res-list-batch' || this.canRunEngine()));
   private readonly batchTpl = viewChild<TemplateRef<unknown>>('batchTpl');
   private batchRef: ModalRef | null = null;
   private batchSub: Subscription | null = null;
@@ -860,6 +923,10 @@ export class EngineResultsListComponent implements OnInit {
    *  ils ne pourraient ni se griser pendant le calcul ni devenir « Fermer » à la fin. */
   private openBatchModal(): ModalRef {
     return this.modal.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t('PAYROLL.ENGINE_RESULTS.BATCH_TITLE'),
       subtitle: this.t('PAYROLL.ENGINE_RESULTS.BATCH_SUBTITLE'),
       icon: 'calculate',

@@ -994,6 +994,9 @@ export class EmployeeConfigComponent implements OnInit {
     if (!tpl || !this.config()) return;
     this.saveError.set(null);
     this.configModalRef = this.modal.open({
+      resizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t('PAYROLL.EMPLOYEE_CONFIG.CONFIG_TITLE'),
       subtitle: this.employeeName(),
       icon: 'manage_accounts',
@@ -1123,6 +1126,10 @@ export class EmployeeConfigComponent implements OnInit {
       const hosts = () => document.querySelectorAll('daf-modal-host').length;
       const before = hosts();
       this.modal.open({
+        resizable: true,
+        maximizable: true,
+        minWidth: '360px',
+        minHeight: '260px',
         title: this.t('PAYROLL.EMPLOYEE_CONFIG.LEAVE_TITLE'),
         icon: 'warning',
         size: 'sm',
@@ -1151,6 +1158,10 @@ export class EmployeeConfigComponent implements OnInit {
     if (!tpl) return;
     this.resetBonusForm();
     this.bonusModalRef = this.modal.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t('PAYROLL.EMPLOYEE_CONFIG.ADD_BONUS'),
       icon: 'redeem',
       size: 'md',
@@ -1209,6 +1220,10 @@ export class EmployeeConfigComponent implements OnInit {
     const b = this.bonuses().find(x => x.id === bonusId);
     if (!b) return;
     this.modal.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t('PAYROLL.EMPLOYEE_CONFIG.DELETE_BONUS_TITLE'),
       icon: 'delete',
       size: 'sm',

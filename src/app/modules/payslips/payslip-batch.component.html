@@ -11,7 +11,7 @@
   <!-- Rapport : l'en-tête est dans la colonne gauche (deux colonnes, comme les autres
        fiches) ; ici seulement pour le formulaire et le lot introuvable. -->
   @if (isNew() || !result()) {
-    <daf-page-header
+    <daf-page-header data-guide="ps-new-header"
       [title]="title()"
       [subtitle]="subtitle()"
       [badges]="headerBadges()"
@@ -38,7 +38,7 @@
         <div class="step-body">
         <div class="import">
         <!-- ① Pays et mois -->
-        <section class="import__step">
+        <section class="import__step" data-guide="ps-new-period">
           <daf-section-title [title]="'PAYROLL.PAYSLIPS.FORM.STEP_PERIOD' | translate" />
           <div class="import__fields">
             <daf-select
@@ -78,7 +78,7 @@
         </section>
 
         <!-- ② Fichier : zone de dépôt tant qu'aucun fichier n'est choisi, puis la fiche du fichier. -->
-        <section class="import__step">
+        <section class="import__step" data-guide="ps-new-file">
           <daf-section-title [title]="'PAYROLL.PAYSLIPS.FORM.STEP_FILE' | translate" />
           <input #replaceInput type="file" accept=".pdf,application/pdf" class="hidden-input"
                  (change)="onReplacePicked($event)" />
@@ -168,7 +168,7 @@
            `daf-card` `floating`, collée en bas (`sticky`, dans le flux). Annuler en action
            de texte à gauche, une seule action dessinée à droite (teal, pilule), qui ouvre
            la confirmation (`confirmSubmit()`). -->
-      <daf-card class="action-bar" [options]="{ variant: 'floating', radius: 'lg', padding: 'sm' }">
+      <daf-card data-guide="ps-new-actions" class="action-bar" [options]="{ variant: 'floating', radius: 'lg', padding: 'sm' }">
         <div class="action-bar__inner">
           <div class="action-bar__side">
             <button type="button" class="footer-action" [disabled]="processing()" (click)="cancel()">
@@ -193,14 +193,14 @@
 
       <div class="detail-aside">
         <div class="detail-aside__sticky">
-          <daf-page-header
+          <daf-page-header data-guide="ps-rep-header"
             size="md"
             [title]="title()"
             [titleWrap]="true"
             [badges]="headerBadges()"
             [breadcrumbs]="breadcrumbs()" />
 
-          <daf-section-card>
+          <daf-section-card data-guide="ps-rep-details">
             <div class="dp-card">
               @for (block of reportDetails(); track block.id; let first = $first) {
                 @if (!first) { <div class="dp-rule"></div> }
@@ -221,7 +221,7 @@
 
           <!-- Actions rapides — même carte que la fiche simulateur : action principale
                pleine largeur, deux actions secondaires côte à côte. -->
-          <daf-section-card>
+          <daf-section-card data-guide="ps-rep-actions">
             <div class="flex flex-col gap-3 bg-surface-container p-6">
               <daf-section-title [title]="'PAYROLL.PAYSLIPS.REPORT.QUICK_TITLE' | translate" />
               <daf-button
@@ -244,13 +244,13 @@
       </div>
 
       <div class="detail-main">
-        <div class="kpi-row">
+        <div class="kpi-row" data-guide="ps-rep-kpis">
           @for (k of kpis(); track k.label) {
             <daf-metric-card class="kpi-cell" [label]="k.label" [value]="k.value" [delta]="k.delta" [options]="k.options" />
           }
         </div>
 
-        <section class="section">
+        <section class="section" data-guide="ps-rep-table">
           <daf-section-title [title]="'PAYROLL.PAYSLIPS.TABLE.TITLE' | translate" />
 
           <!-- Même barre que les listes : recherche, panneau Filtres (pages à corriger, statut)
@@ -317,6 +317,12 @@
     </div>
   }
 </daf-page>
+
+@if (isNew()) {
+  <app-page-guide storageKey="payslip-new" [steps]="newGuideSteps" />
+} @else {
+  <app-page-guide storageKey="payslip-report" [steps]="reportGuideSteps()" />
+}
 
 <!-- Corps du pop-up d'attente (`ModalService`, voir `openProcessingModal()`) : le
      `daf-loading` de la lib, ramené à une hauteur de pop-up (il réserve 50vh hors

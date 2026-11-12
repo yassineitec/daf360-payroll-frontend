@@ -1,0 +1,206 @@
+<!-- /payroll/aide — « Aide & guides », same layout as /rh/aide. One daf-tabs tab per page;
+     the panel holds that page's FAQ and documentation on the left, its guide, videos and
+     the support contact on the right. Typed questions: the header's button opens the
+     assistant bubble (app-help-chat); the search box filters the list below.
+
+     Library parts only: daf-page + daf-page-header, daf-tabs
+     (strip-only: the panel below is ours, wired back with panelId/tabId), one
+     daf-section-card per block, daf-badge for statuses.
+     The collapsible rows inside the FAQ / documentation cards stay hand-made:
+     daf-accordion-card models a stage with a state (accent stripe, status pill), too
+     heavy for a question and its answer. -->
+<daf-page>
+
+  <daf-page-header
+    [title]="'GUIDE.HELP_CENTER' | translate"
+    [subtitle]="'GUIDE.CENTER.SUBTITLE' | translate">
+    <ng-container pageActions>
+      <daf-button [options]="{ variant: 'teal', label: ('GUIDE.CENTER.CHAT.ASK' | translate), iconStart: 'chat' }"
+                  (onClick)="chat.open.set(true)" />
+    </ng-container>
+  </daf-page-header>
+
+  <daf-tabs #tabsRef
+    variant="underline"
+    style="--daf-tabs-fade: var(--color-background)"
+    [tabs]="tabs()"
+    [(active)]="activeTab"
+    [tabsLabel]="'GUIDE.HELP_CENTER' | translate"
+    idPrefix="aide" />
+
+  @if (guides().length) {
+    <div role="tabpanel"
+         [id]="tabsRef.panelId(activeTab())"
+         [attr.aria-labelledby]="tabsRef.tabId(activeTab())"
+         class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+
+      <!-- Left: the tab's FAQ and documentation, one at a time behind a pill strip
+           (daf-tabs `pill` is the variant meant for a strip inside a card). -->
+      @if (sectionTabs().length) {
+        <daf-section-card class="min-w-0 lg:col-span-2" [options]="{ padding: 'lg' }"
+                          [title]="'GUIDE.CENTER.PAGE_HELP' | translate">
+          <div class="flex flex-col gap-5">
+            <!-- FAQ / Documentation on the left; for a tab with several pages (« Profils » +
+                 « Fiche d'un collaborateur », the /rh/admin cards…), the section dropdown on
+                 the same row, at the other end — one page shown at a time. -->
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <daf-tabs #sectionRef
+                variant="pill"
+                [tabs]="sectionTabs()"
+                [(active)]="section"
+                [scrollControls]="false"
+                [tabsLabel]="'GUIDE.HELP_CENTER' | translate"
+                idPrefix="aide-section" />
+
+              @if (usePicker()) {
+                <daf-select
+                  class="block w-full sm:w-80 sm:shrink-0"
+                  [options]="subPageOptions()"
+                  [selected]="subPageSelected()"
+                  [config]="{ label: ('GUIDE.SEARCH.SECTION' | translate), searchable: true, fullWidth: true }"
+                  (selectedChange)="onSubPageSelect($event)" />
+              }
+            </div>
+
+            <!-- Filters the list below while typing — same matcher as the assistant. -->
+            <daf-form-field
+              [options]="{ type: 'search', prefixIcon: 'search', fullWidth: true,
+                           placeholder: ((section() === 'docs' ? 'GUIDE.SEARCH.DOCS' : 'GUIDE.SEARCH.FAQ') | translate) }"
+              [value]="query()"
+              (valueChange)="query.set($any($event) ?? '')" />
+
+            <div role="tabpanel"
+                 [id]="sectionRef.panelId(section())"
+                 [attr.aria-labelledby]="sectionRef.tabId(section())">
+              @if ((section() === 'docs' ? shownDocs() : shownFaq()).length === 0) {
+                <p class="rounded-xl border border-dashed border-outline-variant/60 px-4 py-6 text-center text-body-sm text-on-surface-variant">
+                  {{ 'GUIDE.SEARCH.NO_MATCH' | translate:{ query: query().trim() } }}
+                </p>
+              } @else if (section() === 'docs') {
+                <div class="flex flex-col gap-3">
+                  @for (s of shownDocs(); track s.titleKey) {
+                    <div class="rounded-xl border border-outline-variant/60">
+                      <button type="button" (click)="toggle(s.titleKey)" [attr.aria-expanded]="openId() === s.titleKey"
+                              class="flex w-full items-center gap-2 px-4 py-3 text-left text-body-md font-medium text-on-surface">
+                        <span class="flex-1">{{ s.titleKey | translate }}</span>
+                        <span class="material-symbols-outlined text-[20px] text-outline transition-transform"
+                              [class.rotate-180]="openId() === s.titleKey">expand_more</span>
+                      </button>
+                      @if (openId() === s.titleKey) {
+                        <p class="px-4 pb-4 text-body-sm text-on-surface-variant">{{ s.textKey | translate }}</p>
+                      }
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="flex flex-col gap-3">
+                  @for (f of shownFaq(); track f.id) {
+                    <div class="rounded-xl border border-outline-variant/60">
+                      <button type="button" (click)="toggle(f.id)" [attr.aria-expanded]="openId() === f.id"
+                              class="flex w-full items-center gap-2 px-4 py-3 text-left text-body-md font-medium text-on-surface">
+                        <span class="flex-1">{{ f.question }}</span>
+                        <span class="material-symbols-outlined text-[20px] text-outline transition-transform"
+                              [class.rotate-180]="openId() === f.id">expand_more</span>
+                      </button>
+                      @if (openId() === f.id) {
+                        <p class="px-4 pb-4 text-body-sm text-on-surface-variant">{{ f.answer }}</p>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        </daf-section-card>
+      }
+
+      <!-- Right: the guide of the section shown on the left, the tab's videos, the support -->
+      <div class="flex min-w-0 flex-col gap-6">
+
+        <!-- A guide of a page with an id (a profile file) starts on the file the help
+             center was opened from; without one, the card says how to get there. -->
+        <daf-section-card [options]="{ padding: 'lg' }" [title]="'GUIDE.CENTER.GUIDES' | translate">
+          <div class="flex flex-col gap-3">
+            @for (g of shownGuides(); track g.guideKey) {
+              <div class="flex flex-col gap-3 rounded-xl border p-3"
+                   [class]="startUrl(g) !== null ? 'border-teal/20 bg-teal/10' : 'border-outline-variant/60'">
+                <div class="flex items-center gap-3">
+                  <span class="material-symbols-outlined" [class]="startUrl(g) !== null ? 'text-teal' : 'text-outline'">{{ g.icon }}</span>
+                  <span class="min-w-0 flex-1 truncate text-body-sm font-semibold text-on-surface">{{ g.labelKey | translate }}</span>
+                </div>
+                @if (startUrl(g) !== null) {
+                  <!-- One row, equal columns (a lone button takes the whole row): short
+                       labels, since the card's name already says which page. -->
+                  <div class="grid grid-flow-col auto-cols-fr gap-2">
+                    <daf-button [options]="{ variant: 'teal', size: 'sm', label: ('GUIDE.START' | translate), iconStart: 'play_arrow', fullWidth: true }"
+                                (onClick)="startGuide(g)" />
+                    <!-- A file's guide (pattern) opens the file the help center came from. -->
+                    <daf-button [options]="{ variant: 'ghost', size: 'sm', label: ('GUIDE.CENTER.OPEN_PAGE' | translate), iconEnd: 'arrow_forward', fullWidth: true }"
+                                (onClick)="openGuidePage(g)" />
+                  </div>
+                } @else {
+                  <p class="text-body-sm text-on-surface-variant">{{ 'GUIDE.CENTER.NEEDS_RECORD' | translate }}</p>
+                  <div>
+                    <daf-button [options]="{ variant: 'ghost', size: 'sm', label: ('GUIDE.CENTER.PICK_RECORD' | translate), iconEnd: 'arrow_forward' }"
+                                (onClick)="openPage(g)" />
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        </daf-section-card>
+
+        @if (content().videos.length) {
+          <daf-section-card id="aide-videos" class="block scroll-mt-6" [options]="{ padding: 'lg' }" [title]="'GUIDE.CENTER.VIDEOS_TITLE' | translate">
+            <div class="flex flex-col gap-3">
+              @for (v of content().videos; track v.titleKey) {
+                <!-- Plays in a large daf modal (videoTpl, end of file), not a new window. -->
+                <button type="button" [disabled]="!v.url" (click)="playVideo(v)"
+                   class="flex w-full items-center gap-3 rounded-xl border border-outline-variant/60 p-3 text-left"
+                   [class]="v.url ? 'hover:bg-surface-container/60' : 'cursor-default'">
+                  <span class="flex h-12 w-16 shrink-0 items-center justify-center rounded-lg bg-surface-container"
+                        [class]="v.url ? 'text-teal' : 'text-outline'">
+                    <span class="material-symbols-outlined">play_arrow</span>
+                  </span>
+                  <span class="flex min-w-0 flex-1 flex-col items-start gap-1 text-body-sm">
+                    <span class="font-medium text-on-surface">{{ v.titleKey | translate }}</span>
+                    <span class="flex items-center gap-2 text-label-sm text-outline">
+                      {{ 'GUIDE.CENTER.MINUTES' | translate:{ count: v.minutes } }}
+                      @if (!v.url) {
+                        <daf-badge [label]="'GUIDE.CENTER.SOON' | translate" [options]="{ variant: 'warning', size: 'sm' }" />
+                      }
+                    </span>
+                  </span>
+                </button>
+              }
+            </div>
+          </daf-section-card>
+        }
+
+        <!-- Hidden until a support address is configured (SUPPORT_CONTACT): a card saying
+             « to be filled in » would read as an unfinished page. -->
+        @if (support.email) {
+          <daf-section-card [options]="{ padding: 'lg' }" [title]="'GUIDE.CENTER.SUPPORT_TITLE' | translate">
+            <div class="flex flex-col gap-2">
+              <p class="text-body-sm text-on-surface-variant">{{ 'GUIDE.CENTER.SUPPORT_TEXT' | translate }}</p>
+              <a [href]="'mailto:' + support.email" class="flex items-center gap-1 text-body-sm font-semibold text-teal hover:underline">
+                <span class="material-symbols-outlined text-[18px]">mail</span>{{ support.email }}
+              </a>
+            </div>
+          </daf-section-card>
+        }
+      </div>
+    </div>
+  }
+
+</daf-page>
+
+<!-- Video player, the body of the modal opened by playVideo(). Autoplay: the user just
+     clicked « play ». Closing the modal destroys the element, which stops the video. -->
+<ng-template #videoTpl>
+  @if (playing(); as v) {
+    <video class="block max-h-[75vh] w-full rounded-xl bg-black" controls autoplay playsinline
+           [src]="v.url">
+    </video>
+  }
+</ng-template>

@@ -643,6 +643,10 @@ export class EngineParamsAdminComponent implements OnInit {
       ACTIVATE:        () => this.engine.activateParamSet(v.id, by),
     }[step];
     this.modal.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t(`PAYROLL.ADMIN_HOME.ENGINE_PARAMS.CONFIRM.${step}.TITLE`, { version: v.versionNumber }),
       body: this.t(`PAYROLL.ADMIN_HOME.ENGINE_PARAMS.CONFIRM.${step}.BODY`, { version: v.versionNumber }),
       size: 'sm',
@@ -777,6 +781,10 @@ export class EngineParamsAdminComponent implements OnInit {
     if (current?.kind === 'bareme') this.loadBrackets(current.value);
     this.error.set(null);
     this.modalRef = this.modal.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: key ? this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.EDIT_PARAM', { key }) : this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.ADD_PARAM'),
       icon: 'tune',
       body: this.paramTpl(),
@@ -804,6 +812,10 @@ export class EngineParamsAdminComponent implements OnInit {
   private confirmDeleteParam(key: string): void {
     const used = this.usedBy(key);
     this.modal.open({
+      resizable: true,
+      maximizable: true,
+      minWidth: '360px',
+      minHeight: '260px',
       title: this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.DELETE_TITLE'),
       body: used.length
         ? this.t('PAYROLL.ADMIN_HOME.ENGINE_PARAMS.DELETE_USED', { key, codes: used.join(', ') })

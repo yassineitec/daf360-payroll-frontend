@@ -1,5 +1,5 @@
 <daf-page>
-  <daf-page-header
+  <daf-page-header data-guide="cand-list-header"
     [title]="'PAYROLL.CANDIDATE_SIMULATION.TITLE' | translate"
     [subtitle]="'PAYROLL.CANDIDATE_SIMULATION.SUBTITLE' | translate">
   </daf-page-header>
@@ -9,7 +9,7 @@
          (invoice-list, payments-dashboard) — une section nue en grille, sans carte
          englobante, avant tout filtre. TOUJOURS affiché : à 0 tant
          qu'aucun pays n'est choisi dans le filtre, mis à jour dès qu'il l'est. ──── -->
-    <section class="grid grid-cols-4 gap-2 sm:gap-6 kpi-section transition-opacity"
+    <section data-guide="cand-list-kpis" class="grid grid-cols-4 gap-2 sm:gap-6 kpi-section transition-opacity"
              [class.opacity-60]="candLoading()">
       <!-- Quatre tuiles de RÉSULTAT, aucune cliquable (le statut se filtre dans le panneau) :
            ce que la DAF doit traiter, ce qu'elle a accepté, la pression salariale, le volume. -->
@@ -54,7 +54,7 @@
          /finance/affaires (`daf-search-toolbar` embarque les trois). Le PAYS se choisit
          dans le bouton filtre, avec le statut. Toujours affiché, même vide : le message
          de liste vide (`emptyMessage()`) dit s'il faut choisir un pays. ──────────── -->
-    <daf-search-toolbar
+    <daf-search-toolbar data-guide="cand-list-toolbar"
       [placeholder]="'PAYROLL.CANDIDATE_SIMULATION.SEARCH_PLACEHOLDER' | translate"
       [value]="searchText()"
       (valueChange)="onSearchTextChange($event)"
@@ -70,7 +70,7 @@
     @if (viewMode() === 'grid') {
       <!-- Même grille que /finance/affaires (`affaires-cards-section`) : 3 colonnes,
            `gap-5`, squelettes de 248 px au chargement, état vide en pointillés. -->
-      <div class="grid grid-cols-3 gap-5 cand-cards">
+      <div class="grid grid-cols-3 gap-5 cand-cards" data-guide="cand-list-results">
         @if (candLoading() && !pagedCandidateCards().length) {
           @for (i of [0, 1, 2, 3, 4, 5]; track i) {
             <daf-skeleton variant="block" radius="xl" width="100%" height="248px" />
@@ -92,7 +92,7 @@
     } @else {
       <!-- Tableau nu, comme l'exemple de la bibliothèque (demo-app) : pas de daf-card
            autour — le tableau porte déjà son propre cadre. -->
-      <daf-data-table
+      <daf-data-table data-guide="cand-list-results"
         [columns]="candidateColumns()"
         [rows]="pagedCandidateRows()"
         [config]="candidateTableConfig()"
@@ -119,3 +119,5 @@
     </daf-pagination>
   </div>
 </daf-page>
+
+<app-page-guide storageKey="candidate-simulation" [steps]="guideSteps" />

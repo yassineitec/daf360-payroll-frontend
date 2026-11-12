@@ -30,6 +30,37 @@ import { readBlobError, saveBlob } from '../../shared/blob-download';
 import { HrProfileService, contractTypeLabel, type EmployeeListItem } from '../../core/hr-profile.service';
 import { CurrencyService } from '../../core/currency.service';
 import { searchTableRows, tableTools } from '../../shared/table-tools';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import type { GuideStep } from '../../shared/guide/page-guide.types';
+
+/**
+ * Guides de la page — deux, selon la vue : le formulaire en 3 étapes (`/new`) et la fiche
+ * résultat (`/:id`). `target` = un `data-guide` du gabarit ; `tab` = l'étape du formulaire
+ * ('0'…'2', voir `onGuideStep`) ou l'onglet de la fiche (voir `onGuideTab`).
+ */
+const guideStep = (page: string, key: string, icon: string, target?: string, tab?: string): GuideStep => ({
+  icon, titleKey: `GUIDE.${page}.${key}_TITLE`, textKey: `GUIDE.${page}.${key}_TEXT`, target, tab,
+});
+const FORM_GUIDE_STEPS: GuideStep[] = [
+  guideStep('SIMULATOR_NEW', 'WELCOME',  'calculate'),
+  guideStep('SIMULATOR_NEW', 'HEADER',   'label',        'sim-form-header'),
+  guideStep('SIMULATOR_NEW', 'STEP1',    'person',       'sim-form-card', '0'),
+  guideStep('SIMULATOR_NEW', 'STEP2',    'payments',     'sim-form-card', '1'),
+  guideStep('SIMULATOR_NEW', 'STEP3',    'redeem',       'sim-form-card', '2'),
+  guideStep('SIMULATOR_NEW', 'RAIL',     'linear_scale', 'sim-form-rail'),
+  guideStep('SIMULATOR_NEW', 'SIMULATE', 'play_arrow',   'sim-form-next', '2'),
+];
+const RESULT_GUIDE_STEPS: GuideStep[] = [
+  guideStep('SIMULATION_DETAIL', 'WELCOME',   'receipt_long'),
+  guideStep('SIMULATION_DETAIL', 'DETAILS',   'info',               'sim-result-details'),
+  guideStep('SIMULATION_DETAIL', 'ACTIONS',   'bolt',               'sim-result-actions'),
+  guideStep('SIMULATION_DETAIL', 'KPIS',      'monitoring',         'sim-result-kpis'),
+  guideStep('SIMULATION_DETAIL', 'TABS',      'tab',                'sim-result-tabs'),
+  guideStep('SIMULATION_DETAIL', 'OVERVIEW',  'dashboard',          'sim-result-panel', 'overview'),
+  guideStep('SIMULATION_DETAIL', 'RUBRIQUES', 'list_alt',           'sim-result-panel', 'rubriques'),
+  guideStep('SIMULATION_DETAIL', 'CHARGES',   'account_balance',    'sim-result-panel', 'charges'),
+  guideStep('SIMULATION_DETAIL', 'IRPP',      'stacked_line_chart', 'sim-result-panel', 'irpp'),
+];
 import { Subject, takeUntil, forkJoin, of, combineLatest } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -107,7 +138,7 @@ interface IrppBracketRow {
     DataTableComponent, FieldMessageComponent, FormFieldComponent, MetricCardComponent,
     PageComponent, PageHeaderComponent, RadioGroupComponent, SearchToolbarComponent,
     SectionCardComponent, SelectComponent, StatusBadgeComponent, StepperComponent,
-    TabsComponent,
+    TabsComponent, PageGuideComponent,
   ],
   templateUrl: './simulator.component.html',
   // Squelette de la FICHE uniquement (deux colonnes, rangées de tuiles, panneau de détails),
@@ -511,37 +542,6 @@ export class SimulatorComponent implements OnDestroy {
   /** Barème du jeu UTILISÉ par la simulation — onglet « Barème IRPP appliqué ». */
   readonly usedIrppBrackets = computed(() => this.parseBrackets(this.usedPs()?.irppBrackets));
 
-  /** Everything needed before the "Simuler" button means anything. */
-  readonly blockingReason = computed((): string | null => {
-    if (this.selectedPaysId() == null) return this.t('PAYROLL.SIMULATOR.BLOCKING.NO_PAYS');
-    if (this.psState() === 'LOADING')  return this.t('PAYROLL.SIMULATOR.BLOCKING.LOADING');
-    if (this.psState() === 'MISSING')  {
-      return this.t('PAYROLL.SIMULATOR.BLOCKING.NO_PARAMETER_SET');
-    }
-    if (this.subject() === 'EMPLOYEE' && this.formValue().profileUserId == null) {
-      return this.t('PAYROLL.SIMULATOR.BLOCKING.NO_EMPLOYEE');
-    }
-    // A candidate has no RH profile to fall back on, so a contract the referential
-    // actually prices must be chosen. A collaborator may leave it empty — the backend
-    // then takes the one on the HR fiche.
-    if (this.subject() === 'CANDIDATE' && !this.formValue().contractType) {
-      return this.t('PAYROLL.SIMULATOR.BLOCKING.NO_CONTRACT');
-    }
-    return null;
-  });
-
-  readonly canSimulate = computed(() =>
-    !this.blockingReason() && !this.amountError() && !this.loading(),
-  );
-
-  /** Message under the amount field — the one control the form's own validators cover. */
-  readonly amountError = computed((): string | null => {
-    const v = this.formValue();
-    const amount = this.mode() === 'NET_TO_BRUT' ? v.inputNet : v.inputGross;
-    if (amount == null || (amount as unknown as string) === '') {
-      return this.t('PAYROLL.SIMULATOR.BLOCKING.AMOUNT_REQUIRED');
-    }
-    if (Number(amount) <= 0) return this.t('PAYROLL.SIMULATOR.BLOCKING.AMOUNT_POSITIVE');
   /** IRPP annuel sur une base — même règle que `IrppCalculatorService` (taux ≥ 1 lus en %). */
   private annualIrpp(brackets: IrppBracketRow[], base: number): number {
     let total = 0;
@@ -601,6 +601,37 @@ export class SimulatorComponent implements OnDestroy {
     };
   });
 
+  /** Everything needed before the "Simuler" button means anything. */
+  readonly blockingReason = computed((): string | null => {
+    if (this.selectedPaysId() == null) return this.t('PAYROLL.SIMULATOR.BLOCKING.NO_PAYS');
+    if (this.psState() === 'LOADING')  return this.t('PAYROLL.SIMULATOR.BLOCKING.LOADING');
+    if (this.psState() === 'MISSING')  {
+      return this.t('PAYROLL.SIMULATOR.BLOCKING.NO_PARAMETER_SET');
+    }
+    if (this.subject() === 'EMPLOYEE' && this.formValue().profileUserId == null) {
+      return this.t('PAYROLL.SIMULATOR.BLOCKING.NO_EMPLOYEE');
+    }
+    // A candidate has no RH profile to fall back on, so a contract the referential
+    // actually prices must be chosen. A collaborator may leave it empty — the backend
+    // then takes the one on the HR fiche.
+    if (this.subject() === 'CANDIDATE' && !this.formValue().contractType) {
+      return this.t('PAYROLL.SIMULATOR.BLOCKING.NO_CONTRACT');
+    }
+    return null;
+  });
+
+  readonly canSimulate = computed(() =>
+    !this.blockingReason() && !this.amountError() && !this.loading(),
+  );
+
+  /** Message under the amount field — the one control the form's own validators cover. */
+  readonly amountError = computed((): string | null => {
+    const v = this.formValue();
+    const amount = this.mode() === 'NET_TO_BRUT' ? v.inputNet : v.inputGross;
+    if (amount == null || (amount as unknown as string) === '') {
+      return this.t('PAYROLL.SIMULATOR.BLOCKING.AMOUNT_REQUIRED');
+    }
+    if (Number(amount) <= 0) return this.t('PAYROLL.SIMULATOR.BLOCKING.AMOUNT_POSITIVE');
     return null;
   });
 
@@ -1238,6 +1269,41 @@ export class SimulatorComponent implements OnDestroy {
    *  (ex. barème illisible pour cet utilisateur). */
   readonly currentTab = computed(() =>
     this.resultTabs().some(t => t.id === this.activeTab()) ? this.activeTab() : 'overview');
+
+  // ── Guides (« Aide & guides ») ─────────────────────────────────────────────
+
+  readonly formGuideSteps = FORM_GUIDE_STEPS;
+
+  /** Fiche résultat : seuls les onglets présents pour CETTE simulation ; sans barre d'onglets
+   *  (seulement la vue générale), l'étape qui la présente disparaît aussi. */
+  readonly resultGuideSteps = computed(() => {
+    const ids = new Set(this.resultTabs().map(t => t.id));
+    return RESULT_GUIDE_STEPS.filter(s =>
+      (s.target !== 'sim-result-tabs' || this.showResultTabs()) && (!s.tab || ids.has(s.tab)));
+  });
+
+  /** L'étape ou l'onglet de l'utilisateur, rendus à la fermeture du guide (qui ouvre ceux
+   *  qu'il explique). */
+  private stepBeforeGuide: number | null = null;
+  private tabBeforeGuide: string | null = null;
+
+  /** Formulaire : le guide montre l'étape qu'il explique (les étapes sont libres). */
+  onGuideStep(tab: string): void {
+    this.stepBeforeGuide ??= this.currentStep();
+    this.goToStep(Number(tab));
+  }
+
+  onGuideTab(tab: string): void {
+    this.tabBeforeGuide ??= this.activeTab();
+    this.activeTab.set(tab);
+  }
+
+  onGuideClosed(): void {
+    if (this.stepBeforeGuide != null) this.goToStep(this.stepBeforeGuide);
+    if (this.tabBeforeGuide != null) this.activeTab.set(this.tabBeforeGuide);
+    this.stepBeforeGuide = null;
+    this.tabBeforeGuide = null;
+  }
 
   /** Les 4 indicateurs de la colonne droite — `daf-metric-card`, aide au survol (sans titre :
    *  il redirait celui de la tuile). Dans l'ordre du raisonnement d'un financier : ce que

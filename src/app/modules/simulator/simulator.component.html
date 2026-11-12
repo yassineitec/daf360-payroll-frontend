@@ -63,7 +63,7 @@
        titre (pays · sujet · contrat · montant et sens), à mesure qu'elle avance. Le retour
        à la liste est « Annuler » dans la barre d'actions du bas. Pas de bouton dans
        l'en-tête (l'ancien « Réinitialiser » a été retiré). -->
-  <daf-page-header
+  <daf-page-header data-guide="sim-form-header"
     [title]="pageTitle()"
     [subtitle]="pageSubtitle()"
     [badges]="formBadges()"
@@ -91,7 +91,7 @@
          flottante qui porte la progression (Annuler / Précédent · rail · Suivant / Simuler).
          Le résumé de la saisie est dans les pastilles de l'en-tête de page. ───────── -->
     <div class="sim-wizard" [formGroup]="form">
-      <div class="form-card">
+      <div class="form-card" data-guide="sim-form-card">
 
         <!-- Titre de l'étape courante -->
         <div class="card-head">
@@ -574,7 +574,7 @@
             }
           </div>
 
-          <div class="action-bar__rail">
+          <div class="action-bar__rail" data-guide="sim-form-rail">
             <daf-stepper
               orientation="horizontal"
               [steps]="steps()"
@@ -583,7 +583,7 @@
               (stepClick)="goToStep($event)" />
           </div>
 
-          <div class="action-bar__side action-bar__side--end">
+          <div class="action-bar__side action-bar__side--end" data-guide="sim-form-next">
             <!-- Dernière étape : « Suivant » devient « Simuler » — lance `submit()`, qui
                  ouvre la fiche du résultat. -->
             <daf-button [options]="nextButtonOptions()"
@@ -595,6 +595,15 @@
     }
   </div>
 </daf-page>
+
+<!-- Guide : celui du formulaire (/new) ou celui de la fiche résultat (/:id). -->
+@if (resultView()) {
+  <app-page-guide storageKey="simulation-detail" [steps]="resultGuideSteps()"
+                  (tabChange)="onGuideTab($event)" (closed)="onGuideClosed()" />
+} @else {
+  <app-page-guide storageKey="simulator-new" [steps]="formGuideSteps"
+                  (tabChange)="onGuideStep($event)" (closed)="onGuideClosed()" />
+}
 
 <!--
   Fiche résultat (`/payroll/simulator/:id`) — même mise en page que la fiche affaire
@@ -630,7 +639,7 @@
         <aside class="dp" [attr.aria-label]="'PAYROLL.SIMULATOR.DETAIL.PANEL_ARIA' | translate">
 
           <!-- ── Carte 1 : Détails ─────────────────────────────────────────── -->
-          <daf-section-card>
+          <daf-section-card data-guide="sim-result-details">
             <div class="dp-card">
               <!-- Le nom du sujet n'est plus répété ici : il est dans le titre de la page. -->
               @for (block of detailBlocks(); track block.id; let first = $first) {
@@ -661,7 +670,7 @@
           <!-- ── Carte 2 : Actions rapides — même hiérarchie que la fiche affaire :
                action principale `lg` pleine largeur, deux actions `sm` côte à côte,
                puis une rangée de pied sous un filet. ──────────────────────────── -->
-          <daf-section-card>
+          <daf-section-card data-guide="sim-result-actions">
             <div class="flex flex-col gap-3 bg-surface-container p-6">
               <p class="text-label-caps font-extrabold uppercase tracking-widest text-on-surface-variant">
                 {{ 'PAYROLL.SIMULATOR.DETAIL.QUICK_TITLE' | translate }}
@@ -712,7 +721,7 @@
         </div>
       }
 
-      <div class="kpi-row">
+      <div class="kpi-row" data-guide="sim-result-kpis">
         @for (k of resultKpis(); track k.label) {
           <daf-metric-card class="kpi-cell" [label]="k.label" [value]="k.value" [delta]="k.delta" [options]="k.options" />
         }
@@ -721,7 +730,7 @@
       <!-- Onglets : seulement ceux qui ont du contenu (voir `resultTabs`) ; la barre est
            masquée quand il ne reste que « Vue générale ». -->
       @if (showResultTabs()) {
-        <daf-tabs
+        <daf-tabs data-guide="sim-result-tabs"
           variant="underline"
           [tabs]="resultTabs()"
           [active]="currentTab()"
@@ -730,7 +739,7 @@
           idPrefix="simulation-detail" />
       }
 
-      <div class="flex flex-col gap-6">
+      <div class="flex flex-col gap-6" data-guide="sim-result-panel">
 
         <!-- ── Vue générale ─────────────────────────────────────────────────── -->
         @if (currentTab() === 'overview') {
@@ -846,15 +855,6 @@
           <p class="text-body-sm text-on-surface-variant m-0">
             {{ 'PAYROLL.SIMULATOR.DETAIL.USED_SCALE_NOTE' | translate: { id: r.parameterSetId } }}
           </p>
-          <daf-search-toolbar
-            [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
-            [(value)]="irppSearch"
-            [table]="irppTable" />
-          <daf-data-table #irppTable
-            [columns]="irppColumns()"
-            [rows]="filteredIrppRows()"
-            [config]="resultTableConfig()" />
-        }
           <!-- Du net imposable à la base IRPP : abattement et déductions, invisibles ailleurs. -->
           @if (irppBaseSteps(); as s) {
             <section class="flex flex-col gap-3">
@@ -893,6 +893,15 @@
               </div>
             </section>
           }
+          <daf-search-toolbar
+            [placeholder]="'PAYROLL.COMMON.TABLE.SEARCH' | translate"
+            [(value)]="irppSearch"
+            [table]="irppTable" />
+          <daf-data-table #irppTable
+            [columns]="irppColumns()"
+            [rows]="filteredIrppRows()"
+            [config]="resultTableConfig()" />
+        }
       </div>
     </div>
   </div>

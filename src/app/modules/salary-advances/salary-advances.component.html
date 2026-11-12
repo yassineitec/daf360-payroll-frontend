@@ -7,27 +7,27 @@
     <!-- Les règles des avances se modifient dans l'administration (carte « Avances sur
          salaire ») : un seul endroit. Lien seulement pour qui peut l'ouvrir. -->
     @if (canOpenRules()) {
-      <daf-button pageActions
+      <daf-button pageActions data-guide="adv-rules"
         [options]="{ variant: 'secondary', iconStart: 'tune', label: ('PAYROLL.SALARY_ADVANCES.RULES_LINK' | translate) }"
         (onClick)="openRules()" />
     }
   </daf-page-header>
 
-  <section class="grid grid-cols-2 gap-2 sm:gap-6 lg:grid-cols-4">
+  <section data-guide="adv-kpis" class="grid grid-cols-2 gap-2 sm:gap-6 lg:grid-cols-4">
     <daf-metric-card [label]="'PAYROLL.SALARY_ADVANCES.KPI.TO_PAY' | translate" [value]="stats().toPay" [options]="kpiPayout" />
     <daf-metric-card [label]="'PAYROLL.SALARY_ADVANCES.KPI.REPAYING' | translate" [value]="stats().repaying" [options]="kpiRepaying" />
     <daf-metric-card [label]="'PAYROLL.SALARY_ADVANCES.KPI.DUE' | translate" [value]="stats().due" [options]="kpiDue" />
     <daf-metric-card [label]="'PAYROLL.SALARY_ADVANCES.KPI.OUTSTANDING' | translate" [value]="stats().outstanding" [options]="kpiOutstanding" />
   </section>
 
-  <daf-tabs #tabsRef
+  <daf-tabs #tabsRef data-guide="adv-tabs"
     variant="underline"
     style="--daf-tabs-fade: var(--color-background)"
     [tabs]="tabs()"
     [(active)]="activeTab"
     idPrefix="salary-advances" />
 
-  <div role="tabpanel"
+  <div role="tabpanel" data-guide="adv-panel"
        [id]="tabsRef.panelId(activeTab())"
        [attr.aria-labelledby]="tabsRef.tabId(activeTab())"
        class="flex flex-col gap-6">
@@ -71,7 +71,7 @@
 
         <!-- Payroll month accordion: the month in the header (steppable even when folded),
              its summary and the month-wide actions in the body. -->
-        <daf-accordion-card
+        <daf-accordion-card data-guide="adv-month"
           [options]="{
             title: monthTitle(),
             subtitle: monthSubtitle(),
@@ -186,6 +186,9 @@
   </div>
 
 </daf-page>
+
+<app-page-guide storageKey="salary-advances" [steps]="guideSteps()"
+                (tabChange)="onGuideTab($event)" (closed)="onGuideClosed()" />
 
 <!-- ── Modal bodies, projected by ModalService. ── -->
 

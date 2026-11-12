@@ -32,6 +32,19 @@ import { UserStore } from '../../core/user.store';
 import { dayRange, distinctSorted, inDayRange, pickValue, rangeSeed } from '../../shared/filter-utils';
 import { TableSort, delegatedSort, sortTableRows, tableTools, toTableSort } from '../../shared/table-tools';
 import { PaysNamesService } from '../../core/pays-names.service';
+import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import type { GuideStep } from '../../shared/guide/page-guide.types';
+
+/** Guide de la page — `target` = un `data-guide` du gabarit. */
+const guideStep = (key: string, icon: string, target?: string): GuideStep => ({
+  icon, titleKey: `GUIDE.CANDIDATE_SIMULATION.${key}_TITLE`, textKey: `GUIDE.CANDIDATE_SIMULATION.${key}_TEXT`, target,
+});
+const GUIDE_STEPS: GuideStep[] = [
+  guideStep('WELCOME', 'person_search', 'cand-list-header'),
+  guideStep('KPIS',    'monitoring',    'cand-list-kpis'),
+  guideStep('TOOLBAR', 'filter_list',   'cand-list-toolbar'),
+  guideStep('RESULTS', 'table_rows',    'cand-list-results'),
+];
 
 /**
  * `/payroll/candidate-simulation` — historique des simulations de rémunération soumises
@@ -49,12 +62,14 @@ import { PaysNamesService } from '../../core/pays-names.service';
     CommonModule, TranslatePipe,
     CardComponent, DataTableComponent, EntityCardComponent,
     MetricCardComponent, PageComponent, PageHeaderComponent, PaginationComponent,
-    SearchToolbarComponent, SkeletonComponent,
+    SearchToolbarComponent, SkeletonComponent, PageGuideComponent,
   ],
   templateUrl: './candidate-simulation.component.html',
   styleUrl: './candidate-simulation.component.scss',
 })
 export class CandidateSimulationComponent implements OnInit {
+  readonly guideSteps = GUIDE_STEPS;
+
   private readonly candSvc   = inject(CandidateSimulationService);
   private readonly api       = inject(PayrollApiService);
   private readonly translate = inject(TranslateService);
