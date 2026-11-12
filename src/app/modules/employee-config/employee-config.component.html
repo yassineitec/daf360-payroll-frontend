@@ -236,14 +236,17 @@
                 }
               </div>
   
-              <!-- 2. Salaire — le brut se saisit, le net est calculé automatiquement (lecture
-                   seule) : plus de brut et de net qui ne correspondent pas. -->
+              <!-- 2. Salaire — brut ou net se saisit, l'autre est calculé automatiquement par le
+                   serveur : plus de brut et de net qui ne correspondent pas. -->
               <div class="ec-block" data-guide="ec-detail-salary">
                 <daf-section-title [title]="'PAYROLL.EMPLOYEE_CONFIG.SALARY_SECTION' | translate" />
                 <div class="field-row">
                   <div class="flex-1 min-w-0">
                     <daf-form-field
-                      [options]="{ label: 'PAYROLL.EMPLOYEE_CONFIG.GROSS_SALARY' | translate, type: 'number', align: 'end', suffixText: currentCurrency(), placeholder: '0.00', fullWidth: true }"
+                      [options]="{
+                        label: 'PAYROLL.EMPLOYEE_CONFIG.GROSS_SALARY' | translate, type: 'number', align: 'end', suffixText: currentCurrency(), placeholder: '0.00', fullWidth: true,
+                        hint: calculatingGross() ? ('PAYROLL.EMPLOYEE_CONFIG.GROSS_CALCULATING' | translate) : ''
+                      }"
                       [value]="cfg.currentGrossSalary"
                       (valueChange)="onGrossSalaryChange(toNumber($event))">
                     </daf-form-field>
@@ -261,10 +264,11 @@
                   <daf-form-field
                     [options]="{
                       label: 'PAYROLL.EMPLOYEE_CONFIG.CURRENT_SALARY' | translate, type: 'number', align: 'end',
-                      suffixText: currentCurrency(), placeholder: '—', fullWidth: true, readonly: true,
+                      suffixText: currentCurrency(), placeholder: '0', fullWidth: true,
                       hint: calculatingNet() ? ('PAYROLL.EMPLOYEE_CONFIG.NET_CALCULATING' | translate) : netHint()
                     }"
-                    [value]="netInCurrentCurrency()">
+                    [value]="netInCurrentCurrency()"
+                    (valueChange)="onNetSalaryChange(toNumber($event))">
                   </daf-form-field>
                 </div>
                 @if (cfg.inputCurrency && cfg.inputAmountOriginal != null) {

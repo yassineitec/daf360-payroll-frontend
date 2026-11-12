@@ -169,21 +169,35 @@ export class EmployeeConfigListComponent implements OnInit {
     this.restoreState();
     this.payrollApi.listPayrollPays()
       .pipe(catchError(() => of([] as PaysDto[])))
-      .subscribe(list => this.paysList.set(list));
+      // Types de contrat après les pays : sans pays filtré, on fusionne ceux de chaque pays.
+      .subscribe(list => { this.paysList.set(list); this.loadContractTypes(); });
     this.hrService.getFilterOptions().subscribe(o => this.filterOptions.set(o));
-    this.loadContractTypes();
     this.load();
     this.loadKpis();
   }
 
   /** Choix du filtre « Type de contrat » : la liste configurable RH « Type de contrat »
-   *  (/rh/admin?tab=lists), valeurs globales + celles du pays filtré, actives seulement. */
-  readonly contractTypes = signal<HrContractType[]>([]);
+   *  (/rh/admin?tab=lists), valeurs globales + celles du pays filtré, actives seulement.
+   *  Sans pays filtré : globales + celles de chaque pays de paie. La liste est « par pays » et
+   *  l'API ne renvoie sans `pays` que les valeurs globales — vide si toutes sont rattachées
+   *  à un pays. Les doublons entre pays sont fusionnés par le champ de filtre `contract`.
+   *  `paysId` = pays de rattachement (null = valeur globale), pour l'étiquette sans pays filtré. */
+  readonly contractTypes = signal<(HrContractType & { paysId: number | null })[]>([]);
   private contractTypesSeq = 0;
-  private loadContractTypes(): void {
+  /** `afterLoad` : appelé une fois la liste reçue (voir `applyFilters`). */
+  private loadContractTypes(afterLoad?: () => void): void {
     const current = ++this.contractTypesSeq;
-    this.hrService.getContractTypes(this.paysFilter())
-      .subscribe(list => { if (current === this.contractTypesSeq) this.contractTypes.set(list); });
+    const pays = this.paysFilter();
+    const fetch = (id: number | null) => this.hrService.getContractTypes(id)
+      .pipe(map(list => list.map(t => ({ ...t, paysId: pays != null ? null : id }))));
+    const source = pays != null
+      ? fetch(pays)
+      : forkJoin([fetch(null), ...this.paysList().map(p => fetch(p.id))]).pipe(map(lists => lists.flat()));
+    source.subscribe(list => {
+      if (current !== this.contractTypesSeq) return;
+      this.contractTypes.set(list);
+      afterLoad?.();
+    });
   }
 
   // ── Bandeau KPI ─────────────────────────────────────────────────────────────
@@ -432,13 +446,29 @@ export class EmployeeConfigListComponent implements OnInit {
     // Liste RH « Type de contrat » (/rh/admin?tab=lists), dans son ordre et avec ses libellés.
     // Valeur = code ramené au code de paie, comparé au contrat affiché (voir `loadScope()`).
     // Un ancien code et son code de paie (« PERMANENT » / « CDI ») ne donnent qu'un choix.
-    options: this.contractTypes()
-      .map(c => ({
-        value: EmployeeConfigListComponent.normContract(c.code)!,
-        label: this.translate.currentLang() === 'en' ? (c.labelEn || c.labelFr) : c.labelFr,
-      }))
-      .filter((o, i, all) => all.findIndex(x => x.value === o.value) === i),
+    options: this.contractOptions(),
   }]);
+
+  /** Choix du filtre « Type de contrat », un par code normalisé. Sans pays filtré, l'étiquette
+   *  porte les pays de la valeur — « CDI (Égypte, Tunisie) » — sauf pour une valeur globale. */
+  private contractOptions(): { value: string; label: string }[] {
+    const isEn = this.translate.currentLang() === 'en';
+    const groups = new Map<string, { label: string; pays: Set<number>; global: boolean }>();
+    for (const c of this.contractTypes()) {
+      const value = EmployeeConfigListComponent.normContract(c.code)!;
+      let g = groups.get(value);
+      if (!g) groups.set(value, g = { label: isEn ? (c.labelEn || c.labelFr) : c.labelFr, pays: new Set(), global: false });
+      if (c.paysId == null) g.global = true; else g.pays.add(c.paysId);
+    }
+    const paysName = (id: number) => {
+      const p = this.paysList().find(x => x.id === id);
+      return this.paysNames.name(id, p?.frenchLabel ?? String(id));
+    };
+    return [...groups].map(([value, g]) => ({
+      value,
+      label: g.global || !g.pays.size ? g.label : `${g.label} (${[...g.pays].map(paysName).join(', ')})`,
+    }));
+  }
 
   readonly filterConfig = computed<SearchToolbarFilterConfig>(() => ({
     title: this.t('PAYROLL.ENGINE_RESULTS.FILTER_EMPLOYEES_TITLE'),
@@ -458,8 +488,17 @@ export class EmployeeConfigListComponent implements OnInit {
     const raw = result['pays'] as string | null;
     const paysChanged = (raw ? Number(raw) : null) !== this.paysFilter();
     this.paysFilter.set(raw ? Number(raw) : null);
-    // Les types de contrat dépendent du pays (valeurs globales + celles du pays).
-    if (paysChanged) this.loadContractTypes();
+    // Les types de contrat dépendent du pays (valeurs globales + celles du pays). Un contrat
+    // choisi qui n'existe pas dans le nouveau pays est retiré du filtre, puis la liste rechargée.
+    if (paysChanged) this.loadContractTypes(() => {
+      const wanted = EmployeeConfigListComponent.normContract(this.contractFilter());
+      if (wanted && !this.contractOptions().some(o => o.value === wanted)) {
+        this.contractFilter.set(null);
+        this.page.set(0);
+        this.load();
+        this.loadKpis();
+      }
+    });
     this.statusFilter.set((result['status'] as string | null) || null);
     this.departmentFilter.set((result['department'] as string | null) || null);
     this.contractFilter.set((result['contract'] as string | null) || null);

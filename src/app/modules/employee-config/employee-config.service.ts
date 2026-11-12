@@ -72,6 +72,23 @@ export interface CalculateNetResponse {
   netInHand: number;
 }
 
+/** `CalculationFormValues` de daf360-payroll-service : ce que le formulaire affiche. */
+export interface CalculationFormValues {
+  paysId: number | null;
+  contractType: string | null;
+  selectedBenefitCodes: string[];
+  isMarried: boolean;
+  childrenCount: number;
+}
+
+/** `grossSalary` dans la devise de saisie ; `netInHand` dans la devise de travail, comme
+ *  `CalculateNetResponse`. */
+export interface CalculateGrossResponse {
+  grossSalary: number;
+  netInHand: number;
+  convergenceOk: boolean;
+}
+
 export interface EmployeePayrollBonusDto {
   id: number;
   profileUserId: number;
@@ -138,12 +155,19 @@ export class EmployeeConfigService {
     return this.http.get<EmployeePayrollConfigHistoryDto[]>(`${this.base}/${profileUserId}/history`);
   }
 
-  /** Net by the real payroll engine (nothing saved), with the country/contract currently on
-   *  screen — they may not be saved yet. */
-  calculateNet(profileUserId: number, grossSalary: number, inputCurrency: string | null,
-               paysId: number | null, contractType: string | null): Observable<CalculateNetResponse> {
+  /** Net by the real payroll engine (nothing saved). `form` : valeurs affichées (pas forcément
+   *  enregistrées) — le serveur calcule avec leur pays / contrat, sinon avec la configuration
+   *  enregistrée. paysId / contractType sont aussi envoyés à plat (format accepté par le serveur). */
+  calculateNet(profileUserId: number, grossSalary: number, inputCurrency?: string | null,
+               form?: CalculationFormValues): Observable<CalculateNetResponse> {
     return this.http.post<CalculateNetResponse>(`${this.base}/${profileUserId}/calculate-net`,
-      { grossSalary, inputCurrency, paysId, contractType });
+      { grossSalary, inputCurrency, paysId: form?.paysId ?? null, contractType: form?.contractType ?? null, form });
+  }
+
+  /** Calcul inverse : net saisi (devise de saisie) → brut dans cette même devise. */
+  calculateGross(profileUserId: number, netSalary: number, inputCurrency?: string | null,
+                 form?: CalculationFormValues): Observable<CalculateGrossResponse> {
+    return this.http.post<CalculateGrossResponse>(`${this.base}/${profileUserId}/calculate-gross`, { netSalary, inputCurrency, form });
   }
 
   getBonuses(profileUserId: number): Observable<EmployeePayrollBonusDto[]> {
