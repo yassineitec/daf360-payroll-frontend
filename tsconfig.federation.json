@@ -7,7 +7,35 @@
     ]
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "node_modules\\@angular\\animations\\fesm2022\\animations.mjs",
+    "node_modules\\@angular\\animations\\fesm2022\\browser.mjs",
+    "node_modules\\@angular\\common\\fesm2022\\common.mjs",
+    "node_modules\\@angular\\common\\fesm2022\\http.mjs",
+    "node_modules\\@angular\\compiler\\fesm2022\\compiler.mjs",
+    "node_modules\\@angular\\core\\fesm2022\\core.mjs",
+    "node_modules\\@angular\\core\\event-dispatch-contract.min.js",
+    "node_modules\\@angular\\core\\fesm2022\\primitives-di.mjs",
+    "node_modules\\@angular\\core\\fesm2022\\primitives-event-dispatch.mjs",
+    "node_modules\\@angular\\core\\fesm2022\\primitives-signals.mjs",
+    "node_modules\\@angular\\core\\fesm2022\\rxjs-interop.mjs",
+    "node_modules\\@angular\\forms\\fesm2022\\forms.mjs",
+    "node_modules\\@angular\\forms\\fesm2022\\signals.mjs",
+    "node_modules\\@angular\\forms\\fesm2022\\signals-compat.mjs",
+    "node_modules\\@angular\\platform-browser\\fesm2022\\platform-browser.mjs",
+    "node_modules\\@angular\\platform-browser\\fesm2022\\animations.mjs",
+    "node_modules\\@angular\\platform-browser\\fesm2022\\animations-async.mjs",
+    "node_modules\\@angular\\router\\fesm2022\\router.mjs",
+    "node_modules\\@khalilrebhiitec\\daf360\\fesm2022\\khalilrebhiitec-daf360.mjs",
+    "node_modules\\@ngrx\\effects\\fesm2022\\ngrx-effects.mjs",
+    "node_modules\\@ngrx\\effects\\fesm2022\\ngrx-effects-testing.mjs",
+    "node_modules\\@ngrx\\store\\fesm2022\\ngrx-store.mjs",
+    "node_modules\\@ngrx\\store\\fesm2022\\ngrx-store-testing.mjs",
+    "node_modules\\@ngx-translate\\core\\fesm2022\\ngx-translate-core.mjs",
+    "node_modules\\@ngx-translate\\http-loader\\fesm2022\\ngx-translate-http-loader.mjs",
+    "node_modules\\rxjs\\dist\\esm\\index.js",
+    "node_modules\\rxjs\\dist\\esm\\operators\\index.js",
+    "node_modules\\tslib\\tslib.es6.mjs"
   ],
   "exclude": [
     "src/**/*.spec.ts"

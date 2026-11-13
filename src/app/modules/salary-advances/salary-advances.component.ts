@@ -43,7 +43,7 @@ const GUIDE_STEPS: GuideStep[] = [
 ];
 
 const ADVANCE_VARIANT: Record<AdvanceStatus, BadgeVariant> = {
-  PENDING_FINANCE: 'warning', APPROVED: 'info', REPAYING: 'success',
+  PENDING_DIRECTOR: 'warning', PENDING_FINANCE: 'warning', APPROVED: 'info', REPAYING: 'success',
   REPAID: 'neutral', REJECTED: 'danger', CANCELLED: 'neutral',
 };
 const INSTALLMENT_VARIANT: Record<InstallmentStatus, BadgeVariant> = {
@@ -270,7 +270,8 @@ export class SalaryAdvancesComponent implements OnInit {
         currency(toPay.map(a => a.currency)),
         {
           name: 'firstMonth', label: t('PAYROLL.SALARY_ADVANCES.FILTER.FIRST_MONTH'), type: 'select', placeholder: all,
-          options: distinct(toPay.map(a => a.firstDeductionMonth.slice(0, 7))).map(m => ({ value: m, label: this.monthName(m) })),
+          options: distinct(toPay.map(a => (a.firstDeductionMonth ?? '').slice(0, 7)).filter(m => !!m))
+            .map(m => ({ value: m, label: this.monthName(m) })),
         },
         { name: 'approved', label: t('PAYROLL.SALARY_ADVANCES.FILTER.APPROVED'), type: 'daterange' },
         months('installments', 'PAYROLL.SALARY_ADVANCES.FILTER.INSTALLMENTS', toPay.map(a => a.installments)),
@@ -364,7 +365,20 @@ export class SalaryAdvancesComponent implements OnInit {
   }
 
   // ── Tables ───────────────────────────────────────────────────────────────
-  private advanceColumns(): TableColumn[] {
+  /**
+   * Largeur des colonnes `_actions`. `tableTools()` active `resizableColumns`, donc
+   * `table-layout: fixed` : un `width: '1%'` y vaut quelques pixels et les boutons débordaient
+   * sur la colonne « Montant ». La lib ne dimensionne que SA colonne d'actions intégrée, pas
+   * une colonne `dafCell="_actions"` — la largeur doit donc couvrir les boutons libellés
+   * (taille sm + icône), le plus long libellé FR/EN compris, plus le padding de la cellule.
+   */
+  private static readonly ACTIONS_WIDTH = {
+    payout:     '15rem',   // Détail + Verser
+    followup:   '8.5rem',  // Détail
+    deductions: '28rem',   // Prélevée + Reporter + Solder autrement
+  } as const;
+
+  private advanceColumns(actionsWidth: string): TableColumn[] {
     const t = (k: string) => this.translate.instant(k);
     // Tri local : ces listes arrivent entières et ne sont pas paginées, la lib trie donc
     // bien tout le résultat — sur les valeurs brutes, pas sur les libellés formatés.
@@ -372,11 +386,11 @@ export class SalaryAdvancesComponent implements OnInit {
     return [
       { key: 'employee', label: t('PAYROLL.SALARY_ADVANCES.COL.EMPLOYEE'), type: 'avatar', sortable: true },
       { key: 'terms',    label: t('PAYROLL.SALARY_ADVANCES.COL.TERMS'), sortable: true,
-        sortAccessor: row => src(row).firstDeductionMonth },
+        sortAccessor: row => src(row).firstDeductionMonth ?? '' },
       { key: 'status',   label: t('PAYROLL.SALARY_ADVANCES.COL.STATUS'), type: 'badge', sortable: true },
       { key: 'amount',   label: t('PAYROLL.SALARY_ADVANCES.COL.AMOUNT'), align: 'right', sortable: true,
         sortAccessor: row => src(row).amount },
-      { key: '_actions', label: '', align: 'right', width: '1%' },
+      { key: '_actions', label: '', align: 'right', width: actionsWidth },
     ];
   }
 
@@ -398,7 +412,14 @@ export class SalaryAdvancesComponent implements OnInit {
     };
   }
 
-  readonly payoutColumns = computed<TableColumn[]>(() => { this.translate.currentLang(); return this.advanceColumns(); });
+  readonly payoutColumns = computed<TableColumn[]>(() => {
+    this.translate.currentLang();
+    return this.advanceColumns(SalaryAdvancesComponent.ACTIONS_WIDTH.payout);
+  });
+  readonly followupColumns = computed<TableColumn[]>(() => {
+    this.translate.currentLang();
+    return this.advanceColumns(SalaryAdvancesComponent.ACTIONS_WIDTH.followup);
+  });
   readonly payoutRows = computed<TableRow[]>(() => {
     this.translate.currentLang();
     const pays = this.pick('payout', 'pays');
@@ -412,7 +433,7 @@ export class SalaryAdvancesComponent implements OnInit {
       .filter(a => this.matches(a.employeeName)
         && (!pays || String(a.paysId) === pays)
         && (!currency || a.currency === currency)
-        && (!firstMonth || a.firstDeductionMonth.startsWith(firstMonth))
+        && (!firstMonth || (a.firstDeductionMonth ?? '').startsWith(firstMonth))
         && inRange(a.financeDecidedAt, from, to)
         && (!installments || String(a.installments) === installments)
         && (!decidedBy || a.financeDecidedByName === decidedBy)
@@ -454,7 +475,7 @@ export class SalaryAdvancesComponent implements OnInit {
       { key: 'status',      label: t('PAYROLL.SALARY_ADVANCES.COL.STATUS'), type: 'badge', sortable: true },
       { key: 'amount',      label: t('PAYROLL.SALARY_ADVANCES.COL.AMOUNT'), align: 'right', sortable: true,
         sortAccessor: row => src(row).amount },
-      { key: '_actions',    label: '', align: 'right', width: '1%' },
+      { key: '_actions',    label: '', align: 'right', width: SalaryAdvancesComponent.ACTIONS_WIDTH.deductions },
     ];
   });
 
@@ -557,11 +578,33 @@ export class SalaryAdvancesComponent implements OnInit {
     });
   }
 
+  /**
+   * The payout waits for the signed debt contract where the country requires it (V39) — the
+   * server refuses it too; the button says why instead of failing on click.
+   */
+  payoutBlocked(a: SalaryAdvance): boolean {
+    return a.requireSignedContract && a.contractStatus !== 'SIGNED';
+  }
+
+  /** The generated contract, or the signed scan — opened in a new tab. */
+  openContract(a: SalaryAdvance, signed: boolean): void {
+    this.svc.contract(a.id, signed).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank', 'noopener');
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      },
+      error: err => this.error.set(this.message(err)),
+    });
+  }
+
   openPayout(a: SalaryAdvance): void {
+    if (this.payoutBlocked(a)) return;
     this.selected.set(a);
     this.method.set('VIREMENT');
     this.reference.set('');
-    this.paidOn.set(todayIso());
+    // The DAF's date d'effet is the planned payout date; payroll records the real one.
+    this.paidOn.set(a.effectiveDate ?? todayIso());
     this.note.set('');
     this.modalError.set(null);
     const t = (k: string) => this.translate.instant(k);

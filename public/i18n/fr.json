@@ -153,12 +153,19 @@
         "OUTSTANDING": "Reste dû"
       },
       "STATUS": {
-        "PENDING_FINANCE": "En attente de la finance",
-        "APPROVED": "Approuvée — à verser",
+        "PENDING_DIRECTOR": "Validation au-dessus du seuil",
+        "PENDING_FINANCE": "En attente de traitement (DAF)",
+        "APPROVED": "Accordée — à verser",
         "REPAYING": "En remboursement",
         "REPAID": "Remboursée",
-        "REJECTED": "Refusée par la finance",
+        "REJECTED": "Refusée",
         "CANCELLED": "Retirée"
+      },
+      "CONTRACT": {
+        "TO_SIGN": "Contrat à signer",
+        "SIGNED": "Contrat signé et archivé",
+        "GENERATED": "Contrat",
+        "SIGNED_COPY": "Copie signée"
       },
       "INSTALLMENT": {
         "PLANNED": "Prévue",
@@ -175,6 +182,7 @@
       "ACTIONS": {
         "VIEW": "Détail",
         "PAY": "Verser",
+        "CONTRACT_PENDING": "Contrat non signé",
         "DEDUCTED": "Prélevée",
         "SKIP": "Reporter",
         "WAIVE": "Solder autrement"
@@ -186,21 +194,32 @@
         "RULES": "Aucune règle — aucun pays ne propose d'avance pour l'instant"
       },
       "PAYOUT": {
-        "HINT": "Les avances approuvées par la finance, en attente de versement.",
+        "HINT": "Les avances accordées par le DAF, en attente de versement. Le versement attend le contrat signé là où le pays l'exige.",
         "TITLE": "Versement de l'avance",
         "CONFIRM": "Enregistrer le versement",
-        "SCHEDULE_HINT": "Le versement crée l'échéancier : les retenues commencent au mois prévu, ou au mois en cours si celui-ci est passé.",
+        "SCHEDULE_HINT": "L'échéancier a été fixé par le DAF. Un versement après le premier mois prévu décale toutes les retenues au mois en cours.",
+        "CONTRACT_BLOCK": "Le contrat de dette signé et légalisé doit être déposé par le DAF avant le versement",
         "METHOD": "Mode de versement",
         "DATE": "Date du versement",
         "REFERENCE": "Référence (virement, reçu…)",
         "DATE_REQUIRED": "La date du versement est obligatoire"
       },
       "DETAIL": {
-        "DECIDED_BY": "Décision finance",
+        "DECIDED_BY": "Décision DAF",
+        "DIRECTOR": "Validation au-dessus du seuil",
+        "REQUESTED": "Demandé",
+        "EFFECTIVE_DATE": "Date d'effet",
+        "CONTRACT": "Contrat de dette",
         "PAID": "Versée"
       },
       "RULES": {
-        "HINT": "Un pays sans règle ouverte ne propose pas d'avance. Pas de plafond sur le montant : la finance en juge.",
+        "HINT": "Un pays sans règle ouverte ne propose pas d'avance. Pas de plafond sur le montant : le DAF en juge ; au-dessus du seuil, un directeur valide d'abord.",
+        "THRESHOLD": "Seuil de validation",
+        "THRESHOLD_HINT": "Au-dessus de ce montant, la demande est d'abord validée au-dessus du seuil. Vide = pas de validation préalable",
+        "NO_THRESHOLD": "Aucun",
+        "CONTRACT": "Contrat signé avant versement",
+        "CONTRACT_REQUIRED": "Obligatoire",
+        "CONTRACT_OPTIONAL": "Facultatif",
         "PAYS": "Pays",
         "CURRENCY": "Devise",
         "MAX_MONTHS": "Durée maximale (mois)",

@@ -22,7 +22,9 @@ const CURRENCIES = ['TND', 'EGP', 'EUR', 'USD'];
 
 /**
  * Section « Règles des avances » de l'administration paie (/payroll/admin) : par
- * pays, la durée maximale de remboursement, l'ancienneté minimale et l'ouverture. Mêmes
+ * pays, la durée maximale de remboursement, l'ancienneté minimale, l'ouverture, le seuil
+ * au-delà duquel un directeur valide avant le DAF et l'obligation du contrat signé avant
+ * versement (V39). Mêmes
  * endpoints (`GET/PUT /salary-advances/policies`), mêmes libellés et même pop-up que
  * l'onglet « Règles » de /payroll/salary-advances — ici rangés avec le reste du paramétrage.
  */
@@ -132,6 +134,21 @@ const CURRENCIES = ['TND', 'EGP', 'EUR', 'USD'];
             [config]="{ label: ('PAYROLL.SALARY_ADVANCES.RULES.STATE' | translate), required: true }"
             [selected]="[form().isActive ? 'open' : 'closed']"
             (selectedChange)="patch({ isActive: $event[0] === 'open' })" />
+          <daf-form-field
+            [value]="form().directorThreshold"
+            (valueChange)="patch({ directorThreshold: toNumber($event) })"
+            [options]="{
+              type: 'number', fullWidth: true, align: 'end',
+              suffixText: form().currency,
+              label: ('PAYROLL.SALARY_ADVANCES.RULES.THRESHOLD' | translate),
+              hint: ('PAYROLL.SALARY_ADVANCES.RULES.THRESHOLD_HINT' | translate),
+              error: fieldError('directorThreshold')
+            }" />
+          <daf-select
+            [options]="contractOptions()"
+            [config]="{ label: ('PAYROLL.SALARY_ADVANCES.RULES.CONTRACT' | translate), required: true }"
+            [selected]="[form().requireSignedContract ? 'required' : 'optional']"
+            (selectedChange)="patch({ requireSignedContract: $event[0] !== 'optional' })" />
         </div>
         @if (error()) {
           <div class="admin-error-banner" role="alert">{{ error() }}</div>
@@ -215,6 +232,11 @@ export class AdvanceRulesAdminComponent implements OnInit {
     { value: 'closed', label: this.t('PAYROLL.SALARY_ADVANCES.RULES.CLOSED') },
   ]);
 
+  readonly contractOptions = computed<SelectOption[]>(() => [
+    { value: 'required', label: this.t('PAYROLL.SALARY_ADVANCES.RULES.CONTRACT_REQUIRED') },
+    { value: 'optional', label: this.t('PAYROLL.SALARY_ADVANCES.RULES.CONTRACT_OPTIONAL') },
+  ]);
+
   readonly filterFields = computed<FilterField[]>(() => {
     const all = this.t('PAYROLL.SALARY_ADVANCES.FILTER.ALL');
     return [
@@ -247,6 +269,8 @@ export class AdvanceRulesAdminComponent implements OnInit {
       sortAccessor: row => (row['_source'] as AdvancePolicy).maxInstallments },
     { key: 'seniority', label: this.t('PAYROLL.SALARY_ADVANCES.RULES.SENIORITY'), sortable: true,
       sortAccessor: row => (row['_source'] as AdvancePolicy).minSeniorityMonths },
+    { key: 'threshold', label: this.t('PAYROLL.SALARY_ADVANCES.RULES.THRESHOLD'), align: 'right', sortable: true,
+      sortAccessor: row => (row['_source'] as AdvancePolicy).directorThreshold ?? Number.MAX_SAFE_INTEGER },
     { key: 'state',     label: this.t('PAYROLL.SALARY_ADVANCES.RULES.STATE'), type: 'badge', sortable: true },
   ]);
 
@@ -264,6 +288,9 @@ export class AdvanceRulesAdminComponent implements OnInit {
         seniority: p.minSeniorityMonths
           ? this.t('PAYROLL.SALARY_ADVANCES.N_MONTHS', { count: p.minSeniorityMonths })
           : this.t('PAYROLL.SALARY_ADVANCES.RULES.NONE'),
+        threshold: p.directorThreshold != null
+          ? `${new Intl.NumberFormat(this.translate.currentLang() === 'en' ? 'en-GB' : 'fr-FR', { maximumFractionDigits: 3 }).format(p.directorThreshold)} ${p.currency}`
+          : this.t('PAYROLL.SALARY_ADVANCES.RULES.NO_THRESHOLD'),
         state: {
           label: this.t(p.isActive ? 'PAYROLL.SALARY_ADVANCES.RULES.OPEN' : 'PAYROLL.SALARY_ADVANCES.RULES.CLOSED'),
           options: { variant: p.isActive ? 'success' : 'neutral', size: 'sm', dot: true },
@@ -358,6 +385,10 @@ export class AdvanceRulesAdminComponent implements OnInit {
     if (m) e.maxInstallments = m;
     const sn = int(f.minSeniorityMonths, 0);
     if (sn) e.minSeniorityMonths = sn;
+    // Optional: empty = no director step. When set, strictly positive (as the server's check).
+    if (f.directorThreshold != null && !(f.directorThreshold > 0)) {
+      e.directorThreshold = this.t('PAYROLL.ADMIN.ERR.MIN', { min: 0.001 });
+    }
     return e;
   }
 
@@ -419,5 +450,8 @@ function seedSelect(applied: FilterResult, name: string): string[] {
 }
 
 function blankPolicy(): PolicyForm {
-  return { paysId: 0, currency: 'TND', maxInstallments: 3, minSeniorityMonths: 3, isActive: true };
+  return {
+    paysId: 0, currency: 'TND', maxInstallments: 3, minSeniorityMonths: 3, isActive: true,
+    directorThreshold: null, requireSignedContract: true,
+  };
 }

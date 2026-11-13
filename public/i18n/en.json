@@ -153,12 +153,19 @@
         "OUTSTANDING": "Outstanding"
       },
       "STATUS": {
-        "PENDING_FINANCE": "Awaiting finance",
-        "APPROVED": "Approved — to pay out",
+        "PENDING_DIRECTOR": "Above-threshold validation",
+        "PENDING_FINANCE": "Awaiting processing (CFO)",
+        "APPROVED": "Granted — to pay out",
         "REPAYING": "Being repaid",
         "REPAID": "Repaid",
-        "REJECTED": "Rejected by finance",
+        "REJECTED": "Rejected",
         "CANCELLED": "Withdrawn"
+      },
+      "CONTRACT": {
+        "TO_SIGN": "Agreement to sign",
+        "SIGNED": "Agreement signed and filed",
+        "GENERATED": "Agreement",
+        "SIGNED_COPY": "Signed copy"
       },
       "INSTALLMENT": {
         "PLANNED": "Planned",
@@ -175,6 +182,7 @@
       "ACTIONS": {
         "VIEW": "Details",
         "PAY": "Pay out",
+        "CONTRACT_PENDING": "Agreement not signed",
         "DEDUCTED": "Deducted",
         "SKIP": "Postpone",
         "WAIVE": "Settle otherwise"
@@ -186,21 +194,32 @@
         "RULES": "No rule — no country offers advances yet"
       },
       "PAYOUT": {
-        "HINT": "Advances approved by finance, waiting to be paid out.",
+        "HINT": "Advances granted by the CFO, waiting to be paid out. The payout waits for the signed agreement where the country requires it.",
         "TITLE": "Advance payout",
         "CONFIRM": "Record the payout",
-        "SCHEDULE_HINT": "Recording the payout creates the schedule: deductions start in the planned month, or the current month if that one has passed.",
+        "SCHEDULE_HINT": "The schedule was set by the CFO. A payout after the first planned month moves every deduction to the current month.",
+        "CONTRACT_BLOCK": "The CFO must file the signed, certified debt agreement before the payout",
         "METHOD": "Payment method",
         "DATE": "Payout date",
         "REFERENCE": "Reference (transfer, receipt…)",
         "DATE_REQUIRED": "The payout date is required"
       },
       "DETAIL": {
-        "DECIDED_BY": "Finance decision",
+        "DECIDED_BY": "CFO decision",
+        "DIRECTOR": "Above-threshold validation",
+        "REQUESTED": "Requested",
+        "EFFECTIVE_DATE": "Effective date",
+        "CONTRACT": "Debt agreement",
         "PAID": "Paid out"
       },
       "RULES": {
-        "HINT": "A country without an open rule offers no advance. No ceiling on the amount: finance judges it.",
+        "HINT": "A country without an open rule offers no advance. No ceiling on the amount: the CFO judges it; above the threshold, a director validates first.",
+        "THRESHOLD": "Validation threshold",
+        "THRESHOLD_HINT": "Above this amount, the request is validated above the threshold first. Empty = no prior validation",
+        "NO_THRESHOLD": "None",
+        "CONTRACT": "Signed agreement before payout",
+        "CONTRACT_REQUIRED": "Required",
+        "CONTRACT_OPTIONAL": "Optional",
         "PAYS": "Country",
         "CURRENCY": "Currency",
         "MAX_MONTHS": "Maximum period (months)",

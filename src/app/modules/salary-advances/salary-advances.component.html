@@ -57,9 +57,15 @@
               <daf-button
                 [options]="{ variant: 'ghost', size: 'sm', iconStart: 'visibility', label: ('PAYROLL.SALARY_ADVANCES.ACTIONS.VIEW' | translate) }"
                 (onClick)="openDetail(row['_source'])" />
-              <daf-button
-                [options]="{ variant: 'teal', size: 'sm', iconStart: 'account_balance', label: ('PAYROLL.SALARY_ADVANCES.ACTIONS.PAY' | translate) }"
-                (onClick)="openPayout(row['_source'])" />
+              @if (payoutBlocked(row['_source'])) {
+                <daf-button
+                  [title]="'PAYROLL.SALARY_ADVANCES.PAYOUT.CONTRACT_BLOCK' | translate"
+                  [options]="{ variant: 'secondary', size: 'sm', iconStart: 'contract_edit', disabled: true, label: ('PAYROLL.SALARY_ADVANCES.ACTIONS.CONTRACT_PENDING' | translate) }" />
+              } @else {
+                <daf-button
+                  [options]="{ variant: 'teal', size: 'sm', iconStart: 'account_balance', label: ('PAYROLL.SALARY_ADVANCES.ACTIONS.PAY' | translate) }"
+                  (onClick)="openPayout(row['_source'])" />
+              }
             </div>
           </ng-template>
         </daf-data-table>
@@ -172,7 +178,7 @@
           [filterConfig]="filterConfigs().followup"
           (filterApply)="onFilter('followup', $event)"
           [table]="followupTable" />
-        <daf-data-table #followupTable [columns]="payoutColumns()" [rows]="followupRows()" [config]="followupConfig()">
+        <daf-data-table #followupTable [columns]="followupColumns()" [rows]="followupRows()" [config]="followupConfig()">
           <ng-template dafCell="_actions" let-row>
             <div class="flex items-center justify-end">
               <daf-button
@@ -206,10 +212,47 @@
             {{ 'PAYROLL.SALARY_ADVANCES.TERMS' | translate:{ monthly: money(a.monthlyAmount, a.currency), count: a.installments, month: monthName(a.firstDeductionMonth) } }}
           </span>
         </div>
+        <div class="flex justify-between gap-4">
+          <span class="text-outline">{{ 'PAYROLL.SALARY_ADVANCES.DETAIL.REQUESTED' | translate }}</span>
+          <span class="text-right font-medium text-on-surface">
+            {{ money(a.requestedAmount, a.currency) }} · {{ 'PAYROLL.SALARY_ADVANCES.N_MONTHS' | translate:{ count: a.requestedInstallments } }}
+            @if (a.requestedAvailabilityDate) { · {{ a.requestedAvailabilityDate }} }
+          </span>
+        </div>
+        @if (a.effectiveDate) {
+          <div class="flex justify-between gap-4">
+            <span class="text-outline">{{ 'PAYROLL.SALARY_ADVANCES.DETAIL.EFFECTIVE_DATE' | translate }}</span>
+            <span class="font-medium text-on-surface">{{ a.effectiveDate }}</span>
+          </div>
+        }
+        @if (a.directorDecidedByName) {
+          <div class="flex justify-between gap-4">
+            <span class="text-outline">{{ 'PAYROLL.SALARY_ADVANCES.DETAIL.DIRECTOR' | translate }}</span>
+            <span class="font-medium text-on-surface">{{ a.directorDecidedByName }}</span>
+          </div>
+        }
         @if (a.financeDecidedByName) {
           <div class="flex justify-between gap-4">
             <span class="text-outline">{{ 'PAYROLL.SALARY_ADVANCES.DETAIL.DECIDED_BY' | translate }}</span>
             <span class="font-medium text-on-surface">{{ a.financeDecidedByName }}</span>
+          </div>
+        }
+        @if (a.contractStatus) {
+          <div class="flex items-center justify-between gap-4">
+            <span class="text-outline">{{ 'PAYROLL.SALARY_ADVANCES.DETAIL.CONTRACT' | translate }}</span>
+            <span class="flex flex-wrap items-center justify-end gap-2">
+              <span class="font-medium text-on-surface">{{ ('PAYROLL.SALARY_ADVANCES.CONTRACT.' + a.contractStatus) | translate }}</span>
+              @if (a.contractAvailable) {
+                <daf-button
+                  [options]="{ variant: 'ghost', size: 'sm', iconStart: 'description', label: ('PAYROLL.SALARY_ADVANCES.CONTRACT.GENERATED' | translate) }"
+                  (onClick)="openContract(a, false)" />
+              }
+              @if (a.signedContractAvailable) {
+                <daf-button
+                  [options]="{ variant: 'ghost', size: 'sm', iconStart: 'verified', label: ('PAYROLL.SALARY_ADVANCES.CONTRACT.SIGNED_COPY' | translate) }"
+                  (onClick)="openContract(a, true)" />
+              }
+            </span>
           </div>
         }
         @if (a.disbursedOn) {
@@ -253,6 +296,9 @@
       <div class="flex flex-col gap-1 rounded-xl bg-surface-container-low px-4 py-3">
         <span class="text-label-caps text-outline">{{ a.employeeName }} · AVS-{{ a.id }}</span>
         <span class="text-[22px] font-black leading-tight text-on-surface">{{ money(a.amount, a.currency) }}</span>
+        <span class="text-body-sm text-on-surface-variant">
+          {{ 'PAYROLL.SALARY_ADVANCES.TERMS' | translate:{ monthly: money(a.monthlyAmount, a.currency), count: a.installments, month: monthName(a.firstDeductionMonth) } }}
+        </span>
         <span class="text-body-sm text-on-surface-variant">{{ 'PAYROLL.SALARY_ADVANCES.PAYOUT.SCHEDULE_HINT' | translate }}</span>
       </div>
     }
