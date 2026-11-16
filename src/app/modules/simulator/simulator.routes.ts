@@ -1,5 +1,5 @@
 import { inject } from '@angular/core';
-import { CanActivateFn, Router, Routes } from '@angular/router';
+import { CanActivateFn, Router, Routes, UrlMatcher, UrlMatchResult } from '@angular/router';
 import { PermissionService } from '@khalilrebhiitec/daf360';
 
 /** Codes qui ouvrent la liste — ceux de `GET /simulations/individual` côté backend. */
@@ -17,14 +17,30 @@ const simulationListGuard: CanActivateFn = (_route, state) => {
 };
 
 /**
+ * `new`, `:id` et `:id/edit` sur UNE seule route : `id` vaut `new` ou un nombre, `edit`
+ * n'est présent que sur le formulaire de modification. Trois routes distinctes (comme
+ * les affaires) recréeraient le composant à chaque passage, et le formulaire rempli
+ * serait perdu entre « Simuler » → résultat → « Modifier la simulation ».
+ */
+const simulatorMatcher: UrlMatcher = (segments): UrlMatchResult | null => {
+  const [first, second] = segments;
+  if (!first || segments.length > 2) return null;
+  if (segments.length === 1) {
+    return /^(new|\d+)$/.test(first.path) ? { consumed: segments, posParams: { id: first } } : null;
+  }
+  return /^\d+$/.test(first.path) && second.path === 'edit'
+    ? { consumed: segments, posParams: { id: first, edit: second } }
+    : null;
+};
+
+/**
  * Même parcours que les listes de la facturation et de RH :
- *   ''     → liste des simulations (recherche, filtres, KPI, pagination) ;
- *   'new'  → formulaire en 3 étapes ;
- *   ':id'  → fiche résultat, rechargeable et partageable par son URL.
+ *   ''          → liste des simulations (recherche, filtres, KPI, pagination) ;
+ *   'new'       → formulaire en 3 étapes ;
+ *   ':id'       → fiche résultat, rechargeable et partageable par son URL ;
+ *   ':id/edit'  → formulaire pré-rempli avec la simulation `:id` (« Modifier la simulation »).
  *
- * `new` et `:id` partagent UNE route (`:id` vaut `new` ou un nombre) : passer de l'une à
- * l'autre garde le même `SimulatorComponent`, donc le formulaire rempli survit à
- * « Simuler » → résultat → « Modifier la simulation » (et au bouton Précédent).
+ * Les trois dernières partagent le même `SimulatorComponent` (voir `simulatorMatcher`).
  */
 export const SIMULATOR_ROUTES: Routes = [
   {
@@ -35,7 +51,7 @@ export const SIMULATOR_ROUTES: Routes = [
       import('./simulator-list.component').then(m => m.SimulatorListComponent),
   },
   {
-    path: ':id',
+    matcher: simulatorMatcher,
     loadComponent: () =>
       import('./simulator.component').then(m => m.SimulatorComponent),
   },
