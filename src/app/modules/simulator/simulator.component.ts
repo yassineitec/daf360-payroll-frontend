@@ -325,6 +325,8 @@ export class SimulatorComponent implements OnDestroy {
   private pendingPrefill: { contractType: string; benefitCodes: string[] | null } | null = null;
   /** Id de la simulation dont le formulaire a été pré-rempli — un seul pré-remplissage. */
   private prefilledFrom: number | null = null;
+  /** Id de la simulation modifiée sur `/payroll/simulator/:id/edit`, sinon `null`. */
+  readonly editingId = signal<number | null>(null);
   private readonly destroy$ = new Subject<void>();
 
   /**
@@ -954,6 +956,18 @@ export class SimulatorComponent implements OnDestroy {
 
   readonly breadcrumbs = computed((): BreadcrumbItem[] => {
     const r = this.result();
+    const editing = this.editingId();
+    if (editing != null) {
+      return [
+        { label: this.t('PAYROLL.COMMON.BREADCRUMB_ROOT'), link: '/payroll' },
+        { label: this.t('PAYROLL.SIMULATOR.BREADCRUMB'), link: '/payroll/simulator' },
+        {
+          label: this.t('PAYROLL.SIMULATOR.BREADCRUMB_RESULT', { id: editing }),
+          link: `/payroll/simulator/${editing}`,
+        },
+        { label: this.t('PAYROLL.SIMULATOR.BREADCRUMB_EDIT') },
+      ];
+    }
     return [
       { label: this.t('PAYROLL.COMMON.BREADCRUMB_ROOT'), link: '/payroll' },
       { label: this.t('PAYROLL.SIMULATOR.BREADCRUMB'), link: '/payroll/simulator' },
@@ -973,6 +987,8 @@ export class SimulatorComponent implements OnDestroy {
    */
   readonly pageTitle = computed(() => {
     const r = this.result();
+    const editing = this.editingId();
+    if (editing != null) return this.t('PAYROLL.SIMULATOR.EDIT_TITLE', { id: editing });
     if (!this.resultView() || !r) return this.t('PAYROLL.SIMULATOR.NEW_TITLE');
 
     let who: string | null = null;
@@ -1607,17 +1623,33 @@ export class SimulatorComponent implements OnDestroy {
         }
       });
 
-    // `:id` vaut `new` (formulaire) ou un nombre (fiche) ; `?from=` = « Dupliquer ».
+    // `:id` vaut `new` (formulaire) ou un nombre (fiche) ; `:id/edit` = « Modifier la
+    // simulation » ; `?from=` = « Dupliquer ».
     combineLatest([this.route.paramMap, this.route.queryParamMap])
       .pipe(takeUntil(this.destroy$))
-      .subscribe(([params, query]) => this.onRouteChange(params.get('id'), query.get('from')));
+      .subscribe(([params, query]) =>
+        this.onRouteChange(params.get('id'), params.has('edit'), query.get('from')));
   }
 
   // ── Routage : formulaire / fiche ───────────────────────────────────────────
 
-  private onRouteChange(rawId: string | null, rawFrom: string | null): void {
+  private onRouteChange(rawId: string | null, edit: boolean, rawFrom: string | null): void {
     this.loadError.set(null);
     const id = rawId && /^\d+$/.test(rawId) ? Number(rawId) : null;
+    this.editingId.set(edit ? id : null);
+
+    if (id != null && edit) {
+      // Formulaire pré-rempli avec la simulation `:id`. Venant de sa fiche, il l'est déjà
+      // (valeurs intactes, étape conservée) ; sinon (F5, lien) on la relit.
+      this.resultView.set(false);
+      if (id !== this.prefilledFrom) {
+        this.fetchSimulation(id, r => {
+          this.prefill(r);
+          this.result.set(r);
+        });
+      }
+      return;
+    }
 
     if (id == null) {
       // Formulaire. Revenir d'une fiche le retrouve tel quel ; un « Dupliquer » le remplit
@@ -1912,13 +1944,21 @@ export class SimulatorComponent implements OnDestroy {
     this.chargesSearch.set('');
   }
 
-  /** Formulaire, sur l'étape où on l'a laissé, valeurs intactes (même composant, voir les routes). */
+  /** `/payroll/simulator/:id/edit` : formulaire sur l'étape où on l'a laissé, valeurs
+   *  intactes (même composant, voir `simulatorMatcher`). */
   backToForm(): void {
-    this.router.navigate(['..', 'new'], { relativeTo: this.route });
+    const id = this.result()?.id;
+    this.navigateInSimulator(id != null ? [String(id), 'edit'] : ['new']);
   }
 
   backToList(): void {
-    this.router.navigate(['..'], { relativeTo: this.route });
+    this.navigateInSimulator(['.']);
+  }
+
+  /** Navigation depuis `/payroll/simulator` : `..` ne remonte que d'un segment, ce qui ne
+   *  suffit plus depuis `:id/edit` (deux segments pour une seule route). */
+  private navigateInSimulator(commands: string[]): void {
+    this.router.navigate(commands, { relativeTo: this.route.parent });
   }
 
   /** Free navigation — `(stepClick)` fires for every step because none is disabled. */
@@ -1962,8 +2002,11 @@ export class SimulatorComponent implements OnDestroy {
     this.form.get(name)?.setValue(value == null ? '' : String(value));
   }
 
-  private selectionOf(name: string): string[] {
-    const v = this.form.get(name)?.value;
+  /** Lit `formValue()` (signal), pas `form.get(name).value` : les `computed` qui
+   *  l'appellent ne se recalculeraient jamais, et un pré-remplissage (« Modifier la
+   *  simulation », « Dupliquer ») laisserait les listes sur leur premier état, vide. */
+  private selectionOf(name: 'paysId' | 'grade' | 'discipline' | 'contractType'): string[] {
+    const v = this.formValue()[name];
     return v === null || v === undefined || v === '' ? [] : [String(v)];
   }
 
@@ -2086,7 +2129,7 @@ export class SimulatorComponent implements OnDestroy {
         this.activeTab.set('overview');
         this.loading.set(false);
         // Le résultat a sa propre URL ; `onRouteChange` le trouve déjà en main.
-        this.router.navigate(['..', res.id], { relativeTo: this.route });
+        this.navigateInSimulator([String(res.id)]);
       },
       error: err => {
         this.error.set(
