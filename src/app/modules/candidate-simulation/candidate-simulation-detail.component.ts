@@ -336,7 +336,6 @@ export class CandidateSimulationDetailComponent {
       { label: this.t('PAYROLL.CANDIDATE_SIMULATION.KPI_LOADED_ANNUAL'), value: this.money(annual, cur),
         delta: monthlyLine ? { value: monthlyLine, direction: 'neutral' } : null,
         options: { icon: 'account_balance', valueColor: 'text-primary' } },
-      this.surcostCard(l, asked, cur, true),
     ];
   });
 
@@ -363,7 +362,7 @@ export class CandidateSimulationDetailComponent {
    * coefficient de charge de la proposition (coût employeur ÷ net) × 12. L'impôt n'étant pas
    * proportionnel, ce n'est qu'un ordre de grandeur (« ≈ »).
    */
-  private surcostCard(r: Round, asked: number | null, cur: string, last = false): Kpi {
+  private surcostCard(r: Round, asked: number | null, cur: string): Kpi {
     const net = r.snap.inputNet ?? r.sim.salaireNetRh;
     const coef = r.snap.loadedCost != null && net ? r.snap.loadedCost / net : null;
     const extra = asked != null && net && coef != null ? (asked - net) * coef * 12 : null;
@@ -382,7 +381,6 @@ export class CandidateSimulationDetailComponent {
         icon: 'trending_up',
         ...(extra != null && extra > 0 ? { valueColor: 'text-warning', iconColor: 'text-warning', iconBg: 'bg-warning/10' } : {}),
         help: this.t('PAYROLL.CANDIDATE_SIMULATION.DETAIL.SURCOST_HELP'),
-        ...(last ? { helpPlacement: 'top' as const } : {}),
       },
     };
   }
