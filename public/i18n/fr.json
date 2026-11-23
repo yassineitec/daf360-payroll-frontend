@@ -2934,7 +2934,7 @@
       "ACTIONS_TITLE": "Actions rapides",
       "ACTIONS_TEXT": "« Nouvelle simulation à partir de la dernière » ouvre le simulateur prérempli avec la dernière proposition. « Voir la fiche candidat (RH) » ouvre le candidat dans le recrutement. Chaque action n'apparaît qu'avec le droit correspondant.",
       "KPIS_TITLE": "Les indicateurs",
-      "KPIS_TEXT": "Pour la dernière proposition : le net proposé par la RH, le net demandé et l'écart avec l'offre, le coût employeur, et le surcoût annuel estimé si la demande du candidat était acceptée.",
+      "KPIS_TEXT": "Pour la dernière proposition : le net proposé par la RH, le net demandé et l'écart avec l'offre, et le coût employeur.",
       "TIMELINE_TITLE": "Le fil de la négociation",
       "TIMELINE_TEXT": "Une étape par proposition, la plus ancienne en haut : ce que la RH a proposé, ce que le candidat demandait, puis la réponse de la DAF (en attente, approuvée, refusée ou contre-proposition) avec sa note.",
       "DETAIL_TITLE": "Le détail d'une proposition",

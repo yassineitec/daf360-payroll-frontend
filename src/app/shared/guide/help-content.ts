@@ -138,7 +138,6 @@ export const HELP_CONTENT: Record<string, HelpPageContent> = {
   'candidate-detail': {
     faq: [
       faq('candidate-detail', 'CANDIDATE_DETAIL.ROUNDS',    'rounds'),
-      faq('candidate-detail', 'CANDIDATE_DETAIL.SURCOST',   'surcost'),
       faq('candidate-detail', 'CANDIDATE_DETAIL.DUPLICATE', 'duplicate'),
       faq('candidate-detail', 'CANDIDATE_DETAIL.RH',        'rh'),
     ],

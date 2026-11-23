@@ -116,7 +116,7 @@
 .pd-decision--danger  { color: var(--color-danger, #ba1a1a); }
 
 /* Trois chiffres clés : `daf-metric-card` de la lib, sur trois colonnes (une seule sur mobile). */
-.pd-figures { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; }
+.pd-figures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
 @media (max-width: 640px) { .pd-figures { grid-template-columns: 1fr; } }
 
 /* Décomposition en lignes de bulletin, trait avant chaque total. */

@@ -357,34 +357,6 @@ export class CandidateSimulationDetailComponent {
     };
   }
 
-  /**
-   * « Surcoût si la demande est acceptée » — ESTIMATION : (net demandé − net proposé) ×
-   * coefficient de charge de la proposition (coût employeur ÷ net) × 12. L'impôt n'étant pas
-   * proportionnel, ce n'est qu'un ordre de grandeur (« ≈ »).
-   */
-  private surcostCard(r: Round, asked: number | null, cur: string): Kpi {
-    const net = r.snap.inputNet ?? r.sim.salaireNetRh;
-    const coef = r.snap.loadedCost != null && net ? r.snap.loadedCost / net : null;
-    const extra = asked != null && net && coef != null ? (asked - net) * coef * 12 : null;
-    const sign = extra != null && extra < 0 ? '−' : '+';
-    return {
-      label: this.t('PAYROLL.CANDIDATE_SIMULATION.DETAIL.KPI_SURCOST'),
-      value: extra == null ? '—'
-        : this.t('PAYROLL.CANDIDATE_SIMULATION.DETAIL.SURCOST_VALUE', { amount: `${sign} ${this.money(Math.abs(extra), cur)}` }),
-      delta: {
-        value: asked == null
-          ? this.t('PAYROLL.CANDIDATE_SIMULATION.DETAIL.SURCOST_NO_ASK')
-          : coef == null ? '' : this.t('PAYROLL.CANDIDATE_SIMULATION.DETAIL.SURCOST_BASE', { coef: this.num(coef, 2) }),
-        direction: 'neutral',
-      },
-      options: {
-        icon: 'trending_up',
-        ...(extra != null && extra > 0 ? { valueColor: 'text-warning', iconColor: 'text-warning', iconBg: 'bg-warning/10' } : {}),
-        help: this.t('PAYROLL.CANDIDATE_SIMULATION.DETAIL.SURCOST_HELP'),
-      },
-    };
-  }
-
   private pctDelta(pct: number, suffix: string): MetricDelta {
     const sign = pct > 0 ? '+' : '';
     return {
@@ -457,21 +429,18 @@ export class CandidateSimulationDetailComponent {
     return { netRh: this.money(netRh, currency), evolution };
   });
 
-  /** Les trois chiffres clés en `daf-metric-card` (comme les tuiles de la page) : net
-   *  proposé (évolution dessous), net demandé (écart à l'offre dessous), surcoût estimé. */
+  /** Les chiffres clés en `daf-metric-card` (comme les tuiles de la page) : net proposé
+   *  (évolution dessous), net demandé (écart à l'offre dessous). */
   readonly figureCards = computed<Kpi[]>(() => {
     const k = this.keyFigures();
     const r = this.selected();
     if (!k || !r) return [];
-    // Mêmes tuiles que la page, pour la proposition ouverte : l'écart passe sous le net
-    // demandé, et le surcoût estimé remplace l'ancienne tuile « Écart ».
     const asked = r.sim.salaireNetCandidat ?? null;
     return [
       { label: this.t('PAYROLL.CANDIDATE_SIMULATION.KPI_NET_RH'), value: k.netRh,
         delta: k.evolution ? { value: k.evolution, direction: 'neutral' } : null,
         options: { icon: 'payments' } },
       this.askedCard(asked, r.sim.salaireNetRh, r.currency),
-      this.surcostCard(r, asked, r.currency),
     ];
   });
 

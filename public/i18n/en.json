@@ -2934,7 +2934,7 @@
       "ACTIONS_TITLE": "Quick actions",
       "ACTIONS_TEXT": "« New simulation from the latest » opens the simulator prefilled with the latest proposal. « View candidate record (HR) » opens the candidate in recruitment. Each action only shows with the matching right.",
       "KPIS_TITLE": "The indicators",
-      "KPIS_TEXT": "For the latest proposal: the net offered by HR, the net asked and the gap with the offer, the employer cost, and the estimated yearly extra cost if the candidate's request were accepted.",
+      "KPIS_TEXT": "For the latest proposal: the net offered by HR, the net asked and the gap with the offer, and the employer cost.",
       "TIMELINE_TITLE": "The negotiation thread",
       "TIMELINE_TEXT": "One step per proposal, oldest at the top: what HR offered, what the candidate asked, then the DAF's answer (pending, approved, rejected or counter-proposal) with its note.",
       "DETAIL_TITLE": "Detail of a proposal",
