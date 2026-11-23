@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, TemplateRef, ViewChild, computed, inject, signal, untracked, viewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { catchError, of } from 'rxjs';
+import { catchError, forkJoin, of } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   DataTableComponent, ModalRef, ModalService, SearchToolbarComponent, SelectComponent,
@@ -16,7 +16,7 @@ import { rememberAdminState } from './admin-section-state';
 import { UserStore } from '../../../core/user.store';
 import { PaysNamesService } from '../../../core/pays-names.service';
 import {
-  actionVariant, computeFieldDiffs, type DisplayEntry, domainVariant, type FieldDiff,
+  actionVariant, computeFieldDiffs, type DisplayEntry, domainVariant, extractActorRefIds, type FieldDiff,
   groupGenericBursts, recordIdentity, tableDomain, tableLabel,
 } from './payroll-audit-display.util';
 
@@ -207,6 +207,11 @@ export class PayrollAuditAdminComponent implements OnInit {
   readonly activeGroup = signal<AuditEntryDto[] | null>(null);
   private modalRef: ModalRef | null = null;
 
+  /** users_ref id -> nom complet, pour les champs `*_by` trouvés dans le JSON d'une ligne
+   *  GENERIC (ex. `invoices.emitted_by`) -- résolu à la demande, à l'ouverture de la modale
+   *  détail, et gardé d'une ligne à l'autre. */
+  private readonly actorRefNames = signal<Record<number, string>>({});
+
   readonly tableLabel = tableLabel;
   readonly tableDomain = tableDomain;
   readonly recordIdentity = recordIdentity;
@@ -394,6 +399,7 @@ export class PayrollAuditAdminComponent implements OnInit {
 
   openDetailModal(entry: AuditEntryDto): void {
     this.activeEntry.set(entry);
+    this.resolveActorRefs(entry);
     this.modalRef = this.modal.open({
       resizable: true,
       maximizable: true,
@@ -404,6 +410,21 @@ export class PayrollAuditAdminComponent implements OnInit {
       size: 'lg',
       buttons: [{ label: this.t('PAYROLL.COMMON.CLOSE'), variant: 'secondary', action: r => r.close() }],
     });
+  }
+
+  /** Resolves whichever `*_by` ids this row's JSON references and aren't already cached -- a
+   *  handful of individual GETs at most, same lazy pattern as RH's/Facturation's audit screens. */
+  private resolveActorRefs(entry: AuditEntryDto): void {
+    const known = this.actorRefNames();
+    const missing = extractActorRefIds(entry).filter(id => !(id in known));
+    if (missing.length === 0) return;
+
+    forkJoin(missing.map(id => this.api.getUser(id).pipe(catchError(() => of(null)))))
+      .subscribe(results => {
+        const next = { ...this.actorRefNames() };
+        results.forEach((user, i) => { if (user) next[missing[i]] = user.fullName; });
+        this.actorRefNames.set(next);
+      });
   }
 
   openGroupModal(members: AuditEntryDto[]): void {
@@ -427,7 +448,7 @@ export class PayrollAuditAdminComponent implements OnInit {
 
   readonly activeDiff = computed<FieldDiff[]>(() => {
     const entry = this.activeEntry();
-    return entry ? computeFieldDiffs(entry) : [];
+    return entry ? computeFieldDiffs(entry, this.actorRefNames()) : [];
   });
 
   /** Pages de 5 lignes, comme les sections de /rh/admin. Le tri porte sur tout le journal,

@@ -148,13 +148,61 @@ export interface FieldDiff {
 
 const NO_VALUE = '—';
 
+/** A field ending in `_by` is this platform's actor-reference convention (`changed_by`,
+ *  `created_by`, `emitted_by`...) -- its value is a users_ref id, not something meant to be
+ *  read as a bare number. Same heuristic used in daf360-rh-frontend / daf360-facturation-frontend. */
+function isActorRefField(field: string): boolean {
+  return /_by$/i.test(field);
+}
+
+function toUserId(value: unknown): number | null {
+  if (typeof value !== 'number' && typeof value !== 'string') return null;
+  if (value === '') return null;
+  const id = Number(value);
+  return Number.isFinite(id) ? id : null;
+}
+
+/** Every users_ref id referenced by an `_by` field in this row's before/after JSON -- what the
+ *  caller needs to resolve before rendering the diff, collected once per distinct id. */
+export function extractActorRefIds(entry: Pick<AuditEntryDto, 'oldValue' | 'newValue'>): number[] {
+  const ids = new Set<number>();
+  for (const json of [entry.oldValue, entry.newValue]) {
+    const row = safeParse(json);
+    if (!row) continue;
+    for (const [field, value] of Object.entries(row)) {
+      if (!isActorRefField(field)) continue;
+      const id = toUserId(value);
+      if (id !== null) ids.add(id);
+    }
+  }
+  return [...ids];
+}
+
 function display(value: unknown): string {
   if (value === null || value === undefined) return NO_VALUE;
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
 }
 
-export function computeFieldDiffs(entry: Pick<AuditEntryDto, 'oldValue' | 'newValue'>): FieldDiff[] {
+/** `userNames` resolves an `_by` field's raw id to a person -- see `extractActorRefIds`. Missing
+ *  from the map (not yet resolved, or no such user) falls back to the bare id rather than
+ *  blocking the rest of the diff. */
+function displayField(field: string, value: unknown, present: boolean, userNames: Record<number, string>): string {
+  if (!present) return NO_VALUE;
+  if (isActorRefField(field)) {
+    const id = toUserId(value);
+    if (id !== null) {
+      const name = userNames[id];
+      return name ? `${name} (#${id})` : `#${id}`;
+    }
+  }
+  return display(value);
+}
+
+export function computeFieldDiffs(
+  entry: Pick<AuditEntryDto, 'oldValue' | 'newValue'>,
+  userNames: Record<number, string> = {},
+): FieldDiff[] {
   const before = safeParse(entry.oldValue) ?? {};
   const after = safeParse(entry.newValue) ?? {};
   const keys = Array.from(new Set([...Object.keys(before), ...Object.keys(after)])).sort();
@@ -163,8 +211,8 @@ export function computeFieldDiffs(entry: Pick<AuditEntryDto, 'oldValue' | 'newVa
     const a = after[field];
     return {
       field,
-      before: field in before ? display(b) : NO_VALUE,
-      after: field in after ? display(a) : NO_VALUE,
+      before: displayField(field, b, field in before, userNames),
+      after: displayField(field, a, field in after, userNames),
       changed: JSON.stringify(b) !== JSON.stringify(a),
     };
   });
