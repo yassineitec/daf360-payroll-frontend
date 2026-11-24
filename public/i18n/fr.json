@@ -1032,7 +1032,7 @@
       "TITLE": "Simulation salariale — cohorte ou employé",
       "BREADCRUMB": "Simulation cohorte",
       "SUBTITLE": "Simulez l'impact d'une révision salariale sur un groupe d'employés actifs. Vous voyez des totaux uniquement, et aucun montant pour un groupe de moins de 5 personnes.",
-      "SCOPE_TITLE": "Périmètre & modificateur",
+      "SCOPE_TITLE": "Périmètre",
       "PAYS": "Pays",
       "FILTERS_HINT": "Laissez un filtre sur « Tous » pour ne pas restreindre.",
       "GRADE_LABEL": "Grade",

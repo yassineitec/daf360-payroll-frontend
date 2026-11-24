@@ -1032,7 +1032,7 @@
       "TITLE": "Salary simulation — cohort or employee",
       "BREADCRUMB": "Cohort simulation",
       "SUBTITLE": "Simulate the impact of a salary review on a group of active employees. You see totals only, and no amount for a group of fewer than 5 people.",
-      "SCOPE_TITLE": "Scope & modifier",
+      "SCOPE_TITLE": "Scope",
       "PAYS": "Country",
       "FILTERS_HINT": "Leave a filter on “All” not to restrict.",
       "GRADE_LABEL": "Grade",
