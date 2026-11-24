@@ -291,18 +291,71 @@ export interface CohortFilterRequest {
   grade?: string | null;
   discipline?: string | null;
   contractType?: string | null;
-  entite?: string | null;
-  /** "PCT" or "ABSOLU" */
+  /** PERCENT (alias PCT) or AMOUNT (alias ABSOLU). */
   modifierType?: string;
   modifierValue?: number;
+  /** NET (default) or GROSS: the salary the change is applied to. */
+  salaryBase?: 'NET' | 'GROSS';
+  /** Per-employee rows — PAYROLL_VIEW_INDIVIDUAL only (403 otherwise). */
+  includeEmployees?: boolean;
 }
 
+export interface CohortMessage {
+  code: string;
+  level: 'INFO' | 'WARNING' | 'ERROR';
+  text: string;
+}
+
+export interface CohortFx {
+  currency: string | null;
+  eurRate: number | null;
+  eurSource: string | null;
+  chfRate: number | null;
+  chfSource: string | null;
+  syncedAt: string | null;
+}
+
+/** The five strata + charges of one payslip, as the engine returns them (unrounded). */
+export interface WhatIfFigures {
+  netInHand: number;
+  netTaxable: number;
+  gross: number;
+  grossWithBenefits: number;
+  loadedCost: number;
+  irppAmount: number;
+  employeeCharges: number;
+  employerCharges: number;
+  taxableBase: number;
+  convergenceOk: boolean;
+  iterationsUsed: number;
+}
+
+export interface EmployeeWhatIfRow {
+  profileUserId: number;
+  contractType: string | null;
+  grade: string | null;
+  discipline: string | null;
+  current: WhatIfFigures;
+  projected: WhatIfFigures;
+  deltaNet: number;
+  deltaGross: number;
+  deltaLoadedCost: number;
+  deltaLoadedCostPct: number | null;
+  nonConverged: boolean;
+  benefitsAssumed: boolean;
+  grossSource: 'CONFIG' | 'COMPUTED';
+  married: boolean | null;
+  children: number | null;
+}
+
+/** Amounts are null when hidden (group below k for an aggregate-only role), when no employee
+ *  converged, or when no trustworthy FX rate exists. */
 export interface CohortAggregateResponse {
   headcount: number;
-  currentMonthlyCost: number;
-  projectedMonthlyCost: number;
-  deltaMonthly: number;
-  deltaAnnual: number;
+  currentMonthlyCost: number | null;
+  projectedMonthlyCost: number | null;
+  deltaMonthly: number | null;
+  deltaAnnual: number | null;
   currentMonthlyCostEur: number | null;
   projectedMonthlyCostEur: number | null;
   currentMonthlyCostChf: number | null;
@@ -311,6 +364,60 @@ export interface CohortAggregateResponse {
   modifierType: string;
   modifierValue: number;
   appliedFilters: CohortFilterRequest;
+  visibility?: 'INDIVIDUAL' | 'AGGREGATE';
+  suppressed?: boolean;
+  minGroupSize?: number;
+  matched?: number;
+  excludedNoSalary?: number;
+  failed?: number;
+  nonConverged?: number;
+  benefitsAssumed?: number;
+  grossFromConfig?: number;
+  parameterSetId?: number | null;
+  parameterSetVersion?: number | null;
+  fiscalYear?: number | null;
+  asOf?: string;
+  fxSource?: string;
+  fx?: CohortFx;
+  changeType?: 'PERCENT' | 'AMOUNT';
+  salaryBase?: 'NET' | 'GROSS';
+  workingDays?: number;
+  avgNetBefore?: number | null;
+  avgNetAfter?: number | null;
+  avgGrossBefore?: number | null;
+  avgGrossAfter?: number | null;
+  deltaPct?: number | null;
+  messages?: CohortMessage[];
+  employees?: EmployeeWhatIfRow[] | null;
+}
+
+export interface EmployeeWhatIfRequest {
+  paysId: number;
+  profileUserId: number;
+  modifierType: 'PERCENT' | 'AMOUNT';
+  modifierValue: number;
+  salaryBase: 'NET' | 'GROSS';
+}
+
+export interface EmployeeWhatIfResponse {
+  employee: EmployeeWhatIfRow;
+  localCurrency: string | null;
+  changeType: 'PERCENT' | 'AMOUNT';
+  modifierValue: number;
+  salaryBase: 'NET' | 'GROSS';
+  parameterSetId: number | null;
+  parameterSetVersion: number | null;
+  fiscalYear: number | null;
+  workingDays: number;
+  asOf: string;
+  fxSource: string;
+  fx: CohortFx;
+  currentLoadedCostEur: number | null;
+  projectedLoadedCostEur: number | null;
+  currentLoadedCostChf: number | null;
+  projectedLoadedCostChf: number | null;
+  benefitCodes: string[];
+  messages: CohortMessage[];
 }
 
 export interface PayrollBudgetLineDto {
@@ -567,6 +674,10 @@ export class PayrollApiService {
 
   runCohortAggregate(req: CohortFilterRequest): Observable<CohortAggregateResponse> {
     return this.http.post<CohortAggregateResponse>(`${this.base}/simulations/cohort/aggregate`, req);
+  }
+
+  runEmployeeWhatIf(req: EmployeeWhatIfRequest): Observable<EmployeeWhatIfResponse> {
+    return this.http.post<EmployeeWhatIfResponse>(`${this.base}/simulations/cohort/what-if/employee`, req);
   }
 
   getCohortResults(cohortId: number): Observable<SimulationResultDto[]> {
