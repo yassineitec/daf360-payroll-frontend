@@ -13,18 +13,19 @@ Decisions: `docs/COHORT_DECISIONS.md`. Final report: `docs/COHORT_HARDENING_REPO
 The working copies `daf360-payroll-service` (feature/cost-rates-f04) and `daf360-payroll-frontend`
 (feature/audit-actor-names) are not touched.
 
-## Status
+## Status — all items done (2026-11-24)
 
 | Item | State | Commit(s) |
 |---|---|---|
 | Baseline backend tests | 185 run, 0 failures | — |
-| A1 country scoping | DONE (backend) | 51e3618 |
-| A3/A4 503 + 400 + unknown fields | DONE (backend) | 5626bd9 |
-| A6 FX resolution | DONE (backend) | 65a0dd6 |
-| A2/A3/A5 + B1/B2 service | DONE (backend), 231 tests green | ce81c4b |
-| Live localhost verification (backend on :8894) | in progress | — |
-| A7 + B3 UI | in progress | — |
-| Report + decisions | pending | — |
+| A1 country scoping | DONE | backend 51e3618 |
+| A3/A4 503 + 400 + unknown fields | DONE | backend 5626bd9, cf65b3d |
+| A6 FX resolution | DONE | backend 65a0dd6 |
+| A2/A3/A5 + B1/B2 service | DONE, 231 tests green | backend ce81c4b |
+| A7 + B3 UI | DONE, ng build 0 errors, Playwright checks green | frontend 1da2ee3, 44e8d40 |
+| Live localhost verification | DONE (backend :8894, HR-down instance :8895 stopped) | — |
+| Cleanup | DONE: cohort 10007 + 1 result deleted; counts 4 / 86 | — |
+| Decisions + report | DONE | this commit |
 
 ## How to resume
 
