@@ -25,7 +25,10 @@ The working copies `daf360-payroll-service` (feature/cost-rates-f04) and `daf360
 | A7 + B3 UI | DONE, ng build 0 errors, Playwright checks green | frontend 1da2ee3, 44e8d40 |
 | Live localhost verification | DONE (backend :8894, HR-down instance :8895 stopped) | — |
 | Cleanup | DONE: cohort 10007 + 1 result deleted; counts 4 / 86 | — |
-| Decisions + report | DONE | this commit |
+| Decisions + report | DONE | 36e651b |
+| Pre-merge regression (848 calls, branch vs origin/main), pages, HR candidate simulation | DONE — nothing legitimate blocked | `COHORT_PREMERGE_REPORT.md` |
+| Step 2: `benefitsNoneSelected` + `coverage` / `LOW_COVERAGE` | DONE, 243 tests green, Playwright green | backend 20d4701, frontend 0b77169 |
+| PR texts | DONE | `PR_feature-cohort-reactivate.md` (here), `PR_feature-cohort-hardening.md` (payroll-service) |
 
 ## How to resume
 
