@@ -5,7 +5,18 @@
   (itemClick)="onNavClick($event)">
   <!-- Bas de la barre latérale (ordinateur) : la devise d'affichage, puis « Aide & guides ».
        Dans l'emplacement de pied du rail (lib 5.13.0) : la liste défile au-dessus, pas dessous. -->
+  <!-- De haut en bas : le pays (lib 5.19.0 — sans trait propre, app-help-center trace le
+       sien), la devise, « Aide & guides ». Sur mobile, le globe reste dans la navbar du shell. -->
   <app-help-center dafSideNavFooter>
+    <daf-country-picker
+      [separator]="false"
+      [countries]="countryPicker.countries()"
+      [allCountriesLabel]="countryPicker.allCountriesLabel()"
+      [multiCountry]="countryPicker.multiCountry()"
+      [activeCountry]="countryPicker.activeCountry()"
+      [activeCountries]="countryPicker.activeCountries()"
+      (countryChange)="countryPicker.onCountryChange($event)"
+      (countriesChange)="countryPicker.onCountriesChange($event)" />
     <app-currency-switch />
   </app-help-center>
 </daf-side-nav>

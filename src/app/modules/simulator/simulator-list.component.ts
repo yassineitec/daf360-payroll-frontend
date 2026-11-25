@@ -44,7 +44,8 @@ import { TableSort, delegatedSort, tableTools, toTableSort } from '../../shared/
 import { PAYROLL_SIMULATOR_PERMISSIONS } from '../../core/payroll-nav';
 import { SimulatorListStateService } from './simulator-list-state.service';
 import { PageGuideComponent } from '../../shared/guide/page-guide.component';
-import type { GuideStep } from '../../shared/guide/page-guide.types';
+import type { GuideStep } from '../../shared/guide/page-guide.types';
+import { flagEntity, injectHeaderPays } from '../../core/header-pays';
 
 /** Guide de la page — `target` = un `data-guide` du gabarit. */
 const guideStep = (key: string, icon: string, target?: string): GuideStep => ({
@@ -125,7 +126,29 @@ export class SimulatorListComponent implements OnInit {
   readonly employeeCount  = signal<number | null>(null);
 
   readonly searchText     = signal('');
-  readonly paysFilter     = signal<number | null>(null);
+  /**
+   * L'entité de la liste — UNE seule : l'historique est cloisonné par pays côté serveur, et
+   * les tuiles font des moyennes de coût dans la devise de ce pays. Tirée des drapeaux de la
+   * barre (`flagEntity` : un drapeau → ce pays ; aucun → le pays de l'utilisateur ;
+   * plusieurs → le sien s'il est coché, sinon le premier coché). Le champ « Pays » du panneau
+   * est retiré. null = pas encore connu.
+   */
+  private readonly headerPays = injectHeaderPays();
+  readonly paysFilter     = computed<number | null>(() => flagEntity(
+    this.headerPays(),
+    this.userStore.currentUser()?.paysId ?? this.paysList()[0]?.id ?? null));
+  private loadedPays: number | null | undefined = undefined;
+  /** Changement de drapeaux : types de contrat et liste du nouveau pays (page 0). */
+  private readonly followPays = effect(() => {
+    const pays = this.paysFilter();
+    untracked(() => {
+      if (this.loadedPays === undefined || pays === this.loadedPays) return;
+      this.loadedPays = pays;
+      this.page.set(0);
+      this.loadContractTypes();
+      this.load();
+    });
+  });
   readonly contractFilter = signal<string | null>(null);
   readonly subjectFilter  = signal<string | null>(null);
   readonly modeFilter     = signal<string | null>(null);
@@ -180,7 +203,6 @@ export class SimulatorListComponent implements OnInit {
     const s = this.listState.restore();
     if (s) {
       this.searchText.set(s.searchText);
-      this.paysFilter.set(s.paysFilter);
       this.contractFilter.set(s.contractFilter);
       this.subjectFilter.set(s.subjectFilter);
       this.modeFilter.set(s.modeFilter);
@@ -189,10 +211,6 @@ export class SimulatorListComponent implements OnInit {
       this.page.set(s.page);
       this.pageSize.set(s.pageSize);
       this.viewMode.set(s.viewMode ?? 'grid');
-    } else {
-      // Pays de départ : celui de l'utilisateur — c'est aussi le seul que la plupart des
-      // rôles ont le droit de lire.
-      this.paysFilter.set(this.userStore.currentUser()?.paysId ?? null);
     }
 
     this.api.getFxRates()
@@ -203,8 +221,9 @@ export class SimulatorListComponent implements OnInit {
       .pipe(catchError(() => of([] as PaysDto[])))
       .subscribe(list => {
         this.paysList.set(list);
-        if (this.paysFilter() == null && list.length) {
-          this.paysFilter.set(list[0].id);
+        // Sans pays connu jusque-là, `paysFilter` retombe maintenant sur le premier de la liste.
+        if (this.loadedPays == null && this.paysFilter() != null) {
+          this.loadedPays = this.paysFilter();
           this.loadContractTypes();
           this.load();
         } else if (this.paysFilter() == null) {
@@ -212,6 +231,7 @@ export class SimulatorListComponent implements OnInit {
           this.firstLoad.set(false);
         }
       });
+    this.loadedPays = this.paysFilter();
     this.loadContractTypes();
     this.load();
   }
@@ -291,16 +311,6 @@ export class SimulatorListComponent implements OnInit {
 
   readonly filterFields = computed((): FilterField[] => [
     {
-      name: 'pays',
-      label: this.t('PAYROLL.SIMULATOR.LIST.FILTER.PAYS'),
-      type: 'select',
-      searchable: true,
-      options: this.paysList().map(p => ({
-        value: String(p.id),
-        label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})`,
-      })),
-    },
-    {
       name: 'contract',
       label: this.t('PAYROLL.SIMULATOR.LIST.FILTER.CONTRACT'),
       type: 'select',
@@ -345,7 +355,6 @@ export class SimulatorListComponent implements OnInit {
     resetLabel:   this.t('PAYROLL.SIMULATOR.LIST.FILTER.RESET'),
     triggerLabel: this.t('PAYROLL.SIMULATOR.LIST.FILTER.TRIGGER'),
     initialValues: {
-      pays:     this.paysFilter() != null ? [String(this.paysFilter())] : [],
       contract: this.contractFilter() ? [this.contractFilter()!] : [],
       subject:  this.subjectFilter() ? [this.subjectFilter()!] : [],
       mode:     this.modeFilter() ? [this.modeFilter()!] : [],
@@ -354,18 +363,11 @@ export class SimulatorListComponent implements OnInit {
   }));
 
   applyFilters(result: FilterResult): void {
-    const rawPays = result['pays'] as string | null;
-    // Le pays est obligatoire (l'historique est cloisonné par pays) : « Réinitialiser »
-    // ramène celui de l'utilisateur plutôt qu'une liste vide.
-    const nextPays = rawPays ? Number(rawPays) : (this.userStore.currentUser()?.paysId ?? this.paysFilter());
-    const paysChanged = nextPays !== this.paysFilter();
-    this.paysFilter.set(nextPays);
     this.contractFilter.set((result['contract'] as string | null) || null);
     this.subjectFilter.set((result['subject'] as string | null) || null);
     this.modeFilter.set((result['mode'] as string | null) || null);
     this.partialOnly.set(result['convergence'] === 'PARTIAL');
     this.page.set(0);
-    if (paysChanged) this.loadContractTypes();
     this.load();
   }
 

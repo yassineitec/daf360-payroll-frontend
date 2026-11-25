@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, TemplateRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { flagEntity, injectHeaderPays } from '../../core/header-pays';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormArray, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
@@ -324,11 +325,32 @@ export class ParameterSetsComponent implements OnInit {
     return pays ? this.paysNames.name(pays.id, pays.frenchLabel) : (user?.isoCode ?? '—');
   });
 
-  /** « Changer de pays » de l'accueil, comme /rh/admin : réservé aux administrateurs (qui
-   *  gèrent plusieurs pays), et seulement s'il y a plus d'un pays. */
+  /**
+   * Plus de « Changer de pays » sur l'accueil ni de champ « Pays » dans le filtre de la liste :
+   * l'entité administrée vient des drapeaux de la barre — UNE seule, même règle que
+   * /rh/admin (un drapeau → ce pays ; aucun → le pays de l'utilisateur ; plusieurs → le sien
+   * s'il est coché, sinon le premier coché). Les administrateurs seulement peuvent changer
+   * d'entité, comme avant ; les autres restent sur la leur.
+   */
   readonly canSwitchPays = computed(() =>
-    this.paysList().length > 1
-    && (this.userStore.isAdmin() || this.userStore.hasPermission('PAYROLL_SUPER_ADMIN')));
+    this.userStore.isAdmin() || this.userStore.hasPermission('PAYROLL_SUPER_ADMIN'));
+  private readonly headerPays = injectHeaderPays();
+  readonly flagPaysId = computed<number | null>(() => {
+    const own = this.userStore.currentUser()?.paysId ?? null;
+    return this.canSwitchPays() ? flagEntity(this.headerPays(), own) : own;
+  });
+  private flagsReady = false;
+  /** Entité des drapeaux au dernier passage — un lien `?pays=` n'est pas écrasé au démarrage. */
+  private lastFlagId: number | null = null;
+  /** Drapeaux changés : toute l'administration passe à la nouvelle entité. */
+  private readonly followFlags = effect(() => {
+    const id = this.flagPaysId();
+    untracked(() => {
+      if (!this.flagsReady || !id || id === this.lastFlagId) return;
+      this.lastFlagId = id;
+      this.onHomePays([String(id)]);
+    });
+  });
 
   /** Pays choisi sur l'accueil : il vaut pour toute l'administration (liste des règles,
    *  formulaire de création) et reste dans l'adresse (`?pays=`). */
@@ -392,7 +414,10 @@ export class ParameterSetsComponent implements OnInit {
       this.openSetId.set(set > 0 ? set : null);
     });
     const urlPays = Number(this.route.snapshot.queryParamMap.get('pays'));
-    const initialPays = urlPays > 0 ? urlPays : this.userStore.currentUser()?.paysId;
+    // `?pays=` d'un lien partagé (jeu ouvert) d'abord ; sinon l'entité des drapeaux.
+    const initialPays = urlPays > 0 ? urlPays : this.flagPaysId();
+    this.lastFlagId = this.flagPaysId();
+    this.flagsReady = true;
     if (initialPays) {
       this.setListPays(initialPays);
       this.load();
@@ -416,7 +441,8 @@ export class ParameterSetsComponent implements OnInit {
   });
   readonly guideSteps = computed<GuideStep[]>(() => {
     const tab = this.activeTab();
-    if (tab === null) return HOME_GUIDE.filter(s => s.target !== 'adm-home-pays' || this.canSwitchPays());
+    // Plus de sélecteur de pays sur l'accueil (drapeaux de la barre) : son étape est retirée.
+    if (tab === null) return HOME_GUIDE.filter(s => s.target !== 'adm-home-pays');
     if (tab === 'list') return this.detailSet() ? SET_GUIDE : RULES_GUIDE;
     if (tab === 'create') return CREATE_GUIDE;
     return SECTION_GUIDES[tab] ?? [];
@@ -606,13 +632,6 @@ export class ParameterSetsComponent implements OnInit {
    *  chargé côté serveur (un changement relance `load()`), le reste filtre la liste déjà
    *  en mémoire. */
   readonly filterFields = computed<FilterField[]>(() => [{
-    name: 'pays',
-    label: this.t('PAYROLL.PARAMETER_SETS.PAYS'),
-    type: 'select',
-    searchable: true,
-    placeholder: this.t('PAYROLL.SELECT.PAYS_PLACEHOLDER'),
-    options: this.payrollPaysOptions(),
-  }, {
     name: 'status',
     label: this.t('PAYROLL.PARAMETER_SETS.STATUS_FILTER_LABEL'),
     type: 'select',
@@ -648,7 +667,6 @@ export class ParameterSetsComponent implements OnInit {
     // `daf-filter` seeds `initialValues` once, in its own internal shape — a `select`
     // field is a `string[]` there (normalizes to a scalar only on `apply`).
     initialValues: {
-      pays:   this.listPaysId() ? [String(this.listPaysId())] : [],
       status: this.statusFilter() ? [this.statusFilter()] : [],
       fiscalYear: this.fiscalYearFilter() != null ? [String(this.fiscalYearFilter())] : [],
       approval:   this.approvalFilter() ? [this.approvalFilter()] : [],
@@ -662,13 +680,7 @@ export class ParameterSetsComponent implements OnInit {
     this.fiscalYearFilter.set(fiscalYear ? Number(fiscalYear) : null);
     this.approvalFilter.set((pickValue(result, 'approval') ?? '') as '' | 'HR' | 'FINANCE' | 'NONE');
     this.createdFilter.set(rangeSeed(result['created']));
-    const raw = result['pays'] as string | null;
-    const paysId = raw ? Number(raw) : null;
-    if (paysId !== this.listPaysId()) {
-      this.setListPays(paysId);
-      this.selected.set(null);
-      this.load();
-    }
+    // Pays : plus dans le panneau — ce sont les drapeaux de la barre (`followFlags`).
   }
 
   /** Message de la liste vide : pas encore de pays, chargement, pays sans jeu, ou filtre. */

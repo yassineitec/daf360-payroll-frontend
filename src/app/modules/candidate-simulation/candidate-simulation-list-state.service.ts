@@ -6,7 +6,8 @@ import { TableSort } from '../../shared/table-tools';
 
 /** La liste `/payroll/candidate-simulation` telle que l'utilisateur l'a laissée. */
 export interface CandidateSimulationListState {
-  paysId:         number | null;
+  /** Drapeaux au moment de l'ouverture d'une fiche — plus restauré (ils viennent de la barre). */
+  paysId:         number | string | null;
   searchText:     string;
   statusFilter:   string;
   positionFilter: string | null;

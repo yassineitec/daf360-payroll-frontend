@@ -27,7 +27,8 @@ import { dayRange, distinctSorted, inDayRange, pickValue, rangeSeed } from '../.
 import { searchTableRows, tableTools } from '../../shared/table-tools';
 import { MONTH_KEYS, PayslipHistoryEntry, PayslipHistoryStore, batchCounts, periodKey } from './payslip-history';
 import { PageGuideComponent } from '../../shared/guide/page-guide.component';
-import type { GuideStep } from '../../shared/guide/page-guide.types';
+import type { GuideStep } from '../../shared/guide/page-guide.types';
+import { inHeaderPays, injectHeaderPays } from '../../core/header-pays';
 
 /** Guide de la page — `target` = un `data-guide` du gabarit. */
 const guideStep = (page: string, key: string, icon: string, target?: string): GuideStep => ({
@@ -168,7 +169,11 @@ export class PayslipListComponent {
   // ── Recherche, filtres, vue ────────────────────────────────────────────────
   readonly search          = signal('');
   readonly statusFilter    = signal<StatusFilter>('ALL');
-  readonly paysFilter      = signal<number | null>(null);
+  /**
+   * Les drapeaux de la barre (`179,53`) ; undefined = « Tous les pays ». Le champ « Pays »
+   * du panneau est retiré : les lots sont filtrés ici, sur tous les pays cochés.
+   */
+  readonly paysFilter      = injectHeaderPays();
   /** Période au format `YYYY-MM`. */
   readonly periodFilter    = signal<string | null>(null);
   /** Plage « Date de traitement » telle qu'émise par le panneau (`Date[]`). */
@@ -186,7 +191,6 @@ export class PayslipListComponent {
 
   readonly filterFields = computed<FilterField[]>(() => {
     const history = this.history();
-    const pays = new Map(history.map(h => [h.paysId, this.paysName(h)]));
     const periods = distinctSorted(history.map(h => periodKey(h.periodYear, h.periodMonth))).reverse();
     return [{
       name: 'status',
@@ -197,15 +201,6 @@ export class PayslipListComponent {
         { value: 'SUCCESS', label: this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_SUCCESS') },
         { value: 'PARTIAL', label: this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_PARTIAL') },
       ],
-    }, {
-      name: 'pays',
-      label: this.t('PAYROLL.PAYSLIPS.HISTORY.PAYS'),
-      type: 'select',
-      searchable: true,
-      placeholder: this.t('PAYROLL.PAYSLIPS.HISTORY.FILTER_ALL_PAYS'),
-      options: [...pays.entries()]
-        .sort((a, b) => a[1].localeCompare(b[1]))
-        .map(([id, label]) => ({ value: String(id), label })),
     }, {
       name: 'period',
       label: this.t('PAYROLL.PAYSLIPS.HISTORY.PERIOD'),
@@ -231,7 +226,6 @@ export class PayslipListComponent {
     align:        'right',
     initialValues: {
       status:      this.statusFilter() === 'ALL' ? [] : [this.statusFilter()],
-      pays:        this.paysFilter() != null ? [String(this.paysFilter())] : [],
       period:      this.periodFilter() ? [this.periodFilter()!] : [],
       processedAt: this.processedFilter(),
     },
@@ -239,15 +233,12 @@ export class PayslipListComponent {
 
   applyFilters(result: FilterResult): void {
     this.statusFilter.set(((result['status'] as string | null) || 'ALL') as StatusFilter);
-    const pays = pickValue(result, 'pays');
-    this.paysFilter.set(pays ? Number(pays) : null);
     this.periodFilter.set(pickValue(result, 'period'));
     this.processedFilter.set(rangeSeed(result['processedAt']));
   }
 
   resetFilters(): void {
     this.statusFilter.set('ALL');
-    this.paysFilter.set(null);
     this.periodFilter.set(null);
     this.processedFilter.set(null);
   }
@@ -261,7 +252,7 @@ export class PayslipListComponent {
     return this.history().filter(h => {
       const ok = batchCounts(h.result).toFix === 0;
       return (status === 'ALL' || (status === 'SUCCESS') === ok)
-        && (pays == null || h.paysId === pays)
+        && inHeaderPays(pays, h.paysId)
         && (!period || periodKey(h.periodYear, h.periodMonth) === period)
         && inDayRange(h.processedAt, processed);
     });

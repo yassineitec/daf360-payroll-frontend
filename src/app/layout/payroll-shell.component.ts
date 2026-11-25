@@ -6,7 +6,8 @@ import { Router, NavigationEnd, RouterOutlet, ActivatedRoute } from '@angular/ro
 import { filter, map } from 'rxjs';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslateService } from '@ngx-translate/core';
-import { RadialMenuComponent, SideNavComponent } from '@khalilrebhiitec/daf360';
+import { CountryPickerComponent, RadialMenuComponent, SideNavComponent } from '@khalilrebhiitec/daf360';
+import { CountryPickerService } from '../core/country-picker.service';
 import { HelpCenterComponent } from '../shared/guide/help-center.component';
 import { GuideHintComponent } from '../shared/guide/guide-hint.component';
 import { HelpChatComponent } from '../shared/guide/help-chat.component';
@@ -22,7 +23,7 @@ import { CurrencySwitchComponent } from './currency-switch.component';
   selector: 'app-payroll-shell',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, SideNavComponent, RadialMenuComponent, HelpCenterComponent, GuideHintComponent, HelpChatComponent, CurrencySwitchComponent],
+  imports: [RouterOutlet, SideNavComponent, CountryPickerComponent, RadialMenuComponent, HelpCenterComponent, GuideHintComponent, HelpChatComponent, CurrencySwitchComponent],
   templateUrl: './payroll-shell.component.html',
   styleUrl: './payroll-shell.component.scss',
 })
@@ -34,6 +35,8 @@ export class PayrollShellComponent implements OnInit {
   private readonly injector     = inject(Injector);
   private readonly cdr          = inject(ChangeDetectorRef);
   private readonly translate    = inject(TranslateService);
+  /** Sélecteur de pays du bas de la barre latérale (lib 5.19.0) — chargé dès l'ouverture. */
+  readonly countryPicker = (() => { const s = inject(CountryPickerService); s.load(); return s; })();
   private readonly currencySvc  = inject(CurrencyService);
 
   ngOnInit(): void {
