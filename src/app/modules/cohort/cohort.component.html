@@ -22,8 +22,7 @@
           <daf-select
             [options]="paysOptions()"
             [selected]="paysId() ? ['' + paysId()] : []"
-            [config]="{ label: 'PAYROLL.COHORT.PAYS' | translate, placeholder: 'PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate, searchable: true, fullWidth: true, required: true }"
-            (selectedChange)="paysId.set($event[0] ? +$event[0] : null)">
+            [config]="{ label: 'PAYROLL.COHORT.PAYS' | translate, placeholder: 'PAYROLL.SELECT.PAYS_PLACEHOLDER' | translate, fullWidth: true, required: true, disabled: true }">
           </daf-select>
         </div>
 

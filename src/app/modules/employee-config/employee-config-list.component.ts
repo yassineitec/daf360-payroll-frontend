@@ -36,6 +36,7 @@ import { EmployeeConfigListStateService } from './employee-config-list-state.ser
 import { EmployeeConfigService } from './employee-config.service';
 import { PageGuideComponent } from '../../shared/guide/page-guide.component';
 import type { GuideStep } from '../../shared/guide/page-guide.types';
+import { injectHeaderPays } from '../../core/header-pays';
 
 /** Guide de la page — `target` = un `data-guide` du gabarit. */
 const guideStep = (key: string, icon: string, target?: string): GuideStep => ({
@@ -112,7 +113,31 @@ export class EmployeeConfigListComponent implements OnInit {
   readonly error         = signal<string | null>(null);
 
   readonly searchText = signal('');
-  readonly paysFilter = signal<number | null>(null);
+  /**
+   * Les drapeaux de la barre (`179,53`) ; null = « Tous les pays » (le service RH applique
+   * alors le périmètre du rôle). Le champ « Pays » du panneau est retiré.
+   */
+  private readonly headerPays = injectHeaderPays();
+  readonly paysFilter = computed<string | null>(() => this.headerPays() ?? null);
+  private loadedPays: string | null | undefined = undefined;
+  /**
+   * Changement de drapeaux : types de contrat des nouveaux pays (un contrat choisi qui n'y
+   * existe plus est retiré du filtre), puis liste (page 0) et KPI rechargés.
+   */
+  private readonly followPays = effect(() => {
+    const pays = this.paysFilter();
+    untracked(() => {
+      if (this.loadedPays === undefined || pays === this.loadedPays) return;
+      this.loadedPays = pays;
+      this.loadContractTypes(() => {
+        const wanted = EmployeeConfigListComponent.normContract(this.contractFilter());
+        if (wanted && !this.contractOptions().some(o => o.value === wanted)) this.contractFilter.set(null);
+      });
+      this.page.set(0);
+      this.load();
+      this.loadKpis();
+    });
+  });
   readonly statusFilter     = signal<string | null>(null);
   readonly departmentFilter = signal<string | null>(null);
   readonly contractFilter   = signal<string | null>(null);
@@ -136,7 +161,6 @@ export class EmployeeConfigListComponent implements OnInit {
   private readonly persistState = effect(() => {
     this.listState.save({
       searchText:       this.searchText(),
-      paysFilter:       this.paysFilter(),
       statusFilter:     this.statusFilter(),
       departmentFilter: this.departmentFilter(),
       contractFilter:   this.contractFilter(),
@@ -155,7 +179,6 @@ export class EmployeeConfigListComponent implements OnInit {
     const s = this.listState.restore();
     if (!s) return;
     this.searchText.set(s.searchText);
-    this.paysFilter.set(s.paysFilter);
     this.statusFilter.set(s.statusFilter);
     this.departmentFilter.set(s.departmentFilter);
     this.contractFilter.set(s.contractFilter);
@@ -167,6 +190,7 @@ export class EmployeeConfigListComponent implements OnInit {
 
   ngOnInit(): void {
     this.restoreState();
+    this.loadedPays = this.paysFilter();
     this.payrollApi.listPayrollPays()
       .pipe(catchError(() => of([] as PaysDto[])))
       // Types de contrat après les pays : sans pays filtré, on fusionne ceux de chaque pays.
@@ -187,12 +211,16 @@ export class EmployeeConfigListComponent implements OnInit {
   /** `afterLoad` : appelé une fois la liste reçue (voir `applyFilters`). */
   private loadContractTypes(afterLoad?: () => void): void {
     const current = ++this.contractTypesSeq;
-    const pays = this.paysFilter();
+    // Un seul drapeau : les types de ce pays. Plusieurs : globales + celles de chaque pays
+    // coché. Aucun : globales + celles de chaque pays de paie.
+    const ids = (this.paysFilter() ?? '').split(',').map(Number).filter(id => Number.isInteger(id) && id > 0);
+    const single = ids.length === 1 ? ids[0] : null;
     const fetch = (id: number | null) => this.hrService.getContractTypes(id)
-      .pipe(map(list => list.map(t => ({ ...t, paysId: pays != null ? null : id }))));
-    const source = pays != null
-      ? fetch(pays)
-      : forkJoin([fetch(null), ...this.paysList().map(p => fetch(p.id))]).pipe(map(lists => lists.flat()));
+      .pipe(map(list => list.map(t => ({ ...t, paysId: single != null ? null : id }))));
+    const many = ids.length ? ids : this.paysList().map(p => p.id);
+    const source = single != null
+      ? fetch(single)
+      : forkJoin([fetch(null), ...many.map(id => fetch(id))]).pipe(map(lists => lists.flat()));
     source.subscribe(list => {
       if (current !== this.contractTypesSeq) return;
       this.contractTypes.set(list);
@@ -418,13 +446,6 @@ export class EmployeeConfigListComponent implements OnInit {
   ]);
 
   readonly filterFields = computed<FilterField[]>(() => [{
-    name: 'pays',
-    label: this.t('PAYROLL.ENGINE_RESULTS.FILTER_PAYS'),
-    type: 'select',
-    searchable: true,
-    placeholder: this.t('PAYROLL.ENGINE_RESULTS.FILTER_ALL'),
-    options: this.paysList().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})` })),
-  }, {
     name: 'status',
     label: this.t('PAYROLL.ENGINE_RESULTS.FILTER_STATUS'),
     type: 'select',
@@ -477,7 +498,6 @@ export class EmployeeConfigListComponent implements OnInit {
     resetLabel: this.t('PAYROLL.ENGINE_RESULTS.FILTER_RESET'),
     triggerLabel: this.t('PAYROLL.ENGINE_RESULTS.FILTER_TRIGGER'),
     initialValues: {
-      pays:       this.paysFilter() != null ? [String(this.paysFilter())] : [],
       status:     this.statusFilter() ? [this.statusFilter()!] : [],
       department: this.departmentFilter() ? [this.departmentFilter()!] : [],
       contract:   this.contractFilter() ? [EmployeeConfigListComponent.normContract(this.contractFilter())!] : [],
@@ -485,20 +505,7 @@ export class EmployeeConfigListComponent implements OnInit {
   }));
 
   applyFilters(result: FilterResult): void {
-    const raw = result['pays'] as string | null;
-    const paysChanged = (raw ? Number(raw) : null) !== this.paysFilter();
-    this.paysFilter.set(raw ? Number(raw) : null);
-    // Les types de contrat dépendent du pays (valeurs globales + celles du pays). Un contrat
-    // choisi qui n'existe pas dans le nouveau pays est retiré du filtre, puis la liste rechargée.
-    if (paysChanged) this.loadContractTypes(() => {
-      const wanted = EmployeeConfigListComponent.normContract(this.contractFilter());
-      if (wanted && !this.contractOptions().some(o => o.value === wanted)) {
-        this.contractFilter.set(null);
-        this.page.set(0);
-        this.load();
-        this.loadKpis();
-      }
-    });
+    // Pays : plus dans le panneau — ce sont les drapeaux de la barre (`followPays`).
     this.statusFilter.set((result['status'] as string | null) || null);
     this.departmentFilter.set((result['department'] as string | null) || null);
     this.contractFilter.set((result['contract'] as string | null) || null);
@@ -634,7 +641,11 @@ export class EmployeeConfigListComponent implements OnInit {
         id: e.userId,
         options: {
           clickable: true,
-          image: { initials: this.initials(e.fullName) },
+          // Photo RH quand le profil en a une (la lib la préfère aux initiales), initiales sinon.
+          image: {
+            initials: this.initials(e.fullName),
+            ...(this.hrService.photoSrc(e.photoUrl) ? { avatar: this.hrService.photoSrc(e.photoUrl)! } : {}),
+          },
           metadata: {
             title: e.fullName,
             ...(e.lifecycleStatus

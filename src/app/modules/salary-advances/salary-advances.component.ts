@@ -22,7 +22,8 @@ import { tableTools } from '../../shared/table-tools';
 import { PaysNamesService } from '../../core/pays-names.service';
 import { UserStore } from '../../core/user.store';
 import { PageGuideComponent } from '../../shared/guide/page-guide.component';
-import type { GuideStep } from '../../shared/guide/page-guide.types';
+import type { GuideStep } from '../../shared/guide/page-guide.types';
+import { inHeaderPays, injectHeaderPays } from '../../core/header-pays';
 
 type TabKey = 'payout' | 'deductions' | 'followup';
 
@@ -96,9 +97,18 @@ export class SalaryAdvancesComponent implements OnInit {
   private deductionsSub?: Subscription;
 
   // ── Data ─────────────────────────────────────────────────────────────────
-  readonly toPay      = signal<SalaryAdvance[]>([]);
-  readonly all        = signal<SalaryAdvance[]>([]);
-  readonly deductions = signal<DeductionRow[]>([]);
+  /**
+   * Les drapeaux de la barre (`179,53`) ; undefined = « Tous les pays ». Les trois listes
+   * (et donc leurs KPI) ne gardent que les pays cochés — le champ « Pays » des panneaux est
+   * retiré. payroll-service borne déjà au périmètre du rôle, sans prendre de pays.
+   */
+  private readonly headerPays = injectHeaderPays();
+  private readonly toPayRaw      = signal<SalaryAdvance[]>([]);
+  private readonly allRaw        = signal<SalaryAdvance[]>([]);
+  private readonly deductionsRaw = signal<DeductionRow[]>([]);
+  readonly toPay      = computed(() => this.toPayRaw().filter(a => inHeaderPays(this.headerPays(), a.paysId)));
+  readonly all        = computed(() => this.allRaw().filter(a => inHeaderPays(this.headerPays(), a.paysId)));
+  readonly deductions = computed(() => this.deductionsRaw().filter(r => inHeaderPays(this.headerPays(), r.paysId)));
   readonly pays       = signal<PaysDto[]>([]);
 
   readonly firstLoad          = signal(true);
@@ -151,10 +161,10 @@ export class SalaryAdvancesComponent implements OnInit {
     if (!this.firstLoad()) this.loading.set(true);
     this.error.set(null);
     this.svc.toDisburse().subscribe({
-      next: list => { this.toPay.set(list); this.loading.set(false); this.firstLoad.set(false); },
+      next: list => { this.toPayRaw.set(list); this.loading.set(false); this.firstLoad.set(false); },
       error: err => { this.error.set(this.message(err)); this.loading.set(false); this.firstLoad.set(false); },
     });
-    this.svc.list().pipe(catchError(() => of([] as SalaryAdvance[]))).subscribe(list => this.all.set(list));
+    this.svc.list().pipe(catchError(() => of([] as SalaryAdvance[]))).subscribe(list => this.allRaw.set(list));
   }
 
   /** Only the latest month's response may land: switching months fast must not show an older one. */
@@ -162,8 +172,8 @@ export class SalaryAdvancesComponent implements OnInit {
     this.deductionsSub?.unsubscribe();
     this.deductionsLoading.set(true);
     this.deductionsSub = this.svc.deductions(month).subscribe({
-      next: rows => { this.deductions.set(rows); this.deductionsLoading.set(false); },
-      error: err => { this.deductions.set([]); this.deductionsLoading.set(false); this.error.set(this.message(err)); },
+      next: rows => { this.deductionsRaw.set(rows); this.deductionsLoading.set(false); },
+      error: err => { this.deductionsRaw.set([]); this.deductionsLoading.set(false); this.error.set(this.message(err)); },
     });
   }
 
@@ -234,10 +244,6 @@ export class SalaryAdvancesComponent implements OnInit {
     this.translate.currentLang();
     const t = (k: string) => this.translate.instant(k);
     const all = t('PAYROLL.SALARY_ADVANCES.FILTER.ALL');
-    const pays = (ids: number[]): FilterField => ({
-      name: 'pays', label: t('PAYROLL.SALARY_ADVANCES.FILTER.PAYS'), type: 'select', searchable: true, placeholder: all,
-      options: distinct(ids).map(id => ({ value: String(id), label: this.paysName(id) })),
-    });
     const currency = (codes: string[]): FilterField => ({
       name: 'currency', label: t('PAYROLL.SALARY_ADVANCES.FILTER.CURRENCY'), type: 'select', placeholder: all,
       options: distinct(codes).map(c => ({ value: c, label: c })),
@@ -266,7 +272,6 @@ export class SalaryAdvancesComponent implements OnInit {
     const deductions = this.deductions();
     return {
       payout: [
-        pays(toPay.map(a => a.paysId)),
         currency(toPay.map(a => a.currency)),
         {
           name: 'firstMonth', label: t('PAYROLL.SALARY_ADVANCES.FILTER.FIRST_MONTH'), type: 'select', placeholder: all,
@@ -279,7 +284,6 @@ export class SalaryAdvancesComponent implements OnInit {
       ],
       deductions: [
         status(INSTALLMENT_STATUSES, 'INSTALLMENT'),
-        pays(deductions.map(r => r.paysId)),
         currency(deductions.map(r => r.currency)),
         { name: 'noMatricule', label: t('PAYROLL.SALARY_ADVANCES.FILTER.NO_MATRICULE'), type: 'checkbox' },
         names('employee', 'PAYROLL.SALARY_ADVANCES.COL.EMPLOYEE', deductions.map(r => r.employeeName)),
@@ -288,7 +292,6 @@ export class SalaryAdvancesComponent implements OnInit {
       ],
       followup: [
         status(ADVANCE_STATUSES, 'STATUS'),
-        pays(advances.map(a => a.paysId)),
         currency(advances.map(a => a.currency)),
         { name: 'disbursed', label: t('PAYROLL.SALARY_ADVANCES.FILTER.DISBURSED'), type: 'daterange' },
         {
@@ -401,7 +404,6 @@ export class SalaryAdvancesComponent implements OnInit {
   readonly payoutColumns = computed<TableColumn[]>(() => { this.translate.currentLang(); return this.advanceColumns(); });
   readonly payoutRows = computed<TableRow[]>(() => {
     this.translate.currentLang();
-    const pays = this.pick('payout', 'pays');
     const currency = this.pick('payout', 'currency');
     const firstMonth = this.pick('payout', 'firstMonth');
     const [from, to] = this.range('payout', 'approved');
@@ -410,7 +412,6 @@ export class SalaryAdvancesComponent implements OnInit {
     const [reqFrom, reqTo] = this.range('payout', 'requested');
     return this.toPay()
       .filter(a => this.matches(a.employeeName)
-        && (!pays || String(a.paysId) === pays)
         && (!currency || a.currency === currency)
         && (!firstMonth || a.firstDeductionMonth.startsWith(firstMonth))
         && inRange(a.financeDecidedAt, from, to)
@@ -423,7 +424,6 @@ export class SalaryAdvancesComponent implements OnInit {
   readonly followupRows = computed<TableRow[]>(() => {
     this.translate.currentLang();
     const status = this.pick('followup', 'status');
-    const pays = this.pick('followup', 'pays');
     const currency = this.pick('followup', 'currency');
     const [from, to] = this.range('followup', 'disbursed');
     const method = this.pick('followup', 'method');
@@ -432,7 +432,6 @@ export class SalaryAdvancesComponent implements OnInit {
     return this.all()
       .filter(a => this.matches(a.employeeName)
         && (!status || a.status === status)
-        && (!pays || String(a.paysId) === pays)
         && (!currency || a.currency === currency)
         && inRange(a.disbursedOn, from, to)
         && (!method || a.disbursementMethod === method)
@@ -463,7 +462,6 @@ export class SalaryAdvancesComponent implements OnInit {
     const t = (k: string, p?: object) => this.translate.instant(k, p);
     const q = this.search().trim().toLowerCase();
     const status = this.pick('deductions', 'status');
-    const pays = this.pick('deductions', 'pays');
     const currency = this.pick('deductions', 'currency');
     const noMatricule = this.filters().deductions['noMatricule'] === true;
     const employee = this.pick('deductions', 'employee');
@@ -472,7 +470,6 @@ export class SalaryAdvancesComponent implements OnInit {
     return this.deductions()
       .filter(r => (!q || (r.employeeName ?? '').toLowerCase().includes(q) || (r.payrollMatricule ?? '').toLowerCase().includes(q))
         && (!status || r.status === status)
-        && (!pays || String(r.paysId) === pays)
         && (!currency || r.currency === currency)
         && (!noMatricule || !r.payrollMatricule)
         && (!employee || r.employeeName === employee)

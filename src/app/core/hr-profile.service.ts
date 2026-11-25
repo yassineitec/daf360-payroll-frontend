@@ -24,6 +24,8 @@ export interface EmployeeListItem {
   contractType: string | null;
   department: string | null;
   lifecycleStatus: string | null;
+  /** Relatif (`/api/hr/profiles/{id}/photo`) — à passer par `HrProfileService.photoSrc()`. */
+  photoUrl?: string | null;
 }
 
 /** `FilterOptionsDto` de daf360-rh-service. */
@@ -82,14 +84,15 @@ export class HrProfileService {
   /** Paginated variant for the `/payroll/engine-results` directory — same endpoint, but
    *  the caller drives `page` (0-indexed) instead of always reading the first page. */
   listEmployees(opts: {
-    search?: string; paysId?: number | null; status?: string;
+    /** Un pays, ou plusieurs (`179,53`, drapeaux de la barre) — envoyé en `pays`. */
+    search?: string; paysId?: number | string | null; status?: string;
     department?: string | null; contract?: string | null; page: number; size: number;
     /** `colonne,asc|desc` — colonnes admises par le service RH (EmployeeProfileService.EMPLOYEE_SORT_COLUMNS). */
     sort?: string | null;
   }): Observable<EmployeePage> {
     let params = new HttpParams().set('size', opts.size).set('page', opts.page);
     if (opts.search?.trim()) params = params.set('search', opts.search.trim());
-    if (opts.paysId != null) params = params.set('pays', opts.paysId);
+    if (opts.paysId != null && opts.paysId !== '') params = params.set('pays', String(opts.paysId));
     // Sans `status`, le service RH ne renvoie que les collaborateurs en poste
     // (ACTIVE / ON_LEAVE / ON_MISSION, ou sans fiche) ; avec, uniquement ce statut.
     if (opts.status) params = params.set('status', opts.status);
