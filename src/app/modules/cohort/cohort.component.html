@@ -188,6 +188,31 @@
               <p class="text-base font-semibold text-on-surface m-0">{{ 'PAYROLL.COHORT.NO_TOTAL_TITLE' | translate }}</p>
             </div>
           } @else {
+            <!-- Couverture : toujours affichée à côté des KPI ; bannière + chiffres atténués si faible -->
+            <div class="flex items-center gap-2 text-sm text-on-surface-variant" data-testid="coverage">
+              <span class="material-symbols-outlined text-base">groups</span>
+              <span>{{ 'PAYROLL.COHORT.COVERAGE_LINE' | translate: { included: r.headcount, matched: r.matched } }}</span>
+            </div>
+            @if (lowCoverage()) {
+              <div class="rounded-xl border-2 border-warning bg-warning/10 px-4 py-3 flex flex-col gap-2" role="alert" data-testid="low-coverage-banner">
+                <div class="flex items-start gap-2">
+                  <span class="material-symbols-outlined text-warning">warning</span>
+                  <div class="flex flex-col gap-1">
+                    <p class="text-sm font-semibold text-on-surface m-0">{{ 'PAYROLL.COHORT.LOW_COVERAGE_TITLE' | translate: { included: r.headcount, matched: r.matched } }}</p>
+                    <p class="text-sm text-on-surface-variant m-0">{{ 'PAYROLL.COHORT.LOW_COVERAGE_HINT' | translate }}</p>
+                  </div>
+                </div>
+                <div data-testid="coverage-ack">
+                  <daf-checkbox [options]="{ label: ('PAYROLL.COHORT.LOW_COVERAGE_ACK' | translate) }"
+                                [checked]="coverageAck()" (checkedChange)="coverageAck.set($event)" />
+                </div>
+              </div>
+            }
+
+            <div class="flex flex-col gap-6 transition-opacity" data-testid="figures"
+                 [class.opacity-25]="figuresDimmed()" [class.pointer-events-none]="figuresDimmed()"
+                 [class.select-none]="figuresDimmed()" [attr.aria-hidden]="figuresDimmed() || null"
+                 [attr.data-dimmed]="figuresDimmed()">
             <!-- KPI -->
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" data-testid="kpis">
               <daf-metric-card [label]="'PAYROLL.COHORT.METRIC_CURRENT' | translate"
@@ -245,6 +270,7 @@
                   }
                 </div>
               </div>
+            </div>
             </div>
           }
 

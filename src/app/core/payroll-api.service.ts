@@ -343,6 +343,8 @@ export interface EmployeeWhatIfRow {
   deltaLoadedCostPct: number | null;
   nonConverged: boolean;
   benefitsAssumed: boolean;
+  /** Has a payroll configuration whose benefit list is NULL or empty (computed without benefit). */
+  benefitsNoneSelected?: boolean;
   grossSource: 'CONFIG' | 'COMPUTED';
   married: boolean | null;
   children: number | null;
@@ -373,6 +375,12 @@ export interface CohortAggregateResponse {
   nonConverged?: number;
   benefitsAssumed?: number;
   grossFromConfig?: number;
+  /** Employees with a configuration selecting no benefit at all (NULL or empty list). */
+  benefitsNoneSelected?: number;
+  /** headcount ÷ matched, 0–1; null when nothing matched. */
+  coverage?: number | null;
+  /** app.cohort.min-coverage — below it the server adds LOW_COVERAGE. */
+  minCoverage?: number;
   parameterSetId?: number | null;
   parameterSetVersion?: number | null;
   fiscalYear?: number | null;

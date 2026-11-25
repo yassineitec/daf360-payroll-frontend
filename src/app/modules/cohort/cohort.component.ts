@@ -18,6 +18,7 @@ import { tableTools } from '../../shared/table-tools';
 import {
   ButtonComponent,
   CardComponent,
+  CheckboxComponent,
   DataTableComponent,
   FormFieldComponent,
   MetricCardComponent,
@@ -57,7 +58,7 @@ interface StratumLine { key: string; label: string; current: number; projected: 
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, TranslatePipe,
-    ButtonComponent, CardComponent, DataTableComponent, FormFieldComponent, MetricCardComponent,
+    ButtonComponent, CardComponent, CheckboxComponent, DataTableComponent, FormFieldComponent, MetricCardComponent,
     PageComponent, PageHeaderComponent, RadioGroupComponent, SelectComponent,
   ],
   templateUrl: './cohort.component.html',
@@ -99,6 +100,17 @@ export class CohortComponent implements OnInit {
   readonly error    = signal<string | null>(null);
   readonly result   = signal<CohortAggregateResponse | null>(null);
   readonly employeeResult = signal<EmployeeWhatIfResponse | null>(null);
+
+  // ── Coverage (pre-merge 2b): figures dimmed until acknowledged when coverage is low ──
+  /** Client-side only: ticking it changes nothing in the totals, it only un-dims them. */
+  readonly coverageAck = signal(false);
+  readonly lowCoverage = computed(() => {
+    const r = this.result();
+    if (!r) return false;
+    if ((r.messages ?? []).some(m => m.code === 'LOW_COVERAGE')) return true;
+    return r.coverage != null && r.minCoverage != null && r.coverage < r.minCoverage;
+  });
+  readonly figuresDimmed = computed(() => this.lowCoverage() && !this.coverageAck());
 
   // ── Scope ─────────────────────────────────────────────────────────────────
   private readonly paysList = signal<PaysDto[]>([]);
@@ -260,7 +272,7 @@ export class CohortComponent implements OnInit {
       modifierValue: this.changeValue(),
       salaryBase:   this.salaryBase(),
       includeEmployees: this.canSeeIndividuals(),
-    }).subscribe({ next: r => { this.result.set(r); this.loading.set(false); }, error: fail });
+    }).subscribe({ next: r => { this.coverageAck.set(false); this.result.set(r); this.loading.set(false); }, error: fail });
   }
 
   // ── Display helpers (DEC14: the API is unrounded, the screen rounds) ─────
@@ -304,7 +316,14 @@ export class CohortComponent implements OnInit {
     const params = 'headcount' in r ? {
       excluded: r.excludedNoSalary, failed: r.failed, nonConverged: r.nonConverged,
       assumed: r.benefitsAssumed, headcount: r.headcount, k: r.minGroupSize,
+      noneSelected: r.benefitsNoneSelected, matched: r.matched,
+      pct: r.coverage != null ? this.fmt(r.coverage * 100, 0) : '',
+      min: r.minCoverage != null ? this.fmt(r.minCoverage * 100, 0) : '',
     } : {};
+    if (!('headcount' in r)) {
+      const one = this.t(`${key}_ONE`);
+      if (one !== `${key}_ONE`) return one;
+    }
     const txt = this.t(key, params);
     return txt === key ? m.text : txt;
   }
