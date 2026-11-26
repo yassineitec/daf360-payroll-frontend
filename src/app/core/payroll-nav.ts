@@ -12,6 +12,12 @@ export interface PayrollNavDef {
   id:    string;
   /** i18n key under PAYROLL.layout.NAV.*, resolved in the shell — never a literal label. */
   labelKey: string;
+  /**
+   * Nom complet, pour les endroits où l'entrée s'affiche HORS de son groupe (cartes de
+   * l'accueil). Utile quand `labelKey` est raccourci parce que le groupe le complète dans le
+   * menu (« Simulation de rémunération › Individuelle »). Omis ⇒ `labelKey`.
+   */
+  fullLabelKey?: string;
   icon:  string;
   /**
    * Child segment of `/payroll`, matching the route `path` in `app.routes.ts`. Omitted on an
@@ -183,6 +189,7 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
       {
         id:          'simulator',
         labelKey:    'PAYROLL.layout.NAV.SIMULATOR',
+        fullLabelKey: 'PAYROLL.layout.NAV.SIMULATOR_FULL',
         icon:        'calculate',
         route:       'simulator',
         permissions: PAYROLL_SIMULATOR_PERMISSIONS,
@@ -190,6 +197,7 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
       {
         id:          'cohort',
         labelKey:    'PAYROLL.layout.NAV.COHORT',
+        fullLabelKey: 'PAYROLL.layout.NAV.COHORT_FULL',
         icon:        'groups',
         route:       'cohort',
         permissions: ['PAYROLL_RUN_SIMULATION'],
@@ -197,60 +205,71 @@ export const PAYROLL_NAV_DEFS: PayrollNavDef[] = [
       {
         id:          'candidate-simulation',
         labelKey:    'PAYROLL.layout.NAV.CANDIDATE_SIMULATION',
+        fullLabelKey: 'PAYROLL.layout.NAV.CANDIDATE_SIMULATION_FULL',
         icon:        'person_search',
         route:       'candidate-simulation',
         permissions: ['PAYROLL_VIEW_RESULTS'],
       },
     ],
   },
-  // Monthly payroll, in the order the month is worked: the advance deductions are settled
-  // before the run, the results checked after it, the payslips published last.
+  /**
+   * Groupe « Paie & Rémunération » (2026-11-26, à la demande de l'utilisateur) — la paie du
+   * mois et la rémunération de chaque employé : fiches de paie, avances sur salaire, charge
+   * salariale et « Rémunération » (configuration par employé, entrée seule depuis 2026-11-10).
+   * Comme tout groupe, il n'a pas de route et disparaît si aucun enfant n'est accessible.
+   */
   {
-    id:          'salary-advances',
-    labelKey:    'PAYROLL.layout.NAV.SALARY_ADVANCES',
-    icon:        'account_balance_wallet',
-    route:       'salary-advances',
-    permissions: PAYROLL_SALARY_ADVANCES_PERMISSIONS,
+    id:          'pay',
+    labelKey:    'PAYROLL.layout.NAV.PAY_GROUP',
+    icon:        'payments',
+    permissions: [],
+    children: [
+      {
+        id:          'payslips',
+        labelKey:    'PAYROLL.layout.NAV.PAYSLIPS',
+        icon:        'receipt_long',
+        route:       'payslips',
+        permissions: PAYROLL_PAYSLIPS_PERMISSIONS,
+      },
+      {
+        id:          'salary-advances',
+        labelKey:    'PAYROLL.layout.NAV.SALARY_ADVANCES',
+        icon:        'account_balance_wallet',
+        route:       'salary-advances',
+        permissions: PAYROLL_SALARY_ADVANCES_PERMISSIONS,
+      },
+      {
+        id:          'engine-results',
+        labelKey:    'PAYROLL.layout.NAV.ENGINE_RESULTS',
+        icon:        'history',
+        route:       'engine-results',
+        permissions: ['PAYROLL_VIEW_RESULTS'],
+      },
+      {
+        id:          'employee-config',
+        labelKey:    'PAYROLL.layout.NAV.EMPLOYEE_CONFIG',
+        icon:        'manage_accounts',
+        route:       'employee-config',
+        permissions: PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS,
+      },
+    ],
   },
-  {
-    id:          'engine-results',
-    labelKey:    'PAYROLL.layout.NAV.ENGINE_RESULTS',
-    icon:        'history',
-    route:       'engine-results',
-    permissions: ['PAYROLL_VIEW_RESULTS'],
-  },
-  {
-    id:          'payslips',
-    labelKey:    'PAYROLL.layout.NAV.PAYSLIPS',
-    icon:        'receipt_long',
-    route:       'payslips',
-    permissions: PAYROLL_PAYSLIPS_PERMISSIONS,
-  },
-  {
-    id:          'budget',
-    labelKey:    'PAYROLL.layout.NAV.BUDGET',
-    icon:        'account_balance',
-    route:       'budget',
-    permissions: PAYROLL_BUDGET_PERMISSIONS,
-  },
+  // « Budget prévisionnel » masqué du menu pour le moment (2026-11-26, à la demande de
+  // l'utilisateur). La route `budget` reste dans app.routes.ts : la page s'ouvre encore par
+  // son URL. Pour la remettre, décommenter ce bloc.
+  // {
+  //   id:          'budget',
+  //   labelKey:    'PAYROLL.layout.NAV.BUDGET',
+  //   icon:        'account_balance',
+  //   route:       'budget',
+  //   permissions: PAYROLL_BUDGET_PERMISSIONS,
+  // },
   {
     id:          'calibration',
     labelKey:    'PAYROLL.layout.NAV.CALIBRATION',
     icon:        'tune',
     route:       'calibration',
     permissions: ['PAYROLL_RUN_CALIBRATION'],
-  },
-  /**
-   * « Rémunération » — the per-employee payroll configuration (salary, contract, benefits,
-   * bonuses). Its own sidebar entry since 2026-11-10; it used to open only from a card on
-   * the administration home.
-   */
-  {
-    id:          'employee-config',
-    labelKey:    'PAYROLL.layout.NAV.EMPLOYEE_CONFIG',
-    icon:        'manage_accounts',
-    route:       'employee-config',
-    permissions: PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS,
   },
   /**
    * Administration — one entry, like Administration / Admin in RH and Finance, kept last. It

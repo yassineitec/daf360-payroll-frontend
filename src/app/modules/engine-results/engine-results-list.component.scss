@@ -20,3 +20,9 @@
 .same-height-cards ::ng-deep daf-entity-card { display: block; min-height: 248px; }
 .same-height-cards ::ng-deep daf-entity-card > .glass-card { height: 100%; min-height: 248px; }
 .same-height-cards ::ng-deep daf-entity-card > .glass-card > :last-child { margin-top: auto; }
+
+/* Photo de la carte en cercle (la lib la dessine en carré arrondi, sans option de forme) —
+   même rendu que la cellule avatar du tableau. */
+.same-height-cards ::ng-deep daf-entity-card .w-11.h-11,
+.same-height-cards ::ng-deep daf-entity-card .w-11.h-11 > * { border-radius: 9999px; overflow: hidden; }
+.same-height-cards ::ng-deep daf-entity-card .w-11.h-11 img { object-position: top; }

@@ -107,7 +107,8 @@ export class HomeComponent {
           icon:        def.icon,
           iconFilled:  true,
           ...TONE_ICON[MODULE_TONE[def.id] ?? 'primary'],
-          title:       this.translate.instant(def.labelKey),
+          // Hors du menu, le groupe n'est plus là pour compléter « Individuelle » → nom complet.
+          title:       this.translate.instant(def.fullLabelKey ?? def.labelKey),
           description: this.translate.instant(`PAYROLL.HOME.DESC.${def.labelKey.split('.').pop()}`),
         } satisfies CardOptions,
       }));
