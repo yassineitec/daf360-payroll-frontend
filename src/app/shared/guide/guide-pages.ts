@@ -54,9 +54,9 @@ export const GUIDE_PAGES: GuidePageDef[] = [
     helpTab: 'employee-config' },
 
   { guideKey: 'home', labelKey: 'PAYROLL.layout.NAV.HOME', icon: 'home', route: 'accueil', permissions: [] },
-  { guideKey: 'simulator', labelKey: 'PAYROLL.layout.NAV.SIMULATOR', icon: 'calculate', route: 'simulator',
+  { guideKey: 'simulator', labelKey: 'PAYROLL.layout.NAV.SIMULATOR_FULL', icon: 'calculate', route: 'simulator',
     permissions: ['PAYROLL_RUN_SIMULATION'] },
-  { guideKey: 'candidate-simulation', labelKey: 'PAYROLL.layout.NAV.CANDIDATE_SIMULATION', icon: 'person_search',
+  { guideKey: 'candidate-simulation', labelKey: 'PAYROLL.layout.NAV.CANDIDATE_SIMULATION_FULL', icon: 'person_search',
     route: 'candidate-simulation', permissions: ['PAYROLL_VIEW_RESULTS'] },
   { guideKey: 'salary-advances', labelKey: 'PAYROLL.layout.NAV.SALARY_ADVANCES', icon: 'payments',
     route: 'salary-advances', permissions: ['PAYROLL_MANAGE_SALARY_ADVANCES'] },

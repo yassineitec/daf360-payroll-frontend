@@ -65,7 +65,8 @@ export class PayrollShellComponent implements OnInit {
     this.translate.currentLang();
     return {
       sectionLabel: this.translate.instant('PAYROLL.layout.SECTION'),
-      collapsible: true,
+      // Pas de `collapsible` / `resizable` (lib ≥ 5.22.0) : le rail payroll garde sa largeur
+      // fixe de 256px, sans bouton réduire ni poignée.
     };
   });
 

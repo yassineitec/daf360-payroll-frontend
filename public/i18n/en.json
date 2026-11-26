@@ -39,22 +39,26 @@
     "layout": {
       "NAV": {
         "HOME": "Home",
-        "SIMULATOR": "Manual simulator",
+        "SIMULATOR": "Individual",
         "ADMIN": "Administration",
         "PAYSLIPS": "Payslips",
-        "EMPLOYEE_CONFIG": "Compensation",
+        "EMPLOYEE_CONFIG": "Compensation management",
         "SALARY_ADVANCES": "Salary advances",
-        "COHORT": "Cohort simulation",
+        "COHORT": "Cohort",
         "ENGINE_RUN": "Payroll run",
         "ENGINE_RESULTS": "Salary cost",
-        "CANDIDATE_SIMULATION": "Candidate simulations",
+        "CANDIDATE_SIMULATION": "Candidates",
         "CALIBRATION": "Calibration",
         "PARAMETER_SETS": "Parameters",
         "SETTINGS_GROUP": "Administration",
-        "SIMULATION_GROUP": "Simulation",
+        "SIMULATION_GROUP": "Pay simulation",
+        "PAY_GROUP": "Pay & Compensation",
+        "SIMULATOR_FULL": "Individual simulation",
+        "COHORT_FULL": "Cohort simulation",
+        "CANDIDATE_SIMULATION_FULL": "Candidate simulation",
         "BUDGET": "Forecast budget"
       },
-      "SECTION": "PAYROLL"
+      "SECTION": "Payroll management"
     },
 
     "HOME": {
@@ -304,7 +308,7 @@
       },
 
       "LIST": {
-        "TITLE": "Payroll simulations",
+        "TITLE": "Individual simulation",
         "SUBTITLE": "Every individual simulation for the country — open one, duplicate it, or run a new one.",
         "NEW_BTN": "New simulation",
         "VIEW_LIST": "Table view",

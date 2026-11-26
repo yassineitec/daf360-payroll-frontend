@@ -744,7 +744,7 @@ export class EngineResultsListComponent implements OnInit {
   );
 
   readonly employeeColumns = computed<TableColumn[]>(() => [
-    { key: 'name',       label: this.t('PAYROLL.ENGINE_RESULTS.COL_EMPLOYEE'),   sortable: true },
+    { key: 'name',       label: this.t('PAYROLL.ENGINE_RESULTS.COL_EMPLOYEE'), type: 'avatar', sortable: true },
     { key: 'matricule',  label: this.t('PAYROLL.ENGINE_RESULTS.COL_MATRICULE'),  sortable: true },
     { key: 'department', label: this.t('PAYROLL.ENGINE_RESULTS.COL_DEPARTMENT'), sortable: true },
     { key: 'contract',   label: this.t('PAYROLL.ENGINE_RESULTS.COL_CONTRACT'),   sortable: true },
@@ -790,7 +790,8 @@ export class EngineResultsListComponent implements OnInit {
   readonly employeeRows = computed<TableRow[]>(() =>
     this.employees().map(e => ({
       id:         e.userId,
-      name:       e.fullName,
+      // Cellule avatar de la lib : photo RH ronde, initiales sinon.
+      name:       { name: e.fullName, ...(this.hrService.photoSrc(e.photoUrl) ? { avatar: this.hrService.photoSrc(e.photoUrl)! } : {}) },
       matricule:  e.employeeId ?? '—',
       department: e.department ?? '—',
       contract:   this.contractLabel(e.contractType),
