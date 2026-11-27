@@ -146,7 +146,11 @@ export class HrProfileService {
   /** `photoUrl` est stocké relatif (`/api/hr/profiles/{id}/photo`, servi sans jeton) —
    *  préfixé ici par l'URL du service RH ; `null` quand le profil n'a pas de photo. */
   photoSrc(photoUrl: string | null | undefined): string | null {
-    return photoUrl ? `${this.base}${photoUrl}` : null;
+    const url = photoUrl?.trim();
+    if (!url) return null;
+    // Already absolute (SharePoint, CDN) or inline: used as is — prefixing would break it.
+    if (/^(https?:|data:|blob:)/i.test(url)) return url;
+    return `${this.base}${url.startsWith('/') ? '' : '/'}${url}`;
   }
 }
 

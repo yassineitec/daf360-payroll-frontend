@@ -3,9 +3,9 @@ import { concat, last } from 'rxjs';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   ButtonComponent, DafCellDirective, DataTableComponent, FormFieldComponent, ModalService, PaginationComponent,
-  RadioGroupComponent, SearchToolbarComponent, SectionTitleComponent, SelectComponent, StepperComponent,
-  ToggleComponent,
-  type BadgeCell, type FilterField, type FilterResult, type ModalRef, type RadioOption, type SearchToolbarFilterConfig,
+  RadioGroupComponent, SearchToolbarComponent, SectionCardComponent, SectionTitleComponent, SelectComponent,
+  StepperComponent, TabsComponent, ToggleComponent, tabParam,
+  type BadgeCell, type TabItem, type FilterField, type FilterResult, type ModalRef, type RadioOption, type SearchToolbarFilterConfig,
   type SelectOption, type StepperStep, type TableColumn, type TableConfig, type TableRow,
 } from '@khalilrebhiitec/daf360';
 import {
@@ -31,8 +31,10 @@ const DEFAULT_PAGE_SIZE = 20;
  * Le pays n'est PAS choisi ici : c'est l'entité de la page (drapeaux de la barre ou `?pays=`),
  * comme pour toute l'administration — `paysId` arrive de parameter-sets (`listPaysId()`).
  *
- * Mise en page à plat, sans cartes : en-tête de section, puis deux blocs titrés
- * (`daf-section-title`) :
+ * En-tête de section, puis trois onglets (`daf-tabs`, gardés dans l'adresse en
+ * `?sub=period|overtime|leaves`). Période et HS suivent les cartes de configuration des autres
+ * administrations (`daf-section-card` : valeur en vigueur en lecture, « Modifier » ouvre une
+ * pop-up) ; les listes restent des tableaux (recherche, tableau, pagination). Détail :
  *  - « Période de paie » : mois civil ou période décalée (`daf-radio-group`) ; en décalé, le
  *    jour de début (2 à 28, `daf-select`) — le jour de fin en découle (veille du début, champ
  *    grisé) ; une frise des mois précédent / en cours / suivant (`daf-stepper` en tête seule) ;
@@ -49,8 +51,8 @@ const DEFAULT_PAGE_SIZE = 20;
   imports: [
     TranslatePipe, AdminModalFooterComponent, AdminSectionHeaderComponent, AdminSpinnerComponent,
     ButtonComponent, DafCellDirective, DataTableComponent, FormFieldComponent, PaginationComponent,
-    RadioGroupComponent, SearchToolbarComponent, SectionTitleComponent, SelectComponent, StepperComponent,
-    ToggleComponent,
+    RadioGroupComponent, SearchToolbarComponent, SectionCardComponent, SectionTitleComponent, SelectComponent,
+    StepperComponent, TabsComponent, ToggleComponent,
   ],
   template: `
     <div class="admin-section">
@@ -66,71 +68,72 @@ const DEFAULT_PAGE_SIZE = 20;
         <div class="admin-error-banner" role="alert">{{ 'PAYROLL.ADMIN_HOME.LOAD_ERROR' | translate }}</div>
       } @else if (settings(); as s) {
 
-        <!-- ── Période de paie ───────────────────────────────────────────── -->
-        <section class="ls-block">
-          <daf-section-title [title]="'PAYROLL.LEAVE_SETTINGS.PERIOD_TITLE' | translate" />
-          <p class="ls-hint">{{ 'PAYROLL.LEAVE_SETTINGS.PERIOD_HINT' | translate }}</p>
-          <p class="ls-hint ls-hint--muted">{{ 'PAYROLL.LEAVE_SETTINGS.PERIOD_HELP' | translate }}</p>
+        <!-- Onglets (gardés dans l'adresse : ?sub=period|overtime|leaves), même bandeau que
+             le détail des règles de paie. -->
+        <div class="ls-tabs">
+          <daf-tabs [tabs]="subTabs()" [(active)]="activeSub"
+            [tabsLabel]="'PAYROLL.ADMIN_HOME.CARDS.LEAVE_SETTINGS' | translate" idPrefix="leave-settings-tabs" />
+        </div>
 
-          <div class="ls-band">
-            <daf-radio-group
-              [options]="modeOptions()"
-              [selected]="mode()"
-              [config]="{ layout: 'horizontal', disabled: !canEdit() }"
-              (selectedChange)="onMode($event)" />
-
-            @if (mode() === 'shifted') {
-              <div class="ls-days">
-                <daf-select
-                  [options]="startDayOptions()"
-                  [selected]="['' + startDay()]"
-                  [config]="{ label: ('PAYROLL.LEAVE_SETTINGS.START_DAY' | translate), required: true, fullWidth: true,
-                              disabled: !canEdit(), hint: ('PAYROLL.LEAVE_SETTINGS.START_DAY_HINT' | translate) }"
-                  (selectedChange)="onStart($event[0])" />
-                <daf-form-field
-                  [value]="endDay() ?? ''"
-                  [options]="{ type: 'number', align: 'end', fullWidth: true, disabled: true,
-                               label: ('PAYROLL.LEAVE_SETTINGS.END_DAY' | translate),
-                               hint: ('PAYROLL.LEAVE_SETTINGS.END_DAY_HINT' | translate) }" />
-              </div>
-            }
-
-            <!-- Frise : mois précédent, en cours (étape active), suivant — avec la période en cours de saisie. -->
-            <daf-stepper
-              [steps]="timeline()"
-              [currentStep]="1"
-              [config]="{ chrome: 'header-only', labelDensity: 'quiet',
-                          stepperLabel: ('PAYROLL.LEAVE_SETTINGS.TIMELINE_LABEL' | translate) }" />
-
-            @if (periodError()) {
-              <div class="admin-error-banner" role="alert">{{ periodError() }}</div>
-            }
-            @if (canEdit()) {
-              <div class="ls-actions">
-                <span class="ls-saved">{{ savedPeriodLabel() }}</span>
-                @if (periodDirty()) {
+        @switch (activeSub()) {
+        @case ('period') {
+        <!-- ── Onglet « Période de paie » ─────────────────────────────────── -->
+        <!-- Comme les cartes de configuration des autres administrations (Finance › API
+             de change) : la valeur en vigueur en lecture, « Modifier » ouvre la pop-up. -->
+        <div class="ls-grid">
+          <daf-section-card
+            [title]="'PAYROLL.LEAVE_SETTINGS.PERIOD_CARD_TITLE' | translate"
+            [hint]="'PAYROLL.LEAVE_SETTINGS.PERIOD_HINT' | translate"
+            [help]="'PAYROLL.LEAVE_SETTINGS.PERIOD_HELP' | translate">
+            <div class="ls-card">
+              <dl class="ls-facts">
+                <div class="ls-fact">
+                  <dt>{{ 'PAYROLL.LEAVE_SETTINGS.FACT_MODE' | translate }}</dt>
+                  <dd>{{ savedModeText() }}</dd>
+                </div>
+                <div class="ls-fact">
+                  <dt>{{ 'PAYROLL.LEAVE_SETTINGS.START_DAY' | translate }}</dt>
+                  <dd>{{ savedStartText() }}</dd>
+                </div>
+                <div class="ls-fact">
+                  <dt>{{ 'PAYROLL.LEAVE_SETTINGS.END_DAY' | translate }}</dt>
+                  <dd>{{ savedEndText() }}</dd>
+                </div>
+                <div class="ls-fact">
+                  <dt>{{ 'PAYROLL.LEAVE_SETTINGS.FACT_CURRENT' | translate }}</dt>
+                  <dd class="ls-fact__strong">{{ currentPeriodText() }}</dd>
+                </div>
+              </dl>
+              @if (canEdit()) {
+                <div class="ls-card__actions">
                   <daf-button
-                    [label]="'PAYROLL.LEAVE_SETTINGS.RESET_PERIOD' | translate"
-                    variant="ghost"
-                    [options]="{ disabled: saving() }"
-                    (onClick)="resetPeriod()" />
-                }
-                <daf-button
-                  [label]="'PAYROLL.LEAVE_SETTINGS.SAVE_PERIOD' | translate"
-                  variant="teal"
-                  [options]="{ iconStart: 'save', disabled: saving() || !periodDirty() }"
-                  (onClick)="savePeriod()" />
-              </div>
-            }
-          </div>
-        </section>
+                    [label]="'PAYROLL.LEAVE_SETTINGS.EDIT_PERIOD' | translate"
+                    variant="teal"
+                    [options]="{ iconStart: 'edit', size: 'sm' }"
+                    (onClick)="openPeriod()" />
+                </div>
+              }
+            </div>
+          </daf-section-card>
 
-        <!-- ── Heures supplémentaires de week-end (V43) ──────────────────── -->
+          <daf-section-card
+            [title]="'PAYROLL.LEAVE_SETTINGS.TIMELINE_TITLE' | translate"
+            [hint]="'PAYROLL.LEAVE_SETTINGS.TIMELINE_HINT' | translate">
+            <div class="ls-card">
+              <daf-stepper
+                [steps]="savedTimeline()"
+                [currentStep]="1"
+                [config]="{ chrome: 'header-only', labelDensity: 'quiet',
+                            stepperLabel: ('PAYROLL.LEAVE_SETTINGS.TIMELINE_LABEL' | translate) }" />
+            </div>
+          </daf-section-card>
+        </div>
+        }
+        @case ('overtime') {
+        <!-- ── Onglet « Heures supplémentaires » (V43) ────────────────────── -->
         <section class="ls-block">
-          <daf-section-title [title]="'PAYROLL.LEAVE_SETTINGS.OT_TITLE' | translate" />
-          <p class="ls-hint">{{ 'PAYROLL.LEAVE_SETTINGS.OT_HINT' | translate }}</p>
-
-          @if (otError()) {
+          <!-- Échec du chargement ; les erreurs d'enregistrement s'affichent dans la pop-up. -->
+          @if (otError() && !overtime()) {
             <div class="admin-error-banner" role="alert">{{ otError() }}</div>
           }
           @if (overtime(); as ot) {
@@ -138,44 +141,75 @@ const DEFAULT_PAGE_SIZE = 20;
               <div class="admin-error-banner" role="alert">{{ 'PAYROLL.LEAVE_SETTINGS.OT_HR_UNREACHABLE' | translate }}</div>
             }
 
-            <!-- Majoration par jour de week-end du pays -->
-            <div class="ls-band">
-              <span class="ls-sub">{{ 'PAYROLL.LEAVE_SETTINGS.OT_DAYS_TITLE' | translate }}</span>
-              <div class="ls-days">
-                @for (d of ot.days; track d.dayOfWeek) {
-                  <daf-form-field
-                    [value]="dayDraft()[d.dayOfWeek] ?? ''"
-                    (valueChange)="onDayPct(d.dayOfWeek, $event)"
-                    [options]="{ type: 'number', align: 'end', fullWidth: true, suffixText: '%',
-                                 disabled: !canEdit(),
-                                 label: dayLabel(d.dayOfWeek),
-                                 hint: defaultPctHint() }" />
-                }
-              </div>
-              @if (canEdit()) {
-                <div class="ls-actions">
-                  <span class="ls-saved">{{ countryCapLabel() }}</span>
-                  @if (daysDirty()) {
-                    <daf-button
-                      [label]="'PAYROLL.LEAVE_SETTINGS.RESET_PERIOD' | translate"
-                      variant="ghost"
-                      [options]="{ disabled: otSaving() }"
-                      (onClick)="resetDays()" />
+            <div class="ls-grid">
+              <!-- Majoration par jour de week-end du pays : lecture, « Modifier » ouvre la pop-up. -->
+              <daf-section-card
+                [title]="'PAYROLL.LEAVE_SETTINGS.OT_DAYS_TITLE' | translate"
+                [hint]="'PAYROLL.LEAVE_SETTINGS.OT_HINT' | translate">
+                <div class="ls-card">
+                  <dl class="ls-facts">
+                    @for (d of ot.days; track d.dayOfWeek) {
+                      <div class="ls-fact">
+                        <dt>{{ dayLabel(d.dayOfWeek) }}</dt>
+                        <dd>
+                          @if (d.ownPct != null) {
+                            <span class="ls-fact__strong">{{ d.ownPct }} %</span>
+                          } @else {
+                            <span class="ls-fact__muted">{{ inheritedPctText() }}</span>
+                          }
+                        </dd>
+                      </div>
+                    }
+                  </dl>
+                  @if (canEdit()) {
+                    <div class="ls-card__actions">
+                      <daf-button
+                        [label]="'PAYROLL.LEAVE_SETTINGS.OT_EDIT_DAYS' | translate"
+                        variant="teal"
+                        [options]="{ iconStart: 'edit', size: 'sm' }"
+                        (onClick)="openDays()" />
+                    </div>
                   }
-                  <daf-button
-                    [label]="'PAYROLL.LEAVE_SETTINGS.OT_SAVE_DAYS' | translate"
-                    variant="teal"
-                    [options]="{ iconStart: 'save', disabled: otSaving() || !daysDirty() }"
-                    (onClick)="saveDays()" />
                 </div>
-              }
+              </daf-section-card>
+
+              <!-- Plafond d'heures payées par jour : l'ordre de priorité, et celui du pays. -->
+              <daf-section-card
+                [title]="'PAYROLL.LEAVE_SETTINGS.OT_CAPS_TITLE' | translate"
+                [hint]="'PAYROLL.LEAVE_SETTINGS.OT_CAPS_HINT' | translate">
+                <div class="ls-card">
+                  <dl class="ls-facts">
+                    <div class="ls-fact">
+                      <dt>{{ 'PAYROLL.LEAVE_SETTINGS.OT_FACT_COUNTRY' | translate }}</dt>
+                      <dd class="ls-fact__strong">{{ countryCapText() }}</dd>
+                    </div>
+                    <div class="ls-fact">
+                      <dt>{{ 'PAYROLL.LEAVE_SETTINGS.OT_FACT_ROLES' | translate }}</dt>
+                      <dd>{{ 'PAYROLL.LEAVE_SETTINGS.OT_FACT_ROLES_VALUE' | translate: { count: ownCapRoles(), total: ot.roles.length } }}</dd>
+                    </div>
+                  </dl>
+                  <ol class="ls-priority" [attr.aria-label]="'PAYROLL.LEAVE_SETTINGS.OT_PRIORITY_LABEL' | translate">
+                    <li><span class="ls-priority__n">1</span>{{ 'PAYROLL.LEAVE_SETTINGS.OT_PRIORITY_EMPLOYEE' | translate }}</li>
+                    <li><span class="ls-priority__n">2</span>{{ 'PAYROLL.LEAVE_SETTINGS.OT_PRIORITY_ROLE' | translate }}</li>
+                    <li><span class="ls-priority__n">3</span>{{ 'PAYROLL.LEAVE_SETTINGS.OT_PRIORITY_COUNTRY' | translate }}</li>
+                    <li><span class="ls-priority__n">4</span>{{ 'PAYROLL.LEAVE_SETTINGS.OT_PRIORITY_DEFAULT' | translate }}</li>
+                  </ol>
+                </div>
+              </daf-section-card>
             </div>
 
             <!-- Plafond par rôle (le plafond propre à un collaborateur se règle sur sa fiche paie) -->
-            <span class="ls-sub">{{ 'PAYROLL.LEAVE_SETTINGS.OT_ROLES_TITLE' | translate }}</span>
-            <p class="ls-hint ls-hint--muted">{{ 'PAYROLL.LEAVE_SETTINGS.OT_ROLES_HINT' | translate }}</p>
+            <daf-section-title [title]="'PAYROLL.LEAVE_SETTINGS.OT_ROLES_TITLE' | translate" />
+            <p class="ls-hint">{{ 'PAYROLL.LEAVE_SETTINGS.OT_ROLES_HINT' | translate }}</p>
+            <div class="admin-toolbar">
+              <daf-search-toolbar
+                [card]="false"
+                [showFilter]="false"
+                [placeholder]="'PAYROLL.LEAVE_SETTINGS.OT_SEARCH_ROLE' | translate"
+                [value]="roleSearch()" [debounce]="200" (valueChange)="onRoleSearch($event)" />
+            </div>
             @if (!roleRows().length) {
-              <div class="admin-empty"><p>{{ 'PAYROLL.LEAVE_SETTINGS.OT_NO_ROLES' | translate }}</p></div>
+              <div class="admin-empty"><p>{{ ((overtime()?.roles?.length ?? 0) ? 'PAYROLL.ADMIN_HOME.NO_RESULT' : 'PAYROLL.LEAVE_SETTINGS.OT_NO_ROLES') | translate }}</p></div>
             } @else {
               <div class="admin-table-scroll">
                 <daf-data-table [columns]="roleColumns()" [rows]="rolePager.rows()" [config]="roleTableConfig()"
@@ -197,10 +231,10 @@ const DEFAULT_PAGE_SIZE = 20;
             }
           }
         </section>
-
-        <!-- ── Absences retenues sur le salaire ──────────────────────────── -->
+        }
+        @case ('leaves') {
+        <!-- ── Onglet « Absences retenues » ───────────────────────────────── -->
         <section class="ls-block">
-          <daf-section-title [title]="'PAYROLL.LEAVE_SETTINGS.TYPES_TITLE' | translate" />
           <p class="ls-hint">{{ 'PAYROLL.LEAVE_SETTINGS.TYPES_HINT' | translate }}</p>
           <p class="ls-hint ls-hint--strong">{{ deductedSummary() }}</p>
 
@@ -262,8 +296,82 @@ const DEFAULT_PAGE_SIZE = 20;
             <div class="admin-error-banner" role="alert">{{ ruleError() }}</div>
           }
         </section>
+        }
+        }
       }
     </div>
+
+    <!-- Pop-up : période de paie (mode, jour de début, aperçu des mois) -->
+    <ng-template #periodTpl>
+      <div class="ls-modal">
+        <daf-radio-group
+          [options]="modeOptions()"
+          [selected]="mode()"
+          [config]="{ layout: 'horizontal' }"
+          (selectedChange)="onMode($event)" />
+
+        @if (mode() === 'shifted') {
+          <div class="ls-days">
+            <daf-select
+              [options]="startDayOptions()"
+              [selected]="['' + startDay()]"
+              [config]="{ label: ('PAYROLL.LEAVE_SETTINGS.START_DAY' | translate), required: true, fullWidth: true,
+                          hint: ('PAYROLL.LEAVE_SETTINGS.START_DAY_HINT' | translate) }"
+              (selectedChange)="onStart($event[0])" />
+            <daf-form-field
+              [value]="endDay() ?? ''"
+              [options]="{ type: 'number', align: 'end', fullWidth: true, disabled: true,
+                           label: ('PAYROLL.LEAVE_SETTINGS.END_DAY' | translate),
+                           hint: ('PAYROLL.LEAVE_SETTINGS.END_DAY_HINT' | translate) }" />
+          </div>
+        }
+
+        <!-- Aperçu de la période en cours de saisie sur trois mois. -->
+        <daf-stepper
+          [steps]="timeline()"
+          [currentStep]="1"
+          [config]="{ chrome: 'header-only', labelDensity: 'quiet',
+                      stepperLabel: ('PAYROLL.LEAVE_SETTINGS.TIMELINE_LABEL' | translate) }" />
+
+        @if (periodError()) {
+          <div class="admin-error-banner" role="alert">{{ periodError() }}</div>
+        }
+        <app-admin-modal-footer
+          [saveLabel]="'PAYROLL.LEAVE_SETTINGS.SAVE_PERIOD' | translate"
+          [cancelLabel]="'PAYROLL.LEAVE_SETTINGS.RESET_PERIOD' | translate"
+          [saving]="saving()"
+          [disabled]="!periodDirty()"
+          (save)="savePeriod()"
+          (cancel)="periodModal?.close()" />
+      </div>
+    </ng-template>
+
+    <!-- Pop-up : majoration par jour de week-end -->
+    <ng-template #daysTpl>
+      <div class="ls-modal">
+        <p class="ls-hint">{{ 'PAYROLL.LEAVE_SETTINGS.OT_DAYS_MODAL_HINT' | translate }}</p>
+        <div class="ls-days">
+          @for (d of overtime()?.days ?? []; track d.dayOfWeek) {
+            <daf-form-field
+              [value]="dayDraft()[d.dayOfWeek] ?? ''"
+              (valueChange)="onDayPct(d.dayOfWeek, $event)"
+              [options]="{ type: 'number', align: 'end', fullWidth: true, suffixText: '%',
+                           label: dayLabel(d.dayOfWeek),
+                           hint: defaultPctHint() }" />
+          }
+        </div>
+        @if (otError()) {
+          <div class="admin-error-banner" role="alert">{{ otError() }}</div>
+        }
+        <app-admin-modal-footer
+          [saveLabel]="'PAYROLL.LEAVE_SETTINGS.OT_SAVE_DAYS' | translate"
+          [cancelLabel]="'PAYROLL.LEAVE_SETTINGS.RESET_PERIOD' | translate"
+          [saving]="otSaving()"
+          [disabled]="!daysDirty()"
+          (save)="saveDays()"
+          (cancel)="daysModal?.close()" />
+      </div>
+    </ng-template>
 
     <!-- Pop-up : plafond d'un rôle -->
     <ng-template #roleCapTpl>
@@ -288,15 +396,31 @@ const DEFAULT_PAGE_SIZE = 20;
     </ng-template>
   `,
   styles: [ADMIN_SECTION_STYLES, `
-    .ls-block { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+    .ls-tabs { border-bottom: 1px solid var(--color-outline-variant); }
+    .ls-tabs daf-tabs { display: block; margin-bottom: -1px; }
+    .ls-block { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+    .ls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-top: 4px; }
+    .ls-grid daf-section-card { display: block; height: 100%; }
+    .ls-card { display: flex; flex-direction: column; gap: 16px; padding: 16px 24px 20px; height: 100%; }
+    .ls-facts { display: flex; flex-direction: column; margin: 0; }
+    .ls-fact { display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+               padding: 8px 0; border-bottom: 1px dashed var(--color-outline-variant); }
+    .ls-fact:last-child { border-bottom: 0; }
+    .ls-fact dt { font-size: 0.8125rem; font-weight: 600; color: var(--color-on-surface-variant); }
+    .ls-fact dd { margin: 0; font-size: 0.875rem; color: var(--color-on-surface); text-align: right; }
+    .ls-fact__strong { font-weight: 700; color: var(--color-on-surface); }
+    .ls-fact__muted { color: var(--color-on-surface-variant); font-style: italic; }
+    .ls-card__actions { display: flex; justify-content: flex-end; margin-top: auto; }
+    .ls-priority { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px;
+                   font-size: 0.8125rem; color: var(--color-on-surface); }
+    .ls-priority li { display: flex; align-items: center; gap: 8px; }
+    .ls-priority__n { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px;
+                      border-radius: 999px; font-size: 0.6875rem; font-weight: 700; flex-shrink: 0;
+                      color: var(--color-teal); background: color-mix(in srgb, var(--color-teal) 12%, transparent); }
     .ls-hint { margin: 0; font-size: 0.8125rem; color: var(--color-on-surface-variant); max-width: 900px; }
     .ls-hint--muted { font-size: 0.75rem; opacity: 0.85; }
     .ls-hint--strong { font-weight: 600; color: var(--color-on-surface); }
-    .ls-band { display: flex; flex-direction: column; gap: 18px; padding: 16px 0 4px; }
     .ls-days { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 280px)); gap: 16px; }
-    .ls-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
-    .ls-saved { margin-right: auto; font-size: 0.8125rem; color: var(--color-on-surface-variant); }
-    .ls-sub { font-size: 0.875rem; font-weight: 600; color: var(--color-on-surface); }
     .ls-modal { display: flex; flex-direction: column; gap: 16px; }
     .ls-type { display: flex; flex-direction: column; gap: 2px; }
     .ls-type__label { font-weight: 600; color: var(--color-on-surface); }
@@ -344,6 +468,21 @@ export class LeaveSettingsAdminComponent {
     return this.translate.currentLang() === 'en' ? 'en-GB' : 'fr-FR';
   }
 
+  // ── Onglets ───────────────────────────────────────────────────────────────
+
+  /** Active tab, kept in the address as `?sub=` (`?tab=` already picks the admin section). */
+  readonly activeSub = tabParam(['period', 'overtime', 'leaves'] as const, 'period', { param: 'sub' });
+
+  readonly subTabs = computed<TabItem[]>(() => {
+    const leaves = this.settings()?.leaveTypes ?? [];
+    return [
+      { id: 'period',   label: this.t('PAYROLL.LEAVE_SETTINGS.TAB_PERIOD'),   icon: 'date_range' },
+      { id: 'overtime', label: this.t('PAYROLL.LEAVE_SETTINGS.TAB_OVERTIME'), icon: 'schedule' },
+      { id: 'leaves',   label: this.t('PAYROLL.LEAVE_SETTINGS.TAB_LEAVES'),   icon: 'event_busy',
+        count: leaves.filter(r => r.deductsSalary).length },
+    ];
+  });
+
   /** Reload whenever the page's entity changes (flags, `?pays=`). */
   private readonly followPays = effect(() => {
     const id = this.paysId();
@@ -354,7 +493,32 @@ export class LeaveSettingsAdminComponent {
 
   private readonly modal = inject(ModalService);
   private readonly roleCapTpl = viewChild.required<TemplateRef<unknown>>('roleCapTpl');
+  private readonly daysTpl = viewChild.required<TemplateRef<unknown>>('daysTpl');
   roleModal: ModalRef | null = null;
+  daysModal: ModalRef | null = null;
+
+  /** « Modifier les majorations » : the draft starts from what is saved. */
+  openDays(): void {
+    this.resetDays();
+    this.daysModal = this.modal.open({
+      title: this.t('PAYROLL.LEAVE_SETTINGS.OT_DAYS_TITLE'),
+      icon: 'percent',
+      body: this.daysTpl(),
+      size: 'md',
+      closeOnBackdrop: false,
+    });
+  }
+
+  /** « 75 % (Taux et barèmes) » / « Pas de majoration » for a day left empty. */
+  readonly inheritedPctText = computed(() => {
+    const d = this.overtime()?.defaultPct;
+    return d == null
+      ? this.t('PAYROLL.LEAVE_SETTINGS.OT_INHERIT_NONE')
+      : this.t('PAYROLL.LEAVE_SETTINGS.OT_INHERIT_PCT', { pct: d });
+  });
+
+  /** Roles with their own cap (the others follow the country). */
+  readonly ownCapRoles = computed(() => (this.overtime()?.roles ?? []).filter(r => r.capHours != null).length);
 
   readonly overtime = signal<OvertimeSettingsDto | null>(null);
   readonly otError  = signal<string | null>(null);
@@ -413,9 +577,6 @@ export class LeaveSettingsAdminComponent {
       { hours: o.countryCap });
   });
 
-  readonly countryCapLabel = computed(() =>
-    this.t('PAYROLL.LEAVE_SETTINGS.OT_COUNTRY_CAP', { value: this.countryCapText() }));
-
   onDayPct(day: string, value: unknown): void {
     this.dayDraft.update(d => ({ ...d, [day]: this.toNumber(value) }));
     this.otError.set(null);
@@ -447,7 +608,7 @@ export class LeaveSettingsAdminComponent {
     concat(...changed.map(d => this.api.saveOvertimeDayRate(id, d.dayOfWeek, draft[d.dayOfWeek] ?? null)))
       .pipe(last())
       .subscribe({
-        next: view => { this.otSaving.set(false); this.applyOvertime(view); },
+        next: view => { this.otSaving.set(false); this.applyOvertime(view); this.daysModal?.close(); },
         error: err => { this.otSaving.set(false); this.otError.set(errorText(err) ?? this.t('PAYROLL.ADMIN.ERROR')); },
       });
   }
@@ -455,6 +616,12 @@ export class LeaveSettingsAdminComponent {
   // Plafond par rôle
 
   readonly rolePageSize = signal(DEFAULT_PAGE_SIZE);
+  readonly roleSearch = signal('');
+
+  onRoleSearch(value: string): void {
+    this.roleSearch.set(value);
+    this.rolePager.go(0);
+  }
 
   readonly roleColumns = computed<TableColumn[]>(() => [
     { key: 'role', label: this.t('PAYROLL.LEAVE_SETTINGS.OT_COL_ROLE'), sortable: true },
@@ -466,7 +633,10 @@ export class LeaveSettingsAdminComponent {
     const o = this.overtime();
     if (!o) return [];
     const en = this.translate.currentLang() === 'en';
-    return o.roles.map(r => ({
+    const q = this.roleSearch().trim().toLowerCase();
+    return o.roles
+      .filter(r => !q || (r.labelFr ?? '').toLowerCase().includes(q) || (r.labelEn ?? '').toLowerCase().includes(q))
+      .map(r => ({
       role: (en ? r.labelEn : r.labelFr) || r.labelFr,
       cap: {
         label: r.capHours != null
@@ -573,15 +743,55 @@ export class LeaveSettingsAdminComponent {
     return d.toLocaleDateString(this.locale(), { day: '2-digit', month: '2-digit' });
   }
 
-  /** « En vigueur : du 21 au 20 » / « En vigueur : mois civil » — the SAVED setting. */
-  readonly savedPeriodLabel = computed(() => {
-    const s = this.settings();
-    if (!s) return '';
-    const value = s.periodStartDay > 1
-      ? this.t('PAYROLL.LEAVE_SETTINGS.KPI_SHIFTED', { start: s.periodStartDay, end: s.periodStartDay - 1 })
-      : this.t('PAYROLL.LEAVE_SETTINGS.MODE_CALENDAR');
-    return this.t('PAYROLL.LEAVE_SETTINGS.IN_FORCE', { value });
+  // Card « Période en vigueur » — always the SAVED setting, never the draft of the pop-up.
+
+  private readonly savedStart = computed(() => {
+    const s = this.settings()?.periodStartDay ?? 1;
+    return s > 1 ? s : 1;
   });
+
+  readonly savedModeText = computed(() =>
+    this.t(this.savedStart() > 1 ? 'PAYROLL.LEAVE_SETTINGS.MODE_SHIFTED' : 'PAYROLL.LEAVE_SETTINGS.MODE_CALENDAR'));
+
+  readonly savedStartText = computed(() => {
+    const s = this.savedStart();
+    return s > 1
+      ? this.t('PAYROLL.LEAVE_SETTINGS.FACT_START_SHIFTED', { day: s })
+      : this.t('PAYROLL.LEAVE_SETTINGS.FACT_START_CALENDAR');
+  });
+
+  readonly savedEndText = computed(() => {
+    const s = this.savedStart();
+    return s > 1
+      ? this.t('PAYROLL.LEAVE_SETTINGS.FACT_END_SHIFTED', { day: s - 1 })
+      : this.t('PAYROLL.LEAVE_SETTINGS.FACT_END_CALENDAR');
+  });
+
+  /** « Novembre 2026 : du 21/10 au 20/11 ». */
+  readonly currentPeriodText = computed(() => {
+    const now = new Date();
+    const r = this.range(now.getFullYear(), now.getMonth(), this.savedStart());
+    return this.t('PAYROLL.LEAVE_SETTINGS.EXAMPLE', {
+      month: this.monthName(now.getFullYear(), now.getMonth()), from: this.dm(r.from), to: this.dm(r.to),
+    });
+  });
+
+  readonly savedTimeline = computed(() => this.timelineFor(this.savedStart()));
+
+  private readonly periodTpl = viewChild.required<TemplateRef<unknown>>('periodTpl');
+  periodModal: ModalRef | null = null;
+
+  /** « Modifier la période » : the pop-up starts from what is saved. */
+  openPeriod(): void {
+    this.resetPeriod();
+    this.periodModal = this.modal.open({
+      title: this.t('PAYROLL.LEAVE_SETTINGS.PERIOD_TITLE'),
+      icon: 'date_range',
+      body: this.periodTpl(),
+      size: 'md',
+      closeOnBackdrop: false,
+    });
+  }
 
   readonly modeOptions = computed<RadioOption[]>(() => [
     { value: 'calendar', label: this.t('PAYROLL.LEAVE_SETTINGS.MODE_CALENDAR'), hint: this.t('PAYROLL.LEAVE_SETTINGS.MODE_CALENDAR_HINT') },
@@ -608,9 +818,10 @@ export class LeaveSettingsAdminComponent {
     this.periodError.set(null);
   }
 
-  /** Previous, current and next month with the period being edited — the stepper's steps. */
-  readonly timeline = computed<StepperStep[]>(() => {
-    const start = this.startDay();
+  /** Previous, current and next month with the period being edited — the pop-up's preview. */
+  readonly timeline = computed<StepperStep[]>(() => this.timelineFor(this.startDay()));
+
+  private timelineFor(start: number): StepperStep[] {
     const now = new Date();
     return [-1, 0, 1].map(offset => {
       const ref = new Date(now.getFullYear(), now.getMonth() + offset, 1);
@@ -621,7 +832,7 @@ export class LeaveSettingsAdminComponent {
         icon: offset === 0 ? 'today' : 'calendar_month',
       };
     });
-  });
+  }
 
   readonly periodDirty = computed(() => {
     const s = this.settings();
@@ -641,7 +852,7 @@ export class LeaveSettingsAdminComponent {
     this.saving.set(true);
     this.periodError.set(null);
     this.api.saveLeavePeriod(id, start, start > 1 ? start - 1 : null).subscribe({
-      next: s => { this.saving.set(false); this.apply(s); },
+      next: s => { this.saving.set(false); this.apply(s); this.periodModal?.close(); },
       error: err => { this.saving.set(false); this.periodError.set(errorText(err) ?? this.t('PAYROLL.ADMIN.ERROR')); },
     });
   }
