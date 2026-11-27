@@ -42,3 +42,4 @@ src/environments/environment.local.ts
 # the token auto-revoked by GitHub secret scanning, which breaks every project's
 # npm install and Docker build — not just this one.
 .npmrc
+tsconfig.federation.json

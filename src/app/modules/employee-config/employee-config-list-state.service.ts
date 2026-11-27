@@ -6,7 +6,8 @@ import { TableSort } from '../../shared/table-tools';
 /** Tout ce qui décrit la liste « Salaires des collaborateurs » telle que l'utilisateur l'a laissée. */
 export interface EmployeeConfigListState {
   searchText:       string;
-  paysFilter:       number | null;
+  /** Plus restauré : le pays vient des drapeaux de la barre. */
+  paysFilter?:      number | string | null;
   statusFilter:     string | null;
   departmentFilter: string | null;
   contractFilter:   string | null;

@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, untracked, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { injectHeaderPays } from '../../core/header-pays';
 import { CommonModule } from '@angular/common';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { catchError, of } from 'rxjs';
@@ -84,7 +85,22 @@ export class CandidateSimulationComponent implements OnInit {
     return this.translate.instant(key, params);
   }
 
-  readonly candidatePaysId   = signal<number | null>(null);
+  /**
+   * Les drapeaux de la barre (`179,53`) ; null = « Tous les pays » (le service RH applique
+   * alors le périmètre du rôle). Le champ « Pays » du panneau est retiré.
+   */
+  private readonly headerPays = injectHeaderPays();
+  readonly candidatePaysId   = computed<string | null>(() => this.headerPays() ?? null);
+  private loadedPays: string | null | undefined = undefined;
+  /** Changement de drapeaux : candidats rechargés (page 0). Premier passage après ngOnInit. */
+  private readonly followPays = effect(() => {
+    const pays = this.candidatePaysId();
+    untracked(() => {
+      if (this.loadedPays === undefined || pays === this.loadedPays) return;
+      this.loadedPays = pays;
+      this.loadCandidates();
+    });
+  });
   readonly candLoading       = signal(false);
   readonly candError         = signal<string | null>(null);
   readonly candSearched      = signal(false);
@@ -215,13 +231,6 @@ export class CandidateSimulationComponent implements OnInit {
    *  côté serveur (un changement relance `loadCandidates()`), le reste filtre la liste déjà
    *  en mémoire — poste et localisation proposent les valeurs présentes dans cette liste. */
   readonly filterFields = computed<FilterField[]>(() => [{
-    name: 'pays',
-    label: this.t('PAYROLL.CANDIDATE_SIMULATION.PAYS_SELECT_LABEL'),
-    type: 'select',
-    searchable: true,
-    placeholder: this.t('PAYROLL.CANDIDATE_SIMULATION.PAYS_SELECT_PLACEHOLDER'),
-    options: this.paysOptions(),
-  }, {
     name: 'status',
     label: this.t('PAYROLL.CANDIDATE_SIMULATION.CAND_COL_STATUS'),
     type: 'select',
@@ -256,7 +265,6 @@ export class CandidateSimulationComponent implements OnInit {
     // `daf-filter` seeds `initialValues` once, in its own internal shape — a `select`
     // field is a `string[]` there (normalizes to a scalar only on `apply`).
     initialValues: {
-      pays:   this.candidatePaysId() ? [String(this.candidatePaysId())] : [],
       status: this.statusFilter() ? [this.statusFilter()] : [],
       position:  this.positionFilter() ? [this.positionFilter()!] : [],
       location:  this.locationFilter() ? [this.locationFilter()!] : [],
@@ -270,17 +278,11 @@ export class CandidateSimulationComponent implements OnInit {
     this.locationFilter.set(pickValue(result, 'location'));
     this.submittedFilter.set(rangeSeed(result['submitted']));
     this.page.set(0);
-    const raw = result['pays'] as string | null;
-    const paysId = raw ? Number(raw) : null;
-    if (paysId !== this.candidatePaysId()) {
-      this.candidatePaysId.set(paysId);
-      this.loadCandidates();
-    }
+    // Pays : plus dans le panneau — ce sont les drapeaux de la barre (`followPays`).
   }
 
   /** Message de la liste vide : pas encore de pays, chargement, ou pays sans candidat. */
   readonly emptyMessage = computed(() => {
-    if (!this.candidatePaysId()) return this.t('PAYROLL.CANDIDATE_SIMULATION.NO_PAYS_SELECTED');
     if (this.candLoading())      return this.t('PAYROLL.COMMON.LOADING');
     if (this.candidateList().length === 0) return this.t('PAYROLL.CANDIDATE_SIMULATION.EMPTY_CANDIDATES');
     return this.t('PAYROLL.CANDIDATE_SIMULATION.EMPTY_FILTERED');
@@ -370,8 +372,8 @@ export class CandidateSimulationComponent implements OnInit {
     // tri, page, vue). La liste est réaffichée tout de suite puis rechargée, au cas où une
     // décision serait tombée entre-temps.
     const saved = this.listState.restore();
+    this.loadedPays = this.candidatePaysId();
     if (saved) {
-      this.candidatePaysId.set(saved.paysId);
       this.searchText.set(saved.searchText);
       this.statusFilter.set(saved.statusFilter);
       this.positionFilter.set(saved.positionFilter);
@@ -386,25 +388,13 @@ export class CandidateSimulationComponent implements OnInit {
       return;
     }
 
-    // Pays pré-sélectionné = celui du profil de l'utilisateur connecté (ex. admin Tunisie →
-    // Tunisie) et la recherche part aussitôt ; il reste modifiable dans le bouton filtre
-    // (`applyFilters`). Sans pays sur le profil, la page reste à l'état vide.
-    const userPaysId = this.userStore.currentUser()?.paysId;
-    if (userPaysId) {
-      this.candidatePaysId.set(userPaysId);
-      this.loadCandidates();
-    }
+    // Les pays sont ceux des drapeaux (aucun = tout le périmètre du rôle) : la recherche part
+    // aussitôt.
+    this.loadCandidates();
   }
 
   loadCandidates(): void {
     const paysId = this.candidatePaysId();
-    if (!paysId) {
-      // Pays retiré du filtre : la page revient à son état vide (KPI à 0, liste vide).
-      this.candidateList.set([]);
-      this.candSearched.set(false);
-      this.candError.set(null);
-      return;
-    }
     this.candLoading.set(true);
     this.candError.set(null);
     this.candSearched.set(false);

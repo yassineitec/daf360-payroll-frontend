@@ -9,16 +9,7 @@
       <h2 class="ps-home-title">{{ 'PAYROLL.ADMIN_HOME.TITLE' | translate }}</h2>
       <p class="ps-home-sub">{{ 'PAYROLL.ADMIN_HOME.ENTITY' | translate: { pays: currentPays() } }}</p>
     </div>
-    @if (canSwitchPays()) {
-      <div class="ps-home-pays" data-guide="adm-home-pays">
-        <daf-select
-          [options]="paysOptions()"
-          [selected]="listPaysId() ? ['' + listPaysId()] : []"
-          [config]="{ label: 'PAYROLL.ADMIN_HOME.SWITCH_PAYS' | translate, searchable: true, fullWidth: true }"
-          (selectedChange)="onHomePays($event)">
-        </daf-select>
-      </div>
-    }
+    <!-- Plus de « Changer de pays » : l'entité vient des drapeaux de la barre (`flagPaysId`). -->
   </div>
 
   <!-- Même recette de cartes de module que /rh/admin : `daf-card` glass cliquables, icône

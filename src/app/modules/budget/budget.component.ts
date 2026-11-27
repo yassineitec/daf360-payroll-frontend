@@ -1,4 +1,6 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import { flagEntity, injectHeaderPays } from '../../core/header-pays';
+import { UserStore as PayrollUserStore } from '../../core/user.store';
 import { ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
@@ -56,10 +58,36 @@ export class BudgetComponent implements OnInit {
   // ── Pays : `daf-select`, même besoin déjà couvert par la bibliothèque dans
   //    engine-run/engine-results — liste chargée une fois.
   private readonly paysList = signal<PaysDto[]>([]);
-  readonly paysId = signal<number | null>(null);
+  /**
+   * Le pays de la page — UN seul, tiré des drapeaux de la barre (même règle que /rh/admin et
+   * /payroll/simulator : un drapeau → ce pays ; aucun → le pays de l'utilisateur ; plusieurs →
+   * le sien s'il est coché, sinon le premier coché). Le champ « Pays » l'affiche, grisé : pour
+   * un autre pays, on change les drapeaux. null = pas encore connu.
+   * Avant (2026-11-25) : une liste « Pays » propre à la page, vide au départ.
+   */
+  private readonly headerPays = injectHeaderPays();
+  private readonly userStore  = inject(PayrollUserStore);
+  readonly paysId = computed<number | null>(() => flagEntity(
+    this.headerPays(),
+    this.userStore.currentUser()?.paysId ?? this.paysList()[0]?.id ?? null));
+  /** Une seule option : le pays retenu (le champ est en lecture seule). */
   readonly paysOptions = computed<SelectOption[]>(() =>
-    this.paysList().map(p => ({ value: String(p.id), label: `${p.frenchLabel} (${p.isoCode})` })),
+    this.paysList().filter(p => p.id === this.paysId())
+      .map(p => ({ value: String(p.id), label: `${p.frenchLabel} (${p.isoCode})` })),
   );
+  /** Autre pays → les résultats affichés étaient ceux de l'ancien : on les efface. */
+  private shownPays: number | null | undefined = undefined;
+  private readonly followPays = effect(() => {
+    const id = this.paysId();
+    untracked(() => {
+      if (this.shownPays !== undefined && id !== this.shownPays) {
+        this.budgetLines.set([]);
+        this.forecasts.set([]);
+        this.error.set(null);
+      }
+      this.shownPays = id;
+    });
+  });
 
   ngOnInit(): void {
     this.api.listPayrollPays().subscribe(list => this.paysList.set(list));

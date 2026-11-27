@@ -39,22 +39,26 @@
     "layout": {
       "NAV": {
         "HOME": "Accueil",
-        "SIMULATOR": "Simulateur manuel",
+        "SIMULATOR": "Individuelle",
         "ADMIN": "Administration",
         "PAYSLIPS": "Fiches de paie",
-        "EMPLOYEE_CONFIG": "Rémunération",
+        "EMPLOYEE_CONFIG": "Gestion des rémunérations",
         "SALARY_ADVANCES": "Avances sur salaire",
-        "COHORT": "Simulation cohorte",
+        "COHORT": "Cohorte",
         "ENGINE_RUN": "Calcul de paie",
         "ENGINE_RESULTS": "Charge salariale",
-        "CANDIDATE_SIMULATION": "Simulations candidats",
+        "CANDIDATE_SIMULATION": "Candidats",
         "CALIBRATION": "Calibration",
         "PARAMETER_SETS": "Paramètres",
         "SETTINGS_GROUP": "Administration",
-        "SIMULATION_GROUP": "Simulation",
+        "SIMULATION_GROUP": "Simulation de rémunération",
+        "PAY_GROUP": "Paie & Rémunération",
+        "SIMULATOR_FULL": "Simulation individuelle",
+        "COHORT_FULL": "Simulation cohorte",
+        "CANDIDATE_SIMULATION_FULL": "Simulation candidats",
         "BUDGET": "Budget prévisionnel"
       },
-      "SECTION": "PAIE"
+      "SECTION": "Gestion de la paie"
     },
 
     "HOME": {
@@ -323,7 +327,7 @@
       },
 
       "LIST": {
-        "TITLE": "Simulations de paie",
+        "TITLE": "Simulation individuelle",
         "SUBTITLE": "Toutes les simulations individuelles du pays — ouvrez-en une, dupliquez-la, ou lancez-en une nouvelle.",
         "NEW_BTN": "Nouvelle simulation",
         "VIEW_LIST": "Vue tableau",
@@ -2491,7 +2495,7 @@
           },
           "SIMULATE": {
             "Q": "Comment simuler un salaire ?",
-            "A": "Avec « Simulateur manuel » : net vers brut ou brut vers net, avec le coût employeur. Pour un groupe d'employés, « Simulation cohorte » ; pour un candidat, « Simulations candidats »."
+            "A": "Avec « Simulation individuelle » : net vers brut ou brut vers net, avec le coût employeur. Pour un groupe d'employés, « Simulation cohorte » ; pour un candidat, « Simulation candidats »."
           },
           "PAYSLIP": {
             "Q": "Où trouver les fiches de paie ?",
@@ -2924,7 +2928,7 @@
       "MODULES_TITLE": "Les écrans de paie",
       "MODULES_TEXT": "Chaque carte ouvre un écran, le même que dans la barre latérale. Seuls les écrans autorisés par vos droits apparaissent : deux collègues peuvent donc voir des cartes différentes.",
       "SIMULATION_TITLE": "Simuler un salaire",
-      "SIMULATION_TEXT": "Le simulateur manuel calcule un salaire net à partir du brut, ou l'inverse, avec son coût employeur. « Simulation cohorte » fait de même pour un groupe d'employés et « Simulations candidats » retrouve celles faites pour des candidats. Une simulation ne lance pas la paie réelle.",
+      "SIMULATION_TEXT": "La simulation individuelle calcule un salaire net à partir du brut, ou l'inverse, avec son coût employeur. « Simulation cohorte » fait de même pour un groupe d'employés et « Simulation candidats » retrouve celles faites pour des candidats. Une simulation ne lance pas la paie réelle.",
       "RUN_TITLE": "La paie du mois",
       "RUN_TEXT": "« Charge salariale » lance le calcul de la paie (un collaborateur ou tout un pays) et en garde les résultats. « Fiches de paie » découpe et classe les fiches mensuelles ; « Avances sur salaire » verse les avances approuvées et suit leurs retenues.",
       "SETTINGS_TITLE": "L'administration de la paie",

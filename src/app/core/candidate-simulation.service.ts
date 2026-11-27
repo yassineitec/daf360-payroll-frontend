@@ -74,10 +74,11 @@ export class CandidateSimulationService {
   private readonly http   = inject(HttpClient);
   private readonly base   = `${environment.hrApiUrl}/api/hr/cost-approvals`;
 
-  getCandidatesWithHistory(paysId: number): Observable<CandidateSimulationSummaryDto[]> {
+  /** `paysId` : un pays ou plusieurs (`179,53`) ; null = tout le périmètre du rôle. */
+  getCandidatesWithHistory(paysId: number | string | null): Observable<CandidateSimulationSummaryDto[]> {
     return this.http.get<CandidateSimulationSummaryDto[]>(
       `${this.base}/candidates-with-history`,
-      { params: { paysId: paysId.toString() } }
+      { params: paysId ? { paysId: String(paysId) } : {} }
     );
   }
 

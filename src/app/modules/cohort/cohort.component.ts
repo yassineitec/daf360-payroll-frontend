@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import { flagEntity, injectHeaderPays } from '../../core/header-pays';
 import { CommonModule } from '@angular/common';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { catchError, of } from 'rxjs';
@@ -114,10 +115,38 @@ export class CohortComponent implements OnInit {
 
   // ── Scope ─────────────────────────────────────────────────────────────────
   private readonly paysList = signal<PaysDto[]>([]);
-  readonly paysId = signal<number | null>(null);
+  /**
+   * Le pays de la page — UN seul, tiré des drapeaux de la barre (même règle que /rh/admin et
+   * /payroll/simulator : un drapeau → ce pays ; aucun → le pays de l'utilisateur ; plusieurs →
+   * le sien s'il est coché, sinon le premier coché). Le champ « Pays » l'affiche, grisé : pour
+   * un autre pays, on change les drapeaux. null = pas encore connu.
+   * Avant (2026-11-25) : une liste « Pays » propre à la page, vide au départ.
+   */
+  private readonly headerPays = injectHeaderPays();
+  readonly paysId = computed<number | null>(() => flagEntity(
+    this.headerPays(),
+    this.userStore.currentUser()?.paysId ?? this.paysList()[0]?.id ?? null));
+  /** Une seule option : le pays retenu (le champ est en lecture seule). */
   readonly paysOptions = computed<SelectOption[]>(() =>
-    this.paysList().map(p => ({ value: String(p.id), label: `${p.frenchLabel} (${p.isoCode})` })),
+    this.paysList().filter(p => p.id === this.paysId())
+      .map(p => ({ value: String(p.id), label: `${p.frenchLabel} (${p.isoCode})` })),
   );
+  /**
+   * Autre pays (drapeaux de la barre) → les filtres, l'employé et les résultats affichés
+   * étaient ceux de l'ancien : on les efface et on recharge les référentiels du nouveau.
+   * Remplace l'ancien `setPays()` de la liste « Pays » propre à la page.
+   */
+  private shownPays: number | null | undefined = undefined;
+  private readonly followPays = effect(() => {
+    const id = this.paysId();
+    untracked(() => {
+      if (id === this.shownPays) return;
+      this.shownPays = id;
+      this.grade.set(''); this.discipline.set(''); this.contractType.set(''); this.employeeId.set(null);
+      this.result.set(null); this.employeeResult.set(null); this.error.set(null);
+      this.loadReferences(id);
+    });
+  });
 
   readonly scopeMode = signal<ScopeMode>('GROUP');
   readonly scopeOptions = computed((): RadioOption[] => [
@@ -206,13 +235,6 @@ export class CohortComponent implements OnInit {
 
   ngOnInit(): void {
     this.api.listPayrollPays().subscribe(list => this.paysList.set(list));
-  }
-
-  setPays(id: number | null): void {
-    this.paysId.set(id);
-    this.grade.set(''); this.discipline.set(''); this.contractType.set(''); this.employeeId.set(null);
-    this.result.set(null); this.employeeResult.set(null); this.error.set(null);
-    this.loadReferences(id);
   }
 
   setScope(mode: string): void {

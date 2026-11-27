@@ -1,4 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, TemplateRef, computed, inject, signal, viewChild } from '@angular/core';
+import { flagEntity, injectHeaderPays } from '../../core/header-pays';
+import { UserStore as PayrollUserStore } from '../../core/user.store';
 import { CommonModule } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -246,9 +248,20 @@ export class PayslipBatchComponent implements OnInit {
 
   // ── Étape 1 : pays et période ────────────────────────────────────────────
   private readonly paysList = signal<PaysDto[]>([]);
-  readonly paysId = signal<number | null>(null);
+  /**
+   * Le pays du lot — UN seul, tiré des drapeaux de la barre (même règle que /rh/admin : un
+   * drapeau → ce pays ; aucun → le pays de l'utilisateur ; plusieurs → le sien s'il est
+   * coché, sinon le premier coché). Le champ « Pays » du formulaire l'affiche, grisé : pour
+   * un autre pays, on change les drapeaux. null = pas encore connu.
+   */
+  private readonly headerPays = injectHeaderPays();
+  private readonly ownPaysUser = inject(PayrollUserStore);
+  readonly paysId = computed<number | null>(() => flagEntity(
+    this.headerPays(),
+    this.ownPaysUser.currentUser()?.paysId ?? this.paysList()[0]?.id ?? null));
+  /** Une seule option : le pays retenu (le champ est en lecture seule). */
   readonly paysOptions = computed<SelectOption[]>(() =>
-    this.paysList().map(p => ({
+    this.paysList().filter(p => p.id === this.paysId()).map(p => ({
       value: String(p.id),
       label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})`,
       imageUrl: flagDataUri(p.isoCode),

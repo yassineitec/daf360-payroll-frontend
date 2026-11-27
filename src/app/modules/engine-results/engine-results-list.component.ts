@@ -48,6 +48,7 @@ import { readBlobError, saveBlob } from '../../shared/blob-download';
 import { PaysNamesService } from '../../core/pays-names.service';
 import { PageGuideComponent } from '../../shared/guide/page-guide.component';
 import type { GuideStep } from '../../shared/guide/page-guide.types';
+import { inHeaderPays, injectHeaderPays } from '../../core/header-pays';
 
 /** Guide de la page — `target` = un `data-guide` du gabarit. */
 const guideStep = (key: string, icon: string, target?: string): GuideStep => ({
@@ -125,7 +126,30 @@ export class EngineResultsListComponent implements OnInit {
   readonly error         = signal<string | null>(null);
 
   readonly searchText = signal('');
-  readonly paysFilter = signal<number | null>(null);
+  /**
+   * Les drapeaux de la barre (`179,53`) ; null = « Tous les pays ». Liste, personnel
+   * proposé et KPI suivent tous les pays cochés — le champ « Pays » du panneau est retiré.
+   */
+  private readonly headerPays = injectHeaderPays();
+  readonly paysFilter = computed<string | null>(() => this.headerPays() ?? null);
+  /** Le pays quand UN SEUL est coché — pour les appels de paie qui n'en prennent qu'un. */
+  private readonly singlePays = computed<number | null>(() => {
+    const ids = (this.paysFilter() ?? '').split(',').filter(Boolean);
+    return ids.length === 1 ? Number(ids[0]) : null;
+  });
+  private loadedPays: string | null | undefined = undefined;
+  /** Changement de drapeaux : personnel proposé, liste (page 0) et KPI rechargés. */
+  private readonly followPays = effect(() => {
+    const pays = this.paysFilter();
+    untracked(() => {
+      if (this.loadedPays === undefined || pays === this.loadedPays) return;
+      this.loadedPays = pays;
+      this.loadEmployeeOptions();
+      this.page.set(0);
+      this.load();
+      this.loadKpis();
+    });
+  });
   readonly statusFilter     = signal<string | null>(null);
   readonly departmentFilter = signal<string | null>(null);
   readonly contractFilter   = signal<string | null>(null);
@@ -156,7 +180,6 @@ export class EngineResultsListComponent implements OnInit {
   private readonly persistState = effect(() => {
     this.listState.save({
       searchText:       this.searchText(),
-      paysFilter:       this.paysFilter(),
       statusFilter:     this.statusFilter(),
       departmentFilter: this.departmentFilter(),
       contractFilter:   this.contractFilter(),
@@ -178,7 +201,6 @@ export class EngineResultsListComponent implements OnInit {
     const s = this.listState.restore();
     if (!s) return;
     this.searchText.set(s.searchText);
-    this.paysFilter.set(s.paysFilter);
     this.statusFilter.set(s.statusFilter);
     this.departmentFilter.set(s.departmentFilter);
     this.contractFilter.set(s.contractFilter);
@@ -192,6 +214,7 @@ export class EngineResultsListComponent implements OnInit {
 
   ngOnInit(): void {
     this.restoreState();
+    this.loadedPays = this.paysFilter();
     this.payrollApi.listPayrollPays()
       .pipe(catchError(() => of([] as PaysDto[])))
       .subscribe(list => this.paysList.set(list));
@@ -232,7 +255,9 @@ export class EngineResultsListComponent implements OnInit {
     const [from, to] = this.periodBounds();
     const picked = this.employeeFilter();
     const withResults$: Observable<number[] | null> = from || to
-      ? this.engineApi.getEmployeesWithResults({ paysId: this.paysFilter(), from, to })
+      // Plusieurs pays : sans pays (la liste est déjà bornée aux pays cochés, on n'en garde
+      // que l'intersection).
+      ? this.engineApi.getEmployeesWithResults({ paysId: this.singlePays(), from, to })
       : of(null);
     return withResults$.pipe(map(ids => {
       if (!ids) return picked.length ? new Set(picked) : null;
@@ -258,7 +283,8 @@ export class EngineResultsListComponent implements OnInit {
 
   loadKpis(): void {
     const current = ++this.kpiSeq;
-    const paysId = this.paysFilter();
+    const paysId = this.singlePays();
+    const flags = this.paysFilter();
     // Pas de remise à `null` ici : les tuiles restent affichées pendant le chargement,
     // leur contenu est simplement remplacé à l'arrivée de la réponse.
     this.kpiLoading.set(true);
@@ -267,11 +293,14 @@ export class EngineResultsListComponent implements OnInit {
     const scope = { from, to, employeeIds: picked };
     const summaries$ = paysId != null
       ? this.engineApi.getResultsSummary(paysId, scope).pipe(map(s => [s]))
-      : this.engineApi.getAllResultsSummaries(scope).pipe(map(list => list.filter(s => s.employeeCount > 0)));
+      // Aucun ou plusieurs drapeaux : un résumé par pays, ne garder que les pays cochés (les
+      // montants sont convertis dans la devise d'affichage avant d'être additionnés).
+      : this.engineApi.getAllResultsSummaries(scope).pipe(map(list =>
+          list.filter(s => s.employeeCount > 0 && inHeaderPays(flags ?? undefined, s.paysId))));
     forkJoin({
       summaries: summaries$.pipe(catchError(() => of(null))),
       // Collaborateurs choisis : la couverture se rapporte à eux, pas à tout l'effectif.
-      headcount: picked.length ? of(picked.length) : this.hrService.listEmployees({ paysId, page: 0, size: 1 }).pipe(
+      headcount: picked.length ? of(picked.length) : this.hrService.listEmployees({ paysId: flags, page: 0, size: 1 }).pipe(
         map(p => p.totalElements ?? 0),
         catchError(() => of(null)),
       ),
@@ -610,13 +639,6 @@ export class EngineResultsListComponent implements OnInit {
       label: e.employeeId ? `${e.fullName} (${e.employeeId})` : e.fullName,
     })),
   }, {
-    name: 'pays',
-    label: this.t('PAYROLL.ENGINE_RESULTS.FILTER_PAYS'),
-    type: 'select',
-    searchable: true,
-    placeholder: this.t('PAYROLL.ENGINE_RESULTS.FILTER_ALL'),
-    options: this.paysList().map(p => ({ value: String(p.id), label: `${this.paysNames.name(p.id, p.frenchLabel)} (${p.isoCode})` })),
-  }, {
     name: 'status',
     label: this.t('PAYROLL.ENGINE_RESULTS.FILTER_STATUS'),
     type: 'select',
@@ -648,7 +670,6 @@ export class EngineResultsListComponent implements OnInit {
     initialValues: {
       period:     this.periodFilter(),
       employees:  this.employeeFilter().map(String),
-      pays:      this.paysFilter() != null ? [String(this.paysFilter())] : [],
       status:     this.statusFilter() ? [this.statusFilter()!] : [],
       department: this.departmentFilter() ? [this.departmentFilter()!] : [],
       contract:   this.contractFilter() ? [this.contractFilter()!] : [],
@@ -656,14 +677,11 @@ export class EngineResultsListComponent implements OnInit {
   }));
 
   applyFilters(result: FilterResult): void {
-    const raw = result['pays'] as string | null;
-    const paysChanged = (raw ? Number(raw) : null) !== this.paysFilter();
-    this.paysFilter.set(raw ? Number(raw) : null);
+    // Pays : plus dans le panneau — ce sont les drapeaux de la barre (`followPays`).
     this.periodFilter.set(rangeSeed(result['period']));
     const picked = result['employees'];
     this.employeeFilter.set((Array.isArray(picked) ? picked : picked ? [picked] : [])
       .map(v => Number(v)).filter(n => Number.isFinite(n)));
-    if (paysChanged) this.loadEmployeeOptions();
     this.statusFilter.set((result['status'] as string | null) || null);
     this.departmentFilter.set((result['department'] as string | null) || null);
     this.contractFilter.set((result['contract'] as string | null) || null);
@@ -702,7 +720,11 @@ export class EngineResultsListComponent implements OnInit {
       id: e.userId,
       options: {
         clickable: true,
-        image: { initials: this.initials(e.fullName) },
+        // Photo RH quand le profil en a une (la lib la préfère aux initiales), initiales sinon.
+        image: {
+          initials: this.initials(e.fullName),
+          ...(this.hrService.photoSrc(e.photoUrl) ? { avatar: this.hrService.photoSrc(e.photoUrl)! } : {}),
+        },
         metadata: {
           title: e.fullName,
           // Département et contrat sont désormais des métriques de la carte : plus de
@@ -724,7 +746,7 @@ export class EngineResultsListComponent implements OnInit {
   );
 
   readonly employeeColumns = computed<TableColumn[]>(() => [
-    { key: 'name',       label: this.t('PAYROLL.ENGINE_RESULTS.COL_EMPLOYEE'),   sortable: true },
+    { key: 'name',       label: this.t('PAYROLL.ENGINE_RESULTS.COL_EMPLOYEE'), type: 'avatar', sortable: true },
     { key: 'matricule',  label: this.t('PAYROLL.ENGINE_RESULTS.COL_MATRICULE'),  sortable: true },
     { key: 'department', label: this.t('PAYROLL.ENGINE_RESULTS.COL_DEPARTMENT'), sortable: true },
     { key: 'contract',   label: this.t('PAYROLL.ENGINE_RESULTS.COL_CONTRACT'),   sortable: true },
@@ -770,7 +792,8 @@ export class EngineResultsListComponent implements OnInit {
   readonly employeeRows = computed<TableRow[]>(() =>
     this.employees().map(e => ({
       id:         e.userId,
-      name:       e.fullName,
+      // Cellule avatar de la lib : photo RH ronde, initiales sinon.
+      name:       { name: e.fullName, ...(this.hrService.photoSrc(e.photoUrl) ? { avatar: this.hrService.photoSrc(e.photoUrl)! } : {}) },
       matricule:  e.employeeId ?? '—',
       department: e.department ?? '—',
       contract:   this.contractLabel(e.contractType),
@@ -919,8 +942,8 @@ export class EngineResultsListComponent implements OnInit {
     this.batchYear.set(new Date().getFullYear());
     this.batchJours.set(22);
     this.batchSkipDone.set(true);
-    // Pays filtré de la liste, s'il y en a un.
-    this.batchPaysId.set(this.paysFilter());
+    // Le pays coché, s'il n'y en a qu'un (le calcul en lot porte sur un pays).
+    this.batchPaysId.set(this.singlePays());
     this.prepareBatch();
     this.batchRef = this.openBatchModal();
   }
