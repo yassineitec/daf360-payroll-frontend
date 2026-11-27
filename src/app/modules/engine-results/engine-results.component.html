@@ -25,6 +25,12 @@
       <app-employee-details-card data-guide="res-detail-card"
         [name]="employeeName()" [employee]="employee()" [profile]="profile()" [loading]="profileLoading()" />
 
+      <!-- Soldes de congés du bulletin ouvert (début → fin de la période) : petite carte entre
+           « Détails » et les actions — la colonne de droite garde les tuiles KPI du bulletin en tête. -->
+      @if (openVariableInputs(); as vi) {
+        <app-leave-balance-cards [inputs]="vi" [small]="true" />
+      }
+
       <!-- Actions — sous la carte Détails, dans leur propre carte, comme le centre d'actions de
            /finance/affaires/:id : action principale en `lg` pleine largeur, puis la secondaire. -->
       <daf-section-card data-guide="res-detail-actions">
@@ -55,6 +61,7 @@
           </div>
         </div>
       </daf-section-card>
+
     </div>
 
     <!-- ══ COLONNE DROITE — KPI, liste des périodes, détail ═════════════════ -->
@@ -270,6 +277,7 @@
           </span>
         </div>
         @if (p.variableInputs; as vi) {
+          <app-leave-balance-cards [inputs]="vi" [compact]="true" />
           <app-variable-inputs-card [inputs]="vi" [compact]="true" />
         }
       </div>

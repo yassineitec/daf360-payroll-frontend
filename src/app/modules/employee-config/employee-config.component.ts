@@ -30,7 +30,7 @@ import {
   type TableRow,
   MultiDatePickerComponent,
 } from '@khalilrebhiitec/daf360';
-import { PayrollApiService, BenefitCatalogueDto, PaysDto, FxRateDto } from '../../core/payroll-api.service';
+import { PayrollApiService, BenefitCatalogueDto, PaysDto, FxRateDto, EmployeeOvertimeCapDto } from '../../core/payroll-api.service';
 import { EmployeeProfileDetail, HrProfileService, HrContractType, contractTypeLabel } from '../../core/hr-profile.service';
 import { EmployeeDetailsCardComponent, MARITAL_KEYS } from '../../shared/employee-details/employee-details-card.component';
 import { NotificationService } from '../../core/notification.service';
@@ -226,6 +226,68 @@ export class EmployeeConfigComponent implements OnInit {
   });
 
   /** Liens d'en-tête vers les autres écrans du collaborateur, selon les droits. */
+  // ── Plafond des heures supplémentaires de week-end (V43) ─────────────────
+  /** The employee's own cap → role → country. Saved on its own, outside the salary circuit. */
+  readonly otCap = signal<EmployeeOvertimeCapDto | null>(null);
+  readonly otCapDraft = signal<number | null>(null);
+  readonly otCapSaving = signal(false);
+  readonly otCapError = signal<string | null>(null);
+  readonly canEditOtCap = computed(() =>
+    this.userStore.hasPermission('PAYROLL_MANAGE_EMPLOYEE_CONFIG') || this.userStore.hasPermission('PAYROLL_SUPER_ADMIN'));
+
+  private loadOtCap(): void {
+    this.payrollApi.getEmployeeOvertimeCap(this.userId).subscribe({
+      next: v => { this.otCap.set(v); this.otCapDraft.set(v.ownCap); },
+      error: () => this.otCap.set(null),
+    });
+  }
+
+  /** « 6 h par jour — plafond du rôle Collaborateur ». */
+  readonly otCapSummary = computed(() => {
+    const v = this.otCap();
+    if (!v) return '';
+    const source = v.source === 'EMPLOYEE' ? this.t('PAYROLL.EMPLOYEE_CONFIG.OT_SOURCE_EMPLOYEE')
+      : v.source === 'ROLE' ? this.t('PAYROLL.EMPLOYEE_CONFIG.OT_SOURCE_ROLE', { role: v.roleLabel ?? '—' })
+      : v.source === 'COUNTRY' ? this.t('PAYROLL.EMPLOYEE_CONFIG.OT_SOURCE_COUNTRY')
+      : this.t('PAYROLL.EMPLOYEE_CONFIG.OT_SOURCE_DEFAULT');
+    return this.t('PAYROLL.EMPLOYEE_CONFIG.OT_EFFECTIVE', { hours: v.effectiveCap, source });
+  });
+
+  /** What applies when the field is empty: the role's cap, else the country's. */
+  readonly otCapFallback = computed(() => {
+    const v = this.otCap();
+    if (!v) return '';
+    return v.roleCap != null
+      ? this.t('PAYROLL.EMPLOYEE_CONFIG.OT_FALLBACK_ROLE', { hours: v.roleCap, role: v.roleLabel ?? '—' })
+      : this.t('PAYROLL.EMPLOYEE_CONFIG.OT_FALLBACK_COUNTRY', { hours: v.countryCap });
+  });
+
+  readonly otCapDirty = computed(() => (this.otCap()?.ownCap ?? null) !== this.otCapDraft());
+
+  onOtCap(value: unknown): void {
+    const n = value === '' || value == null ? null : Number(value);
+    this.otCapDraft.set(n != null && Number.isFinite(n) ? n : null);
+    this.otCapError.set(null);
+  }
+
+  saveOtCap(clear = false): void {
+    if (this.otCapSaving()) return;
+    const hours = clear ? null : this.otCapDraft();
+    if (hours != null && (hours < 0 || hours > 24)) {
+      this.otCapError.set(this.t('PAYROLL.EMPLOYEE_CONFIG.OT_ERR'));
+      return;
+    }
+    this.otCapSaving.set(true);
+    this.payrollApi.saveEmployeeOvertimeCap(this.userId, hours).subscribe({
+      next: v => { this.otCapSaving.set(false); this.otCap.set(v); this.otCapDraft.set(v.ownCap); },
+      error: err => {
+        this.otCapSaving.set(false);
+        const body = (err as { error?: { detail?: string; message?: string } } | null)?.error;
+        this.otCapError.set(body?.detail ?? body?.message ?? this.t('PAYROLL.ADMIN.ERROR'));
+      },
+    });
+  }
+
   readonly canViewResults = computed(() => this.userStore.hasPermission('PAYROLL_VIEW_RESULTS'));
   readonly canRunEngine   = computed(() => this.userStore.hasPermission('PAYROLL_RUN_ENGINE'));
 
@@ -749,7 +811,7 @@ export class EmployeeConfigComponent implements OnInit {
     this.payrollApi.listPays().subscribe(pays => this.paysList.set(pays));
     this.payrollApi.listPayrollPays().subscribe(pays => this.payrollPays.set(pays));
     this.payrollApi.getFxRates().subscribe(rates => this.fxRates.set(rates));
-    if (Number.isFinite(this.userId)) this.load(this.userId);
+    if (Number.isFinite(this.userId)) { this.load(this.userId); this.loadOtCap(); }
     this.loadProfile();
     // Fermeture ou rechargement de l'onglet du navigateur avec des modifications en cours.
     const beforeUnload = (e: BeforeUnloadEvent) => { if (this.dirty()) e.preventDefault(); };

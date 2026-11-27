@@ -17,6 +17,7 @@ import { EmployeeConfigService } from '../employee-config/employee-config.servic
 import { EngineResultDetailComponent } from './engine-result-detail.component';
 import { PageGuideComponent } from '../../shared/guide/page-guide.component';
 import { VariableInputsCardComponent } from '../../shared/variable-inputs/variable-inputs-card.component';
+import { LeaveBalanceCardsComponent } from '../../shared/variable-inputs/leave-balance-cards.component';
 import type { GuideStep } from '../../shared/guide/page-guide.types';
 import {
   ButtonComponent,
@@ -97,7 +98,7 @@ const GUIDE_PAYSLIP = guideStep('PAYSLIP', 'receipt_long', 'res-detail-payslip')
     FormFieldComponent, SelectComponent,
     MetricCardComponent, PageComponent, PageHeaderComponent, PaginationComponent,
     SearchToolbarComponent, SectionCardComponent,
-    EngineResultDetailComponent, PageGuideComponent, VariableInputsCardComponent,
+    EngineResultDetailComponent, PageGuideComponent, VariableInputsCardComponent, LeaveBalanceCardsComponent,
   ],
   templateUrl: './engine-results.component.html',
   styleUrl: './engine-results.component.scss',
@@ -531,6 +532,15 @@ export class EngineResultsComponent {
     { initialValue: Number(this.route.snapshot.queryParamMap.get('result')) || null },
   );
   private readonly detailEl = viewChild(EngineResultDetailComponent, { read: ElementRef });
+
+  /** Variable elements of the open payslip — feeds the « Soldes de congés » block of the left
+   *  column (kept out of the right column so the payslip's KPI tiles stay on top). */
+  readonly openVariableInputs = computed(() => {
+    const id = this.selectedResultId();
+    if (!id) return null;
+    const r = this.shownResults().find(x => x.resultId === id) ?? this.results().find(x => x.resultId === id);
+    return r?.variableInputs ?? null;
+  });
 
   /** Ligne du tableau, carte ou icône 👁 → bulletin affiché à la place de la liste. */
   openDetail(id: number): void {

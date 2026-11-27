@@ -464,12 +464,17 @@ export class EngineParamsAdminComponent implements OnInit {
 
   /** Clés utilisées par les rubriques actives et absentes de la version ouverte. */
   readonly missingKeys = computed(() => {
-    const present = new Set(this.entries().map(e => e.key));
+    const present = new Set(this.entries().map(e => e.key.toUpperCase()));
+    // The base-salary line's amount key is filled by every run with the employee's own gross
+    // (same rule as the server: SALAIRE_BASE, else the first strate-1 fixed amount): a version
+    // does not need to hold it.
+    const fixedBase = this.rubriques().filter(r => r.strate === 1 && r.modeCalcul === 'MONTANT_FIXE' && r.paramKeyTaux);
+    const baseKey = (fixedBase.find(r => r.code === 'SALAIRE_BASE') ?? fixedBase[0])?.paramKeyTaux ?? null;
     const used = new Set<string>();
     for (const r of this.rubriques()) {
-      for (const k of [r.paramKeyTaux, r.paramKeyPlafond, r.paramKeyBareme]) if (k) used.add(k);
+      for (const k of [r.paramKeyTaux, r.paramKeyPlafond, r.paramKeyBareme]) if (k && k !== baseKey) used.add(k);
     }
-    return [...used].filter(k => !present.has(k)).sort();
+    return [...used].filter(k => !present.has(k.toUpperCase())).sort();
   });
 
   /** Libellés des éléments du bulletin (rubriques actives) qui utilisent une clé. */

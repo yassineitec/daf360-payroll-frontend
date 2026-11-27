@@ -175,9 +175,14 @@ export interface PayrollVariableInputs {
   hourlyRate: number;
   dailyRate: number;
   overtime: {
+    /** Since V43: hours-weighted average of the days' own majorations. */
     majorationPct: number | null;
     dailyCapHours: number;
-    days: { date: string; dayOfWeek: string; workedHours: number; paidHours: number; capped: boolean }[];
+    /** EMPLOYEE / ROLE / COUNTRY / DEFAULT — absent before V43. */
+    capSource?: string | null;
+    days: { date: string; dayOfWeek: string; workedHours: number; paidHours: number; capped: boolean;
+            /** The day's own majoration and amount — absent before V43. */
+            majorationPct?: number | null; amount?: number | null }[];
     paidHours: number;
     cappedOutHours: number;
     amount: number;

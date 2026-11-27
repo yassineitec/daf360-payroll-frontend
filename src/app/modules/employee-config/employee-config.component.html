@@ -158,6 +158,42 @@
               </div>
             </div>
           </daf-section-card>
+
+          <!-- Plafond des heures sup. de week-end propre à ce collaborateur (V43) : enregistré
+               à part, hors du circuit de validation du salaire. Vide = plafond du rôle, sinon du pays. -->
+          @if (otCap(); as oc) {
+            <daf-section-card
+              [title]="'PAYROLL.EMPLOYEE_CONFIG.OT_TITLE' | translate"
+              [hint]="otCapSummary()"
+              [options]="{ padding: 'lg' }">
+              <div class="ec-ot">
+                <daf-form-field
+                  [value]="otCapDraft() ?? ''"
+                  (valueChange)="onOtCap($event)"
+                  [options]="{ type: 'number', align: 'end', suffixText: 'h', fullWidth: true,
+                               disabled: !canEditOtCap(),
+                               label: ('PAYROLL.EMPLOYEE_CONFIG.OT_LABEL' | translate),
+                               hint: otCapFallback(),
+                               error: otCapError() ?? undefined }" />
+                @if (canEditOtCap()) {
+                  <div class="ec-ot__actions">
+                    @if (oc.ownCap != null) {
+                      <daf-button
+                        [label]="'PAYROLL.EMPLOYEE_CONFIG.OT_CLEAR' | translate"
+                        variant="ghost"
+                        [options]="{ disabled: otCapSaving() }"
+                        (onClick)="saveOtCap(true)" />
+                    }
+                    <daf-button
+                      [label]="'PAYROLL.EMPLOYEE_CONFIG.OT_SAVE' | translate"
+                      variant="teal"
+                      [options]="{ iconStart: 'save', disabled: otCapSaving() || !otCapDirty() }"
+                      (onClick)="saveOtCap()" />
+                  </div>
+                }
+              </div>
+            </daf-section-card>
+          }
         </div>
         }
 

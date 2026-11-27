@@ -60,15 +60,24 @@ export class VariableInputsCardComponent {
     return new Date(2024, 0, 1 + idx).toLocaleDateString(this.locale(), { weekday: 'long' });
   }
 
+  /** Snapshots since V43 carry each day's own majoration and amount. */
+  readonly hasDayDetail = computed(() =>
+    this.inputs().overtime.days.some(d => d.majorationPct !== undefined || d.amount !== undefined));
+
   readonly overtimeDetail = computed(() => {
     const o = this.inputs().overtime;
+    // One majoration for every day → that value; several → « selon le jour »; none → « non configurée ».
+    const dayPcts = [...new Set(o.days.map(d => d.majorationPct).filter((p): p is number => p != null))];
+    const pct = dayPcts.length > 1 ? this.translate.instant('PAYROLL.VARIABLE_INPUTS.OVERTIME_PER_DAY')
+      : dayPcts.length === 1 ? this.num(dayPcts[0]) + ' %'
+      : o.majorationPct != null ? this.num(o.majorationPct) + ' %'
+      : this.translate.instant('PAYROLL.VARIABLE_INPUTS.OVERTIME_NO_PCT');
+    const sourceKey = o.capSource ? 'PAYROLL.VARIABLE_INPUTS.CAP_SOURCE_' + o.capSource : null;
     return this.translate.instant('PAYROLL.VARIABLE_INPUTS.OVERTIME_DETAIL', {
       hours: this.num(o.paidHours),
-      pct: o.majorationPct == null
-        ? this.translate.instant('PAYROLL.VARIABLE_INPUTS.OVERTIME_NO_PCT')
-        : this.num(o.majorationPct) + ' %',
+      pct,
       cap: this.num(o.dailyCapHours),
-    });
+    }) + (sourceKey ? ' ' + this.translate.instant(sourceKey) : '');
   });
 
   readonly unpaidAbsences = computed(() => this.inputs().absences.items.filter(a => a.deductsSalary));
@@ -89,19 +98,6 @@ export class VariableInputsCardComponent {
       from: this.fullDate(i.periodFrom), to: this.fullDate(i.periodTo),
     });
   });
-
-  /** One line per balance: « Congé : 15 j au début → 13 j à la fin (2 j pris dans la période) ». */
-  readonly balanceLines = computed(() => (this.inputs().balances ?? []).map(b => {
-    const key = `PAYROLL.VARIABLE_INPUTS.BALANCE_${b.field}`;
-    const translated = this.translate.instant(key);
-    const label = translated === key ? b.field : translated;
-    const text = b.atPeriodStart == null || b.atPeriodEnd == null
-      ? this.translate.instant('PAYROLL.VARIABLE_INPUTS.BALANCE_NONE', { label })
-      : this.translate.instant('PAYROLL.VARIABLE_INPUTS.BALANCE_LINE', {
-          label, start: this.num(b.atPeriodStart), end: this.num(b.atPeriodEnd), taken: this.num(b.takenInPeriod ?? 0),
-        });
-    return { field: b.field, text };
-  }));
 
   readonly nonEmployedDetail = computed(() => {
     const i = this.inputs();

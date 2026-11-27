@@ -12,6 +12,11 @@
   .detail-aside { flex: 1 1 100%; max-width: none; min-width: 0; position: static; }
 }
 
+/* Plafond des heures sup. de week-end du collaborateur (V43). */
+.ec-ot { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; }
+.ec-ot daf-form-field { flex: 0 1 320px; }
+.ec-ot__actions { display: flex; gap: 8px; margin-left: auto; }
+
 /* Dernière modification, sous les actions. */
 .ec-last-change { margin: 0; font-size: 12px; line-height: 1.4; color: var(--color-on-surface-variant, #44474c); }
 

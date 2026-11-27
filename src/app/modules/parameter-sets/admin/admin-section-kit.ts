@@ -115,12 +115,17 @@ export class AdminPager<T extends TableRow> {
   readonly current: Signal<number>;
   readonly rows: Signal<T[]>;
 
-  constructor(source: () => T[], columns?: () => TableColumn[], size = ADMIN_PAGE_SIZE) {
+  /**
+   * `size`: a fixed page size ({@link ADMIN_PAGE_SIZE} by default), or a getter — e.g. the
+   * signal behind a `daf-pagination` page-size dropdown — read reactively.
+   */
+  constructor(source: () => T[], columns?: () => TableColumn[], size: number | (() => number) = ADMIN_PAGE_SIZE) {
+    const sizeOf = typeof size === 'function' ? size : () => size;
     const sorted = computed(() => columns ? sortTableRows(source(), columns(), this.sort()) : source());
     this.total = computed(() => source().length);
-    this.totalPages = computed(() => Math.max(1, Math.ceil(this.total() / size)));
+    this.totalPages = computed(() => Math.max(1, Math.ceil(this.total() / sizeOf())));
     this.current = computed(() => Math.min(this.page(), this.totalPages() - 1));
-    this.rows = computed(() => sorted().slice(this.current() * size, (this.current() + 1) * size));
+    this.rows = computed(() => sorted().slice(this.current() * sizeOf(), (this.current() + 1) * sizeOf()));
   }
 
   go(page: number): void {

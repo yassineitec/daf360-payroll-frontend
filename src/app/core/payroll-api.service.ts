@@ -563,9 +563,67 @@ export interface LeaveSettingsDto {
   leaveTypes: LeaveTypeRuleDto[];
 }
 
+/** Weekend-overtime settings of one country (V43, OvertimeSettingsService.AdminView). */
+export interface OvertimeSettingsDto {
+  paysId: number;
+  /** False = RH unreachable (weekend assumed Saturday / Sunday, no role list). */
+  hrRead: boolean;
+  /** One entry per weekend day of the country: its own % (null = default) and the effective one. */
+  days: { dayOfWeek: string; ownPct: number | null; effectivePct: number | null }[];
+  /** TAUX_MAJORATION_HS_WEEKEND of « Taux et barèmes » (null = not set). */
+  defaultPct: number | null;
+  /** PLAFOND_HS_JOUR of « Taux et barèmes », else 8. */
+  countryCap: number;
+  countryCapFromParams: boolean;
+  roles: { roleId: number; labelFr: string; labelEn: string; capHours: number | null }[];
+}
+
+/** Daily overtime cap of one employee (V43, OvertimeSettingsService.EmployeeView). */
+export interface EmployeeOvertimeCapDto {
+  userId: number;
+  paysId: number | null;
+  roleId: number | null;
+  roleLabel: string | null;
+  /** The employee's own cap (null = none). */
+  ownCap: number | null;
+  roleCap: number | null;
+  countryCap: number;
+  effectiveCap: number;
+  source: 'EMPLOYEE' | 'ROLE' | 'COUNTRY' | 'DEFAULT';
+  hrRead: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class PayrollApiService {
   private readonly base = environment.payrollApiUrl + '/api/payroll';
+
+  // ── Heures supplémentaires de week-end (V43) ─────────────────────────────
+
+  getOvertimeSettings(paysId: number): Observable<OvertimeSettingsDto> {
+    return this.http.get<OvertimeSettingsDto>(`${this.base}/admin/overtime-settings/${paysId}`);
+  }
+
+  /** `pct` null = back to the default (TAUX_MAJORATION_HS_WEEKEND). */
+  saveOvertimeDayRate(paysId: number, day: string, pct: number | null): Observable<OvertimeSettingsDto> {
+    return this.http.put<OvertimeSettingsDto>(`${this.base}/admin/overtime-settings/${paysId}/days/${day}`,
+      { majorationPct: pct });
+  }
+
+  /** `hours` null = back to the country cap. */
+  saveOvertimeRoleCap(paysId: number, roleId: number, hours: number | null): Observable<OvertimeSettingsDto> {
+    return this.http.put<OvertimeSettingsDto>(`${this.base}/admin/overtime-settings/${paysId}/roles/${roleId}`,
+      { capHours: hours });
+  }
+
+  getEmployeeOvertimeCap(userId: number): Observable<EmployeeOvertimeCapDto> {
+    return this.http.get<EmployeeOvertimeCapDto>(`${this.base}/employee-configs/${userId}/overtime-cap`);
+  }
+
+  /** `hours` null = back to the role / country cap. */
+  saveEmployeeOvertimeCap(userId: number, hours: number | null): Observable<EmployeeOvertimeCapDto> {
+    return this.http.put<EmployeeOvertimeCapDto>(`${this.base}/employee-configs/${userId}/overtime-cap`,
+      { capHours: hours });
+  }
 
   constructor(private http: HttpClient) {}
 

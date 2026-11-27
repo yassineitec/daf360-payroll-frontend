@@ -89,7 +89,7 @@
     @case ('rubriques')     { <app-engine-rubriques-admin #rubriquesSection /> }
     @case ('benefits')      { <app-benefits-catalogue-admin /> }
     @case ('advance-rules') { <app-advance-rules-admin /> }
-    @case ('leave-settings') { <app-leave-settings-admin /> }
+    @case ('leave-settings') { <app-leave-settings-admin [paysId]="listPaysId()" [paysLabel]="currentPays()" /> }
     @case ('audit')         { <app-payroll-audit-admin /> }
     @case ('help-faq')      { <app-help-faq-admin /> }
 

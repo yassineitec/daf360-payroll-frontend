@@ -52,6 +52,10 @@
           <th>{{ 'PAYROLL.VARIABLE_INPUTS.COL_DAY' | translate }}</th>
           <th class="vi-num">{{ 'PAYROLL.VARIABLE_INPUTS.COL_WORKED' | translate }}</th>
           <th class="vi-num">{{ 'PAYROLL.VARIABLE_INPUTS.COL_PAID' | translate }}</th>
+          @if (hasDayDetail()) {
+            <th class="vi-num">{{ 'PAYROLL.VARIABLE_INPUTS.COL_MAJORATION' | translate }}</th>
+            <th class="vi-num">{{ 'PAYROLL.VARIABLE_INPUTS.COL_AMOUNT' | translate }}</th>
+          }
         </tr>
       </thead>
       <tbody>
@@ -66,6 +70,10 @@
                 <span class="vi-chip">{{ 'PAYROLL.VARIABLE_INPUTS.CAPPED' | translate }}</span>
               }
             </td>
+            @if (hasDayDetail()) {
+              <td class="vi-num">{{ d.majorationPct == null ? '—' : num(d.majorationPct) + ' %' }}</td>
+              <td class="vi-num">{{ money(d.amount) }}</td>
+            }
           </tr>
         }
       </tbody>
@@ -148,19 +156,7 @@
     </div>
   }
 
-  <!-- Soldes de congés avant / après la période (information, rien n'est payé ni retenu) -->
-  @if (balanceLines().length) {
-    <div class="vi-row">
-      <div class="vi-row__main">
-        <span class="vi-row__label">{{ 'PAYROLL.VARIABLE_INPUTS.BALANCES' | translate }}</span>
-        @for (b of balanceLines(); track b.field) {
-          <span class="vi-row__detail">{{ b.text }}</span>
-        }
-        <span class="vi-row__detail vi-row__detail--muted">{{ 'PAYROLL.VARIABLE_INPUTS.BALANCES_HINT' | translate }}</span>
-      </div>
-      <span class="vi-amount">—</span>
-    </div>
-  }
+  <!-- Soldes de congés : plus ici — tuiles en tête du bulletin (app-leave-balance-cards). -->
 
   <p class="vi-rates">{{ rates() }}</p>
 </ng-template>
