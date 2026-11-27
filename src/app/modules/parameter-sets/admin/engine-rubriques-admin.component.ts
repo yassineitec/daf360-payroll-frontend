@@ -85,7 +85,7 @@ const NONE = '__none__';
       <daf-search-toolbar
         [card]="true"
         [placeholder]="'PAYROLL.ADMIN_HOME.RUBRIQUES.SEARCH' | translate"
-        [value]="search()" [debounce]="200" (valueChange)="search.set($event ?? '')"
+        [value]="search()" [debounce]="200" (valueChange)="search.set($event)"
         [filterFields]="filterFields()"
         [filterConfig]="filterConfig()"
         (filterApply)="filters.set($event)"

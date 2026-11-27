@@ -53,7 +53,7 @@ import {
   PAYROLL_AUDIT_PERMISSIONS, PAYROLL_BENEFITS_PERMISSIONS, PAYROLL_COUNTRIES_PERMISSIONS,
   PAYROLL_CREATE_PARAMSET_PERMISSIONS, PAYROLL_ENGINE_PARAMS_PERMISSIONS,
   PAYROLL_ENGINE_RUBRIQUES_PERMISSIONS, PAYROLL_HELP_FAQ_PERMISSIONS,
-  PAYROLL_SALARY_ADVANCES_PERMISSIONS,
+  PAYROLL_LEAVE_SETTINGS_PERMISSIONS, PAYROLL_SALARY_ADVANCES_PERMISSIONS,
 } from '../../core/payroll-nav';
 import { AdminSectionHeaderComponent } from './admin/admin-section-header.component';
 import { rememberAdminState } from './admin/admin-section-state';
@@ -68,6 +68,7 @@ import { EngineRubriquesAdminComponent } from './admin/engine-rubriques-admin.co
 import { PayrollAuditAdminComponent } from './admin/payroll-audit-admin.component';
 import { PayrollCountriesAdminComponent } from './admin/payroll-countries-admin.component';
 import { HelpFaqAdminComponent } from './admin/help-faq-admin.component';
+import { LeaveSettingsAdminComponent } from './admin/leave-settings-admin.component';
 import { dayRange, distinctSorted, inDayRange, pickValue, rangeSeed } from '../../shared/filter-utils';
 import { PaysNamesService } from '../../core/pays-names.service';
 import { PageGuideComponent } from '../../shared/guide/page-guide.component';
@@ -88,7 +89,7 @@ type WorkflowStep = 'submit' | 'hr' | 'finance';
 /** Réglage IRPP modifiable sur place dans l'onglet « Vue d'ensemble ». */
 type SettingKey = 'ratePct' | 'cap' | 'married' | 'perChild' | 'maxChildren';
 
-type ParamSetsSection = 'create' | 'list' | 'countries' | 'engine-params' | 'rubriques' | 'benefits' | 'advance-rules' | 'audit' | 'help-faq';
+type ParamSetsSection = 'create' | 'list' | 'countries' | 'engine-params' | 'rubriques' | 'benefits' | 'advance-rules' | 'leave-settings' | 'audit' | 'help-faq';
 
 /** Même langage ton → couleur d'icône que les cartes de /rh/admin. */
 const TONE_ICON = {
@@ -129,6 +130,8 @@ const CARDS: AdminCard[] = [
   { key: 'rubriques',       labelKey: 'PAYROLL.ADMIN_HOME.CARDS.RUBRIQUES',        icon: 'receipt_long',    tone: 'primary',   permissions: PAYROLL_ENGINE_RUBRIQUES_PERMISSIONS, helpKey: 'RUBRIQUES' },
   // { key: 'benefits',        labelKey: 'PAYROLL.ADMIN_HOME.CARDS.BENEFITS',         icon: 'redeem',          tone: 'teal',      permissions: PAYROLL_BENEFITS_PERMISSIONS, helpKey: 'BENEFITS' },
   { key: 'advance-rules',   labelKey: 'PAYROLL.ADMIN_HOME.CARDS.ADVANCE_RULES',    icon: 'request_quote',   tone: 'warning',   permissions: PAYROLL_SALARY_ADVANCES_PERMISSIONS, helpKey: 'ADVANCE_RULES' },
+  // Période de paie et absences déduites du salaire, par pays (V42).
+  { key: 'leave-settings',  labelKey: 'PAYROLL.ADMIN_HOME.CARDS.LEAVE_SETTINGS',   icon: 'event_busy',      tone: 'teal',      permissions: PAYROLL_LEAVE_SETTINGS_PERMISSIONS, helpKey: 'LEAVE_SETTINGS' },
   // Rémunération : entrée de la barre latérale depuis le 2026-11-10.
   // { key: 'employee-config', labelKey: 'PAYROLL.ADMIN_HOME.CARDS.EMPLOYEE_CONFIG',  icon: 'manage_accounts', tone: 'teal',      permissions: PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS, route: '/payroll/employee-config', helpKey: 'EMPLOYEE_CONFIG' },
   { key: 'audit',           labelKey: 'PAYROLL.ADMIN_HOME.CARDS.AUDIT',            icon: 'history',         tone: 'secondary', permissions: PAYROLL_AUDIT_PERMISSIONS, helpKey: 'AUDIT' },
@@ -251,7 +254,8 @@ const SECTION_GUIDES: Partial<Record<ParamSetsSection, GuideStep[]>> = {
     SearchToolbarComponent, SectionTitleComponent, SelectComponent, StatusBadgeComponent, TabsComponent,
     AdminModalFooterComponent, AdminSectionHeaderComponent, AdminSpinnerComponent, AdminTableFooterComponent,
     AdvanceRulesAdminComponent, BenefitsCatalogueAdminComponent, EngineParamsAdminComponent, EngineRubriquesAdminComponent,
-    PayrollAuditAdminComponent, PayrollCountriesAdminComponent, HelpFaqAdminComponent, PageGuideComponent,
+    PayrollAuditAdminComponent, PayrollCountriesAdminComponent, HelpFaqAdminComponent, LeaveSettingsAdminComponent,
+    PageGuideComponent,
   ],
   templateUrl: './parameter-sets.component.html',
   styleUrl: './parameter-sets.component.scss',

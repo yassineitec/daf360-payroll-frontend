@@ -64,7 +64,7 @@ const CURRENCIES = ['TND', 'EGP', 'EUR', 'USD'];
         <daf-search-toolbar
           [card]="false"
           [placeholder]="'PAYROLL.SALARY_ADVANCES.SEARCH_RULES' | translate"
-          [value]="search()" [debounce]="200" (valueChange)="search.set($event ?? '')"
+          [value]="search()" [debounce]="200" (valueChange)="search.set($event)"
           [filterFields]="filterFields()"
           [filterConfig]="filterConfig()"
           (filterApply)="filters.set($event)"

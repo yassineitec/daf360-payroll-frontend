@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, TemplateRef, afterNextRender, computed, inject, signal, untracked, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, TemplateRef, afterNextRender, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { UserStore } from '../../core/user.store';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { catchError, map, of } from 'rxjs';
@@ -16,6 +16,7 @@ import { recallEmployee } from './engine-results-employee';
 import { EmployeeConfigService } from '../employee-config/employee-config.service';
 import { EngineResultDetailComponent } from './engine-result-detail.component';
 import { PageGuideComponent } from '../../shared/guide/page-guide.component';
+import { VariableInputsCardComponent } from '../../shared/variable-inputs/variable-inputs-card.component';
 import type { GuideStep } from '../../shared/guide/page-guide.types';
 import {
   ButtonComponent,
@@ -96,7 +97,7 @@ const GUIDE_PAYSLIP = guideStep('PAYSLIP', 'receipt_long', 'res-detail-payslip')
     FormFieldComponent, SelectComponent,
     MetricCardComponent, PageComponent, PageHeaderComponent, PaginationComponent,
     SearchToolbarComponent, SectionCardComponent,
-    EngineResultDetailComponent, PageGuideComponent,
+    EngineResultDetailComponent, PageGuideComponent, VariableInputsCardComponent,
   ],
   templateUrl: './engine-results.component.html',
   styleUrl: './engine-results.component.scss',
@@ -740,6 +741,70 @@ export class EngineResultsComponent {
     return !!this.calcPaysId() && !!this.calcContract() && this.calcJours() >= 1 && !this.calcRunning();
   }
 
+  // ── Aperçu du mois (V41) : même calcul que « Lancer le calcul », rien d'enregistré ──────
+  // Rejoué à chaque changement de pays / période / contrat / jours tant que la pop-up est
+  // ouverte : heures sup. de week-end, absences, autorisations, primes, avances et net estimé.
+  readonly calcOpen           = signal(false);
+  readonly calcPreview        = signal<RunPayrollResponse | null>(null);
+  readonly calcPreviewLoading = signal(false);
+  readonly calcPreviewError   = signal<string | null>(null);
+  private previewSeq = 0;
+  private previewTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private readonly refreshCalcPreview = effect(() => {
+    const open = this.calcOpen();
+    const paysId = this.calcPaysId(), contract = this.calcContract(), jours = this.calcJours();
+    const year = this.calcYear(), month = this.calcMonth();
+    untracked(() => {
+      if (this.previewTimer) clearTimeout(this.previewTimer);
+      const seq = ++this.previewSeq;
+      if (!open || !paysId || !contract || jours < 1) {
+        this.calcPreview.set(null);
+        this.calcPreviewLoading.set(false);
+        this.calcPreviewError.set(null);
+        return;
+      }
+      this.calcPreviewLoading.set(true);
+      this.calcPreviewError.set(null);
+      // Court délai : un changement de mois puis d'année ne lance qu'un aperçu.
+      this.previewTimer = setTimeout(() => {
+        this.engineApi.previewRun({
+          employeeId: this.employeeId, paysId, periodYear: year, periodMonth: month,
+          contractTypeCode: contract, joursOuvresMois: jours,
+        }).subscribe({
+          next: r => {
+            if (seq !== this.previewSeq) return;
+            this.calcPreview.set(r);
+            this.calcPreviewLoading.set(false);
+          },
+          error: e => {
+            if (seq !== this.previewSeq) return;
+            this.calcPreview.set(null);
+            this.calcPreviewLoading.set(false);
+            this.calcPreviewError.set(this.t('PAYROLL.VARIABLE_INPUTS.PREVIEW_ERROR', {
+              message: e?.error?.detail ?? e?.error?.message ?? this.t('PAYROLL.ENGINE_RUN.ERROR'),
+            }));
+          },
+        });
+      }, 300);
+    });
+  });
+
+  private readonly clearPreviewTimer = inject(DestroyRef).onDestroy(() => {
+    if (this.previewTimer) clearTimeout(this.previewTimer);
+  });
+
+  /** Montant de l'aperçu, dans la devise du pays du calcul (celle de l'aperçu). */
+  previewMoney(v: number | null | undefined): string {
+    if (v == null) return '—';
+    const locale = this.translate.currentLang() === 'en' ? 'en-GB' : 'fr-FR';
+    const currency = this.calcPreview()?.variableInputs?.currency ?? null;
+    return new Intl.NumberFormat(locale, {
+      ...(currency ? { style: 'currency', currency } : {}),
+      minimumFractionDigits: 2, maximumFractionDigits: 3,
+    }).format(v);
+  }
+
   /** Calcul réservé à qui peut lancer le moteur (même droit que `POST /engine/run`). */
   readonly canRunEngine = computed(() => this.userStore.hasPermission('PAYROLL_RUN_ENGINE'));
 
@@ -801,10 +866,12 @@ export class EngineResultsComponent {
       size: 'md',
       closeOnBackdrop: false,
       buttons: [
-        { label: this.t('PAYROLL.ENGINE_RUN.EXISTING_CONFIRM_CANCEL'), variant: 'secondary', action: r => r.close() },
+        { label: this.t('PAYROLL.ENGINE_RUN.EXISTING_CONFIRM_CANCEL'), variant: 'secondary',
+          action: r => { this.calcOpen.set(false); r.close(); } },
         { label: this.t('PAYROLL.ENGINE_RUN.RUN_BUTTON'), variant: 'primary', icon: 'calculate', action: () => this.submitCalc() },
       ],
     });
+    this.calcOpen.set(true);
   }
 
   onCalcPaysChange(selected: string[]): void {
@@ -858,6 +925,7 @@ export class EngineResultsComponent {
     }).subscribe({
       next: r => {
         this.calcRunning.set(false);
+        this.calcOpen.set(false);
         this.calcRef?.close();
         this.results.update(list => [...list, r]);
         this.empSearched.set(true);

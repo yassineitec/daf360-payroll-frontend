@@ -143,6 +143,81 @@ export interface RunPayrollResponse {
   /** Pays du calcul — présent dans `GET /results/{employeeId}` (entité brute), absent de la
    *  réponse de `POST /run`. Sert à la devise de l'historique. */
   paysId?: number | null;
+  /** Éléments variables du mois tels que le calcul les a utilisés (V41) ; null avant V41
+   *  et pour « Calculer le net » de la configuration. */
+  variableInputs?: PayrollVariableInputs | null;
+}
+
+/**
+ * Éléments variables d'un mois de paie (backend `PayrollVariableInputs`) : heures sup. de
+ * week-end lues dans la timesheet (approuvées, plafonnées par jour), absences (déduites ou
+ * payées selon le type), entrée/sortie en cours de mois, autorisations hors quota, primes,
+ * échéances d'avance, taux horaire/journalier, avertissements. Montants en devise de travail.
+ */
+export interface PayrollVariableInputs {
+  periodYear: number;
+  periodMonth: number;
+  currency: string | null;
+  /** Pay period of the country (V42, e.g. 21/10 → 20/11). Absent on snapshots saved before V42. */
+  periodFrom?: string | null;
+  periodTo?: string | null;
+  workPaysId: number | null;
+  weekendDays: string[];
+  workingDaysInMonth: number;
+  hireDate: string | null;
+  exitDate: string | null;
+  workingDaysEmployed: number;
+  nonEmployedDays: number;
+  monthlyGross: number;
+  regimeCode: string | null;
+  hoursPerWeek: number;
+  monthlyHours: number;
+  hourlyRate: number;
+  dailyRate: number;
+  overtime: {
+    majorationPct: number | null;
+    dailyCapHours: number;
+    days: { date: string; dayOfWeek: string; workedHours: number; paidHours: number; capped: boolean }[];
+    paidHours: number;
+    cappedOutHours: number;
+    amount: number;
+  };
+  absences: {
+    items: { typeCode: string; label: string; category: string; from: string; to: string;
+             days: number; deductsSalary: boolean }[];
+    unpaidDays: number;
+    paidDays: number;
+    amount: number;
+  };
+  autorisations: {
+    approvedMinutes: number;
+    monthlyQuotaMinutes: number | null;
+    deductedMinutes: number;
+    deductedHours: number;
+    amount: number;
+  };
+  bonuses: { id: number; label: string; amount: number; currency: string | null; amountConverted: number }[];
+  bonusesTotal: number;
+  advances: { advanceId: number; seq: number; amount: number; currency: string | null;
+              amountConverted: number; status: string }[];
+  advancesTotal: number;
+  /** Congé / maladie balances at the start and end of the period (information). Absent before V42. */
+  balances?: { field: string; atPeriodStart: number | null; atPeriodEnd: number | null;
+               takenInPeriod: number | null }[];
+  hrRead: boolean;
+  timesheetRead: boolean;
+  warnings: string[];
+}
+
+/** `variable_inputs_json` arrive en texte depuis `GET /results/{employeeId}`. */
+function parseVariableInputs(raw: unknown): PayrollVariableInputs | null {
+  if (raw && typeof raw === 'object') return raw as PayrollVariableInputs;
+  if (typeof raw !== 'string' || !raw) return null;
+  try {
+    return JSON.parse(raw) as PayrollVariableInputs;
+  } catch {
+    return null;
+  }
 }
 
 export interface EngineCalibrationDto {
@@ -263,15 +338,23 @@ export class PayrollEngineService {
     return this.http.post<RunPayrollResponse>(`${this.base}/run`, req);
   }
 
+  /** Même calcul que `runPayroll`, rien d'enregistré : aperçu de la pop-up « Calculer la paie »
+   *  (éléments variables du mois + net estimé). `resultId` null. */
+  previewRun(req: RunPayrollRequest): Observable<RunPayrollResponse> {
+    return this.http.post<RunPayrollResponse>(`${this.base}/run/preview`, req);
+  }
+
   /** L'API renvoie l'entité `PayrollResult` brute, pas `RunPayrollResponse` : l'id
    *  s'appelle `id` et `rubriqueDetails` est le JSON stocké en texte. On remet la forme
    *  attendue ici, sinon `resultId` manque et le détail d'une ligne ne s'ouvre pas. */
   getResults(employeeId: number): Observable<RunPayrollResponse[]> {
-    return this.http.get<(RunPayrollResponse & { id?: number })[]>(`${this.base}/results/${employeeId}`).pipe(
+    return this.http.get<(RunPayrollResponse & { id?: number; variableInputsJson?: string | null })[]>(
+      `${this.base}/results/${employeeId}`).pipe(
       map(list => list.map(r => ({
         ...r,
         resultId: r.resultId ?? r.id!,
         rubriqueDetails: parseRubriqueDetails(r.rubriqueDetails),
+        variableInputs: r.variableInputs ?? parseVariableInputs(r.variableInputsJson),
       }))),
     );
   }

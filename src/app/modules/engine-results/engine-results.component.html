@@ -247,6 +247,34 @@
                      prefixIcon: 'calendar_view_day', suffixText: 'j', hint: 'PAYROLL.ENGINE_RUN.WORKDAYS_HINT' | translate }" />
     </div>
 
+    <!-- Aperçu du mois (V41) : éléments variables lus dans RH, la timesheet et la paie, et net
+         estimé — même calcul que « Lancer le calcul », rien d'enregistré. -->
+    @if (calcPreviewLoading()) {
+      <div class="flex items-center gap-2 rounded-xl bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
+        <span class="material-symbols-outlined text-[18px]">hourglass_top</span>
+        {{ 'PAYROLL.VARIABLE_INPUTS.PREVIEW_LOADING' | translate }}
+      </div>
+    } @else if (calcPreviewError(); as pe) {
+      <div class="flex items-center gap-2 rounded-xl bg-warning/10 px-4 py-3 text-sm text-warning">
+        <span class="material-symbols-outlined text-[18px]">info</span>
+        {{ pe }}
+      </div>
+    } @else if (calcPreview(); as p) {
+      <div class="flex flex-col gap-3 rounded-xl border border-outline-variant px-4 py-3">
+        <div class="flex flex-wrap items-baseline justify-between gap-2">
+          <span class="text-sm font-semibold text-on-surface">{{ 'PAYROLL.VARIABLE_INPUTS.PREVIEW_TITLE' | translate }}</span>
+          <span class="text-sm text-on-surface-variant">
+            {{ 'PAYROLL.VARIABLE_INPUTS.PREVIEW_GROSS' | translate }} {{ previewMoney(p.aggregateGross) }} ·
+            {{ 'PAYROLL.VARIABLE_INPUTS.PREVIEW_NET' | translate }}
+            <strong class="text-on-surface">{{ previewMoney(p.aggregateNet) }}</strong>
+          </span>
+        </div>
+        @if (p.variableInputs; as vi) {
+          <app-variable-inputs-card [inputs]="vi" [compact]="true" />
+        }
+      </div>
+    }
+
     @if (calcExitWarning(); as w) {
       <div class="flex items-center gap-2 rounded-xl bg-warning/10 px-4 py-3 text-sm text-warning">
         <span class="material-symbols-outlined text-[18px]">person_off</span>

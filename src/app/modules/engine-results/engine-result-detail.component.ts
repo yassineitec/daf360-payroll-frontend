@@ -7,6 +7,7 @@ import { readBlobError, saveBlob } from '../../shared/blob-download';
 import { ButtonComponent, CardComponent } from '@khalilrebhiitec/daf360';
 import { monthName } from '../../shared/filter-utils';
 import { PayslipBulletinComponent, employerCostOf, type PayslipTotals } from '../../shared/payslip-bulletin/payslip-bulletin.component';
+import { VariableInputsCardComponent } from '../../shared/variable-inputs/variable-inputs-card.component';
 
 /**
  * Bulletin d'un résultat de paie, affiché DANS la page historique
@@ -24,7 +25,7 @@ import { PayslipBulletinComponent, employerCostOf, type PayslipTotals } from '..
   selector: 'app-engine-result-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, TranslatePipe, ButtonComponent, CardComponent, PayslipBulletinComponent],
+  imports: [CommonModule, TranslatePipe, ButtonComponent, CardComponent, PayslipBulletinComponent, VariableInputsCardComponent],
   templateUrl: './engine-result-detail.component.html',
   styleUrl: './engine-result-detail.component.scss',
 })

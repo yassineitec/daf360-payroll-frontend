@@ -46,7 +46,7 @@
         <p class="text-body-sm text-on-surface-variant">{{ 'PAYROLL.SALARY_ADVANCES.PAYOUT.HINT' | translate }}</p>
         <daf-search-toolbar
           [placeholder]="'PAYROLL.SALARY_ADVANCES.SEARCH' | translate"
-          [value]="search()" [debounce]="200" (valueChange)="search.set($event ?? '')"
+          [value]="search()" [debounce]="200" (valueChange)="search.set($event)"
           [filterFields]="filterFields().payout"
           [filterConfig]="filterConfigs().payout"
           (filterApply)="onFilter('payout', $event)"
@@ -145,7 +145,7 @@
         </daf-accordion-card>
         <daf-search-toolbar
           [placeholder]="'PAYROLL.SALARY_ADVANCES.SEARCH_DEDUCTIONS' | translate"
-          [value]="search()" [debounce]="200" (valueChange)="search.set($event ?? '')"
+          [value]="search()" [debounce]="200" (valueChange)="search.set($event)"
           [filterFields]="filterFields().deductions"
           [filterConfig]="filterConfigs().deductions"
           (filterApply)="onFilter('deductions', $event)"
@@ -173,7 +173,7 @@
       @case ('followup') {
         <daf-search-toolbar
           [placeholder]="'PAYROLL.SALARY_ADVANCES.SEARCH' | translate"
-          [value]="search()" [debounce]="200" (valueChange)="search.set($event ?? '')"
+          [value]="search()" [debounce]="200" (valueChange)="search.set($event)"
           [filterFields]="filterFields().followup"
           [filterConfig]="filterConfigs().followup"
           (filterApply)="onFilter('followup', $event)"

@@ -533,6 +533,36 @@ export interface CalibrationCycleDto {
   createdAt: string;
 }
 
+/** One RH leave type with this country's payroll rule (PayrollLeaveSettingsService.LeaveTypeRule). */
+export interface LeaveTypeRuleDto {
+  code: string;
+  labelFr: string;
+  labelEn: string;
+  /** Active in the RH catalogue. */
+  active: boolean;
+  tracksBalance: boolean;
+  /** CONGE / MALADIE when the type draws on a balance. */
+  balanceField: string | null;
+  deductsSalary: boolean;
+  /** False = a saved rule whose type is no longer in the RH catalogue. */
+  inCatalogue: boolean;
+  updatedBy: number | null;
+  updatedAt: string | null;
+}
+
+/** « Absences et période de paie » of one country (V42). */
+export interface LeaveSettingsDto {
+  paysId: number;
+  /** 1 = calendar month. */
+  periodStartDay: number;
+  periodEndDay: number | null;
+  examplePeriodFrom: string;
+  examplePeriodTo: string;
+  /** False = RH unreachable: only the saved rules are listed. */
+  catalogueRead: boolean;
+  leaveTypes: LeaveTypeRuleDto[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class PayrollApiService {
   private readonly base = environment.payrollApiUrl + '/api/payroll';
@@ -548,6 +578,22 @@ export class PayrollApiService {
   /** Pays configurés et actifs dans le moteur (carte « Pays de paie » de /payroll/admin). */
   listPayrollPays(): Observable<PaysDto[]> {
     return this.http.get<PaysDto[]>(`${this.base}/ref/pays/payroll`);
+  }
+
+  // ── Absences et période de paie (V42) ────────────────────────────────────
+
+  getLeaveSettings(paysId: number): Observable<LeaveSettingsDto> {
+    return this.http.get<LeaveSettingsDto>(`${this.base}/admin/leave-settings/${paysId}`);
+  }
+
+  saveLeavePeriod(paysId: number, periodStartDay: number, periodEndDay: number | null): Observable<LeaveSettingsDto> {
+    return this.http.put<LeaveSettingsDto>(`${this.base}/admin/leave-settings/${paysId}/period`,
+      { periodStartDay, periodEndDay });
+  }
+
+  saveLeaveRule(paysId: number, code: string, deductsSalary: boolean): Observable<LeaveSettingsDto> {
+    return this.http.put<LeaveSettingsDto>(
+      `${this.base}/admin/leave-settings/${paysId}/leave-types/${encodeURIComponent(code)}`, { deductsSalary });
   }
 
   /** One user by id, unfiltered -- resolves a raw `*_by` reference found inside a GENERIC audit

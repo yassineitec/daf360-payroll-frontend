@@ -35,6 +35,13 @@
       [employerCost]="employerCost()"
       [(search)]="rubriqueSearch" />
   }
+
+  <!-- Éléments variables du mois (V41) : heures sup. de week-end jour par jour, absences,
+       entrée/sortie, autorisations, primes, avances — dans la devise du pays. Absent des
+       résultats calculés avant. -->
+  @if (r.variableInputs; as vi) {
+    <app-variable-inputs-card [inputs]="vi" />
+  }
 } @else {
   <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
     <div class="not-found">

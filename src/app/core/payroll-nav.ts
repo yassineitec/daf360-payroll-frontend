@@ -88,6 +88,15 @@ export const PAYROLL_EMPLOYEE_CONFIG_PERMISSIONS = [
  */
 export const PAYROLL_SALARY_ADVANCES_PERMISSIONS = ['PAYROLL_MANAGE_SALARY_ADVANCES'];
 
+/** Carte « Absences et période de paie » (V42) — mêmes codes que `PayrollLeaveSettingsController`. */
+export const PAYROLL_LEAVE_SETTINGS_PERMISSIONS = [
+  'PAYROLL_VIEW_PARAMSET', 'PAYROLL_MANAGE_RUBRIQUES', 'PAYROLL_APPROVE_PARAMSET', 'PAYROLL_SUPER_ADMIN',
+];
+/** Modifier la période et les absences déduites. */
+export const PAYROLL_LEAVE_SETTINGS_EDIT_PERMISSIONS = [
+  'PAYROLL_MANAGE_RUBRIQUES', 'PAYROLL_APPROVE_PARAMSET', 'PAYROLL_SUPER_ADMIN',
+];
+
 /** Carte « Pays de paie » de l'administration — mêmes codes que `GET /admin/countries`. */
 export const PAYROLL_COUNTRIES_PERMISSIONS = [
   'PAYROLL_VIEW_PARAMSET',

@@ -1,0 +1,166 @@
+@if (compact()) {
+  <ng-container [ngTemplateOutlet]="body" />
+} @else {
+  <daf-card [options]="{ variant: 'outlined', padding: 'lg', radius: 'xl' }">
+    <h3 class="vi-title">
+      <span class="material-symbols-outlined vi-title__icon">event_note</span>
+      {{ 'PAYROLL.VARIABLE_INPUTS.TITLE' | translate }}
+    </h3>
+    <ng-container [ngTemplateOutlet]="body" />
+  </daf-card>
+}
+
+<ng-template #body>
+  @let i = inputs();
+
+  @for (w of i.warnings; track $index) {
+    <div class="vi-notice">
+      <span class="material-symbols-outlined vi-notice__icon">warning</span>
+      <span>{{ w }}</span>
+    </div>
+  }
+
+  @if (periodLabel(); as pl) {
+    <p class="vi-period">
+      <span class="material-symbols-outlined vi-period__icon">date_range</span>
+      {{ pl }}
+    </p>
+  }
+
+  @if (empty()) {
+    <p class="vi-empty">{{ 'PAYROLL.VARIABLE_INPUTS.NONE' | translate }}</p>
+  }
+
+  <!-- Heures supplémentaires de week-end, jour par jour (plafond par jour) -->
+  @if (i.overtime.days.length) {
+    <div class="vi-row">
+      <div class="vi-row__main">
+        <span class="vi-row__label">{{ 'PAYROLL.VARIABLE_INPUTS.OVERTIME' | translate }}</span>
+        <span class="vi-row__detail">{{ overtimeDetail() }}</span>
+        @if (i.overtime.cappedOutHours > 0) {
+          <span class="vi-row__detail vi-row__detail--warn">
+            {{ 'PAYROLL.VARIABLE_INPUTS.OVERTIME_CAPPED_OUT' | translate: { hours: num(i.overtime.cappedOutHours) } }}
+          </span>
+        }
+      </div>
+      <span class="vi-amount vi-amount--gain">+ {{ money(i.overtime.amount) }}</span>
+    </div>
+    <table class="vi-days">
+      <thead>
+        <tr>
+          <th>{{ 'PAYROLL.VARIABLE_INPUTS.COL_DATE' | translate }}</th>
+          <th>{{ 'PAYROLL.VARIABLE_INPUTS.COL_DAY' | translate }}</th>
+          <th class="vi-num">{{ 'PAYROLL.VARIABLE_INPUTS.COL_WORKED' | translate }}</th>
+          <th class="vi-num">{{ 'PAYROLL.VARIABLE_INPUTS.COL_PAID' | translate }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (d of i.overtime.days; track d.date) {
+          <tr>
+            <td>{{ date(d.date) }}</td>
+            <td class="vi-cap">{{ dayName(d.dayOfWeek) }}</td>
+            <td class="vi-num">{{ num(d.workedHours) }} h</td>
+            <td class="vi-num">
+              {{ num(d.paidHours) }} h
+              @if (d.capped) {
+                <span class="vi-chip">{{ 'PAYROLL.VARIABLE_INPUTS.CAPPED' | translate }}</span>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+
+  <!-- Primes du mois -->
+  @if (i.bonuses.length) {
+    <div class="vi-row">
+      <div class="vi-row__main">
+        <span class="vi-row__label">{{ 'PAYROLL.VARIABLE_INPUTS.BONUSES' | translate }}</span>
+        @for (b of i.bonuses; track b.id) {
+          <span class="vi-row__detail">{{ b.label }} · {{ money(b.amountConverted) }}</span>
+        }
+      </div>
+      <span class="vi-amount vi-amount--gain">+ {{ money(i.bonusesTotal) }}</span>
+    </div>
+  }
+
+  <!-- Absences : non payées (déduites), puis payées (pour information) -->
+  @if (unpaidAbsences().length) {
+    <div class="vi-row">
+      <div class="vi-row__main">
+        <span class="vi-row__label">{{ 'PAYROLL.VARIABLE_INPUTS.ABSENCES' | translate }}</span>
+        <span class="vi-row__detail">{{ 'PAYROLL.VARIABLE_INPUTS.ABSENCES_DETAIL' | translate: { days: num(i.absences.unpaidDays) } }}</span>
+        @for (a of unpaidAbsences(); track $index) {
+          <span class="vi-row__detail">{{ a.label }} · {{ date(a.from) }} → {{ date(a.to) }} · {{ num(a.days) }} j</span>
+        }
+      </div>
+      <span class="vi-amount vi-amount--debit">− {{ money(i.absences.amount) }}</span>
+    </div>
+  }
+  @if (paidAbsences().length) {
+    <div class="vi-row">
+      <div class="vi-row__main">
+        <span class="vi-row__label">{{ 'PAYROLL.VARIABLE_INPUTS.ABSENCES_PAID_ONLY' | translate }}</span>
+        @for (a of paidAbsences(); track $index) {
+          <span class="vi-row__detail">{{ a.label }} · {{ date(a.from) }} → {{ date(a.to) }} · {{ num(a.days) }} j · {{ 'PAYROLL.VARIABLE_INPUTS.ABSENCE_PAID' | translate }}</span>
+        }
+      </div>
+      <span class="vi-amount">—</span>
+    </div>
+  }
+
+  <!-- Entrée / sortie en cours de mois -->
+  @if (i.nonEmployedDays > 0) {
+    <div class="vi-row">
+      <div class="vi-row__main">
+        <span class="vi-row__label">{{ 'PAYROLL.VARIABLE_INPUTS.NON_EMPLOYED' | translate }}</span>
+        <span class="vi-row__detail">{{ nonEmployedDetail() }}</span>
+      </div>
+      <span class="vi-amount vi-amount--debit">− {{ money(i.nonEmployedDays * i.dailyRate) }}</span>
+    </div>
+  }
+
+  <!-- Autorisations au-delà du quota mensuel -->
+  @if (i.autorisations.approvedMinutes > 0) {
+    <div class="vi-row">
+      <div class="vi-row__main">
+        <span class="vi-row__label">{{ 'PAYROLL.VARIABLE_INPUTS.AUTORISATIONS' | translate }}</span>
+        <span class="vi-row__detail">{{ autorisationDetail() }}</span>
+      </div>
+      <span class="vi-amount" [class.vi-amount--debit]="i.autorisations.amount > 0">
+        {{ i.autorisations.amount > 0 ? '− ' + money(i.autorisations.amount) : '—' }}
+      </span>
+    </div>
+  }
+
+  <!-- Échéances d'avance sur salaire -->
+  @if (i.advances.length) {
+    <div class="vi-row">
+      <div class="vi-row__main">
+        <span class="vi-row__label">{{ 'PAYROLL.VARIABLE_INPUTS.ADVANCES' | translate }}</span>
+        <span class="vi-row__detail">{{ 'PAYROLL.VARIABLE_INPUTS.ADVANCES_NET' | translate }}</span>
+        @for (a of i.advances; track a.advanceId + '-' + a.seq) {
+          <span class="vi-row__detail">{{ 'PAYROLL.VARIABLE_INPUTS.ADVANCE_LINE' | translate: { seq: a.seq } }} · {{ money(a.amountConverted) }}</span>
+        }
+      </div>
+      <span class="vi-amount vi-amount--debit">− {{ money(i.advancesTotal) }}</span>
+    </div>
+  }
+
+  <!-- Soldes de congés avant / après la période (information, rien n'est payé ni retenu) -->
+  @if (balanceLines().length) {
+    <div class="vi-row">
+      <div class="vi-row__main">
+        <span class="vi-row__label">{{ 'PAYROLL.VARIABLE_INPUTS.BALANCES' | translate }}</span>
+        @for (b of balanceLines(); track b.field) {
+          <span class="vi-row__detail">{{ b.text }}</span>
+        }
+        <span class="vi-row__detail vi-row__detail--muted">{{ 'PAYROLL.VARIABLE_INPUTS.BALANCES_HINT' | translate }}</span>
+      </div>
+      <span class="vi-amount">—</span>
+    </div>
+  }
+
+  <p class="vi-rates">{{ rates() }}</p>
+</ng-template>

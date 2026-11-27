@@ -70,7 +70,7 @@ const VALUATION_METHODS = ['TAX_AUTHORITY', 'ACTUAL_COST'] as const;
           <daf-search-toolbar
             [card]="false"
             [placeholder]="'PAYROLL.ADMIN_HOME.BENEFITS.SEARCH' | translate"
-            [value]="search()" [debounce]="200" (valueChange)="search.set($event ?? '')"
+            [value]="search()" [debounce]="200" (valueChange)="search.set($event)"
             [filterFields]="filterFields()"
             [filterConfig]="filterConfig()"
             (filterApply)="filters.set($event)"

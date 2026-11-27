@@ -174,7 +174,7 @@ const NEXT_STEP: Partial<Record<string, CircuitStep>> = {
           [card]="true"
           [showFilter]="false"
           [placeholder]="'PAYROLL.ADMIN_HOME.ENGINE_PARAMS.SEARCH' | translate"
-          [value]="paramSearch()" [debounce]="200" (valueChange)="paramSearch.set($event ?? '')"
+          [value]="paramSearch()" [debounce]="200" (valueChange)="paramSearch.set($event)"
           [table]="paramTable() ?? null" />
 
         @if (!paramRows().length) {

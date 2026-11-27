@@ -65,7 +65,7 @@ import { flagDataUri } from '../../../shared/country-flags';
       <daf-search-toolbar
         [card]="true"
         [placeholder]="'PAYROLL.ADMIN_HOME.COUNTRIES.SEARCH' | translate"
-        [value]="search()" [debounce]="200" (valueChange)="search.set($event ?? '')"
+        [value]="search()" [debounce]="200" (valueChange)="search.set($event)"
         [filterFields]="filterFields()"
         [filterConfig]="filterConfig()"
         (filterApply)="filters.set($event)"
